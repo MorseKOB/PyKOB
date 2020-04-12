@@ -1,0 +1,1 @@
+py MorseWF.py 0 "" 15 >>log.txt 2>&1

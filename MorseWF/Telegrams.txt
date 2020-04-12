@@ -1,0 +1,21 @@
+<item>
+<description>NR-1 CITY-OF-ORIGIN DATE =
+ADDRESSEE,
+LOCATION =
+TEXT OF TELEGRAM. =
+SIGNATURE =</description>
+</item>
+<item>
+<description>NR-2 SEATTLE SEP 23 =
+STEVE GREENWOOD,
+PORTLAND =
+HERE'S AN EXAMPLE OF HOW A TELEGRAM MIGHT BE FORMATTED. =
+LES KERR =</description>
+</item>
+<item>
+<description>NR-3 15 Seattle 2014 Sep 23 =
+John Keibel,
+San-Francisco =
+Here's another example.  It includes a word count in the header. =
+Les Kerr =</description>
+</item>

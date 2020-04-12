@@ -1,0 +1,118 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<meta name="GENERATOR" content="Microsoft FrontPage 4.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<title>MorseWF Installation</title>
+</head>
+
+<body>
+
+<h1>MorseWF Installation</h1>
+You should allow at least half an hour to install MorseWF and associated system
+software. The good news is that this only needs to be done once per computer.
+Installing future updates to the program is a much simpler process.
+<p>The following instructions apply to all versions of Windows (XP, Vista,
+Windows 7, Windows 8 and 8.1, and Windows 10).</p>
+<b>A) Download the MorseWF files</b>
+<ol style="list-style-type: decimal;">
+  <li>Open the compressed file at <a href="https://sites.google.com/site/morsekob/morsekob40/downloads/MorseWF.zip?attredirects=0">sites.google.com/site/morsekob/morsekob40/downloads/MorseWF.zip</a>.</li>
+  <li>Copy the unzipped MorseWF folder to your hard drive.</li>
+</ol>
+<p><b>B) Install Python and related software</b></p>
+<ol>
+  <li>Download and install the latest version of Python 3 from <a href="https://www.python.org/downloads/">python.org/downloads</a>.</li>
+  <li>Install pygame and pySerial (Python modules required by MorseWF) by
+    double-clicking on the Install Modules batch file in the MorseWF folder.</li>
+</ol>
+<p><b>C) Verify the installation</b></p>
+<ol style="list-style-type: decimal;">
+  <li>Connect the key/sounder interface and the jack box to USB ports on the
+    computer. Drivers for these devices may need to have been installed already.</li>
+  <li>Open the MorseWF folder.</li>
+  <li>Double-click on the SysCheck&nbsp;Run batch file. A command prompt window
+    with a black background appears briefly while the program is running.</li>
+  <li>The SysCheck program creates a new text file, SysCheck&nbsp;Data. Open
+    this file by double-clicking on its icon. The contents should be something
+    similar to the following:<br>
+    <br>
+    <code>Python 3.3.2 (v3.3.2:d047928ae3f6, May 16 2013, 00:03:43) [MSC v.1600
+    32 bit (Intel)] on win32<br>
+    pygame 1.9.2a0<br>
+    pySerial 2.7<br>
+    MorseKOB 4.0-21<br>
+    Prolific USB-to-Serial Comm Port (COM3)<br>
+    Arduino Uno (COM4)<br>
+    </code>&nbsp;</li>
+  <li>Make a note of the comm port numbers for future reference.</li>
+</ol>
+<b>D) Edit the config file</b>
+<p>The MorseWF folder contains a configuration file named config.py. This file
+tells the MorseWF program which serial port to use for an external key and/or
+sounder, whether to use the speakers as a simulated sounder, and which port to
+use for the jack box.</p>
+<p>Use Notepad to edit this file as required. (<i>Right</i>-click on the config
+file, and select Open with &gt; Notepad.) A pound sign (#) at the beginning of a
+line tells the program to ignore that line. For example, the following config
+file would be used in the case where a key is connected to COM7, audio should be
+enabled to take the place of an actual sounder, and the jack box is connected to
+COM8.</p>
+<blockquote style="margin: 0px 0px 0px 40px; border: none; padding: 0px;">
+  <code># MorseWF configuration settings<br>
+  <br>
+  # A line starting with a pound sign (#) is treated as a comment and is<br>
+  # ignored by the system.<br>
+  <br>
+  #PORT = None<br>
+  PORT = 'COM7'<br>
+  <br>
+  #AUDIO = True<br>
+  AUDIO = False<br>
+  <br>
+  #JACKPORT = None<br>
+  JACKPORT = 'COM8'<br>
+  <br>
+  FONTNAME = '' # default system font<br>
+  #FONTNAME = 'arial'<br>
+  #FONTNAME = 'timesnewroman'<br>
+  FONTSIZE = 28<br>
+  <br>
+  SCREENSIZE = None # default screen size<br>
+  #SCREENSIZE = (1366, 768) # override automatic screen size<br>
+  <br>
+  </code>
+</blockquote>
+<b>E) Edit the MorseMR-xx batch file</b>
+<p>The MorseWF folder contains a number of batch files of the form MorseMR-xx.
+These batch files are used to launch the MorseWF program for office xx, and they
+contain the following command line parameters:</p>
+<blockquote style="margin: 0px 0px 0px 40px; border: none; padding: 0px;">
+  <i>wire</i><span class="Apple-converted-space">&nbsp;</span>– default KOB
+  wire no.<br>
+  <i>idText</i><span class="Apple-converted-space">&nbsp;</span>– office call,
+  etc.<br>
+  <i>wpm</i><span class="Apple-converted-space">&nbsp;</span>– code speed<br>
+  <br>
+</blockquote>
+If you're using a jack box, you may want to edit the batch file to change the
+wire number to zero. This causes the program to run in standalone mode when the
+plug is removed from the jack box; otherwise, the program connects to the
+default wire when the plug is removed. The ID parameter needs to end with a
+pound sign (#) followed by a four-digit PIN code to give access to the Wells
+Fargo private wires. The code speed parameter determines the speed of the Morse
+sent by the computer when using the keyboard, and it should also be close to the
+fastest speed of any incoming Morse for the program to display decoded text
+reliably. <i>Right</i>-click on a batch file and select Edit to open it in
+Notepad if you wish to make any changes.
+<p><b>F) Create shortcuts</b></p>
+<p>To make it easier to start up the program, you may wish to create desktop
+shortcut for the MorseWF-xx batch file. To do this,<span class="Apple-converted-space">&nbsp;</span><i>right</i>-click
+on the batch file and select Send to &gt; Desktop.</p>
+<p>To launch the program automatically whenever the computer is booted, move the
+shortcut to the Windows Startup folder.</p>
+<p align="right"><font size="2">Les Kerr, 2019-04-01</font></p>
+
+</body>
+
+</html>
