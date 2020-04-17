@@ -1,2 +1,4 @@
 zips/
 *.exe
+__pycache__/
+*.pyc
