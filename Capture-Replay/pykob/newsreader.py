@@ -31,14 +31,14 @@ def getArticles(url):
     articles = re.findall('<item>.*?</item>', s, re.IGNORECASE+re.DOTALL)
     for i in range(0, len(articles)):
         title, description, pubDate = None, None, None
-        m = re.search('<title>(.*?)</title>',
+        m = re.search('<title>(<!\[CDATA\[)?(.*?)(\]\]>)?</title>',
                 articles[i], re.IGNORECASE+re.DOTALL)
         if m:
-            title = m.group(1)
-        m = re.search('<description>(.*?)</description>',
+            title = m.group(2)
+        m = re.search('<description>(<!\[CDATA\[)?(.*?)(\]\]>)?</description>',
                 articles[i], re.IGNORECASE+re.DOTALL)
         if m:
-            description = m.group(1)
+            description = m.group(2)
             flags = re.IGNORECASE + re.DOTALL
             description = re.sub('&lt;.*?&gt;', '', description, 0, flags)
             description = re.sub('&amp;#039;', "'", description, 0, flags)

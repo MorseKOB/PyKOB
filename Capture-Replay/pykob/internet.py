@@ -22,7 +22,7 @@ ACK = 5  # Ack
 
 shortPacketFormat = struct.Struct('<hh')  # cmd, wire
 idPacketFormat = struct.Struct('<hh 128s 4x i i 8x 208x 128s 8x')  # cmd, byts, id, seq, idflag, ver
-codePacketFormat = struct.Struct('<hh 128s 4x i 12x 51i i 128x 8x')  # cmd, byts, id, seq, code list, n
+codePacketFormat = struct.Struct('<hh 128s 4x i 12x 51i i 128s 8x')  # cmd, byts, id, seq, code list, n, txt
 
 NUL = '\x00'
 
@@ -87,11 +87,11 @@ class Internet:
                 log.log('PyKOB.internet received invalid record length: {0}'.
                         format(nBytes))
 
-    def write(self, code):
+    def write(self, code, txt=''):
         n = len(code)
         if n == 0:
             return
-        codeBuf = code + (51-n)*(0,) + (n,)
+        codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='ascii'))
         self.sentSeqNo += 1
         codePacket = codePacketFormat.pack(DAT, 492, self.officeID,
                 self.sentSeqNo, *codeBuf)

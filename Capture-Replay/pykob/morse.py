@@ -1,4 +1,4 @@
-﻿"""
+"""
 
 morse.py
 
@@ -6,19 +6,17 @@ Provides classes for sending and reading American and International Morse code.
 
 """
 
+from __future__ import print_function  ###
+
 import sys, os
 import codecs
-import threading
-import time
 
 AMERICAN = 0         # American Morse
 INTERNATIONAL = 1    # International Morse
-ESPERANTO = 2        # International Morse with Esperanto letters
 CHARSPACING = 0      # add Farnsworth spacing between all characters
 WORDSPACING = 1      # add Farnsworth spacing only between words
 DOTSPERWORD = 45     # dot units per word, including all spaces
                      #   (MORSE is 43, PARIS is 47)
-FLUSH = 0.5          # delay before forcing decoding of last character (sec)
 MAXINT = 1000000     # sys.maxint not supported in Python 3
 
 """
@@ -26,7 +24,7 @@ Code sender class
 """
 
 # read code tables
-encodeTable = [{}, {}, {}]  # one dictionary each for American and International
+encodeTable = [{}, {}]  # one dictionary each for American and International
 dir = os.path.dirname(os.path.abspath(__file__))
 def readEncodeTable(codeType, filename):
     fn = os.path.join(dir, filename)
@@ -38,7 +36,6 @@ def readEncodeTable(codeType, filename):
     f.close()
 readEncodeTable(AMERICAN, 'codetable-american.txt')
 readEncodeTable(INTERNATIONAL, 'codetable-international.txt')
-readEncodeTable(ESPERANTO, 'codetable-esperanto.txt')
 
 class Sender:
     def __init__(self, wpm, cwpm=0, codeType=AMERICAN, spacing=CHARSPACING):
@@ -104,8 +101,16 @@ Optional callback function is called whenever a character is decoded:
         spacing - spacing adjustment in space widths (can be negative)
 """
 
+MINDASHLEN      = 1.5  # dot vs dash threshold (in dots)
+MINMORSESPACE   = 2.0  # intrasymbol space vs Morse (in dots)
+MAXMORSESPACE   = 6.0  # maximum length of Morse space (in dots)
+MINCHARSPACE    = 2.7  # intrasymbol space vs character space (in dots)
+MINLLEN         = 4.5  # minimum length of L character (in dots)
+MORSERATIO      = 0.95 # length of Morse space relative to surrounding spaces
+ALPHA           = 0.5  # weight given to wpm update values (for smoothing)
+
 # read code tables
-decodeTable = [{}, {}, {}]  # one dictionary each for American and International
+decodeTable = [{}, {}]  # one dictionary each for American and International
 def readDecodeTable(codeType, filename):
     fn = os.path.dirname(os.path.abspath(__file__)) + '/' + filename
     f = codecs.open(fn, encoding='utf-8')
@@ -116,92 +121,111 @@ def readDecodeTable(codeType, filename):
     f.close()
 readDecodeTable(AMERICAN, 'codetable-american.txt')
 readDecodeTable(INTERNATIONAL, 'codetable-international.txt')
-readDecodeTable(ESPERANTO, 'codetable-esperanto.txt')
 
 class Reader:
     def __init__(self, wpm=20, codeType=AMERICAN, callback=None):
-        self.codeType  = codeType
-        self.dotLen    = 1200 / wpm  # dot length (ms)
-        self.currSpace = 0   # space before current character
-        self.currCode  = ''  # code elements for current character
-        self.currMark  = 0   # length of last dot or dash in current character
-        self.prevSpace = 0   # space before previous character
-        self.prevCode  = ''  # code elements for previous character
-        self.prevMark  = 0   # length of last dot or dash in previous character
-        self.callback  = callback
-        self.tLastDecode = sys.float_info.max  # no decodes so far
-        self.decodeLock = threading.Lock()
-        autoFlushThread = threading.Thread(target=self.autoFlush)
-        autoFlushThread.daemon = True
-##        autoFlushThread.start()  # TEMP
+        self.codeType  = codeType    # American or International
+        self.wpm       = wpm         # current code speed estimate
+        self.dotLen    = int(1200. / wpm)  # nominal dot length (ms)
+        self.truDot    = self.dotLen # actual length of typical dot (ms)
+        self.codeBuf   = ['', '']    # code elements for two characters
+        self.spaceBuf  = [0, 0]      # space before each character
+        self.markBuf   = [0, 0]      # length of last dot or dash in character
+        self.nChars    = 0           # number of complete characters in buffer
+        self.callback  = callback    # function to call when character decoded
 
-    def decode(self, code):
-        with self.decodeLock:
-##            self.tLastDecode = sys.float_info.max
-            for c in code:
-                if c < 0:
-                    sp = -c
-                    if self.currCode[-1:] == '.' and \
-                            self.currMark + sp > 3 * self.dotLen or \
-                            self.currCode[-1:] == '-' and \
-                            sp > 2 * self.dotLen:
-                        self.decodeCodePair(sp)
-                    elif self.currCode == '':
-                        self.currSpace = sp
-                elif c == 1:  # latch into mark state
-                    self.flush()
-                    self.callback('+', self.currSpace)
-                elif c == 2:  # unlatch into space state
-                    self.flush()
-                    self.callback('~', self.currSpace)
-                elif c > 2:
-                    mk = c
-                    if mk < 2 * self.dotLen:
-                        self.currCode += '.'
-                    else:
-                        self.currCode += '-'
-                    self.currMark = mk;
-            self.tLastDecode = time.time()
+    def decode(self, codeSeq):
+        self.updateWPM(codeSeq)
+        i = 0
+        for i in range(0, len(codeSeq), 2):
+            sp = -codeSeq[i]
+            mk = codeSeq[i+1]
+            if self.codeBuf[self.nChars] == '':
+                self.spaceBuf[self.nChars] = sp  # start of new char
+            else:
+                if sp > MINMORSESPACE * self.dotLen:
+                    self.decodeChar(sp)  # possible Morse or word space
+            if mk > MINDASHLEN * self.truDot:
+                self.codeBuf[self.nChars] += '-'  # dash
+            else:
+                self.codeBuf[self.nChars] += '.'  # dot
+            self.markBuf[self.nChars] = mk
 
-    def decodeCodePair(self, sp):
-        codePair = self.prevCode + ' ' + self.currCode
-        if self.prevSpace > self.currSpace * 1.05 and \
-                self.currSpace * 1.05 < sp and \
-                codePair in decodeTable[self.codeType] and \
-                codePair != '. ...':
-            self.decodeChar(self.prevSpace, codePair)
-            self.currCode = ''
-        else:
-            self.decodeChar(self.prevSpace, self.prevCode, self.prevMark)
-        self.prevSpace = self.currSpace
-        self.prevCode = self.currCode
-        self.prevMark = self.currMark
-        self.currSpace = sp
-        self.currCode = ''
-        self.currMark = 0
- 
-    def decodeChar(self, space, codeString, mark=0):
-        if codeString == '':
-            return ''
-        if codeString == '-' and self.codeType == AMERICAN and \
-                mark > 4.5 * self.dotLen:
-            codeString = '='
-        if codeString in decodeTable[self.codeType]:
-            s = decodeTable[self.codeType][codeString]
-        else:
-            s = '[' + codeString + ']'
-        spacing = (float(space) / self.dotLen - 3) / 3
-        self.callback(s, spacing)
-            
+    def setWPM(self, wpm):
+        self.wpm = wpm
+        self.dotLen = int(1200. / wpm)
+        self.truDot = self.dotLen
+
+    def updateWPM(self, codeSeq):
+        for i in range(1, len(codeSeq) - 2, 2):
+            minDotLen = int(0.5 * self.dotLen)
+            maxDotLen = int(1.5 * self.dotLen)
+            if codeSeq[i] > minDotLen and codeSeq[i] < maxDotLen and \
+                    codeSeq[i] - codeSeq[i+1] < 2 * maxDotLen and \
+                    codeSeq[i+2] < maxDotLen:
+                dotLen = (codeSeq[i] - codeSeq[i+1]) / 2
+                self.truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self.truDot)
+                self.dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self.dotLen)
+                self.wpm = 1200. / self.dotLen
+##                print('{} {:.1f} {}'.format(self.dotLen, self.wpm, self.truDot))
+
     def flush(self):
-        self.tLastDecode = sys.float_info.max
-        for i in range(2):
-            self.decodeCodePair(MAXINT)
+        self.decodeChar(MAXINT)
+        self.decodeChar(MAXINT)
 
-    def autoFlush(self):
-        while True:
-            with self.decodeLock:
-                if time.time() > self.tLastDecode + FLUSH:
-                    self.flush()
-            time.sleep(0.1)
-        
+    def decodeChar(self, nextSpace):
+        self.nChars += 1
+        sp1 = self.spaceBuf[0]
+        sp2 = self.spaceBuf[1]
+        sp3 = nextSpace
+        code = ''
+        s = ''
+        if self.nChars == 2 and sp2 < MAXMORSESPACE * self.dotLen and \
+                MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:
+            code = self.codeBuf[0] + ' ' + self.codeBuf[1]
+            s = self.lookupChar(code)
+            if s != '' and s != '&':
+                self.codeBuf[0] = ''
+                self.markBuf[0] = 0
+                self.codeBuf[1] = ''
+                self.spaceBuf[1] = 0
+                self.markBuf[1] = 0
+                self.nChars = 0
+            else:
+                code = ''
+                s = ''
+        if self.nChars == 2 and sp2 < MINCHARSPACE * self.dotLen:
+            self.codeBuf[0] += self.codeBuf[1]
+            self.markBuf[0] = self.markBuf[1]
+            self.codeBuf[1] = ''
+            self.spaceBuf[1] = 0
+            self.markBuf[1] = 0
+            self.nChars = 1
+        if self.nChars == 2:
+            code = self.codeBuf[0]
+            s = self.lookupChar(code)
+            if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen:
+                s = 'L'
+            elif s == 'E':
+                if self.markBuf[0] == 1:
+                    s = '+'
+                elif self.markBuf[0] == 2:
+                    s = '~'
+            self.codeBuf[0] = self.codeBuf[1]
+            self.spaceBuf[0] = self.spaceBuf[1]
+            self.markBuf[0] = self.markBuf[1]
+            self.codeBuf[1] = ''
+            self.spaceBuf[1] = 0
+            self.markBuf[1] = 0
+            self.nChars -= 1
+        self.spaceBuf[self.nChars] = nextSpace
+        if code != '' and s == '':
+            s = '[' + code + ']'
+        if s != '':
+            self.callback(s, float(sp1) / (3 * self.dotLen) - 1)
+
+    def lookupChar(self, code):
+        if code in decodeTable[self.codeType]:
+            return(decodeTable[self.codeType][code])
+        else:
+            return('')

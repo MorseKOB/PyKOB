@@ -1,10 +1,26 @@
 # PyKOB package
 
-VERSION = '1.0.1'
+VERSION = '1.1.4'
 
 """
 
 Change history:
+
+1.1.4  2020-03-20
+- internet: added option to send text with code for CWCom compatibility
+
+1.1.3  2018-07-13
+- newsreader: strip <![CDATA[...]]> tag from title and description
+
+1.1.2  2018-01-16
+- morse: fixed bug in updateWPM
+
+1.1.1  2018-01-08
+- morse: changed updateWPM function to ignore very short dots
+
+1.1.0  2018-01-07
+- morse: redesigned decode section to adapt to incoming Morse speed and handle
+    tapped dots and dashes; (temporarily) removed autoflush
 
 1.0.1
 - morse: added lock mechanism to prevent autoflush from double-decoding
