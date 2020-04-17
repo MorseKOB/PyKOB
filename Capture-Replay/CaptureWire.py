@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! python
 
 """
 
@@ -21,7 +21,7 @@ import time
 from pykob import internet
 
 VERSION = '1.3'
-ID = 'Office ID - monitoring'
+ID = 'AC - monitoring'
 
 wire = int(sys.argv[1])
 

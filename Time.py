@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! python
 
 """
 
@@ -26,6 +26,9 @@ Examples:
 
 Change history:
 
+Time 1.4  2020-02-13
+- removed #!/usr/bin/env python header, which fails with Windows 10
+
 Time 1.3  2019-02-13
 - converted from legacy morsekob module to use pykob module
 - discontinued use of separate config file
@@ -37,12 +40,12 @@ import time
 import threading
 from pykob import log, kob, internet
 
-VERSION = '1.3'
+VERSION = '1.4'
 PORT    = None
 #PORT   = 'COM3'  # typical for Windows
 #PORT   = '/dev/ttyUSB0'  # typical for Linux
-#AUDIO   = False
-AUDIO  = True
+AUDIO   = False
+#AUDIO  = True
 TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
 TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
 NOTICK  = 5 * (-200, +2)

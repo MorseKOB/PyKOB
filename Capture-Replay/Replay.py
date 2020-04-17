@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! python
 
 """
 
@@ -8,7 +8,7 @@ Replays Morse captured to a file.
 
 Usage: python Replay.py <filename.txt
 
-Example: py CaptureKey.py <"Train orders.txt"
+Example: py Replay.py <"Train orders.txt"
 
 """
 

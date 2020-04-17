@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! python
 
 """
 
@@ -35,6 +35,12 @@ Examples:
 
 Change history:
 
+Feed 1.6  2020-02-13
+- replaced #!/usr/bin/env python header, which fails with Windows 10
+
+Feed 1.5  2018-07-13
+- include title (headline) if present (for compatibility with BBC News)
+
 Feed 1.4  2018-07-10
 - converted from legacy morsekob module to use pykob module
 
@@ -46,7 +52,7 @@ import threading
 import pykob
 from pykob import newsreader, morse, internet, kob, log
 
-VERSION     = '1.4'
+VERSION     = '1.6'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
@@ -98,11 +104,10 @@ while True:
             pd = datetime.datetime.strptime(pubDate[:-6], DATEFORMAT).date()
             if pd > today or today - pd >= datetime.timedelta(days):
                 continue
-        if description:
-            text = description
-        else:
-            log.log('Feed ignoring empty description for ' + title)
-            continue
+        text = ''
+        if title:
+            text += title + '. '
+        text += description
         if pubDate:  # treat as an article, not freeform text
             text += '  ='
         while activeSender() or not activeListener():

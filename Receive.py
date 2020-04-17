@@ -1,10 +1,8 @@
-#!/usr/bin/env python
-
 """
-Receive
 
-Monitors a KOB wire, sends the incoming Morse to a real and/or simulated
-sounder, and displays decoded text on the system console.
+Receive.py
+
+Monitors a KOB wire, and displays decoded text on the system console.
 
 Command line parameters:
     KOB wire no. (defaults to 101)
@@ -12,16 +10,19 @@ Command line parameters:
 
 Example:
     python Receive.py 110
+    
 """
 
+from __future__ import print_function  ###
 import sys
 from time import sleep
-from morsekob import VERSION, internet, sounder, morse
-import config
+from pykob import VERSION, internet, morse
+import codecs
 
-WIRE     = 101  # default KOB wire to connect to
+WIRE     = 109  # default KOB wire to connect to
 WPM      = 20  # approximate speed of incoming Morse (for decoder)
-OFFICEID = 'MorseKOB 4.0 test, XX (listening)'
+OFFICEID = 'MorseKOB 4.0 test, AC (listening)'
+THINSPACE = '\u202F'  # narrow (half width) non-breaking space
 
 print('Python ' + sys.version + ' on ' + sys.platform)
 print('MorseKOB ' + VERSION)
@@ -32,14 +33,25 @@ if len(sys.argv) > 1:
 if len(sys.argv) > 2:
     WPM = int(sys.argv[2])
 
-myInternet = internet.Internet(OFFICEID)
-mySounder = sounder.Sounder(config.SERIALPORT, config.AUDIO)
-myReader = morse.Reader(WPM)
+def readerCallback(char, spacing):
+##    outFile.write('{} {}\n'.format(spacing, char))
+##    return
+    halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
+    fullSpace = False
+    if halfSpaces >= 2:
+        fullSpace = True
+        halfSpaces -= 2
+    for i in range(halfSpaces):
+        outFile.write(THINSPACE)
+    if fullSpace:
+        outFile.write(' ')
+    outFile.write(char)
 
+myInternet = internet.Internet(OFFICEID)
+myReader = morse.Reader(callback=readerCallback)
 myInternet.connect(WIRE)
+outFile = codecs.open( "log.txt", "w", "utf-8" )
 sleep(0.5)
 while True:
     code = myInternet.read()
-    mySounder.sound(code)
-    sys.stdout.write(myReader.decode(code))
-    sys.stdout.flush()
+    myReader.decode(code)
