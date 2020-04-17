@@ -92,6 +92,6 @@ def printInfo():
     print("======================================")
     print("Port:", Port)
     print("--------------------------------------")
-    print("Audio", Audio)
+    print("Audio:", Audio)
     print("Speed:", Speed)
 
