@@ -8,16 +8,15 @@ Sends Morse code to a serial port and/or the speakers.
 
 """
 
-from pykob import kob, morse
+from pykob import config, kob, morse
 import time
 
-PORT = None
-#PORT = 'COM3'  # typical for Windows
-#PORT = '/dev/ttyUSB0'  # typical for Linux
-WPM = 20  # code speed
+PORT = config.Port # serial port for KOB interface
+WPM = config.Speed  # code speed (words per minute)
+AUDIO = config.Audio # whether to enable computer audio for sounder
 TEXT = '~ The quick brown fox +'  # ~ opens the circuit, + closes it
 
-myKOB = kob.KOB(PORT, audio=True)
+myKOB = kob.KOB(PORT, audio=AUDIO)
 mySender = morse.Sender(WPM)
 
 # send HI at 20 wpm as an example
