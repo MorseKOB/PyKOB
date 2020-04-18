@@ -2,3 +2,4 @@ zips/
 *.exe
 __pycache__/
 *.pyc
+build/
