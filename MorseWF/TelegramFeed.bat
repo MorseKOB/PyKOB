@@ -1,1 +1,0 @@
-py FeedWF.py 205 "Wells Fargo Telegrams#5631" "file://Telegrams.txt" 15 15 5 5 0 0 >>feedlog.txt 2>&1

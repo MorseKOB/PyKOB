@@ -1,1 +1,0 @@
-py MorseWF.py 203 "SD - Wells Fargo, San Diego#5631" 15 >>log.txt 2>&1

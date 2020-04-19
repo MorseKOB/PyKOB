@@ -1,10 +1,13 @@
 # PyKOB package
 
-VERSION = '1.1.4'
+VERSION = '1.2.1'
 
 """
 
 Change history:
+
+1.2.1  2020-04-18
+- added config module
 
 1.1.4  2020-03-20
 - internet: added option to send text with code for CWCom compatibility

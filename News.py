@@ -1,45 +1,30 @@
-#!/usr/bin/env python
+#! python
 
 """
+
 News
 
 Fetches articles from an RSS news feed and sends them in American Morse
 to a sounder.
+
 """
 
-import sys, time
-import morsekob
-from morsekob import newsreader, morse, sounder
+import sys
+import time
+import pykob
+from pykob import newsreader, morse, kob
 
-SOURCE   = 'http://news.yahoo.com/rss/'  # news feed
+SOURCE   = 'https://www.ansa.it/sito/ansait_rss.xml'  # news feed
+PORT = None
+#PORT = 'COM3'  # typical for Windows
+#PORT = '/dev/ttyUSB0'  # typical for Linux
 WPM      = 20  # default code speed
 CWPM     = 18  # minimum character speed
 PAUSE    = 5  # gap to leave between articles (seconds)
-
-SERIALPORT_WINDOWS = 'COM4'  # typical for Windows
-#SERIALPORT_WINDOWS = None
-SERIALPORT_LINUX = '/dev/ttyUSB0'  # typical for Linux
-#SERIALPORT_LINUX = None
 AUDIO = True  # enable simulated sounder
 
-print('Python ' + sys.version + ' on ' + sys.platform)
-print('MorseKOB ' + morsekob.VERSION)
-
-# get command line parameter, if any
-if len(sys.argv) > 1:
-    WPM = int(sys.argv[1])
-
-# pick serial port appropriate to particular OS
-if sys.platform.startswith('win'):
-    serialPort = SERIALPORT_WINDOWS
-elif sys.platform.startswith('linux'):
-    serialPort = SERIALPORT_LINUX
-else:
-    print('Platform not recognized. Serial port set to None.')
-    serialPort = None
-
-mySender = morse.Sender(WPM, CWPM, morse.AMERICAN, morse.CHARSPACING)
-mySounder = morsekob.sounder.Sounder(serialPort, AUDIO)
+mySender = morse.Sender(WPM, CWPM, morse.INTERNATIONAL, morse.CHARSPACING)
+myKOB = kob.KOB(PORT, AUDIO)
 
 while True:
     print('')
@@ -48,7 +33,7 @@ while True:
         text = title + ' = ' + description + ' ='
         for char in text:
             code = mySender.encode(char)
-            mySounder.sound(code)
+            myKOB.sounder(code)
             if code:
                 sys.stdout.write(char)
             else:
