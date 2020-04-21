@@ -13,10 +13,10 @@ import time
 
 PORT = config.Port # serial port for KOB interface
 WPM = config.Speed  # code speed (words per minute)
-AUDIO = config.Audio # whether to enable computer audio for sounder
+SOUND = config.Sound # whether to enable computer sound for sounder
 TEXT = '~ The quick brown fox +'  # ~ opens the circuit, + closes it
 
-myKOB = kob.KOB(PORT, audio=AUDIO)
+myKOB = kob.KOB(PORT, audio=SOUND)
 mySender = morse.Sender(WPM)
 
 # send HI at 20 wpm as an example
