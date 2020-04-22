@@ -26,7 +26,12 @@ port = None
 sound = None
 speed = None
 
+# Check for command line parameters...
+#  If none are supplied, print the current configuration
+#  If arguments are given, process them against 'help' or the setting values.
 nargs = len(sys.argv)
-
+print(f'Argument count is {nargs}. They are:')
+for i, arg in enumerate(sys.argv):
+    print(f"Argument {i:>6}: {arg}")
 config.printInfo()
 exit
