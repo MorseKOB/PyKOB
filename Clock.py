@@ -31,13 +31,13 @@ Cuckoo clock substitute.
 """
 
 import time
-from pykob import kob, morse, log
+from pykob import config, kob, morse, log
 
 log.log('Starting Clock')
 
-AUDIO   = False
-PORT = '/dev/ttyUSB0'
-WPM     = 20  # code speed
+PORT = config.Port # serial port for KOB interface
+WPM = config.Speed  # code speed (words per minute)
+SOUND = config.Sound # whether to enable computer sound for sounder
 MSGS = [
     ( 900, 'The time is nine oclock     L  L  L  L  L  L  L  L  L'),
     (1000, 'The time is ten oclock     L  L  L  L  L  L  L  L  L  L'),
@@ -54,7 +54,7 @@ MSGS = [
     (2100, 'The time is nine oclock     L  L  L  L  L  L  L  L  L'),
     (2200, 'The time is ten oclock     L  L  L  L  L  L  L  L  L  L')]
 
-myKOB = kob.KOB(port=PORT, audio=AUDIO)
+myKOB = kob.KOB(port=PORT, audio=SOUND)
 mySender = morse.Sender(WPM)
 
 while True:
