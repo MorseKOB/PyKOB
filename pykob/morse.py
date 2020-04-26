@@ -28,7 +28,7 @@ morse.py
 Provides classes for sending and reading American and International Morse code.
 """
 
-from __future__ import print_function  ###
+# from __future__ import print_function  ###
 
 import sys, os
 import codecs
