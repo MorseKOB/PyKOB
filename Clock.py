@@ -57,6 +57,18 @@ MSGS = [
 myKOB = kob.KOB(port=PORT, audio=SOUND)
 mySender = morse.Sender(WPM)
 
+def announce(s, kob, sender):
+    for c in s:
+        code = sender.encode(c)
+        kob.sounder(code)
+
+# Announce the current time right now
+now = time.localtime()
+msg = "The time is {hour}:{minute}".format(hour=now.tm_hour, minute=now.tm_min)
+print(msg)
+announce(msg, myKOB, mySender)
+
+# Loop, making announcements as configured (every hour, on the hour, during the daytime)
 while True:
     for m in MSGS:
         t0 = time.localtime()
@@ -66,7 +78,5 @@ while True:
         dt = tMsg - now  # time to wait
         if dt > 0:
             time.sleep(dt)
-            for c in s:
-                code = mySender.encode(c)
-                myKOB.sounder(code)  # to pace the code sent to the wire
+            announce(s, myKOB, mySender)
     time.sleep(24*3600 - now)  # wait until midnight and start over
