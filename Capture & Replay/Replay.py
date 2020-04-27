@@ -28,23 +28,23 @@ Replay.py
 
 Replays Morse captured to a file.
 
+Serial port and audio preferences should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
+
 Usage: python Replay.py <filename.txt
 
 Example: py Replay.py <"Train orders.txt"
 """
 
 import time
-from pykob import kob
+from pykob import config,kob
 
 VERSION = '1.4'
-#PORT = 'COM4'
-#PORT = '/dev/ttyUSB0'
-PORT = None
-#AUDIO = False
-AUDIO = True
+PORT = config.Port # serial port for KOB interface
+SOUND = config.Sound # whether to enable computer sound for sounder
 
 codes = ''
-myKOB = kob.KOB(port=PORT, audio=AUDIO)
+myKOB = kob.KOB(port=PORT, audio=SOUND)
 s = input()
 print(s)
 while True:

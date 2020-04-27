@@ -28,6 +28,9 @@ SOFTWARE.
 Clock.py
 
 Cuckoo clock substitute.
+
+Serial port, code speed, and audio preferences should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
 """
 
 import time

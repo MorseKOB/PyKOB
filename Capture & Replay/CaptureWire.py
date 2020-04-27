@@ -1,4 +1,5 @@
 #! python
+from __future__ import print_function  # in case you want it to work with Python 2.7
 """
 MIT License
 
@@ -36,7 +37,6 @@ Examples:
     py CaptureWire.py 11 >"MTC Round Table.txt"
 """
 
-from __future__ import print_function  # in case you want it to work with Python 2.7
 import sys
 import time
 from pykob import internet

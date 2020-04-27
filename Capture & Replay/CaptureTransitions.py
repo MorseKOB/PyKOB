@@ -1,4 +1,5 @@
 #! python
+from __future__ import print_function  # in case you want it to work with Python 2.7
 """
 MIT License
 
@@ -30,20 +31,23 @@ Captures timing information from a key to a file for
 later playback and analysis. All transitions are captured.
 No contact debounce filter is applied.
 
+Serial port should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
+
 Usage: python CaptureTransitions.py >filename.txt
 """
 
-from __future__ import print_function  # in case you want it to work with Python 2.7
 import sys
 import time
 import serial
+from pykob import config
+
 if sys.platform == 'win32':
     from ctypes import windll
     windll.winmm.timeBeginPeriod(1)  # set clock resoluton to 1 ms (Windows only)
 
 VERSION = '1.1'
-PORT = 'COM3'
-#PORT = '/dev/ttyUSB0'
+PORT = config.Port # serial port for KOB interface
 N = 50
 
 print('CaptureTransitions {} - {}'.format(VERSION, time.asctime()))

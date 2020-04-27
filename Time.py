@@ -40,8 +40,8 @@ Optional command line parameters:
 If wire is specified, then idText is required. Only sends over the wire if
 someone is listening.
 
-Serial port and audio preferences should be specified by changing the
-associated constants in the program.
+Serial port and audio preferences should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
 
 Examples:
     python Time.py
@@ -61,14 +61,11 @@ Time 1.3  2019-02-13
 import sys
 import time
 import threading
-from pykob import log, kob, internet
+from pykob import config,log, kob, internet
 
 VERSION = '1.4'
-PORT    = None
-#PORT   = 'COM3'  # typical for Windows
-#PORT   = '/dev/ttyUSB0'  # typical for Linux
-AUDIO   = False
-#AUDIO  = True
+PORT    = config.Port # serial port for KOB interface
+SOUND   = config.Sound # whether to enable computer sound for sounder
 TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
 TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
 NOTICK  = 5 * (-200, +2)
@@ -84,7 +81,7 @@ if nargs > 2:
 else:
     wire = None
 
-myKOB = kob.KOB(PORT, AUDIO)
+myKOB = kob.KOB(PORT, SOUND)
 
 if wire:
     myInternet = internet.Internet(idText)
