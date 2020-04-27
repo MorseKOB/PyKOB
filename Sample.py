@@ -27,6 +27,9 @@ SOFTWARE.
 Sample.py
 
 Sends Morse code to a serial port and/or the speakers.
+
+Serial port, code speed, and audio preferences should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
 """
 
 from pykob import config, kob, morse
