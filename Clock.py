@@ -87,4 +87,4 @@ try:
         time.sleep(24*3600 - now)  # wait until midnight and start over
 except KeyboardInterrupt:
     print()
-    sys.exit(1)
+    sys.exit(0)
