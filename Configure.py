@@ -73,7 +73,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv,"hp:a:s:i",["help","port=","sound=","speed=", "sysInfo"])
     except getopt.GetoptError as ex:
-        print(f" {ex.args[0]}")
+        print(" {}".format(ex.args[0]))
         print()
         help()
         sys.exit(2)

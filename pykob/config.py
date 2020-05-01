@@ -111,7 +111,7 @@ def setSpeed(speed):
         Speed = _speed
         userConfig.set(configSection, 'SPEED', str(Speed))
     except ValueError as ex:
-        log.err(f"SPEED value '{ex.args[0]}' is not a valid integer value. Not setting value.")
+        log.err("SPEED value '{}' is not a valid integer value. Not setting value.".format(ex.args[0]))
 
 def setSound(sound):
     global Sound
@@ -123,7 +123,7 @@ def setSound(sound):
             userConfig.set(configSection, 'SOUND', 'OFF')
         Sound = _sound
     except ValueError as ex:
-        log.err(f"SOUND value '{ex.args[0]}' is not a valid boolean value. Not setting value.")
+        log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
 def setPort(port):
     global Port
@@ -147,7 +147,7 @@ def printSystemInfo():
 
 def printConfig():
     print("======================================")
-    print(f"Port: '{Port}'")
+    print("Port: '{}'".format(Port))
     print("--------------------------------------")
     soundPrint = 'OFF'
     if Sound:
@@ -209,12 +209,12 @@ def readConfig():
             exit
 
     except KeyError as ex:
-        log.err(f"Key '{ex.args[0]}' not found in environment.")
+        log.err("Key '{}' not found in environment.".format(ex.args[0]))
         exit
 
     createConfigFilesIfNeeded()
 
-    userConfigDefaults = {'SPEED':'20', 'SOUND':'ON'}
+    userConfigDefaults = {'SPEED':'18', 'SOUND':'ON'}
     appConfigDefaults = {'PORT':''}
 
     userConfig = configparser.ConfigParser(defaults=userConfigDefaults, allow_no_value=True, default_section='PYKOB')
@@ -234,10 +234,10 @@ def readConfig():
         Sound = userConfig.getboolean(configSection, 'SOUND')
         Speed = userConfig.getint(configSection, 'SPEED')
     except KeyError as ex:
-        log.err(f"Key '{ex.args[0]}' not found in configuration file.")
+        log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
     except ValueError as ex:
-        log.err(f"SPEED value '{ex.args[0]}' is not a valid integer value. Setting to 20.")
-        Speed = 20
+        log.err("SPEED value '{}' is not a valid integer value. Setting to 18.".format(ex.args[0]))
+        Speed = 18
 
 # ### Mainline
 readConfig()
