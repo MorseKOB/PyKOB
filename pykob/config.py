@@ -28,7 +28,7 @@ config module
 Reads configuration information for `per-machine` and `per-user` values.  
 
 An example of a `per-machine` value is the KOB serial/com port (PORT).  
-An example of a 'per-user' value is the code speed (WPM).
+An example of a `per-user` value is the code speed (WPM).
 
 Configuration/preference values are read/written to:
  Windows:
@@ -194,7 +194,7 @@ def readConfig():
         hostname = socket.gethostname()
 
         # User configuration file name
-        userConfigFileName = f'config-{userName}.ini'
+        userConfigFileName = 'config-{}.ini'.format(userName)
         appConfigFileName = 'config_app.ini'
 
         # Create the user and application configuration paths
@@ -202,8 +202,8 @@ def readConfig():
             userConfigFilePath = os.path.join(os.environ['LOCALAPPDATA'], os.path.normcase(os.path.join(appName, userConfigFileName)))
             appConfigFilePath = os.path.join(os.environ['ProgramData'], os.path.normcase(os.path.join(appName, appConfigFileName)))
         elif systemName == 'Linux' or systemName == 'Darwin': # Linux or Mac
-            userConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join(f'.{appName}', userConfigFileName)))
-            appConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join(f'.{appName}', appConfigFileName)))
+            userConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), userConfigFileName)))
+            appConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), appConfigFileName)))
         else:
             log.err('Unknown System name')
             exit
