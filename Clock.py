@@ -30,7 +30,7 @@ Clock.py
 Cuckoo clock substitute.
 
 Serial port, code speed, and audio preferences should be specified by running the
-'configure.sh' script or executing 'python3 Configure.py'.
+"configure.sh" script or executing "python3 Configure.py".
 """
 
 NUMBER = [ "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
@@ -42,7 +42,7 @@ def hms_to_seconds(hours, minutes, seconds):
     return hours * 3600 + minutes * 60 + seconds
 
 #
-# Convert from numeric representation to text ('9' to 'nine')
+# Convert from numeric representation to text ("9" to "nine")
 #
 def number_to_text(n):
     if (n < 0) or ( n > 12):
@@ -79,7 +79,7 @@ def round_up(start, interval):
 # Generate a proper time announcement:
 #
 #   "midnight"
-#   "Nine o'clock"
+#   "Nine o"clock"
 #   "A quarter past nine"
 #   "9:20"
 #   "Half past nine"
@@ -94,13 +94,13 @@ def announcement(hours, minutes):
         elif hours == 12:
             msg += "noon" + 12 * "L "
         else:
-            msg += number_to_text(truncate_hours(hours)) + " oclock     " + hours * "L "
+            msg += number_to_text(truncate_hours(hours)) + " o'clock     " + truncate_hours(hours) * "L "
     elif minutes == 15:
         msg += "a quarter past " + number_to_text(truncate_hours(hours))
     elif minutes == 30:
         msg += "half past " + number_to_text(truncate_hours(hours))
     elif minutes == 45:
-        msg += "a quarter to " + numer_to_text(truncate_hours(hours + 1))
+        msg += "a quarter to " + number_to_text(truncate_hours(hours + 1))
     else:
         # Last resort: just generate the time in hh:mm format
         msg += "{hour}:{minute:02d}".format(hour=hours, minute=minutes)
@@ -121,12 +121,12 @@ try:
     import time
     from pykob import config, kob, morse, log
 
-    log.log('Starting Clock')
+    log.log("Starting Clock")
 
     clock_parser = argparse.ArgumentParser(parents=[config.WPM_OVERRIDE])
-    clock_parser.add_argument('-b', '--begin', default=900, type=int, help='Beginning of time announcements ', metavar='time', dest='Begin')
-    clock_parser.add_argument('-e', '--end', default=2230, type=int, help='End of time announcements ', metavar='time', dest='End')
-    clock_parser.add_argument('-i', '--interval', default=60, type=int, help='The time announcement interval in minutes', metavar='minutes', dest='Interval')
+    clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
+    clock_parser.add_argument("-e", "--end", default=2230, type=int, help="End of time announcements ", metavar="time", dest="End")
+    clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
     args = clock_parser.parse_args()
     
     PORT = config.Port # serial port for KOB interface
