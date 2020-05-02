@@ -110,7 +110,7 @@ def announcement(hours, minutes):
 # Send a message as morse on the sounder:
 #
 def announce(s, kob, sender):
-    print("> ", s)
+    print(">", s)
     for c in s:
         code = sender.encode(c)
         kob.sounder(code)
@@ -150,16 +150,16 @@ try:
         next_time = round_up(hms_to_seconds(t.tm_hour, t.tm_min, t.tm_sec), annc_interval)  # next announcement (sec)
         if next_time < start_time:
             next_time = start_time
-        print("Next time announcement at {0}:{1:02d}".format(clock_hour(next_time), clock_minutes(next_time)))
+        # print("Next time announcement at {0}:{1:02d}".format(clock_hour(next_time), clock_minutes(next_time)))
         now = hms_to_seconds(t.tm_hour, t.tm_min, t.tm_sec)  # current time (sec)
         if next_time <= end_time:
             if now < next_time:
-                print("sleeping for {0} seconds until next time announcement...".format(next_time - now))
+                # print("sleeping for {0} seconds until next time announcement...".format(next_time - now))
                 time.sleep(next_time - now)
             msg = announcement(clock_hour(next_time), clock_minutes(next_time))
             announce(msg, myKOB, mySender)
         else:
-            print("sleeping for {0} seconds until midnight...")
+            # print("sleeping for {0} seconds until midnight...")
             time.sleep(24*3600 - now)  # wait until midnight and start over
 except KeyboardInterrupt:
     print()
