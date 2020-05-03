@@ -235,7 +235,7 @@ def readConfig():
             Port = None
 
         # Get the User config values
-        Sound = userConfig.get(configSection, 'SOUND')
+        Sound = userConfig.getboolean(configSection, 'SOUND')
         Speed = userConfig.getint(configSection, 'SPEED')
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
@@ -250,7 +250,7 @@ PortOverride = argparse.ArgumentParser(add_help=False)
 PortOverride.add_argument("-p", "--port", default=Port, help="The  name of the serial port to use ", metavar="portname", dest="Port")
 
 SoundtOverride = argparse.ArgumentParser(add_help=False)
-SoundtOverride.add_argument("-a", "--sound", default=Sound, choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
+SoundtOverride.add_argument("-a", "--sound", default='ON' if Sound else 'OFF', choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
 
 WPMOverride = argparse.ArgumentParser(add_help=False)
 WPMOverride.add_argument("-s", "--speed", default=Speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="Speed")

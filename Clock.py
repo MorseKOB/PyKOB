@@ -130,7 +130,9 @@ try:
     
     port = args.Port # serial port for KOB interface
     speed = args.Speed  # code speed (words per minute)
+    print("args.Sound is", args.Sound)
     sound = True if args.Sound == 'ON' else False
+    print("sound =", sound)
     start_time = hms_to_seconds(int(args.Begin/100), args.Begin % 100, 0)  # start time (sec)
     end_time = hms_to_seconds(int(args.End/100), args.End % 100, 0)  # end time (sec)
     annc_interval = args.Interval * 60      # announcement interval (sec)
