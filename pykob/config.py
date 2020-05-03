@@ -183,8 +183,7 @@ def readConfig():
     global Port
     global Sound
     global Speed
-#   global WIRE_OVERRIDE
-    global WPM_OVERRIDE
+    global WPM_Override
 
     # Get the system data
     try:
@@ -234,7 +233,7 @@ def readConfig():
             Port = None
 
         # Get the User config values
-        Sound = userConfig.getboolean(configSection, 'SOUND')
+        Sound = userConfig.get(configSection, 'SOUND')
         Speed = userConfig.getint(configSection, 'SPEED')
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
@@ -245,10 +244,13 @@ def readConfig():
 # ### Mainline
 readConfig()
 
-# WIRE_OVERRIDE = argparse.ArgumentParser(add_help=False)
-# WIRE_OVERRIDE.add_argument('-w', '--wire', type=int, help='The wire to connect to', metavar='wire', dest='Wire')
+PortOverride = argparse.ArgumentParser(add_help=False)
+PortOverride.add_argument("-p", "--port", default=Port, help="The  name of the serial port to use ", metavar="portname", dest="Port")
 
-WPM_OVERRIDE = argparse.ArgumentParser(add_help=False)
-WPM_OVERRIDE.add_argument('-s', '--speed', default=Speed, type=int, help='The  morse send speed in WPM', metavar='speed', dest='Speed')
+SoundtOverride = argparse.ArgumentParser(add_help=False)
+SoundtOverride.add_argument("-a", "--sound", default=Sound, choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
+
+WPMOverride = argparse.ArgumentParser(add_help=False)
+WPMOverride.add_argument("-s", "--speed", default=Speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="Speed")
 
 exit
