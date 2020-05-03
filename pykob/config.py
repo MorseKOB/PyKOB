@@ -183,7 +183,9 @@ def readConfig():
     global Port
     global Sound
     global Speed
-    global WPM_Override
+    global PortOverride
+    global SoundtOverride
+    global WPMOverride
 
     # Get the system data
     try:
