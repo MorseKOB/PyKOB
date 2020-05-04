@@ -131,16 +131,38 @@ try:
 
     clock_parser = argparse.ArgumentParser(parents=[config.PortOverride, config.SoundtOverride, config.WPMOverride])
     clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
-    clock_parser.add_argument("-e", "--end", default=2230, type=int, help="End of time announcements ", metavar="time", dest="End")
+    clock_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements ", metavar="time", dest="End")
     clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
     clock_parser.add_argument("-t", "--text", action='store_true', default=False, help="Whether to print text locally as it's sent to the sounder", dest="Text")
     args = clock_parser.parse_args()
     
     port = args.Port # serial port for KOB interface
     speed = args.Speed  # code speed (words per minute)
+    if (speed < 1) or(speed > 50):
+        print("Speed specified must be between 1 and 50")
+        sys.exit(1)
     sound = strtobool(args.Sound)
+    #
+    # start_time argument is limited to 0..2400:
+    #
+    if (args.Begin < 0) or (args.Begin > 2400):
+        print("Start time must be betwen 0 and 2400.")
+        sys.exit(1)
     start_time = hms_to_seconds(int(args.Begin/100), args.Begin % 100, 0)  # start time (sec)
+    print("args.Begin = {0}; start_time = {1}".format(args.Begin, start_time))
+    #
+    # end_time argument is limited to 0..2400; end_time in seconds can therefore be 0..144000:
+    #
+    if (args.End < 0) or (args.End > 2400):
+        print("End time must be betwen 0 and 2400.")
+        sys.exit(1)
     end_time = hms_to_seconds(int(args.End/100), args.End % 100, 0)  # end time (sec)
+    #
+    # Limit for announcement interval is 1440 minutes (24 hours):
+    #
+    if (args.Interval < 1) or (args.Interval > 1440):
+        print("Time announcement interval must be betwen 1 and 1440.")
+        sys.exit(1)
     annc_interval = args.Interval * 60      # announcement interval (sec)
     local_text = args.Text;
     
