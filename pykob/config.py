@@ -45,6 +45,7 @@ The files are INI format with the values in a section named 'PYKOB'.
 
 """
 
+import argparse
 import configparser
 import distutils
 import getpass
@@ -182,6 +183,9 @@ def readConfig():
     global Port
     global Sound
     global Speed
+    global PortOverride
+    global SoundtOverride
+    global WPMOverride
 
     # Get the system data
     try:
@@ -241,4 +245,14 @@ def readConfig():
 
 # ### Mainline
 readConfig()
+
+PortOverride = argparse.ArgumentParser(add_help=False)
+PortOverride.add_argument("-p", "--port", default=Port, help="The  name of the serial port to use ", metavar="portname", dest="Port")
+
+SoundtOverride = argparse.ArgumentParser(add_help=False)
+SoundtOverride.add_argument("-a", "--sound", default='ON' if Sound else 'OFF', choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
+
+WPMOverride = argparse.ArgumentParser(add_help=False)
+WPMOverride.add_argument("-s", "--speed", default=Speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="Speed")
+
 exit
