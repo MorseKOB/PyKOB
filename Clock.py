@@ -33,7 +33,11 @@ Serial port, code speed, and audio preferences should be specified by running th
 "configure.sh" script or executing "python3 Configure.py".
 """
 
-NUMBER = [ "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+#
+# For numeric-to-text translation.  Note that "0" is only referneced for midnight, and then it's
+# referred to more commonly as "twelve": "a quarter past 12" instead of "a quarter past midnight"
+# Hence the "twelve" in the slot for '0'.
+NUMBER = [ "twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 
 #
 # Convert hours/minutes/seconds since midnight to seconds since midnight:
@@ -70,7 +74,7 @@ def clock_minutes(t):
     return int(int(t % 3600) / 60)
 
 #
-# Take an starting point and round up to the next interval-multiple:
+# Take a starting point and round up to the next interval-multiple:
 #
 def round_up(start, interval):
     return start - (start % interval) + interval # Round up to next interval (sec)
@@ -89,10 +93,10 @@ def round_up(start, interval):
 def announcement(hours, minutes):
     msg = "The time is "
     if minutes == 0:
-        if hours == 0:
+        if truncate_hours(hours) == 0:
             msg += "midnight"
         elif hours == 12:
-            msg += "noon" + 12 * "L "
+            msg += "noon     " + 12 * "L "
         else:
             msg += number_to_text(truncate_hours(hours)) + " o'clock     " + truncate_hours(hours) * "L "
     elif minutes == 15:
@@ -110,6 +114,8 @@ def announcement(hours, minutes):
 # Send a message as morse on the sounder:
 #
 def announce(s, kob, sender):
+    global local_text
+    if local_text: print('>', s)
     for c in s:
         code = sender.encode(c)
         kob.sounder(code)
@@ -119,6 +125,7 @@ try:
     import sys
     import time
     from pykob import config, kob, morse, log
+    from distutils.util import strtobool
 
     log.log("Starting Clock")
 
@@ -126,14 +133,16 @@ try:
     clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
     clock_parser.add_argument("-e", "--end", default=2230, type=int, help="End of time announcements ", metavar="time", dest="End")
     clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
+    clock_parser.add_argument("-t", "--text", action='store_true', default=False, help="Whether to print text locally as it's sent to the sounder", dest="Text")
     args = clock_parser.parse_args()
     
     port = args.Port # serial port for KOB interface
     speed = args.Speed  # code speed (words per minute)
-    sound = True if args.Sound == 'ON' else False
+    sound = strtobool(args.Sound)
     start_time = hms_to_seconds(int(args.Begin/100), args.Begin % 100, 0)  # start time (sec)
     end_time = hms_to_seconds(int(args.End/100), args.End % 100, 0)  # end time (sec)
     annc_interval = args.Interval * 60      # announcement interval (sec)
+    local_text = args.Text;
     
     myKOB = kob.KOB(port=port, audio=sound)
     mySender = morse.Sender(speed)
