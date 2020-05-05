@@ -28,45 +28,167 @@ SOFTWARE.
 Clock.py
 
 Cuckoo clock substitute.
+
+Serial port, code speed, and audio preferences should be specified by running the
+"configure.sh" script or executing "python3 Configure.py".
 """
 
-import time
-from pykob import kob, morse, log
+#
+# For numeric-to-text translation.  Note that "0" is only referneced for midnight, and then it's
+# referred to more commonly as "twelve": "a quarter past 12" instead of "a quarter past midnight"
+# Hence the "twelve" in the slot for '0'.
+NUMBER = [ "twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
 
-log.log('Starting Clock')
+#
+# Convert hours/minutes/seconds since midnight to seconds since midnight:
+#
+def hms_to_seconds(hours, minutes, seconds):
+    return hours * 3600 + minutes * 60 + seconds
 
-AUDIO   = False
-PORT = '/dev/ttyUSB0'
-WPM     = 20  # code speed
-MSGS = [
-    ( 900, 'The time is nine oclock     L  L  L  L  L  L  L  L  L'),
-    (1000, 'The time is ten oclock     L  L  L  L  L  L  L  L  L  L'),
-    (1100, 'The time is eleven oclock     L  L  L  L  L  L  L  L  L  L  L'),
-    (1200, 'The time is twelve oclock     L  L  L  L  L  L  L  L  L  L  L  L'),
-    (1300, 'The time is one oclock     L'),
-    (1400, 'The time is two oclock     L  L'),
-    (1500, 'The time is three oclock     L  L  L'),
-    (1600, 'The time is four oclock     L  L  L  L'),
-    (1700, 'The time is five oclock     L  L  L  L  L'),
-    (1800, 'The time is six oclock     L  L  L  L  L  L'),
-    (1900, 'The time is seven oclock     L  L  L  L  L  L  L'),
-    (2000, 'The time is eight oclock     L  L  L  L  L  L  L  L'),
-    (2100, 'The time is nine oclock     L  L  L  L  L  L  L  L  L'),
-    (2200, 'The time is ten oclock     L  L  L  L  L  L  L  L  L  L')]
+#
+# Convert from numeric representation to text ("9" to "nine")
+#
+def number_to_text(n):
+    if (n < 0) or ( n > 12):
+        return ""
+    return NUMBER[n]
+#
+# Convert 0-24 hours to 0-12 hours by subtracting 12 if needed:
+#
+def truncate_hours(h):
+    if h <= 12:
+        return h        # 0-12 is returned as-is
+    else:
+        return h % 12   # 13-on is truncated to 1-on
 
-myKOB = kob.KOB(port=PORT, audio=AUDIO)
-mySender = morse.Sender(WPM)
+#
+# Convert seconds since midnight to corresponding clock hour
+#
+def clock_hour(t):
+    return int(t / 3600)
 
-while True:
-    for m in MSGS:
-        t0 = time.localtime()
-        now = t0.tm_hour*3600 + t0.tm_min*60 + t0.tm_sec  # current time (sec)
-        t1, s = m
-        tMsg = 3600*(t1//100) + 60*(t1%100)  # time to send message
-        dt = tMsg - now  # time to wait
-        if dt > 0:
-            time.sleep(dt)
-            for c in s:
-                code = mySender.encode(c)
-                myKOB.sounder(code)  # to pace the code sent to the wire
-    time.sleep(24*3600 - now)  # wait until midnight and start over
+#
+# Convert seconds since midnight to the corresponding clock minute
+#
+def clock_minutes(t):
+    return int(int(t % 3600) / 60)
+
+#
+# Take a starting point and round up to the next interval-multiple:
+#
+def round_up(start, interval):
+    return start - (start % interval) + interval # Round up to next interval (sec)
+
+#
+# Generate a proper time announcement:
+#
+#   "midnight"
+#   "Nine o"clock"
+#   "A quarter past nine"
+#   "9:20"
+#   "Half past nine"
+#   "A quarter to ten"
+#   "noon"
+#
+def announcement(hours, minutes):
+    msg = "The time is "
+    if minutes == 0:
+        if truncate_hours(hours) == 0:
+            msg += "midnight"
+        elif hours == 12:
+            msg += "noon     " + 12 * "L "
+        else:
+            msg += number_to_text(truncate_hours(hours)) + " o'clock     " + truncate_hours(hours) * "L "
+    elif minutes == 15:
+        msg += "a quarter past " + number_to_text(truncate_hours(hours))
+    elif minutes == 30:
+        msg += "half past " + number_to_text(truncate_hours(hours))
+    elif minutes == 45:
+        msg += "a quarter to " + number_to_text(truncate_hours(hours + 1))
+    else:
+        # Last resort: just generate the time in hh:mm format
+        msg += "{hour}:{minute:02d}".format(hour=hours, minute=minutes)
+    return msg
+
+#
+# Send a message as morse on the sounder:
+#
+def announce(s, kob, sender):
+    global local_text
+    if local_text: print('>', s)
+    for c in s:
+        code = sender.encode(c)
+        kob.sounder(code)
+
+try:
+    import argparse
+    import sys
+    import time
+    from pykob import config, kob, morse, log
+    from distutils.util import strtobool
+
+    log.log("Starting Clock")
+
+    clock_parser = argparse.ArgumentParser(parents=[config.PortOverride, config.SoundtOverride, config.WPMOverride])
+    clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
+    clock_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements ", metavar="time", dest="End")
+    clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
+    clock_parser.add_argument("-t", "--text", action='store_true', default=False, help="Whether to print text locally as it's sent to the sounder", dest="Text")
+    args = clock_parser.parse_args()
+    
+    port = args.Port # serial port for KOB interface
+    speed = args.Speed  # code speed (words per minute)
+    if (speed < 1) or(speed > 50):
+        print("Speed specified must be between 1 and 50")
+        sys.exit(1)
+    sound = strtobool(args.Sound)
+    #
+    # start_time argument is limited to 0..2400:
+    #
+    if (args.Begin < 0) or (args.Begin > 2400):
+        print("Start time must be betwen 0 and 2400.")
+        sys.exit(1)
+    start_time = hms_to_seconds(int(args.Begin/100), args.Begin % 100, 0)  # start time (sec)
+    print("args.Begin = {0}; start_time = {1}".format(args.Begin, start_time))
+    #
+    # end_time argument is limited to 0..2400; end_time in seconds can therefore be 0..144000:
+    #
+    if (args.End < 0) or (args.End > 2400):
+        print("End time must be betwen 0 and 2400.")
+        sys.exit(1)
+    end_time = hms_to_seconds(int(args.End/100), args.End % 100, 0)  # end time (sec)
+    #
+    # Limit for announcement interval is 1440 minutes (24 hours):
+    #
+    if (args.Interval < 1) or (args.Interval > 1440):
+        print("Time announcement interval must be betwen 1 and 1440.")
+        sys.exit(1)
+    annc_interval = args.Interval * 60      # announcement interval (sec)
+    local_text = args.Text;
+    
+    myKOB = kob.KOB(port=port, audio=sound)
+    mySender = morse.Sender(speed)
+    
+    # Announce the current time right now
+    now = time.localtime()
+    msg = announcement(now.tm_hour, now.tm_min)
+    announce(msg, myKOB, mySender)
+
+    # Loop, making announcements as configured (every hour, on the hour, during the daytime)
+    while True:
+        t = time.localtime()
+        next_time = round_up(hms_to_seconds(t.tm_hour, t.tm_min, t.tm_sec), annc_interval)  # next announcement (sec)
+        if next_time < start_time:
+            next_time = start_time
+        now = hms_to_seconds(t.tm_hour, t.tm_min, t.tm_sec)  # current time (sec)
+        if next_time <= end_time:
+            if now < next_time:
+                time.sleep(next_time - now)
+            msg = announcement(clock_hour(next_time), clock_minutes(next_time))
+            announce(msg, myKOB, mySender)
+        else:
+            # print("sleeping for {0} seconds until midnight...")
+            time.sleep(24*3600 - now)  # wait until midnight and start over
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)

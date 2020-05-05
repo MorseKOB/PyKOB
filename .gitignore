@@ -3,3 +3,4 @@ zips/
 __pycache__/
 *.pyc
 build/
+log.txt

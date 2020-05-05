@@ -28,7 +28,7 @@ config module
 Reads configuration information for `per-machine` and `per-user` values.  
 
 An example of a `per-machine` value is the KOB serial/com port (PORT).  
-An example of a 'per-user' value is the code speed (WPM).
+An example of a `per-user` value is the code speed (WPM).
 
 Configuration/preference values are read/written to:
  Windows:
@@ -45,6 +45,7 @@ The files are INI format with the values in a section named 'PYKOB'.
 
 """
 
+import argparse
 import configparser
 import distutils
 import getpass
@@ -111,7 +112,7 @@ def setSpeed(speed):
         Speed = _speed
         userConfig.set(configSection, 'SPEED', str(Speed))
     except ValueError as ex:
-        log.err(f"SPEED value '{ex.args[0]}' is not a valid integer value. Not setting value.")
+        log.err("SPEED value '{}' is not a valid integer value. Not setting value.".format(ex.args[0]))
 
 def setSound(sound):
     global Sound
@@ -123,7 +124,7 @@ def setSound(sound):
             userConfig.set(configSection, 'SOUND', 'OFF')
         Sound = _sound
     except ValueError as ex:
-        log.err(f"SOUND value '{ex.args[0]}' is not a valid boolean value. Not setting value.")
+        log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
 def setPort(port):
     global Port
@@ -147,7 +148,7 @@ def printSystemInfo():
 
 def printConfig():
     print("======================================")
-    print(f"Port: '{Port}'")
+    print("Port: '{}'".format(Port))
     print("--------------------------------------")
     soundPrint = 'OFF'
     if Sound:
@@ -182,6 +183,9 @@ def readConfig():
     global Port
     global Sound
     global Speed
+    global PortOverride
+    global SoundtOverride
+    global WPMOverride
 
     # Get the system data
     try:
@@ -194,7 +198,7 @@ def readConfig():
         hostname = socket.gethostname()
 
         # User configuration file name
-        userConfigFileName = f'config-{userName}.ini'
+        userConfigFileName = 'config-{}.ini'.format(userName)
         appConfigFileName = 'config_app.ini'
 
         # Create the user and application configuration paths
@@ -202,19 +206,19 @@ def readConfig():
             userConfigFilePath = os.path.join(os.environ['LOCALAPPDATA'], os.path.normcase(os.path.join(appName, userConfigFileName)))
             appConfigFilePath = os.path.join(os.environ['ProgramData'], os.path.normcase(os.path.join(appName, appConfigFileName)))
         elif systemName == 'Linux' or systemName == 'Darwin': # Linux or Mac
-            userConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join(f'.{appName}', userConfigFileName)))
-            appConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join(f'.{appName}', appConfigFileName)))
+            userConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), userConfigFileName)))
+            appConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), appConfigFileName)))
         else:
             log.err('Unknown System name')
             exit
 
     except KeyError as ex:
-        log.err(f"Key '{ex.args[0]}' not found in environment.")
+        log.err("Key '{}' not found in environment.".format(ex.args[0]))
         exit
 
     createConfigFilesIfNeeded()
 
-    userConfigDefaults = {'SPEED':'20', 'SOUND':'ON'}
+    userConfigDefaults = {'SPEED':'18', 'SOUND':'ON'}
     appConfigDefaults = {'PORT':''}
 
     userConfig = configparser.ConfigParser(defaults=userConfigDefaults, allow_no_value=True, default_section='PYKOB')
@@ -234,11 +238,21 @@ def readConfig():
         Sound = userConfig.getboolean(configSection, 'SOUND')
         Speed = userConfig.getint(configSection, 'SPEED')
     except KeyError as ex:
-        log.err(f"Key '{ex.args[0]}' not found in configuration file.")
+        log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
     except ValueError as ex:
-        log.err(f"SPEED value '{ex.args[0]}' is not a valid integer value. Setting to 20.")
-        Speed = 20
+        log.err("SPEED value '{}' is not a valid integer value. Setting to 18.".format(ex.args[0]))
+        Speed = 18
 
 # ### Mainline
 readConfig()
+
+PortOverride = argparse.ArgumentParser(add_help=False)
+PortOverride.add_argument("-p", "--port", default=Port, help="The  name of the serial port to use ", metavar="portname", dest="Port")
+
+SoundtOverride = argparse.ArgumentParser(add_help=False)
+SoundtOverride.add_argument("-a", "--sound", default='ON' if Sound else 'OFF', choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
+
+WPMOverride = argparse.ArgumentParser(add_help=False)
+WPMOverride.add_argument("-s", "--speed", default=Speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="Speed")
+
 exit

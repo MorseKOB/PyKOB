@@ -1,4 +1,5 @@
 #! python
+from __future__ import print_function  # in case you want it to work with Python 2.7
 """
 MIT License
 
@@ -29,19 +30,20 @@ CaptureKey.py
 Captures timing information from a key to a file for
 later playback and analysis.
 
+Serial port should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
+
 Usage: python CaptureKey.py >filename.txt
 
 Example: py CaptureKey.py >TrainOrders.txt
 """
 
-from __future__ import print_function  # in case you want it to work with Python 2.7
 import sys
 import time
-from pykob import kob
+from pykob import config,kob
 
 VERSION = '1.3'
-PORT = 'COM4'
-#PORT = '/dev/ttyUSB0'
+PORT = config.Port # serial port for KOB interface
 
 myKOB = kob.KOB(PORT)
 

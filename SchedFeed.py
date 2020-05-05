@@ -29,6 +29,9 @@ SchedFeed.py
 
 Sends messages according to a time schedule.
 
+Serial port, code speed, and audio preferences should be specified by running the
+'configure.sh' script or executing 'python3 Configure.py'.
+
 Change history:
 
 SchedFeed 1.3  2016-02-04
@@ -46,15 +49,15 @@ SchedFeed 1.0  2015-12-28
 """
 
 import time
-from pykob import kob, internet, morse, log
+from pykob import config, kob, internet, morse, log
 
 log.log('SchedFeed 1.3')
 
-AUDIO   = True  # False if you don't want to hear audio
-PORT    = None  # 'COM3' for comm port 3, etc., for an attached sounder
+PORT = config.Port # serial port for KOB interface
+WPM = config.Speed  # code speed (words per minute)
+SOUND = config.Sound # whether to enable computer sound for sounder
 WIRE    = 199  # 0 for no feed to internet
 IDTEXT  = 'Test feed, XX'  # text to identify your feed, with office call
-WPM     = 20  # code speed
 msgs = [  # 24-hour clock, no leading zeros
     ( 822, '~ DS HN OS +     ~ GA +   ~ OS HN NO 18 D 822 HN +    ~ OK DS +'),
     (1201, '~ DS NB OS +    ~ GA +  ~ OS NB NO 18 BY 1159 NB +   ~ OK DS +'),
@@ -68,7 +71,7 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
     
-myKOB = kob.KOB(port=PORT, audio=AUDIO)
+myKOB = kob.KOB(port=PORT, audio=SOUND)
 if WIRE:
     myInternet = internet.Internet(IDTEXT)
     myInternet.connect(WIRE)
