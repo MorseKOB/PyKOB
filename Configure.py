@@ -29,11 +29,11 @@ Configure.py
 Configures system values and user preferences for the suite of PyKOB applications.
 
 Command line parameters:
-    -h              : Print help information for using the application
-    -port <port>    : Set the system PORT (COM or tty) value to use for a sounder
-    -speed <speed>  : Set the user Words-Per-Minute speed preference
-    -sound <ON|OFF> : Set the user preference for using/not-using the computer sound
-
+    -h | --help                     : Print help information for using the application
+    -p | --port <port>              : Set the system PORT (COM or tty) value to use for a sounder
+    -a | --sound <ON|OFF>           : Set the user preference for using/not-using the computer sound
+    -s | --speed <words_per_minute> : Set the user Words-Per-Minute speed preference
+    -i | --sysInfo                  : Print information about the system that relates to PyKOB
 Examples:
     configure -port COM3
     configure -speed 22 -sound ON
@@ -44,10 +44,10 @@ from pykob import config
 
 def help():
     print(' Configure settings/preferences for PyKOB')
-    print('  Usage: Configure {[{-h|--help} | {-p|--port port} {-a|--sound [ON|OFF]) {-s|--speed wpm} {--sysInfo}]}')
+    print('  Usage: Configure {[{-h|--help} | {-p|--port port} {-a|--sound [ON|OFF]) {-s|--speed wpm} {-i|--sysInfo}]}')
     print('      Values are:')
     print('          -h | --help:                      Pring this help message.')
-    print('          -p | --port <serial_port|NONE>:        Set the serial communication port for the interface.')
+    print('          -p | --port <serial_port|NONE>:   Set the serial communication port for the interface.')
     print('          -a | --sound ON|OFF:              Use the computer sound or not.')
     print('          -s | --speed <words_per_minute>:  Set the WPM value to use for playing and analyzing.')
     print('          -i | --sysInfo:                   Print information about the system that relates to MorseKOB')
@@ -92,26 +92,26 @@ def main(argv):
         elif opt in ("-s", "--speed"):
             speed = arg
         elif opt in ("-i", "--sysInfo"):
-            config.printSystemInfo()
+            config.print_system_info()
 
     # Set config values if they were specified
-    saveConfig = False
+    save_config = False
     if not port == None:
         if port.upper() == "NONE":
             port = ''
-        config.setPort(port)
-        saveConfig = True
+        config.set_serial_port(port)
+        save_config = True
     if not sound == None:
-        config.setSound(sound)
-        saveConfig = True
+        config.set_sound(sound)
+        save_config = True
     if not speed == None:
-        config.setSpeed(speed)
-        saveConfig = True
+        config.set_wpm_speed(speed)
+        save_config = True
 
-    if saveConfig:
-        config.saveConfig()
+    if save_config:
+        config.save_config()
 
-    config.printConfig()
+    config.print_config()
     exit
 
 if __name__ == "__main__":

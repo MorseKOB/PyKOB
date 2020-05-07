@@ -46,7 +46,7 @@ from pykob import VERSION, config, internet, morse
 import codecs
 
 WIRE     = 109  # default KOB wire to connect to
-WPM      = config.Speed  # code speed (words per minute)
+WPM      = config.words_per_min_speed  # code speed (words per minute)
 OFFICEID = 'MorseKOB 4.0 test, AC (listening)'
 THINSPACE = '\u202F'  # narrow (half width) non-breaking space
 

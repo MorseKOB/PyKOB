@@ -35,9 +35,9 @@ Serial port, code speed, and audio preferences should be specified by running th
 from pykob import config, kob, morse
 import time
 
-PORT = config.Port # serial port for KOB interface
-WPM = config.Speed  # code speed (words per minute)
-SOUND = config.Sound # whether to enable computer sound for sounder
+PORT = config.serial_port # serial port for KOB interface
+WPM = config.words_per_min_speed  # code speed (words per minute)
+SOUND = config.sound # whether to enable computer sound for sounder
 TEXT = '~ The quick brown fox +'  # ~ opens the circuit, + closes it
 
 myKOB = kob.KOB(PORT, audio=SOUND)

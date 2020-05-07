@@ -64,8 +64,8 @@ import threading
 from pykob import config,log, kob, internet
 
 VERSION = '1.4'
-PORT    = config.Port # serial port for KOB interface
-SOUND   = config.Sound # whether to enable computer sound for sounder
+PORT    = config.serial_port # serial port for KOB interface
+SOUND   = config.sound # whether to enable computer sound for sounder
 TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
 TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
 NOTICK  = 5 * (-200, +2)

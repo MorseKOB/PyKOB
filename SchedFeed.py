@@ -53,9 +53,9 @@ from pykob import config, kob, internet, morse, log
 
 log.log('SchedFeed 1.3')
 
-PORT = config.Port # serial port for KOB interface
-WPM = config.Speed  # code speed (words per minute)
-SOUND = config.Sound # whether to enable computer sound for sounder
+PORT = config.serial_port # serial port for KOB interface
+WPM = config.words_per_min_speed  # code speed (words per minute)
+SOUND = config.sound # whether to enable computer sound for sounder
 WIRE    = 199  # 0 for no feed to internet
 IDTEXT  = 'Test feed, XX'  # text to identify your feed, with office call
 msgs = [  # 24-hour clock, no leading zeros

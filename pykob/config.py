@@ -41,10 +41,9 @@ Configuration/preference values are read/written to:
   User: ~/.pykob/config-[user].ini
   Machine: ~/.pykob/config_app.ini
 
-The files are INI format with the values in a section named 'PYKOB'.
+The files are INI format with the values in a section named "PYKOB".
 
 """
-
 import argparse
 import configparser
 import distutils
@@ -57,202 +56,231 @@ from distutils.util import strtobool
 from pykob import log
 
 # Application name
-appName = 'pykob'
+__APP_NAME = "pykob"
 # INI Section
-configSection = 'PYKOB'
+__CONFIG_SECTION = "PYKOB"
+# System/Machine INI file Parameters/Keys
+__SERIAL_PORT_KEY = "PORT"
+# User INI file Parameters/Keys
+__SOUND_KEY = "SOUND"
+__WPM_SPEED_KEY = "WPM_SPEED"
+__STATION_KEY = "STATION"
+__WIRE_KEY = "WIRE"
+
 
 # Paths and Configurations
-appConfigDir = None
-appConfigFilePath = None
-appConfig = None
-userConfigDir = None
-userConfigFilePath = None
-userConfig = None
+app_config_dir = None
+app_config_file_path = None
+app_config = None
+user_config_dir = None
+user_config_file_path = None
+user_config = None
 
 # System information
 hostname = None
-osName = None
-platformName= None
-systemName = None
-systemVersion = None
-userHome = None
-userName = None
+os_name = None
+platform_name= None
+system_name = None
+system_version = None
+user_home = None
+user_name = None
 
-# Settings
-Speed = 20
-Sound = True
-Port = None
+# Machine/System Settings
+serial_port = None
 
-def createConfigFilesIfNeeded():
-    global appConfigDir
-    global appConfigFilePath
-    global userConfigDir
-    global userConfigFilePath
+# User Settings
+sound = True
+station = None
+wire = None
+words_per_min_speed = 18
+
+def create_config_files_if_needed():
+    global app_config_dir
+    global app_config_file_path
+    global user_config_dir
+    global user_config_file_path
 
     # Create the files if they don't exist
-    if not os.path.isfile(userConfigFilePath):
+    if not os.path.isfile(user_config_file_path):
         # need to create
-        userConfigDir = os.path.split(userConfigFilePath)[0]
-        if not os.path.isdir(userConfigDir):
-            os.makedirs(userConfigDir)
-        f = open(userConfigFilePath, 'w')
+        user_config_dir = os.path.split(user_config_file_path)[0]
+        if not os.path.isdir(user_config_dir):
+            os.makedirs(user_config_dir)
+        f = open(user_config_file_path, 'w')
         f.close()
-    if not os.path.isfile(appConfigFilePath):
+    if not os.path.isfile(app_config_file_path):
         # need to create
-        appConfigDir = os.path.split(appConfigFilePath)[0]
-        if not os.path.isdir(appConfigDir):
-            os.makedirs(appConfigDir)
-        f = open(appConfigFilePath, 'w')
+        app_config_dir = os.path.split(app_config_file_path)[0]
+        if not os.path.isdir(app_config_dir):
+            os.makedirs(app_config_dir)
+        f = open(app_config_file_path, 'w')
         f.close()
 
-def setSpeed(speed):
-    global Speed
+def set_wpm_speed(s):
+    global words_per_min_speed
     try:
-        _speed = int(speed)
-        Speed = _speed
-        userConfig.set(configSection, 'SPEED', str(Speed))
+        _speed = int(s)
+        words_per_min_speed = _speed
+        user_config.set(__CONFIG_SECTION, __WPM_SPEED_KEY, str(words_per_min_speed))
     except ValueError as ex:
         log.err("SPEED value '{}' is not a valid integer value. Not setting value.".format(ex.args[0]))
 
-def setSound(sound):
-    global Sound
+def set_sound(s):
+    global sound
     try:
-        _sound = strtobool(str(sound))
+        _sound = strtobool(str(s))
         if _sound:
-            userConfig.set(configSection, 'SOUND', 'ON')
+            user_config.set(__CONFIG_SECTION, __SOUND_KEY, "ON")
         else:
-            userConfig.set(configSection, 'SOUND', 'OFF')
-        Sound = _sound
+            user_config.set(__CONFIG_SECTION, __SOUND_KEY, "OFF")
+        sound = _sound
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
-def setPort(port):
-    global Port
-    Port = port
-    appConfig.set(configSection, 'PORT', Port)
+def set_serial_port(p):
+    global serial_port
+    serial_port = p
+    app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
 
-def printInfo():
-    printSystemInfo()
-    printConfig()
+def set_station(s):
+    global station
+    station = s
+    user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
-def printSystemInfo():
-    print("User:", userName)
-    print("User Home Path:", userHome)
-    print("User Configuration File:", userConfigFilePath)
-    print("App Configuration File", appConfigFilePath)
-    print("OS:", osName)
-    print("System:", systemName)
-    print("Version:", systemVersion)
-    print("Platform", platformName)
+def set_wire(w):
+    global wire
+    wire = w
+    user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
+
+def print_info():
+    print_system_info()
+    print_config()
+
+def print_system_info():
+    print("User:", user_name)
+    print("User Home Path:", user_home)
+    print("User Configuration File:", user_config_file_path)
+    print("App Configuration File", app_config_file_path)
+    print("OS:", os_name)
+    print("System:", system_name)
+    print("Version:", system_version)
+    print("Platform", platform_name)
     print("Host:", hostname)
 
-def printConfig():
+def print_config():
     print("======================================")
-    print("Port: '{}'".format(Port))
+    print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
-    soundPrint = 'OFF'
-    if Sound:
-        soundPrint = 'ON'
+    soundPrint = "OFF"
+    if sound:
+        soundPrint = "ON"
     print("Sound:", soundPrint)
-    print("Speed:", Speed)
+    print("Station:", station)
+    print("Wire:", wire)
+    print("Words per Min Speed:", words_per_min_speed)
 
 '''
 Save (write) the configuration values out to the user and machine config files.
 '''
-def saveConfig():
-    createConfigFilesIfNeeded()
-    with open(userConfigFilePath, 'w') as configfile:
-        userConfig.write(configfile, space_around_delimiters=False)
-    with open(appConfigFilePath, 'w') as configfile:
-        appConfig.write(configfile, space_around_delimiters=False)
+def save_config():
+    create_config_files_if_needed()
+    with open(user_config_file_path, 'w') as configfile:
+        user_config.write(configfile, space_around_delimiters=False)
+    with open(app_config_file_path, 'w') as configfile:
+        app_config.write(configfile, space_around_delimiters=False)
 
 
-def readConfig():
+def read_config():
     global hostname
-    global platformName
-    global osName
-    global systemName
-    global systemVersion
-    global appConfig
-    global appConfigFilePath
-    global userConfig
-    global userConfigFilePath
-    global userHome
-    global userName
+    global platform_name
+    global os_name
+    global system_name
+    global system_version
+    global app_config
+    global app_config_file_path
+    global user_config
+    global user_config_file_path
+    global user_home
+    global user_name
     #
-    global Port
-    global Sound
-    global Speed
-    global PortOverride
-    global SoundtOverride
-    global WPMOverride
+    global serial_port
+    global sound
+    global station
+    global wire
+    global words_per_min_speed
+    #
+    global serial_port_override
+    global sound_override
+    global station_override
+    global wire_override
+    global wpm_override
 
     # Get the system data
     try:
-        userName = getpass.getuser()
-        userHome = os.path.expanduser('~')
-        osName = os.name
-        systemName = platform.system()
-        systemVersion = platform.release()
-        platformName = sys.platform
+        user_name = getpass.getuser()
+        user_home = os.path.expanduser('~')
+        os_name = os.name
+        system_name = platform.system()
+        system_version = platform.release()
+        platform_name = sys.platform
         hostname = socket.gethostname()
 
         # User configuration file name
-        userConfigFileName = 'config-{}.ini'.format(userName)
-        appConfigFileName = 'config_app.ini'
+        userConfigFileName = "config-{}.ini".format(user_name)
+        app_configFileName = "config_app.ini"
 
         # Create the user and application configuration paths
-        if systemName == 'Windows':
-            userConfigFilePath = os.path.join(os.environ['LOCALAPPDATA'], os.path.normcase(os.path.join(appName, userConfigFileName)))
-            appConfigFilePath = os.path.join(os.environ['ProgramData'], os.path.normcase(os.path.join(appName, appConfigFileName)))
-        elif systemName == 'Linux' or systemName == 'Darwin': # Linux or Mac
-            userConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), userConfigFileName)))
-            appConfigFilePath = os.path.join(userHome, os.path.normcase(os.path.join('.{}'.format(appName), appConfigFileName)))
+        if system_name == "Windows":
+            user_config_file_path = os.path.join(os.environ["LOCALAPPDATA"], os.path.normcase(os.path.join(__APP_NAME, userConfigFileName)))
+            app_config_file_path = os.path.join(os.environ["ProgramData"], os.path.normcase(os.path.join(__APP_NAME, app_configFileName)))
+        elif system_name == "Linux" or system_name == "Darwin": # Linux or Mac
+            user_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(__APP_NAME), userConfigFileName)))
+            app_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(__APP_NAME), app_configFileName)))
         else:
-            log.err('Unknown System name')
+            log.err("Unknown System name")
             exit
 
     except KeyError as ex:
         log.err("Key '{}' not found in environment.".format(ex.args[0]))
         exit
 
-    createConfigFilesIfNeeded()
+    create_config_files_if_needed()
 
-    userConfigDefaults = {'SPEED':'18', 'SOUND':'ON'}
-    appConfigDefaults = {'PORT':''}
+    userConfigDefaults = {__WPM_SPEED_KEY:"18", __SOUND_KEY:"ON"}
+    app_configDefaults = {"PORT":""}
 
-    userConfig = configparser.ConfigParser(defaults=userConfigDefaults, allow_no_value=True, default_section='PYKOB')
-    appConfig = configparser.ConfigParser(defaults=appConfigDefaults, allow_no_value=True, default_section='PYKOB')
+    user_config = configparser.ConfigParser(defaults=userConfigDefaults, allow_no_value=True, default_section=__CONFIG_SECTION)
+    app_config = configparser.ConfigParser(defaults=app_configDefaults, allow_no_value=True, default_section=__CONFIG_SECTION)
 
-    userConfig.read(userConfigFilePath)
-    appConfig.read(appConfigFilePath)
+    user_config.read(user_config_file_path)
+    app_config.read(app_config_file_path)
 
     try:
         # Get the System (App) config values
-        Port = appConfig.get(configSection, 'PORT')
+        serial_port = app_config.get(__CONFIG_SECTION, __SERIAL_PORT_KEY)
         # If there isn't a PORT value set PORT to None
-        if not Port:
-            Port = None
+        if not serial_port:
+            serial_port = None
 
         # Get the User config values
-        Sound = userConfig.getboolean(configSection, 'SOUND')
-        Speed = userConfig.getint(configSection, 'SPEED')
+        sound = user_config.getboolean(__CONFIG_SECTION, __SOUND_KEY)
+        words_per_min_speed = user_config.getint(__CONFIG_SECTION, __WPM_SPEED_KEY)
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
     except ValueError as ex:
         log.err("SPEED value '{}' is not a valid integer value. Setting to 18.".format(ex.args[0]))
-        Speed = 18
+        words_per_min_speed = 18
 
 # ### Mainline
-readConfig()
+read_config()
 
-PortOverride = argparse.ArgumentParser(add_help=False)
-PortOverride.add_argument("-p", "--port", default=Port, help="The  name of the serial port to use ", metavar="portname", dest="Port")
+serial_port_override = argparse.ArgumentParser(add_help=False)
+serial_port_override.add_argument("-p", "--port", default=serial_port, help="The  name of the serial port to use ", metavar="portname", dest="serial_port")
 
-SoundtOverride = argparse.ArgumentParser(add_help=False)
-SoundtOverride.add_argument("-a", "--sound", default='ON' if Sound else 'OFF', choices=['ON', 'OFF'], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="Sound")
+sound_override = argparse.ArgumentParser(add_help=False)
+sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="sound")
 
-WPMOverride = argparse.ArgumentParser(add_help=False)
-WPMOverride.add_argument("-s", "--speed", default=Speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="Speed")
+wpm_override = argparse.ArgumentParser(add_help=False)
+wpm_override.add_argument("-s", "--speed", default=words_per_min_speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="words_per_min_speed")
 
 exit
