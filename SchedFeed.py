@@ -77,20 +77,24 @@ if WIRE:
     myInternet.connect(WIRE)
 mySender = morse.Sender(WPM)
 
-while True:
-    for m in msgs:
-        t0 = time.localtime()
-        now = t0.tm_hour*3600 + t0.tm_min*60 + t0.tm_sec  # current time (sec)
-        t1, s = m
-        tMsg = 3600*(t1//100) + 60*(t1%100)  # time to send message
-        dt = tMsg - now  # time to wait
-        if dt > 0:
-            time.sleep(dt)
-            for c in s:
-                code = mySender.encode(c)
-                myKOB.sounder(code)  # to pace the code sent to the wire
-                if WIRE:
-                    myInternet.write(code)
-                print(c, end='', flush=True)  # display each character
-            print(flush=True)  # start new line after each message
-    time.sleep(24*3600 - now)  # wait until midnight and start over
+try:
+    while True:
+        for m in msgs:
+            t0 = time.localtime()
+            now = t0.tm_hour*3600 + t0.tm_min*60 + t0.tm_sec  # current time (sec)
+            t1, s = m
+            tMsg = 3600*(t1//100) + 60*(t1%100)  # time to send message
+            dt = tMsg - now  # time to wait
+            if dt > 0:
+                time.sleep(dt)
+                for c in s:
+                    code = mySender.encode(c)
+                    myKOB.sounder(code)  # to pace the code sent to the wire
+                    if WIRE:
+                        myInternet.write(code)
+                    print(c, end='', flush=True)  # display each character
+                print(flush=True)  # start new line after each message
+        time.sleep(24*3600 - now)  # wait until midnight and start over
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.

@@ -115,4 +115,8 @@ def main(argv):
     exit
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except KeyboardInterrupt:
+        print()
+        sys.exit(1)     # Indicate this was an abnormal exit

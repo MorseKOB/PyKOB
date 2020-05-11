@@ -56,11 +56,7 @@ Change history:
 - initial release
 
 """
-
-try:
-    from urllib.request import Request, urlopen  # Python 3
-except:
-    from urllib2 import Request, urlopen  # Python 2
+from urllib.request import Request, urlopen  # Python 3
 import re
 import time
 from pykob import internet, morse, kob, log
@@ -208,33 +204,37 @@ def send(text):
         myKOB.sounder(code)  # to pace the code sent to the wire
         myInternet.write(code)
 
-if DEBUG:
-    print(DEBUG)
-    sendForecast(DEBUG)
-    exit()
+try:
+    if DEBUG:
+        print(DEBUG)
+        sendForecast(DEBUG)
+        exit()
 
-myInternet = internet.Internet(IDTEXT)
-myInternet.connect(WIRE)
-myReader = morse.Reader(callback=readerCallback)
-mySender = morse.Sender(WPM)
-myKOB = kob.KOB(port=None, audio=False)
-myReader.setWPM(WPM)
-code = []
-bracket = False
-msg = ''
-while True:
-    try:
-        code += myInternet.read()
-        if code[-1] == 1:
-            log.log('Weather.py: {}'.format(code))
-            myReader.decode(code)
-            myReader.flush()
+    myInternet = internet.Internet(IDTEXT)
+    myInternet.connect(WIRE)
+    myReader = morse.Reader(callback=readerCallback)
+    mySender = morse.Sender(WPM)
+    myKOB = kob.KOB(port=None, audio=False)
+    myReader.setWPM(WPM)
+    code = []
+    bracket = False
+    msg = ''
+    while True:
+        try:
+            code += myInternet.read()
+            if code[-1] == 1:
+                log.log('Weather.py: {}'.format(code))
+                myReader.decode(code)
+                myReader.flush()
+                code = []
+                bracket = False
+                msg = ''
+        except:
+            log.err('Weather.py: Recovering from fatal error.')
+            time.sleep(30)
             code = []
             bracket = False
             msg = ''
-    except:
-        log.err('Weather.py: Recovering from fatal error.')
-        time.sleep(30)
-        code = []
-        bracket = False
-        msg = ''
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
