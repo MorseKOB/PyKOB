@@ -129,7 +129,14 @@ try:
 
     log.log("Starting Clock")
 
-    clock_parser = argparse.ArgumentParser(parents=[config.serial_port_override, config.sound_override, config.wpm_override])
+    clock_parser = argparse.ArgumentParser(parents=\
+     [\
+      config.serial_port_override, \
+      config.sound_override, \
+      config.sounder_override, \
+      config.spacing_override, \
+      config.cwpm_override, \
+      config.wpm_override])
     clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
     clock_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements ", metavar="time", dest="End")
     clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
@@ -137,7 +144,7 @@ try:
     args = clock_parser.parse_args()
     
     port = args.serial_port # serial port for KOB interface
-    speed = args.words_per_min_speed  # code speed (words per minute)
+    speed = args.word_speed  # code speed (words per minute)
     if (speed < 1) or(speed > 50):
         print("words_per_min_speed specified must be between 1 and 50")
         sys.exit(1)

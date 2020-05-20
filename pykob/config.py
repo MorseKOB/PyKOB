@@ -22,8 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-""" 
-config module
+"""config module  
 
 Reads configuration information for `per-machine` and `per-user` values.  
 
@@ -53,7 +52,13 @@ import platform
 import socket
 import sys
 from distutils.util import strtobool
+from enum import Enum, unique
 from pykob import log
+
+@unique
+class Spacing(Enum):
+    char = "CHARSPACING"
+    word = "WORDSPACING"
 
 # Application name
 __APP_NAME = "pykob"
@@ -62,8 +67,11 @@ __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
-__SOUND_KEY = "SOUND"
+__CWPM_SPEED_KEY = "CWPM_SPEED"
 __WPM_SPEED_KEY = "WPM_SPEED"
+__SOUND_KEY = "SOUND"
+__SOUNDER_KEY = "SOUNDER"
+__SPACING_KEY = "SPACING"
 __STATION_KEY = "STATION"
 __WIRE_KEY = "WIRE"
 
@@ -90,9 +98,41 @@ serial_port = None
 
 # User Settings
 sound = True
+sounder = False
+spacing = Spacing.char
 station = None
 wire = None
-words_per_min_speed = 18
+char_speed = 18
+word_speed = 18
+
+def onOffFromBool(b):
+    """Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
+
+    Parameters
+    ----------
+    b : boolean
+        The value to evaluate
+    Return
+    ------
+        'ON' for `True`, 'OFF' for `False`
+    """
+    #print(b)
+    r = "ON" if b else "OFF"
+    return r
+
+def noneOrValueFromStr(s):
+    """Return `None` if `s` is '' and the string value otherwise
+
+    Parameters
+    ----------
+    s : str
+        The string value to evaluate
+    Return
+    ------
+        `None` or the string value
+"""
+    r = None if not s or not s.strip() else s
+    return r
 
 def create_config_files_if_needed():
     global app_config_dir
@@ -116,47 +156,163 @@ def create_config_files_if_needed():
         f = open(app_config_file_path, 'w')
         f.close()
 
-def set_wpm_speed(s):
-    global words_per_min_speed
+def set_cwpm_speed(s):
+    """Sets the Character words per minute speed
+
+    A difference between character words per minute speed and words per 
+    minute speed is used to calulate a Farnsworth timing value.
+
+    Parameters
+    ----------
+    s : str
+        The speed in words-per-minute as an interger string value
+    """
+
+    global char_speed
     try:
         _speed = int(s)
-        words_per_min_speed = _speed
-        user_config.set(__CONFIG_SECTION, __WPM_SPEED_KEY, str(words_per_min_speed))
+        char_speed = _speed
+        user_config.set(__CONFIG_SECTION, __CWPM_SPEED_KEY, str(char_speed))
     except ValueError as ex:
-        log.err("SPEED value '{}' is not a valid integer value. Not setting value.".format(ex.args[0]))
+        log.err("CHARS value '{}' is not a valid integer value. Not setting CWPM value.".format(ex.args[0]))
+
+def set_serial_port(p):
+    """Sets the name/path of the serial/tty port to use for a 
+    key+sounder/loop interface
+
+    Parameters
+    ----------
+    p : str
+        The 'COM' port for Windows, the 'tty' device path for Mac and Linux
+    """
+
+    global serial_port
+    serial_port = noneOrValueFromStr(p)
+    app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
 
 def set_sound(s):
+    """Sets the Sound/Audio enable state
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the computer audio 
+    will be used to produce sounder output.
+
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable sound. Values of `NO`|`OFF`|`FALSE` will disable sound.
+    """
+
     global sound
     try:
-        _sound = strtobool(str(s))
-        if _sound:
-            user_config.set(__CONFIG_SECTION, __SOUND_KEY, "ON")
-        else:
-            user_config.set(__CONFIG_SECTION, __SOUND_KEY, "OFF")
-        sound = _sound
+        _sb = strtobool(str(s))
+        sound = onOffFromBool(_sb)
+        user_config.set(__CONFIG_SECTION, __SOUND_KEY, sound)
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
-def set_serial_port(p):
-    global serial_port
-    serial_port = p
-    app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
+def set_sounder(s):
+    """Sets the Sounder enable state
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the sounder will 
+    be driven if the `port` value is configured.
+
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable sounder output. Values of `NO`|`OFF`|`FALSE` will disable 
+        sounder output.
+    """
+
+    global sounder
+    try:
+        _sb = strtobool(str(s))
+        sounder = onOffFromBool(_sb)
+        user_config.set(__CONFIG_SECTION, __SOUNDER_KEY, sounder)
+    except ValueError as ex:
+        log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+
+def set_spacing(s):
+    """Sets the Spacing (for Farnsworth timing) to Character `Spacing.char` or 
+    Word `Spacing.word`
+
+    When set to `Spacing.char` Farnsworth spacing will be added between characters. 
+    When set to `Spacing.word` Farnsworth spacing will be added between words.
+    
+    Parameters
+    ----------
+    s : str
+        The value `C|CHAR` will set the spacing to `Spacing.char`. The value 
+        `W|WORD` will set the spacing to `Spacing.word`.
+    """
+
+    global spacing
+    s = s.upper()
+    if s=="C" or s=="CHAR" or s=="CHARACTER":
+        spacing = Spacing.char
+    elif s=="W" or s=="WORD":
+        spacing = Spacing.word
+    else:
+        log.err("SPACING value '{}' is not a valid `Spacing` value 'CHAR' or 'WORD'.".format(s))
+        return
+    user_config.set(__CONFIG_SECTION, __SPACING_KEY, "CHAR" if spacing == Spacing.char else "WORD")
+
 
 def set_station(s):
+    """Sets the station name to use when connecting to a wire
+
+    Parameters
+    ----------
+    s : str
+        The station name
+    """
+
     global station
-    station = s
+    station = noneOrValueFromStr(s)
     user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
 def set_wire(w):
+    """Sets the wire to use when connecting
+
+    Parameters
+    ----------
+    w : str
+        The wire name
+    """
+
     global wire
-    wire = w
+    wire = noneOrValueFromStr(w)
     user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
 
+def set_wpm_speed(s):
+    """Sets the Words per minute speed
+
+    Parameters
+    ----------
+    s : str
+        The speed in words-per-minute as an interger string value
+    """
+
+    global word_speed
+    try:
+        _speed = int(s)
+        word_speed = _speed
+        user_config.set(__CONFIG_SECTION, __WPM_SPEED_KEY, str(word_speed))
+    except ValueError as ex:
+        log.err("WORDS value '{}' is not a valid integer value. Not setting WPM value.".format(ex.args[0]))
+
 def print_info():
+    """Print system and configuration information
+    """
+
     print_system_info()
     print_config()
 
 def print_system_info():
+    """Print system information
+    """
+
     print("User:", user_name)
     print("User Home Path:", user_home)
     print("User Configuration File:", user_config_file_path)
@@ -168,29 +324,35 @@ def print_system_info():
     print("Host:", hostname)
 
 def print_config():
+    """Print the PyKOB configuration
+    """
+
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
-    soundPrint = "OFF"
-    if sound:
-        soundPrint = "ON"
-    print("Sound:", soundPrint)
-    print("Station:", station)
-    print("Wire:", wire)
-    print("Words per Min Speed:", words_per_min_speed)
+    print("Sound:", sound)
+    print("Sounder:", sounder)
+    print("Spacing:", spacing)
+    print("Station:", noneOrValueFromStr(station))
+    print("Wire:", noneOrValueFromStr(wire))
+    print("Character speed", char_speed)
+    print("Words per min speed:", word_speed)
 
-'''
-Save (write) the configuration values out to the user and machine config files.
-'''
 def save_config():
+    """Save (write) the configuration values out to the user and 
+    system/machine config files.
+    """
+
     create_config_files_if_needed()
     with open(user_config_file_path, 'w') as configfile:
         user_config.write(configfile, space_around_delimiters=False)
     with open(app_config_file_path, 'w') as configfile:
         app_config.write(configfile, space_around_delimiters=False)
 
-
 def read_config():
+    """Read the configuration values from the user and machine config files.
+    """
+
     global hostname
     global platform_name
     global os_name
@@ -204,13 +366,19 @@ def read_config():
     global user_name
     #
     global serial_port
+    #
+    global char_speed
     global sound
+    global sounder
+    global spacing
     global station
     global wire
-    global words_per_min_speed
+    global word_speed
     #
+    global cwpm_override
     global serial_port_override
     global sound_override
+    global spacing_override
     global station_override
     global wire_override
     global wpm_override
@@ -246,11 +414,18 @@ def read_config():
 
     create_config_files_if_needed()
 
-    userConfigDefaults = {__WPM_SPEED_KEY:"18", __SOUND_KEY:"ON"}
-    app_configDefaults = {"PORT":""}
+    user_config_defaults = {\
+        __CWPM_SPEED_KEY:"20", \
+        __SOUND_KEY:"ON", \
+        __SOUNDER_KEY:"OFF", \
+        __SPACING_KEY:"CHAR", \
+        __STATION_KEY:"", \
+        __WIRE_KEY:"", \
+        __WPM_SPEED_KEY:"18"}
+    app_config_defaults = {"PORT":""}
 
-    user_config = configparser.ConfigParser(defaults=userConfigDefaults, allow_no_value=True, default_section=__CONFIG_SECTION)
-    app_config = configparser.ConfigParser(defaults=app_configDefaults, allow_no_value=True, default_section=__CONFIG_SECTION)
+    user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
+    app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
 
     user_config.read(user_config_file_path)
     app_config.read(app_config_file_path)
@@ -263,24 +438,72 @@ def read_config():
             serial_port = None
 
         # Get the User config values
+        __option = "Character Speed"
+        char_speed = user_config.getint(__CONFIG_SECTION, __CWPM_SPEED_KEY)
+        __option = "Word Speed"
+        word_speed = user_config.getint(__CONFIG_SECTION, __WPM_SPEED_KEY)
+        __option = "Sound"
         sound = user_config.getboolean(__CONFIG_SECTION, __SOUND_KEY)
-        words_per_min_speed = user_config.getint(__CONFIG_SECTION, __WPM_SPEED_KEY)
+        __option = "Sounder"
+        sounder = user_config.getboolean(__CONFIG_SECTION, __SOUNDER_KEY)
+        __option = "Spacing"
+        _spacing = (user_config.get(__CONFIG_SECTION, __SPACING_KEY)).upper()
+        if _spacing == "CHAR":
+            spacing = Spacing.char
+        elif _spacing == "WORD":
+            spacing = Spacing.word
+        else:
+            raise ValueError(_spacing)
+        __option = "Station"
+        _station = user_config.get(__CONFIG_SECTION, __STATION_KEY)
+        if not _station or _station.upper() == "NONE":
+            station = _station
+        __option = "Wire"
+        _wire = user_config.get(__CONFIG_SECTION, __WIRE_KEY)
+        if not _wire or _wire.upper() == "NONE":
+            wire = _wire
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
     except ValueError as ex:
-        log.err("SPEED value '{}' is not a valid integer value. Setting to 18.".format(ex.args[0]))
-        words_per_min_speed = 18
+        log.err("{} option value '{}' is not a valid value for the option.".format(__option, ex.args[0]))
+        word_speed = 18
 
 # ### Mainline
 read_config()
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", default=serial_port, help="The  name of the serial port to use ", metavar="portname", dest="serial_port")
+serial_port_override.add_argument("-p", "--port", default=serial_port, \
+help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+
+cwpm_override = argparse.ArgumentParser(add_help=False)
+cwpm_override.add_argument("-c", "--chars", default=char_speed, type=int, \
+help="The character speed to use in Words per Minute. This is used in conjunction with \
+`speed` to introduce Farnsworth timing.", metavar="charspeed", dest="char_")
 
 sound_override = argparse.ArgumentParser(add_help=False)
-sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether morse audio should be generated", metavar="sound", dest="sound")
+sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
+choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether morse audio \
+should be generated.", metavar="sound", dest="sound")
+
+sounder_override = argparse.ArgumentParser(add_help=False)
+sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF", 
+choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether to use \
+sounder if `port` is configured.", metavar="sounder", dest="sounder")
+
+spacing_override = argparse.ArgumentParser(add_help=False)
+spacing_override.add_argument("-s", "--spacing", default=spacing, \
+help="The spacing (CHAR|WORD) to use.", metavar="spacing", dest="spacing")
+
+station_override = argparse.ArgumentParser(add_help=False)
+station_override.add_argument("-5", "--station", default=station, \
+help="The station to use (or 'NONE').", metavar="station", dest="station")
+
+wire_override = argparse.ArgumentParser(add_help=False)
+wire_override.add_argument("-W", "--wire", default=wire, \
+help="The wire to use (or 'NONE').", metavar="wire", dest="wire")
 
 wpm_override = argparse.ArgumentParser(add_help=False)
-wpm_override.add_argument("-s", "--speed", default=words_per_min_speed, type=int, help="The  morse send speed in WPM", metavar="speed", dest="words_per_min_speed")
+wpm_override.add_argument("-w", "--words", default=word_speed, type=int, \
+help="The morse send speed in Words per Minute.", metavar="speed", dest="word_speed")
 
 exit
