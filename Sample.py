@@ -36,7 +36,7 @@ from pykob import config, kob, morse
 import time
 
 PORT = config.serial_port # serial port for KOB interface
-WPM = config.words_per_min_speed  # code speed (words per minute)
+WPM = config.word_speed  # code speed (words per minute)
 SOUND = config.sound # whether to enable computer sound for sounder
 TEXT = '~ The quick brown fox +'  # ~ opens the circuit, + closes it
 
@@ -44,14 +44,14 @@ myKOB = kob.KOB(PORT, audio=SOUND)
 mySender = morse.Sender(WPM)
 
 # send HI at 20 wpm as an example
-print("HI");
+print("HI")
 code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
         -180, +60, -60, +60, -1000, +1)
 myKOB.sounder(code)
 time.sleep(2)
 
 # then send the text
-print(TEXT);
+print(TEXT)
 for c in TEXT:
     code = mySender.encode(c)
     myKOB.sounder(code)
