@@ -61,6 +61,11 @@ class Spacing(Enum):
     char = "CHAR"
     word = "WORD"
 
+@unique
+class CodeType(Enum):
+    international = "INTERNATIONAL"
+    american = "AMERICAN"
+
 # Application name
 __APP_NAME = "pykob"
 # INI Section
@@ -68,6 +73,7 @@ __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
+__CODE_TYPE_KEY = "CODE_TYPE"
 __LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
@@ -100,6 +106,7 @@ user_name = None
 serial_port = None
 
 # User Settings
+code_type = CodeType.american
 local = False
 remote = False
 sound = True
@@ -160,6 +167,41 @@ def create_config_files_if_needed():
             os.makedirs(app_config_dir)
         f = open(app_config_file_path, 'w')
         f.close()
+
+def set_code_type(s):
+    """Sets the Code Type (for American or International)
+
+    Parameters
+    ----------
+    s : str
+        The value `A|AMERICAN` will set the code type to 'American'.  
+        The value `I|INTERNATIONAL` will set the code type to 'International'.  
+    """
+
+    global code_type
+    s = s.upper()
+    if s=="A" or s=="AMERICAN":
+        code_type = CodeType.american
+    elif s=="I" or s=="INTERNATIONAL":
+        code_type = CodeType.international
+    else:
+        log.err("TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s))
+        return
+    user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type)
+
+
+def set_station(s):
+    """Sets the station name to use when connecting to a wire
+
+    Parameters
+    ----------
+    s : str
+        The station name
+    """
+
+    global station
+    station = noneOrValueFromStr(s)
+    user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
 def set_local(l):
     """Enable/disable local copy
@@ -386,6 +428,7 @@ def print_config():
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
+    print("Code type:", code_type)
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("Sound:", onOffFromBool(sound))
@@ -425,6 +468,7 @@ def read_config():
     #
     global serial_port
     #
+    global code_type
     global local
     global min_char_speed
     global remote
@@ -467,6 +511,7 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
+        __CODE_TYPE_KEY:"AMERICAN", \
         __LOCAL_KEY:"OFF", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"OFF", \
@@ -492,6 +537,15 @@ def read_config():
             serial_port = None
 
         # Get the User config values
+        __option = "Code type"
+        __key = __CODE_TYPE_KEY
+        _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        if _code_type == "AMERICAN":
+            code_type = CodeType.american
+        elif _code_type == "INTERNATIONAL":
+            code_type = CodeType.international
+        else:
+            raise ValueError(_code_type)
         __option = "Local copy"
         __key = __LOCAL_KEY
         local = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -538,6 +592,10 @@ def read_config():
 
 # ### Mainline
 read_config()
+
+code_type_override = argparse.ArgumentParser(add_help=False)
+code_type_override.add_argument("-T", "--type", default=code_type, \
+help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="type", dest="code_type")
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", default=local, \

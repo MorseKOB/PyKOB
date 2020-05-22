@@ -131,6 +131,7 @@ try:
     arg_parser = argparse.ArgumentParser(description="Morse Cuckoo Clock", parents=\
      [\
       config.serial_port_override, \
+      config.code_type_override, \
       config.sound_override, \
       config.sounder_override, \
       config.spacing_override, \

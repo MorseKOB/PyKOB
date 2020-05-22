@@ -43,23 +43,6 @@ import time
 from pykob import config, kob, morse, log
 from distutils.util import strtobool
 
-__full = False
-__DLW = False
-
-arg_parser = argparse.ArgumentParser(description="Sample of the PyKOB functionality with a short Morse code text and options for longer texts.", \
-    parents=\
-    [\
-    config.serial_port_override, \
-    config.sound_override, \
-    config.sounder_override, \
-    config.spacing_override, \
-    config.min_char_speed_override, \
-    config.text_speed_override])
-arg_parser.add_argument("-F", "--full", action='store_true', default=False, help="Play full 'Quick Brown Fox...'", dest="full")
-arg_parser.add_argument("-D", "--dwi", action='store_true', default=False, help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
-args = arg_parser.parse_args()
-
-
 __short_QBF = "The quick brown fox"
 __full_QGF = "The quick brown fox jumps over the lazy dog"
 __disneyland_dedication = "To all who come to this happy place; welcome. \
@@ -69,10 +52,33 @@ is dedicated to the ideals, the dreams and the hard facts that have \
 created America... \
 with the hope that it will be a source of joy and inspiration to all the world."
 
+__full = False
+__DLW = False
+
+arg_parser = argparse.ArgumentParser(description="Sample of the PyKOB functionality with a short Morse code text and options for longer texts.", \
+    parents=\
+    [\
+    config.serial_port_override, \
+    config.code_type_override, \
+    config.sound_override, \
+    config.sounder_override, \
+    config.spacing_override, \
+    config.min_char_speed_override, \
+    config.text_speed_override])
+arg_parser.add_argument("-F", "--full", action='store_true', default=False, help="Play full 'Quick Brown Fox...'", dest="full")
+arg_parser.add_argument("-D", "--di", action='store_true', default=False, help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
+args = arg_parser.parse_args()
+
+
+port = args.serial_port # serial port for KOB interface
+text_speed = args.text_speed  # text speed (words per minute)
+if (text_speed < 1) or(text_speed > 50):
+    print("text_speed specified must be between 1 and 50")
+    sys.exit(1)
 sound = strtobool(args.sound)
 
-myKOB = kob.KOB(port=args.serial_port, audio=args.sound)
-mySender = morse.Sender(args.text_speed)
+myKOB = kob.KOB(port=port, audio=sound)
+mySender = morse.Sender(text_speed)
 
 # send HI at 20 wpm as an example
 print("HI")
