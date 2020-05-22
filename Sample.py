@@ -22,7 +22,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-
+"""
+Disneyland dedication from Walt Disney (as displayed on plaque at Disneyland entrance  
+and as sounded at the Frontierland station.)
+"""
 """
 Sample.py
 
@@ -33,27 +36,62 @@ Serial port, code speed, and audio preferences should be specified by running th
 """
 
 from pykob import config, kob, morse
+
+import argparse
+import sys
 import time
+from pykob import config, kob, morse, log
+from distutils.util import strtobool
 
-PORT = config.serial_port # serial port for KOB interface
-WPM = config.word_speed  # code speed (words per minute)
-SOUND = config.sound # whether to enable computer sound for sounder
-TEXT = '~ The quick brown fox +'  # ~ opens the circuit, + closes it
+__full = False
+__DLW = False
 
-myKOB = kob.KOB(PORT, audio=SOUND)
-mySender = morse.Sender(WPM)
+arg_parser = argparse.ArgumentParser(description="Sample of the PyKOB functionality with a short Morse code text and options for longer texts.", \
+    parents=\
+    [\
+    config.serial_port_override, \
+    config.sound_override, \
+    config.sounder_override, \
+    config.spacing_override, \
+    config.min_char_speed_override, \
+    config.text_speed_override])
+arg_parser.add_argument("-F", "--full", action='store_true', default=False, help="Play full 'Quick Brown Fox...'", dest="full")
+arg_parser.add_argument("-D", "--dwi", action='store_true', default=False, help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
+args = arg_parser.parse_args()
+
+
+__short_QBF = "The quick brown fox"
+__full_QGF = "The quick brown fox jumps over the lazy dog"
+__disneyland_dedication = "To all who come to this happy place; welcome. \
+Disneyland is your land. Here age relives fond memories of the past... \
+and here youth may savor the challenge and promise of the future. Disneyland \
+is dedicated to the ideals, the dreams and the hard facts that have \
+created America... \
+with the hope that it will be a source of joy and inspiration to all the world."
+
+sound = strtobool(args.sound)
+
+myKOB = kob.KOB(port=args.serial_port, audio=args.sound)
+mySender = morse.Sender(args.text_speed)
 
 # send HI at 20 wpm as an example
 print("HI")
 code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
         -180, +60, -60, +60, -1000, +1)
-myKOB.sounder(code)
-time.sleep(2)
-
-# then send the text
-print(TEXT)
-for c in TEXT:
-    code = mySender.encode(c)
-    myKOB.sounder(code)
 
 time.sleep(1)
+
+# then send the text
+__text = __full_QGF if args.full else __short_QBF
+if args.dd:
+    __text = __disneyland_dedication
+    print("From Disneyland Fronteer Land...")
+print(__text)
+myKOB.sounder(mySender.encode('~')) # Open the circuit
+time.sleep(0.200)
+for c in __text:
+    code = mySender.encode(c)
+    myKOB.sounder(code)
+time.sleep(0.350)
+myKOB.sounder(mySender.encode('+')) # Close the circuit
+

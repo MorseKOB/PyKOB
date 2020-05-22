@@ -34,8 +34,8 @@ Configuration/preference values are read/written to:
   User: [user]\AppData\Roaming\pykob\config-[user].ini
   Machine: \ProgramData\pykob\config_app.ini
  Mac:
-  User: 
-  Machine: 
+  User: ~/.pykob/config-[user].ini
+  Machine: ~/.pykob/config_app.ini
  Linux:
   User: ~/.pykob/config-[user].ini
   Machine: ~/.pykob/config_app.ini
@@ -57,8 +57,9 @@ from pykob import log
 
 @unique
 class Spacing(Enum):
-    char = "CHARSPACING"
-    word = "WORDSPACING"
+    none = "NONE"
+    char = "CHAR"
+    word = "WORD"
 
 # Application name
 __APP_NAME = "pykob"
@@ -67,12 +68,14 @@ __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
-__CWPM_SPEED_KEY = "CWPM_SPEED"
-__WPM_SPEED_KEY = "WPM_SPEED"
+__LOCAL_KEY = "LOCAL"
+__MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
+__REMOTE_KEY = "REMOTE"
 __SOUND_KEY = "SOUND"
 __SOUNDER_KEY = "SOUNDER"
 __SPACING_KEY = "SPACING"
 __STATION_KEY = "STATION"
+__TEXT_SPEED_KEY = "TEXT_SPEED"
 __WIRE_KEY = "WIRE"
 
 
@@ -97,13 +100,15 @@ user_name = None
 serial_port = None
 
 # User Settings
+local = False
+remote = False
 sound = True
 sounder = False
-spacing = Spacing.char
+spacing = Spacing.none
 station = None
 wire = None
-char_speed = 18
-word_speed = 18
+min_char_speed = 18
+text_speed = 18
 
 def onOffFromBool(b):
     """Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
@@ -156,11 +161,55 @@ def create_config_files_if_needed():
         f = open(app_config_file_path, 'w')
         f.close()
 
-def set_cwpm_speed(s):
-    """Sets the Character words per minute speed
+def set_local(l):
+    """Enable/disable local copy
 
-    A difference between character words per minute speed and words per 
-    minute speed is used to calulate a Farnsworth timing value.
+    When local copy is enabled, the local sound/sounder configuration is  
+    used to locally sound the content being sent to the wire.
+    
+    Parameters
+    ----------
+    l : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
+    """
+
+    global local
+    try:
+        local = strtobool(str(l))
+        user_config.set(__CONFIG_SECTION, __LOCAL_KEY, onOffFromBool(local))
+    except ValueError as ex:
+        log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+
+def set_remote(r):
+    """Enable/disable remote send
+
+    When remote send is enabled, the content will be sent to the  
+    station+wire configured.  
+    
+    Parameters
+    ----------
+    r : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
+    """
+
+    global remote
+    try:
+        remote = strtobool(str(r))
+        user_config.set(__CONFIG_SECTION, __REMOTE_KEY, onOffFromBool(remote))
+    except ValueError as ex:
+        log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+
+def set_min_char_speed(s):
+    """Sets the minimum character speed in words per minute
+
+    A difference between character speed (in WPM) and text speed  
+    (in WPM) is used to calulate a Farnsworth timing value.  
+
+    This is the minimum character speed. If the text speed is 
+    higher, then the character speed will be bumped up to  
+    the text speed.
 
     Parameters
     ----------
@@ -168,11 +217,11 @@ def set_cwpm_speed(s):
         The speed in words-per-minute as an interger string value
     """
 
-    global char_speed
+    global min_char_speed
     try:
         _speed = int(s)
-        char_speed = _speed
-        user_config.set(__CONFIG_SECTION, __CWPM_SPEED_KEY, str(char_speed))
+        min_char_speed = _speed
+        user_config.set(__CONFIG_SECTION, __MIN_CHAR_SPEED_KEY, str(min_char_speed))
     except ValueError as ex:
         log.err("CHARS value '{}' is not a valid integer value. Not setting CWPM value.".format(ex.args[0]))
 
@@ -205,9 +254,8 @@ def set_sound(s):
 
     global sound
     try:
-        _sb = strtobool(str(s))
-        sound = onOffFromBool(_sb)
-        user_config.set(__CONFIG_SECTION, __SOUND_KEY, sound)
+        sound = strtobool(str(s))
+        user_config.set(__CONFIG_SECTION, __SOUND_KEY, onOffFromBool(sound))
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
@@ -227,36 +275,44 @@ def set_sounder(s):
 
     global sounder
     try:
-        _sb = strtobool(str(s))
-        sounder = onOffFromBool(_sb)
-        user_config.set(__CONFIG_SECTION, __SOUNDER_KEY, sounder)
+        sounder = strtobool(str(s))
+        user_config.set(__CONFIG_SECTION, __SOUNDER_KEY, onOffFromBool(sounder))
     except ValueError as ex:
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
 
 def set_spacing(s):
-    """Sets the Spacing (for Farnsworth timing) to Character `Spacing.char` or 
-    Word `Spacing.word`
+    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,  
+    Character `Spacing.char` or Word `Spacing.word`
 
-    When set to `Spacing.char` Farnsworth spacing will be added between characters. 
-    When set to `Spacing.word` Farnsworth spacing will be added between words.
+    When set to `Spacing.none` Farnsworth spacing will not be added.  
+    When set to `Spacing.char` Farnsworth spacing will be added between characters.  
+    When set to `Spacing.word` Farnsworth spacing will be added between words.  
     
     Parameters
     ----------
     s : str
-        The value `C|CHAR` will set the spacing to `Spacing.char`. The value 
-        `W|WORD` will set the spacing to `Spacing.word`.
+        The value `N|NONE` will set the spacing to `Spacing.none` (disabled).  
+        The value `C|CHAR` will set the spacing to `Spacing.char`.  
+        The value `W|WORD` will set the spacing to `Spacing.word`.
     """
 
     global spacing
     s = s.upper()
-    if s=="C" or s=="CHAR" or s=="CHARACTER":
+    config_spacing = None
+    if s=="N" or s=="NONE":
+        spacing = Spacing.none
+        config_spacing = "NONE"
+    elif s=="C" or s=="CHAR" or s=="CHARACTER":
         spacing = Spacing.char
+        config_spacing = "CHAR"
     elif s=="W" or s=="WORD":
         spacing = Spacing.word
+        config_spacing = "WORD"
     else:
-        log.err("SPACING value '{}' is not a valid `Spacing` value 'CHAR' or 'WORD'.".format(s))
+        log.err("SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s))
         return
-    user_config.set(__CONFIG_SECTION, __SPACING_KEY, "CHAR" if spacing == Spacing.char else "WORD")
+    if config_spacing:
+        user_config.set(__CONFIG_SECTION, __SPACING_KEY, config_spacing)
 
 
 def set_station(s):
@@ -285,25 +341,25 @@ def set_wire(w):
     wire = noneOrValueFromStr(w)
     user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
 
-def set_wpm_speed(s):
-    """Sets the Words per minute speed
+def set_text_speed(s):
+    """Sets the Text (code) speed in words per minute
 
     Parameters
     ----------
     s : str
-        The speed in words-per-minute as an interger string value
+        The text speed in words-per-minute as an interger string value
     """
 
-    global word_speed
+    global text_speed
     try:
         _speed = int(s)
-        word_speed = _speed
-        user_config.set(__CONFIG_SECTION, __WPM_SPEED_KEY, str(word_speed))
+        text_speed = _speed
+        user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
     except ValueError as ex:
-        log.err("WORDS value '{}' is not a valid integer value. Not setting WPM value.".format(ex.args[0]))
+        log.err("Text speed value '{}' is not a valid integer value.".format(ex.args[0]))
 
 def print_info():
-    """Print system and configuration information
+    """Print system and PyKOB configuration information
     """
 
     print_system_info()
@@ -330,13 +386,15 @@ def print_config():
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
-    print("Sound:", sound)
-    print("Sounder:", sounder)
+    print("Local copy:", onOffFromBool(local))
+    print("Remote send:", onOffFromBool(remote))
+    print("Sound:", onOffFromBool(sound))
+    print("Sounder:", onOffFromBool(sounder))
     print("Spacing:", spacing)
     print("Station:", noneOrValueFromStr(station))
     print("Wire:", noneOrValueFromStr(wire))
-    print("Character speed", char_speed)
-    print("Words per min speed:", word_speed)
+    print("Character speed", min_char_speed)
+    print("Words per min speed:", text_speed)
 
 def save_config():
     """Save (write) the configuration values out to the user and 
@@ -367,21 +425,15 @@ def read_config():
     #
     global serial_port
     #
-    global char_speed
+    global local
+    global min_char_speed
+    global remote
     global sound
     global sounder
     global spacing
     global station
     global wire
-    global word_speed
-    #
-    global cwpm_override
-    global serial_port_override
-    global sound_override
-    global spacing_override
-    global station_override
-    global wire_override
-    global wpm_override
+    global text_speed
 
     # Get the system data
     try:
@@ -415,13 +467,15 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
-        __CWPM_SPEED_KEY:"20", \
+        __LOCAL_KEY:"OFF", \
+        __MIN_CHAR_SPEED_KEY:"18", \
+        __REMOTE_KEY:"OFF", \
         __SOUND_KEY:"ON", \
         __SOUNDER_KEY:"OFF", \
-        __SPACING_KEY:"CHAR", \
+        __SPACING_KEY:"NONE", \
         __STATION_KEY:"", \
         __WIRE_KEY:"", \
-        __WPM_SPEED_KEY:"18"}
+        __TEXT_SPEED_KEY:"18"}
     app_config_defaults = {"PORT":""}
 
     user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
@@ -438,47 +492,69 @@ def read_config():
             serial_port = None
 
         # Get the User config values
-        __option = "Character Speed"
-        char_speed = user_config.getint(__CONFIG_SECTION, __CWPM_SPEED_KEY)
-        __option = "Word Speed"
-        word_speed = user_config.getint(__CONFIG_SECTION, __WPM_SPEED_KEY)
+        __option = "Local copy"
+        __key = __LOCAL_KEY
+        local = user_config.getboolean(__CONFIG_SECTION, __key)
+        __option = "Minimum character speed"
+        __key = __MIN_CHAR_SPEED_KEY
+        min_char_speed = user_config.getint(__CONFIG_SECTION, __key)
+        __option = "Remote send"
+        __key = __REMOTE_KEY
+        remote = user_config.getboolean(__CONFIG_SECTION, __key)
+        __option = "Text speed"
+        __key = __TEXT_SPEED_KEY
+        text_speed = user_config.getint(__CONFIG_SECTION, __key)
         __option = "Sound"
-        sound = user_config.getboolean(__CONFIG_SECTION, __SOUND_KEY)
+        __key = __SOUND_KEY
+        sound = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Sounder"
-        sounder = user_config.getboolean(__CONFIG_SECTION, __SOUNDER_KEY)
+        __key = __SOUNDER_KEY
+        sounder = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Spacing"
-        _spacing = (user_config.get(__CONFIG_SECTION, __SPACING_KEY)).upper()
-        if _spacing == "CHAR":
+        __key = __SPACING_KEY
+        _spacing = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        if _spacing == "NONE":
+            spacing = Spacing.none
+        elif _spacing == "CHAR":
             spacing = Spacing.char
         elif _spacing == "WORD":
             spacing = Spacing.word
         else:
             raise ValueError(_spacing)
         __option = "Station"
-        _station = user_config.get(__CONFIG_SECTION, __STATION_KEY)
+        __key = __STATION_KEY
+        _station = user_config.get(__CONFIG_SECTION, __key)
         if not _station or _station.upper() == "NONE":
             station = _station
         __option = "Wire"
-        _wire = user_config.get(__CONFIG_SECTION, __WIRE_KEY)
+        __key = __WIRE_KEY
+        _wire = user_config.get(__CONFIG_SECTION, __key)
         if not _wire or _wire.upper() == "NONE":
             wire = _wire
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
     except ValueError as ex:
-        log.err("{} option value '{}' is not a valid value for the option.".format(__option, ex.args[0]))
-        word_speed = 18
+        log.err("{} option value '{}' is not a valid value. INI file key: {}.".format(__option, ex.args[0], __key))
 
 # ### Mainline
 read_config()
+
+local_override = argparse.ArgumentParser(add_help=False)
+local_override.add_argument("-L", "--local", default=local, \
+help="Enable/disable local copy of transmitted code.", metavar="local", dest="local")
+
+remote_override = argparse.ArgumentParser(add_help=False)
+remote_override.add_argument("-R", "--remote", default=remote, \
+help="Enable/disable remote transmission of generated code.", metavar="remote", dest="remote")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
-cwpm_override = argparse.ArgumentParser(add_help=False)
-cwpm_override.add_argument("-c", "--chars", default=char_speed, type=int, \
-help="The character speed to use in Words per Minute. This is used in conjunction with \
-`speed` to introduce Farnsworth timing.", metavar="charspeed", dest="char_")
+min_char_speed_override = argparse.ArgumentParser(add_help=False)
+min_char_speed_override.add_argument("-c", "--chars", default=min_char_speed, type=int, \
+help="The minimum character speed to use in words per minute. This is used in conjunction with \
+text speed to introduce Farnsworth timing.", metavar="charspeed", dest="char_speed_min")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
@@ -492,18 +568,18 @@ sounder if `port` is configured.", metavar="sounder", dest="sounder")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
 spacing_override.add_argument("-s", "--spacing", default=spacing, \
-help="The spacing (CHAR|WORD) to use.", metavar="spacing", dest="spacing")
+help="The spacing (NONE|CHAR|WORD) to use.", metavar="spacing", dest="spacing")
 
 station_override = argparse.ArgumentParser(add_help=False)
-station_override.add_argument("-5", "--station", default=station, \
+station_override.add_argument("-S", "--station", default=station, \
 help="The station to use (or 'NONE').", metavar="station", dest="station")
 
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \
 help="The wire to use (or 'NONE').", metavar="wire", dest="wire")
 
-wpm_override = argparse.ArgumentParser(add_help=False)
-wpm_override.add_argument("-w", "--words", default=word_speed, type=int, \
-help="The morse send speed in Words per Minute.", metavar="speed", dest="word_speed")
+text_speed_override = argparse.ArgumentParser(add_help=False)
+text_speed_override.add_argument("-t", "--texts", default=text_speed, type=int, \
+help="The morse text speed in words per minute.", metavar="textspeed", dest="text_speed")
 
 exit

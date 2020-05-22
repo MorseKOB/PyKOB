@@ -32,6 +32,8 @@ Command line parameters:
     -h | --help                     : Print help information for using the application
     -i | --sysInfo                  : Print information about the system that relates to PyKOB
     -p | --port <port>              : Set the system PORT (COM or tty) value to use for a sounder
+    -L | --local <ON|OFF>           : Enable/disable local copy of generated content  
+    -R | --remote <ON|OFF>          : Enable/disable sending generated content to remote wire-station
     -a | --sound <ON|OFF>           : Set preference for using/not-using the computer sound
     -A | --sounder <ON|OFF>         : Set preference for using a physical sounder (`port` must be configured)
     -c | --chars                    : Set preferance for speed in WPM (used with word speed for Farnsworth timing)
@@ -52,10 +54,11 @@ NONE_CFG_VALUE = "NONE"
 def help():
     print(" Configure settings/preferences for PyKOB")
     print("  Usage: Configure {[{-h|--help} | {-p|--port port} \
-        {-a|--sound [ON|OFF]) {-c|--chars n} {-s|--spacing [CHAR|WORD]} \
-        {-w|--words n} {-A|--sounder [ON|OFF]} \
-        {-S|--station [station|NONE]} {-W|--wire n} \
-        {-i|--sysInfo}]}")
+{-L|--local [ON|OFF]} {-R|--remote [ON|OFF]} \
+{-a|--sound [ON|OFF]} {-c|--chars n} {-s|--spacing [NONE|CHAR|WORD]} \
+{-w|--words n} {-A|--sounder [ON|OFF]} \
+{-S|--station [station|NONE]} {-W|--wire n} \
+{-i|--sysInfo}]}")
     print("      Values are:")
     print("          -h | --help:                           Pring this help message.")
     print("")
@@ -63,11 +66,13 @@ def help():
     print("")
     print("          -p | --port <serial_port|NONE>:        Set the serial communication port for the interface.")
     print("")
-    print("          -c | --chars <words_per_minute>:       Set the character speed in WPM (used with word speed for Farnsworth timing).")
-    print("          -w | --words <words_per_minute>:       Set the word speed in WPM (used with character speed for Farnsworth timing).")
+    print("          -c | --charspeed <words_per_minute>:   Set the minimum character speed in WPM (used with word speed for Farnsworth timing).")
+    print("          -t | --textspeed <words_per_minute>:   Set the text speed in WPM (used with character speed for Farnsworth timing).")
     print("          -a | --sound ON|OFF:                   Use the computer sound to simulate a sounder.")
     print("          -A | --sounder ON|OFF:                 Use the physical sounder (if 'PORT' is configured).")
-    print("          -s | --spacing CHAR|WORD:              How to apply Farnsworth spacing.")
+    print("          -L | --local ON|OFF:                   Produce local copy of generated/transmited text.")
+    print("          -R | --remote ON|OFF:                  Transmit the content to the configured wire-station.")
+    print("          -s | --spacing NONE|CHAR|WORD:         How to apply Farnsworth spacing.")
     print("          -S | --station <station|NONE>:         Set the Station to connect to.")
     print("          -W | --wire <wire-number>:             Set the Wire number to connect to.")
 
@@ -102,17 +107,19 @@ def main(argv):
     # System configuration
     port = None
     # User preferences
+    local = None
+    remote = None
     sound = None
     sounder = None
     spacing = None
     station = None
     wire = None
-    char_speed = None
-    word_speed = None
+    min_char_speed = None
+    text_speed = None
 
     try:
-        opts, args = getopt.getopt(argv,"hp:c:w:a:A:s:S:W:i",["help","port=", \
-            "chars=","words=", "sound=", "sounder=", "spacing=", "station=", \
+        opts, args = getopt.getopt(argv,"hp:c:t:L:R:a:A:s:S:W:i",["help","port=", \
+            "charspeed=","textspeed=", "local=", "remote=", "sound=", "sounder=", "spacing=", "station=", \
             "wire=", "sysInfo"])
     except getopt.GetoptError as ex:
         print(" {}".format(ex.args[0]))
@@ -127,10 +134,12 @@ def main(argv):
             sys.exit()
         elif opt in ("-p", "--port"):
             port = arg
-        elif opt in ("-c", "--chars"):
-            char_speed = arg
-        elif opt in ("-w", "--words"):
-            word_speed = arg
+        elif opt in ("-L", "--local"):
+            local = arg
+        elif opt in ("-c", "--charspeed"):
+            min_char_speed = arg
+        elif opt in ("-t", "--textspeed"):
+            text_speed = arg
         elif opt in ("-a", "--sound"):
             sound = arg
         elif opt in ("-A", "--sounder"):
@@ -151,13 +160,21 @@ def main(argv):
         port = stringOrNone(port)
         config.set_serial_port(port)
         save_config = True
-    if char_speed:
-        #print(char_speed)
-        config.set_cwpm_speed(char_speed)
+    if local:
+        #print(local)
+        config.set_local(local)
         save_config = True
-    if word_speed:
-        #print(word_speed)
-        config.set_wpm_speed(word_speed)
+    if remote:
+        #print(remote)
+        config.set_remote(remote)
+        save_config = True
+    if min_char_speed:
+        #print(min_char_speed)
+        config.set_min_char_speed(min_char_speed)
+        save_config = True
+    if text_speed:
+        #print(text_speed)
+        config.set_text_speed(text_speed)
         save_config = True
     if sound:
         #print(sound)
