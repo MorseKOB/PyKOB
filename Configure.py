@@ -60,20 +60,20 @@ def help():
 {-S|--station [station|NONE]} {-W|--wire n} \
 {-i|--sysInfo}]}")
     print("      Values are:")
-    print("          -h | --help:                           Pring this help message.")
+    print("          -h | --help:                           Print this help message.")
     print("")
     print("          -i | --sysInfo:                        Print information about the system that relates to MorseKOB")
     print("")
     print("          -p | --port <serial_port|NONE>:        Set the serial communication port for the interface.")
     print("")
-    print("          -c | --charspeed <words_per_minute>:   Set the minimum character speed in WPM (used with word speed for Farnsworth timing).")
-    print("          -t | --textspeed <words_per_minute>:   Set the text speed in WPM (used with character speed for Farnsworth timing).")
+    print("          -t | --textspeed <words_per_minute>:   Set the overall code speed in WPM.")
+    print("          -c | --charspeed <words_per_minute>:   Set the minimum character speed in WPM (used for Farnsworth timing).")
     print("          -a | --sound ON|OFF:                   Use the computer sound to simulate a sounder.")
     print("          -A | --sounder ON|OFF:                 Use the physical sounder (if 'PORT' is configured).")
-    print("          -L | --local ON|OFF:                   Produce local copy of generated/transmited text.")
-    print("          -R | --remote ON|OFF:                  Transmit the content to the configured wire-station.")
+    print("          -L | --local ON|OFF:                   Produce local copy of generated/transmitted text.")
+    print("          -R | --remote ON|OFF:                  Transmit over the internet on the specified wire.")
     print("          -s | --spacing NONE|CHAR|WORD:         How to apply Farnsworth spacing.")
-    print("          -S | --station <station|NONE>:         Set the Station to connect to.")
+    print("          -S | --station <station|NONE>:         Set the Station ID.")
     print("          -W | --wire <wire-number>:             Set the Wire number to connect to.")
 
 def missingArgsErr(msg):
@@ -118,8 +118,8 @@ def main(argv):
     text_speed = None
 
     try:
-        opts, args = getopt.getopt(argv,"hp:c:t:L:R:a:A:s:S:W:i",["help","port=", \
-            "charspeed=","textspeed=", "local=", "remote=", "sound=", "sounder=", "spacing=", "station=", \
+        opts, args = getopt.getopt(argv,"hp:t:c:L:R:a:A:s:T:S:W:i",["help", "port=", \
+            "textspeed=", "charspeed=", "local=", "remote=", "sound=", "sounder=", "spacing=", "type=", "station=", \
             "wire=", "sysInfo"])
     except getopt.GetoptError as ex:
         print(" {}".format(ex.args[0]))
@@ -146,6 +146,8 @@ def main(argv):
             sounder = arg
         elif opt in ("-s", "--spacing"):
             spacing = arg
+        elif opt in ("-T", "--type"):
+            code_type = arg
         elif opt in ("-S", "--station"):
             station = arg
         elif opt in ("-W", "--wire"):
@@ -188,6 +190,10 @@ def main(argv):
     if spacing:
         #print(spacing)
         config.set_spacing(spacing)
+        save_config = True
+    if code_type:
+        #print(code_type)
+        config.set_code_type(code_type)
         save_config = True
     if station:
         #print(station)

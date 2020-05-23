@@ -190,19 +190,6 @@ def set_code_type(s):
     user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type)
 
 
-def set_station(s):
-    """Sets the station name to use when connecting to a wire
-
-    Parameters
-    ----------
-    s : str
-        The station name
-    """
-
-    global station
-    station = noneOrValueFromStr(s)
-    user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
-
 def set_local(l):
     """Enable/disable local copy
 
@@ -222,6 +209,7 @@ def set_local(l):
         user_config.set(__CONFIG_SECTION, __LOCAL_KEY, onOffFromBool(local))
     except ValueError as ex:
         log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_remote(r):
     """Enable/disable remote send
@@ -242,6 +230,7 @@ def set_remote(r):
         user_config.set(__CONFIG_SECTION, __REMOTE_KEY, onOffFromBool(remote))
     except ValueError as ex:
         log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_min_char_speed(s):
     """Sets the minimum character speed in words per minute
@@ -266,6 +255,7 @@ def set_min_char_speed(s):
         user_config.set(__CONFIG_SECTION, __MIN_CHAR_SPEED_KEY, str(min_char_speed))
     except ValueError as ex:
         log.err("CHARS value '{}' is not a valid integer value. Not setting CWPM value.".format(ex.args[0]))
+        raise
 
 def set_serial_port(p):
     """Sets the name/path of the serial/tty port to use for a 
@@ -300,6 +290,7 @@ def set_sound(s):
         user_config.set(__CONFIG_SECTION, __SOUND_KEY, onOffFromBool(sound))
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_sounder(s):
     """Sets the Sounder enable state
@@ -321,6 +312,7 @@ def set_sounder(s):
         user_config.set(__CONFIG_SECTION, __SOUNDER_KEY, onOffFromBool(sounder))
     except ValueError as ex:
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_spacing(s):
     """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,  
@@ -358,12 +350,12 @@ def set_spacing(s):
 
 
 def set_station(s):
-    """Sets the station name to use when connecting to a wire
+    """Sets the Station ID to use when connecting to a wire
 
     Parameters
     ----------
     s : str
-        The station name
+        The Station ID
     """
 
     global station
@@ -371,12 +363,12 @@ def set_station(s):
     user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
 def set_wire(w):
-    """Sets the wire to use when connecting
+    """Sets the wire to connect to
 
     Parameters
     ----------
     w : str
-        The wire name
+        The Wire number
     """
 
     global wire
@@ -399,6 +391,7 @@ def set_text_speed(s):
         user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
     except ValueError as ex:
         log.err("Text speed value '{}' is not a valid integer value.".format(ex.args[0]))
+        raise
 
 def print_info():
     """Print system and PyKOB configuration information
@@ -587,8 +580,10 @@ def read_config():
             wire = _wire
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
+        raise
     except ValueError as ex:
         log.err("{} option value '{}' is not a valid value. INI file key: {}.".format(__option, ex.args[0], __key))
+        raise
 
 # ### Mainline
 read_config()
@@ -603,26 +598,33 @@ help="Enable/disable local copy of transmitted code.", metavar="local", dest="lo
 
 remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument("-R", "--remote", default=remote, \
-help="Enable/disable remote transmission of generated code.", metavar="remote", dest="remote")
+help="Enable/disable transmission over the internet on the specified wire.", \
+metavar="remote", dest="remote")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
+text_speed_override = argparse.ArgumentParser(add_help=False)
+text_speed_override.add_argument("-t", "--textspeed", default=text_speed, type=int, \
+help="The morse text speed in words per minute.", metavar="wpm", dest="text_speed")
+
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
-min_char_speed_override.add_argument("-c", "--chars", default=min_char_speed, type=int, \
-help="The minimum character speed to use in words per minute. This is used in conjunction with \
-text speed to introduce Farnsworth timing.", metavar="charspeed", dest="char_speed_min")
+min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
+help="The minimum character speed to use in words per minute (used for Farnsworth timing).", \
+metavar="wpm", dest="char_speed_min")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
-choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether morse audio \
-should be generated.", metavar="sound", dest="sound")
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
+metavar="sound", dest="sound")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
 sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF", 
-choices=["ON", "OFF"], help="'ON' or 'OFF' to indicate whether to use \
-sounder if `port` is configured.", metavar="sounder", dest="sounder")
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
+metavar="sounder", dest="sounder")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
 spacing_override.add_argument("-s", "--spacing", default=spacing, \
@@ -630,14 +632,10 @@ help="The spacing (NONE|CHAR|WORD) to use.", metavar="spacing", dest="spacing")
 
 station_override = argparse.ArgumentParser(add_help=False)
 station_override.add_argument("-S", "--station", default=station, \
-help="The station to use (or 'NONE').", metavar="station", dest="station")
+help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
 
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \
-help="The wire to use (or 'NONE').", metavar="wire", dest="wire")
-
-text_speed_override = argparse.ArgumentParser(add_help=False)
-text_speed_override.add_argument("-t", "--texts", default=text_speed, type=int, \
-help="The morse text speed in words per minute.", metavar="textspeed", dest="text_speed")
+help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")
 
 exit
