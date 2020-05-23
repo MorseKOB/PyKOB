@@ -29,21 +29,22 @@ Configure.py
 Configures system values and user preferences for the suite of PyKOB applications.
 
 Command line parameters:
-    -h | --help                     : Print help information for using the application
-    -i | --sysInfo                  : Print information about the system that relates to PyKOB
-    -p | --port <port>              : Set the system PORT (COM or tty) value to use for a sounder
-    -L | --local <ON|OFF>           : Enable/disable local copy of generated content  
-    -R | --remote <ON|OFF>          : Enable/disable sending generated content to remote wire-station
-    -a | --sound <ON|OFF>           : Set preference for using/not-using the computer sound
-    -A | --sounder <ON|OFF>         : Set preference for using a physical sounder (`port` must be configured)
-    -c | --chars                    : Set preferance for speed in WPM (used with word speed for Farnsworth timing)
-    -s | --spacing CHAR|WORD:       : Set preferance for how to apply Farnsworth spacing
-    -S | --station <station|NONE>:  : Set preferance for the station to connect to
-    -w | --words <words_per_minute> : Set preference for Words-Per-Minute speed
-    -W | --wire <wire-number>:      : Set preference for wire number to connect to
+    -h | --help                        : Print help information for using the application
+    -i | --sysInfo                     : Print information about the system that relates to PyKOB
+    -p | --port <port>                 : Set the system PORT (COM or tty) value to use for a sounder
+    -L | --local <ON|OFF>              : Enable/disable local copy of code  
+    -R | --remote <ON|OFF>             : Enable/disable sending code to remote wire (over the internet)
+    -a | --sound <ON|OFF>              : Enable the computer sound to simulate a sounder
+    -A | --sounder <ON|OFF>            : Use a physical sounder (`port` must be configured)
+    -t | --textspeed wpm               : Set the text speed in words per minute
+    -c | --charspeed                   : Set the minimum character speed in words per minute (used for Farnsworth timing)
+    -s | --spacing NONE|CHAR|WORD      : Set preferance for how to apply Farnsworth spacing
+    -T | --type AMERICAN|INTERNATIONAL : Set the code type
+    -S | --station <station|NONE>      : Set preferance for the station to connect to
+    -W | --wire <wire-number>          : Set preference for wire number to connect to
 Examples:
-    configure -port COM3
-    configure -c 20 -w 16 --sound ON
+    configure --port COM3
+    configure --charspeed 20 -t 16 --sound ON
 
 """
 import sys, getopt
@@ -68,11 +69,12 @@ def help():
     print("")
     print("          -t | --textspeed <words_per_minute>:   Set the overall code speed in WPM.")
     print("          -c | --charspeed <words_per_minute>:   Set the minimum character speed in WPM (used for Farnsworth timing).")
-    print("          -a | --sound ON|OFF:                   Use the computer sound to simulate a sounder.")
-    print("          -A | --sounder ON|OFF:                 Use the physical sounder (if 'PORT' is configured).")
+    print("          -a | --sound ON|OFF:                   Set preference for using the computer sound to simulate a sounder.")
+    print("          -A | --sounder ON|OFF:                 Set preference for using a physical sounder ('PORT' must be configured).")
     print("          -L | --local ON|OFF:                   Produce local copy of generated/transmitted text.")
     print("          -R | --remote ON|OFF:                  Transmit over the internet on the specified wire.")
     print("          -s | --spacing NONE|CHAR|WORD:         How to apply Farnsworth spacing.")
+    print("          -T | --type AMERICAN|INTERNATIONAL:    Set the code type.")
     print("          -S | --station <station|NONE>:         Set the Station ID.")
     print("          -W | --wire <wire-number>:             Set the Wire number to connect to.")
 
@@ -136,6 +138,8 @@ def main(argv):
             port = arg
         elif opt in ("-L", "--local"):
             local = arg
+        elif opt in ("-R", "--remote"):
+            remote = arg
         elif opt in ("-c", "--charspeed"):
             min_char_speed = arg
         elif opt in ("-t", "--textspeed"):
