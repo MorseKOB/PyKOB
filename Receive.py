@@ -45,20 +45,6 @@ from time import sleep
 from pykob import VERSION, config, internet, morse
 import codecs
 
-WIRE     = 109  # default KOB wire to connect to
-WPM      = config.Speed  # code speed (words per minute)
-OFFICEID = 'MorseKOB 4.0 test, AC (listening)'
-THINSPACE = '\u202F'  # narrow (half width) non-breaking space
-
-print('Python ' + sys.version + ' on ' + sys.platform)
-print('MorseKOB ' + VERSION)
-
-# get command line parameters, if any
-if len(sys.argv) > 1:
-    WIRE = int(sys.argv[1])
-if len(sys.argv) > 2:
-    WPM = int(sys.argv[2])
-
 def readerCallback(char, spacing):
 ##    outFile.write('{} {}\n'.format(spacing, char))
 ##    return
@@ -73,11 +59,29 @@ def readerCallback(char, spacing):
         outFile.write(' ')
     outFile.write(char)
 
-myInternet = internet.Internet(OFFICEID)
-myReader = morse.Reader(callback=readerCallback)
-myInternet.connect(WIRE)
-outFile = codecs.open( "log.txt", "w", "utf-8" )
-sleep(0.5)
-while True:
-    code = myInternet.read()
-    myReader.decode(code)
+try:
+    WIRE     = 109  # default KOB wire to connect to
+    WPM      = config.Speed  # code speed (words per minute)
+    OFFICEID = 'MorseKOB 4.0 test, AC (listening)'
+    THINSPACE = '\u202F'  # narrow (half width) non-breaking space
+
+    print('Python ' + sys.version + ' on ' + sys.platform)
+    print('MorseKOB ' + VERSION)
+
+    # get command line parameters, if any
+    if len(sys.argv) > 1:
+        WIRE = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        WPM = int(sys.argv[2])
+
+    myInternet = internet.Internet(OFFICEID)
+    myReader = morse.Reader(callback=readerCallback)
+    myInternet.connect(WIRE)
+    outFile = codecs.open( "log.txt", "w", "utf-8" )
+    sleep(0.5)
+    while True:
+        code = myInternet.read()
+        myReader.decode(code)
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.

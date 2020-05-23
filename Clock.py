@@ -191,4 +191,4 @@ try:
             time.sleep(24*3600 - now)  # wait until midnight and start over
 except KeyboardInterrupt:
     print()
-    sys.exit(0)
+    sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
