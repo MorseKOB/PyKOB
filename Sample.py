@@ -65,10 +65,12 @@ arg_parser = argparse.ArgumentParser(description="Sample of the PyKOB functional
     config.spacing_override, \
     config.min_char_speed_override, \
     config.text_speed_override])
-arg_parser.add_argument("-F", "--full", action='store_true', default=False, help="Play full 'Quick Brown Fox...'", dest="full")
-arg_parser.add_argument("-D", "--di", action='store_true', default=False, help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
-args = arg_parser.parse_args()
+arg_parser.add_argument("-f", "--full", action='store_true', default=False, \
+help="Play full 'Quick Brown Fox...'", dest="full")
+arg_parser.add_argument("-d", "--di", action='store_true', default=False, \
+help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
 
+args = arg_parser.parse_args()
 
 port = args.serial_port # serial port for KOB interface
 text_speed = args.text_speed  # text speed (words per minute)
