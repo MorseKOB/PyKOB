@@ -115,6 +115,7 @@ def main(argv):
     sounder = None
     spacing = None
     station = None
+    code_type = None
     wire = None
     min_char_speed = None
     text_speed = None
