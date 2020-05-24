@@ -99,6 +99,7 @@ hostname = None
 os_name = None
 platform_name = None
 pyaudio_version = None
+pyserial_version = None
 python_version = None
 pykob_version = None
 system_name = None
