@@ -49,6 +49,7 @@ import distutils
 import getpass
 import os
 import platform
+import pykob
 import socket
 import sys
 from distutils.util import strtobool
@@ -96,7 +97,9 @@ user_config = None
 # System information
 hostname = None
 os_name = None
-platform_name= None
+platform_name = None
+python_version = None
+pykob_version = None
 system_name = None
 system_version = None
 user_home = None
@@ -406,7 +409,9 @@ def print_system_info():
     print("OS:", os_name)
     print("System:", system_name)
     print("Version:", system_version)
-    print("Platform", platform_name)
+    print("Platform:", platform_name)
+    print("PyKOB:", pykob_version)
+    print("Python:", python_version)
     print("Host:", hostname)
 
 def print_config():
@@ -445,6 +450,8 @@ def read_config():
     global hostname
     global platform_name
     global os_name
+    global pykob_version
+    global python_version
     global system_name
     global system_version
     global app_config
@@ -475,6 +482,8 @@ def read_config():
         system_name = platform.system()
         system_version = platform.release()
         platform_name = sys.platform
+        pykob_version = pykob.VERSION
+        python_version = "{}.{}.{}".format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
         hostname = socket.gethostname()
 
         # User configuration file name
