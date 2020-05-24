@@ -98,6 +98,7 @@ user_config = None
 hostname = None
 os_name = None
 platform_name = None
+pyaudio_version = None
 python_version = None
 pykob_version = None
 system_name = None
@@ -412,6 +413,8 @@ def print_system_info():
     print("Platform:", platform_name)
     print("PyKOB:", pykob_version)
     print("Python:", python_version)
+    print("PyAudio:", pyaudio_version)
+    print("PySerial:", pyserial_version)
     print("Host:", hostname)
 
 def print_config():
@@ -452,6 +455,8 @@ def read_config():
     global os_name
     global pykob_version
     global python_version
+    global pyaudio_version
+    global pyserial_version
     global system_name
     global system_version
     global app_config
@@ -484,6 +489,16 @@ def read_config():
         platform_name = sys.platform
         pykob_version = pykob.VERSION
         python_version = "{}.{}.{}".format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+        try:
+            import pyaudio
+            pyaudio_version = pyaudio.__version__ # NOTE: Using '__" property - not recommended, but only way to get version
+        except:
+            pyaudio_version = "PyAudio is not installed or the version information is not available (check installation)"
+        try:
+            import serial
+            pyserial_version = serial.VERSION
+        except:
+            pyserial_version = "PySerial is not installed or the version information is not available (check installation)"
         hostname = socket.gethostname()
 
         # User configuration file name
