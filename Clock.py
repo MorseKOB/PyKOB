@@ -144,10 +144,10 @@ try:
     args = arg_parser.parse_args()
     
     port = args.serial_port # serial port for KOB interface
-    text_speed = args.text_speed  # text speed (words per minute)
-    if (text_speed < 1) or(text_speed > 50):
+    if (args.text_speed < 1) or(args.text_speed > 50):
         print("text_speed specified must be between 1 and 50")
         sys.exit(1)
+    text_speed = args.text_speed  # text speed (words per minute)
     sound = strtobool(args.sound)
     #
     # start_time argument is limited to 0..2400:
