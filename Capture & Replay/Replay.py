@@ -40,8 +40,8 @@ import time
 from pykob import config,kob
 
 VERSION = '1.4'
-PORT = config.Port # serial port for KOB interface
-SOUND = config.Sound # whether to enable computer sound for sounder
+PORT = config.serial_port # serial port for KOB interface
+SOUND = config.sound # whether to enable computer sound for sounder
 
 codes = ''
 myKOB = kob.KOB(port=PORT, audio=SOUND)

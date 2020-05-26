@@ -39,9 +39,9 @@ import pykob
 from pykob import config,newsreader, morse, kob
 
 SOURCE   = 'https://www.ansa.it/sito/ansait_rss.xml'  # news feed
-PORT = config.Port # serial port for KOB interface
-WPM = config.Speed  # code speed (words per minute)
-SOUND = config.Sound # whether to enable computer sound for sounder
+PORT = config.serial_port # serial port for KOB interface
+WPM = config.words_per_min_speed  # code speed (words per minute)
+SOUND = config.sound # whether to enable computer sound for sounder
 CWPM     = 18  # minimum character speed
 PAUSE    = 5  # gap to leave between articles (seconds)
 

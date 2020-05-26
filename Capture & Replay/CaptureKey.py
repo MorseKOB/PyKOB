@@ -43,7 +43,7 @@ import time
 from pykob import config,kob
 
 VERSION = '1.3'
-PORT = config.Port # serial port for KOB interface
+PORT = config.serial_port # serial port for KOB interface
 
 myKOB = kob.KOB(PORT)
 

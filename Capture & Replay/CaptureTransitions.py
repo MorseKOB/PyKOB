@@ -47,7 +47,7 @@ if sys.platform == 'win32':
     windll.winmm.timeBeginPeriod(1)  # set clock resoluton to 1 ms (Windows only)
 
 VERSION = '1.1'
-PORT = config.Port # serial port for KOB interface
+PORT = config.serial_port # serial port for KOB interface
 N = 50
 
 print('CaptureTransitions {} - {}'.format(VERSION, time.asctime()))

@@ -23,9 +23,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-"""
-
-Time.py
+"""Time.py
 
 Sends time signals to a KOB wire and/or to a sounder or speakers. The time
 signals can be sent hourly, daily at 12:00 noon EST, or continuously (every
@@ -70,8 +68,8 @@ try:
     from pykob import config,log, kob, internet
 
     VERSION = '1.4'
-    PORT    = config.Port # serial port for KOB interface
-    SOUND   = config.Sound # whether to enable computer sound for sounder
+    PORT    = config.serial_port # serial port for KOB interface
+    SOUND   = config.sound # whether to enable computer sound for sounder
     TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
     TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
     NOTICK  = 5 * (-200, +2)

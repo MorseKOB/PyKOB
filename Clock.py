@@ -24,12 +24,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Clock.py
+"""Clock.py
 
 Cuckoo clock substitute.
 
-Serial port, code speed, and audio preferences should be specified by running the
+Serial port, text speed, and audio preferences should be specified by running the
 "configure.sh" script or executing "python3 Configure.py".
 """
 
@@ -127,21 +126,29 @@ try:
     from pykob import config, kob, morse, log
     from distutils.util import strtobool
 
-    log.log("Starting Clock")
+    #log.log("Starting Clock")
 
-    clock_parser = argparse.ArgumentParser(parents=[config.PortOverride, config.SoundtOverride, config.WPMOverride])
-    clock_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements ", metavar="time", dest="Begin")
-    clock_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements ", metavar="time", dest="End")
-    clock_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
-    clock_parser.add_argument("-t", "--text", action='store_true', default=False, help="Whether to print text locally as it's sent to the sounder", dest="Text")
-    args = clock_parser.parse_args()
+    arg_parser = argparse.ArgumentParser(description="Morse Cuckoo Clock", parents=\
+     [\
+      config.serial_port_override, \
+      config.code_type_override, \
+      config.sound_override, \
+      config.sounder_override, \
+      config.spacing_override, \
+      config.min_char_speed_override, \
+      config.text_speed_override])
+    arg_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements (24-hour value 0-2400)", metavar="time", dest="Begin")
+    arg_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements  (24-hour value 0-2400)", metavar="time", dest="End")
+    arg_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
+    arg_parser.add_argument("-P", "--print", action='store_true', default=False, help="Print the text sent as code to the sounder", dest="Text")
+    args = arg_parser.parse_args()
     
-    port = args.Port # serial port for KOB interface
-    speed = args.Speed  # code speed (words per minute)
-    if (speed < 1) or(speed > 50):
-        print("Speed specified must be between 1 and 50")
+    port = args.serial_port # serial port for KOB interface
+    if (args.text_speed < 1) or (args.text_speed > 50):
+        print("text_speed specified must be between 1 and 50")
         sys.exit(1)
-    sound = strtobool(args.Sound)
+    text_speed = args.text_speed  # text speed (words per minute)
+    sound = strtobool(args.sound)
     #
     # start_time argument is limited to 0..2400:
     #
@@ -164,10 +171,10 @@ try:
         print("Time announcement interval must be betwen 1 and 1440.")
         sys.exit(1)
     annc_interval = args.Interval * 60      # announcement interval (sec)
-    local_text = args.Text;
+    local_text = args.Text
     
     myKOB = kob.KOB(port=port, audio=sound)
-    mySender = morse.Sender(speed)
+    mySender = morse.Sender(text_speed)
     
     # Announce the current time right now
     now = time.localtime()
