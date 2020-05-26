@@ -25,7 +25,7 @@ SOFTWARE.
 """
 
 """
-MKOB.pyw  (Why does this say MKOB.pyw instead of MKOB.py? I don't remember. @leskerr)
+MKOB.pyw
 
 Python version of MorseKOB 2.5
 """
