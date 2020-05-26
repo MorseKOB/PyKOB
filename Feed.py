@@ -67,7 +67,6 @@ Feed 1.4  2018-07-10
 - converted from legacy morsekob module to use pykob module
 
 """
-
 import sys
 import time, datetime
 import threading
@@ -118,29 +117,33 @@ def send(code):
     myInternet.write(code)
     myKOB.sounder(code)  # to pace the code sent to the wire
 
-while True:
-    articles = newsreader.getArticles(url)
-    for (title, description, pubDate) in articles:
-        if days and pubDate:
-            today = datetime.date.today()
-            pd = datetime.datetime.strptime(pubDate[:-6], DATEFORMAT).date()
-            if pd > today or today - pd >= datetime.timedelta(days):
-                continue
-        text = ''
-        if title:
-            text += title + '. '
-        text += description
-        if pubDate:  # treat as an article, not freeform text
-            text += '  ='
-        while activeSender() or not activeListener():
-            time.sleep(1)
-        send((-0x7fff, +2, -1000, +2))  # open circuit and wait 1 sec
-        for char in text:
-            if activeSender() or not activeListener():
-                break
-            code = mySender.encode(char)
-            if code:
-                send(code)
-        send((-1000, +1))  # close circuit after 1 sec
-        time.sleep(artPause)
-    time.sleep(grpPause - artPause)
+try:
+    while True:
+        articles = newsreader.getArticles(url)
+        for (title, description, pubDate) in articles:
+            if days and pubDate:
+                today = datetime.date.today()
+                pd = datetime.datetime.strptime(pubDate[:-6], DATEFORMAT).date()
+                if pd > today or today - pd >= datetime.timedelta(days):
+                    continue
+            text = ''
+            if title:
+                text += title + '. '
+            text += description
+            if pubDate:  # treat as an article, not freeform text
+                text += '  ='
+            while activeSender() or not activeListener():
+                time.sleep(1)
+            send((-0x7fff, +2, -1000, +2))  # open circuit and wait 1 sec
+            for char in text:
+                if activeSender() or not activeListener():
+                    break
+                code = mySender.encode(char)
+                if code:
+                    send(code)
+            send((-1000, +1))  # close circuit after 1 sec
+            time.sleep(artPause)
+        time.sleep(grpPause - artPause)
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.

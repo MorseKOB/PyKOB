@@ -48,20 +48,24 @@ PAUSE    = 5  # gap to leave between articles (seconds)
 mySender = morse.Sender(WPM, CWPM, morse.INTERNATIONAL, morse.CHARSPACING)
 myKOB = kob.KOB(PORT, SOUND)
 
-while True:
-    print('')
-    articles = newsreader.getArticles(SOURCE)
-    for (title, description, pubDate) in articles:
-        text = title + ' = ' + description + ' ='
-        for char in text:
-            code = mySender.encode(char)
-            myKOB.sounder(code)
-            if code:
-                sys.stdout.write(char)
-            else:
-                sys.stdout.write(' ')
-            sys.stdout.flush()
-            if char == '=':
-                print('')
+try:
+    while True:
         print('')
-        time.sleep(PAUSE)
+        articles = newsreader.getArticles(SOURCE)
+        for (title, description, pubDate) in articles:
+            text = title + ' = ' + description + ' ='
+            for char in text:
+                code = mySender.encode(char)
+                myKOB.sounder(code)
+                if code:
+                    sys.stdout.write(char)
+                else:
+                    sys.stdout.write(' ')
+                sys.stdout.flush()
+                if char == '=':
+                    print('')
+            print('')
+            time.sleep(PAUSE)
+except KeyboardInterrupt:
+    print()
+    sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
