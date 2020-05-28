@@ -56,7 +56,7 @@ Change history:
 - initial release
 
 """
-from urllib.request import Request, urlopen  # Python 3
+from urllib.request import Request, urlopen
 import re
 import time
 from pykob import internet, morse, kob, log
