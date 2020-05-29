@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 
 """
 MIT License
@@ -23,7 +23,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-"""Time.py
+
+"""
+Time.py
 
 Sends time signals to a KOB wire and/or to a sounder or speakers. The time
 signals can be sent hourly, daily at 12:00 noon EST, or continuously (every
@@ -47,13 +49,15 @@ Examples:
 
 Change history:
 
+Time 1.5  2020-05-28
+- changed header to `#!/usr/bin/env python3`
+
 Time 1.4  2020-02-13
 - removed #!/usr/bin/env python header, which fails with Windows 10
 
 Time 1.3  2019-02-13
 - converted from legacy morsekob module to use pykob module
 - discontinued use of separate config file
-
 """
 
 def send(code):
@@ -67,7 +71,7 @@ try:
     import threading
     from pykob import config,log, kob, internet
 
-    VERSION = '1.4'
+    VERSION = '1.5'
     PORT    = config.serial_port # serial port for KOB interface
     SOUND   = config.sound # whether to enable computer sound for sounder
     TIMEOUT = 30.0  # time to send after last indication of live listener (sec)

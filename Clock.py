@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 
 """
 MIT License
@@ -24,7 +24,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""Clock.py
+"""
+Clock.py
 
 Cuckoo clock substitute.
 

@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 """
 MIT License
 
@@ -45,8 +45,6 @@ from pykob import VERSION, config, internet, morse
 import codecs
 
 def readerCallback(char, spacing):
-##    outFile.write('{} {}\n'.format(spacing, char))
-##    return
     halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
     fullSpace = False
     if halfSpaces >= 2:
