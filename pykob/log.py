@@ -23,9 +23,9 @@ SOFTWARE.
 """
 
 """
-internet module
+log module
 
-Reads/writes code sequences from/to a KOB wire.
+logs status and error messages.
 """
 import sys
 import datetime

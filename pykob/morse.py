@@ -28,8 +28,6 @@ morse.py
 Provides classes for sending and reading American and International Morse code.
 """
 
-# from __future__ import print_function  ###
-
 import sys, os
 import codecs
 
@@ -39,7 +37,7 @@ CHARSPACING = 0      # add Farnsworth spacing between all characters
 WORDSPACING = 1      # add Farnsworth spacing only between words
 DOTSPERWORD = 45     # dot units per word, including all spaces
                      #   (MORSE is 43, PARIS is 47)
-MAXINT = 1000000     # sys.maxint not supported in Python 3
+MAXINT = sys.maxsize # a very large integer
 
 """
 Code sender class
@@ -189,11 +187,10 @@ class Reader:
                 self.truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self.truDot)
                 self.dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self.dotLen)
                 self.wpm = 1200. / self.dotLen
-##                print('{} {:.1f} {}'.format(self.dotLen, self.wpm, self.truDot))
 
     def flush(self):
         self.decodeChar(MAXINT)
-        self.decodeChar(MAXINT)
+        self.decodeChar(MAXINT)  # this is intentional, although maybe not needed
 
     def decodeChar(self, nextSpace):
         self.nChars += 1
