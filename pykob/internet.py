@@ -91,7 +91,8 @@ class Internet:
                 pass  # ignore Ack packet
             elif nBytes == 496:  # code or ID packet
                 self.tLastListener = time.time()
-                stnID, seqNo, *code = codePacketFormat.unpack(buf)
+                cp = codePacketFormat.unpack(buf)
+                cmd, byts, stnID, seqNo, code = cp[0], cp[1], cp[2], cp[3], cp[4:]
                 stnID, sep, fill = stnID.decode(encoding='ascii').partition(NUL)
                 n = code[51]
                 if n == 0 and seqNo == self.rcvdSeqNo + 2:  # ID packet
