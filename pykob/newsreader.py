@@ -31,10 +31,7 @@ extracts the content as plain text.
 
 import os
 import time
-try:
-    from urllib.request import urlopen  # Python 3.3
-except ImportError:
-    from urllib import urlopen  # Python 2.7
+from urllib.request import urlopen
 import re
 from pykob import log
 

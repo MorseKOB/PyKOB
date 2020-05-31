@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 
 """
 MIT License
@@ -24,14 +24,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Weather.py
+"""Weather.py
 
 Waits for a station to send a message ending in WX XXXX, where XXXX is the
 4- or 5-character code for a U.S. weather reporting station, and replies
 with the current weather conditions and short term forecast for that area.
 
 Change history:
+
+1.0.7  2020-05-28
+- changed header to `#!/usr/bin/env python3`
 
 1.0.6  2020-02-10
 - added DEBUG capability
@@ -54,15 +56,15 @@ Change history:
 
 1.0.0  2018-01-09
 - initial release
-
 """
-from urllib.request import Request, urlopen  # Python 3
+
+from urllib.request import Request, urlopen
 import re
 import time
 from pykob import internet, morse, kob, log
 import pykob  # to access PyKOB version number
 
-VERSION = '1.0.6'
+VERSION = '1.0.7'
 WIRE    = 106
 IDTEXT  = 'KOB Weather Service, AC'
 WPM     = 20  # initial guess at received Morse speed

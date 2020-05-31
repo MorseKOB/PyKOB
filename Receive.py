@@ -1,5 +1,4 @@
-#! python
-from __future__ import print_function  ###
+#!/usr/bin/env python3
 """
 MIT License
 
@@ -24,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Receive.py
+"""Receive.py
 
 Monitors a KOB wire, and displays decoded text on the system console.
 
@@ -46,8 +44,6 @@ from pykob import VERSION, config, internet, morse
 import codecs
 
 def readerCallback(char, spacing):
-##    outFile.write('{} {}\n'.format(spacing, char))
-##    return
     halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
     fullSpace = False
     if halfSpaces >= 2:

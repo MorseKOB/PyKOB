@@ -1,4 +1,5 @@
-#! python
+#!/usr/bin/env python3
+
 """
 MIT License
 
@@ -23,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-News
+"""News.py
 
 Fetches articles from an RSS news feed and sends them in American Morse
 to a sounder.

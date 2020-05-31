@@ -89,8 +89,3 @@ if ok:
     strm = pa.open(rate=frameRate, channels=nChannels, format=sampleFormat,
             output=True, output_device_index=devIdx, frames_per_buffer=BUFFERSIZE,
             stream_callback=callback)
-##    print('PyAudio latency: {0:.0f} ms'.format(strm.get_output_latency()*1000))
-
-##strm.stop_stream()
-##strm.close()
-##pa.terminate()

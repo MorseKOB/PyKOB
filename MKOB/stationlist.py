@@ -31,11 +31,7 @@ string.
 
 """
 
-try:
-    from urllib.request import urlopen  # Python 3.3
-except ImportError:
-    from urllib import urlopen  # Python 2.7
-import re
+from urllib.request import urlopen
 
 def getStationList():
     s = urlopen('http://mtc-kob.dyndns.org/').read().decode('utf-8')

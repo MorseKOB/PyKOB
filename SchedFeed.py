@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 
 """
 MIT License
@@ -23,9 +23,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-"""
 
-SchedFeed.py
+"""SchedFeed.py
 
 Sends messages according to a time schedule.
 
@@ -45,7 +44,6 @@ SchedFeed 1.1  2015-12-30
 
 SchedFeed 1.0  2015-12-28
 - initial release
-
 """
 
 import time

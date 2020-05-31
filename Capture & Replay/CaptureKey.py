@@ -1,5 +1,4 @@
-#! python
-from __future__ import print_function  # in case you want it to work with Python 2.7
+#!/usr/bin/env python3
 """
 MIT License
 
@@ -24,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-CaptureKey.py
+"""CaptureKey.py
 
 Captures timing information from a key to a file for
 later playback and analysis.

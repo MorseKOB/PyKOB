@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python3
 """
 MIT License
 
@@ -23,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Configure.py
+"""Configure.py
 
 Configures system values and user preferences for the suite of PyKOB applications.
 

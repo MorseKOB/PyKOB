@@ -1,4 +1,5 @@
-#! python
+#!/usr/bin/env python3
+
 """
 MIT License
 
@@ -23,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Feed.py
+"""Feed.py
 
 Waits for a station to connect to a KOB wire and sends text from a RSS-formatted
 local file or news feed in Morse at a given speed.
@@ -57,6 +57,9 @@ Examples:
 
 Change history:
 
+Feed 1.7  2020-05-28
+- changed header to `#!/usr/bin/env python3`
+
 Feed 1.6  2020-02-13
 - replaced #!/usr/bin/env python header, which fails with Windows 10
 
@@ -65,15 +68,15 @@ Feed 1.5  2018-07-13
 
 Feed 1.4  2018-07-10
 - converted from legacy morsekob module to use pykob module
-
 """
+
 import sys
 import time, datetime
 import threading
 import pykob
 from pykob import newsreader, morse, internet, kob, log
 
-VERSION     = '1.6'
+VERSION     = '1.7'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
