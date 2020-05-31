@@ -26,8 +26,7 @@ SOFTWARE.
 Disneyland dedication from Walt Disney (as displayed on plaque at Disneyland entrance  
 and as sounded at the Frontierland station.)
 """
-"""
-Sample.py
+"""Sample.py
 
 Sends Morse code to a serial port and/or the speakers.
 

@@ -24,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Time.py
+"""Time.py
 
 Sends time signals to a KOB wire and/or to a sounder or speakers. The time
 signals can be sent hourly, daily at 12:00 noon EST, or continuously (every

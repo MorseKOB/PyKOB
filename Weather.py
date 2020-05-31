@@ -24,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Weather.py
+"""Weather.py
 
 Waits for a station to send a message ending in WX XXXX, where XXXX is the
 4- or 5-character code for a U.S. weather reporting station, and replies

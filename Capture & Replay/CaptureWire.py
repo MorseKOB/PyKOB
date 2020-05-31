@@ -23,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-CaptureWire.py
+"""CaptureWire.py
 
 Captures timing information from a KOB wire to a file for
 later playback and analysis.

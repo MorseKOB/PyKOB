@@ -24,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Feed.py
+"""Feed.py
 
 Waits for a station to connect to a KOB wire and sends text from a RSS-formatted
 local file or news feed in Morse at a given speed.

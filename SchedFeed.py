@@ -24,8 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-SchedFeed.py
+"""SchedFeed.py
 
 Sends messages according to a time schedule.
 

@@ -23,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-CaptureTransitions.py
+"""CaptureTransitions.py
 
 Captures timing information from a key to a file for
 later playback and analysis. All transitions are captured.

@@ -23,8 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""
-Receive.py
+"""Receive.py
 
 Monitors a KOB wire, and displays decoded text on the system console.
 
