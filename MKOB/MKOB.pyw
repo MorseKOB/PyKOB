@@ -27,6 +27,9 @@ SOFTWARE.
 """MKOB.pyw
 
 Python version of MorseKOB 2.5
+
+MorseKOB 4.0.1  2020-06-06
+- fix jitter in code reader window
 """
 
 import tkinter as tk
@@ -34,7 +37,7 @@ import kobwindow as kw
 import kobactions as ka
 import threading
 
-VERSION = "MorseKOB 4.0.0"
+VERSION = "MorseKOB 4.0.1"
 
 root = tk.Tk()
 kw.KOBWindow(root, VERSION)
