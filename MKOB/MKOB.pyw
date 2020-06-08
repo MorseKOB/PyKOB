@@ -40,6 +40,7 @@ import threading
 VERSION = "MorseKOB 4.0.1"
 
 root = tk.Tk()
+root.iconbitmap("MorseKOB Icon.ico")
 kw.KOBWindow(root, VERSION)
 root.mainloop()
 ##ka.running = False
