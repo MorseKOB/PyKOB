@@ -30,7 +30,6 @@ Creates the main KOB window for MKOB and lays out its widgets
 """
 
 import tkinter as tk
-import tkinter.ttk as ttk
 import tkinter.scrolledtext as tkst 
 import kobactions as ka
 import kobconfig as kc
@@ -45,6 +44,7 @@ class KOBWindow:
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(VERSION)
+        
 
         # File menu
         menu = tk.Menu()
@@ -62,28 +62,29 @@ class KOBWindow:
         helpMenu.add_command(label='About', command=ka.doHelpAbout)
 
         # paned windows
-        pwd1 = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
+        pwd1 = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashwidth=4,
+                borderwidth=0)  # left/right side
         pwd1.grid(sticky='NESW', padx=6, pady=6)    
-        pwd2 = ttk.PanedWindow(pwd1, orient=tk.VERTICAL)
-        pwd1.add(pwd2, weight=2)
+        pwd2 = tk.PanedWindow(pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
+        pwd1.add(pwd2, stretch='first')
 
         # frames
-        frm1 = tk.Frame(pwd2, padx=3, pady=0)
+        frm1 = tk.Frame(pwd2, padx=3, pady=0)  # reader
         frm1.rowconfigure(0, weight=1)
         frm1.columnconfigure(0, weight=2)
-        pwd2.add(frm1, weight=1)
+        pwd2.add(frm1, stretch='always')
 
-        frm2 = tk.Frame(pwd2, padx=3, pady=6)
+        frm2 = tk.Frame(pwd2, padx=3, pady=6)  # keyboard
         frm2.rowconfigure(0, weight=1)
         frm2.columnconfigure(0, weight=1)
-        pwd2.add(frm2, weight=1)
+        pwd2.add(frm2, stretch='always')
 
-        frm3 = tk.Frame(pwd1)
+        frm3 = tk.Frame(pwd1)  # right side
         frm3.rowconfigure(0, weight=1)
         frm3.columnconfigure(0, weight=1)
-        pwd1.add(frm3, weight=1)
+        pwd1.add(frm3)
 
-        frm4 = tk.Frame(frm3)
+        frm4 = tk.Frame(frm3)  # right side rows
         frm4.columnconfigure(0, weight=1)
         frm4.grid(row=2)
 
@@ -93,6 +94,8 @@ class KOBWindow:
                 spacing1=0, spacing2=5, spacing3=0,
                 font=('Helvetica', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
+        self.txtReader.rowconfigure(0, weight=1)
+        self.txtReader.columnconfigure(0, weight=2)
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(frm2, width=40, height=5, wrap='word', bd=2,
@@ -122,9 +125,9 @@ class KOBWindow:
         chkCktClsr = tk.Checkbutton(lfm1, text='Circuit Closer',
                 variable=self.varCircuitCloser)
         chkCktClsr.grid(row=0, column=0)
-        tk.Label(lfm1, text='  WPM').grid(row=0, column=1)
+        tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
         self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify='center',
-                width=4, bd=2, command=ka.doWPM)
+                width=4, borderwidth=2, command=ka.doWPM)
         self.spnWPM.bind('<Any-KeyRelease>', ka.doWPM)
         self.spnWPM.grid(row=0, column=2)
 
@@ -145,14 +148,14 @@ class KOBWindow:
         lfm3.grid(row=1, column=1, padx=3, pady=6, sticky='NS')
         self.varWireNo = tk.StringVar()
         self.spnWireNo = tk.Spinbox(lfm3, from_=1, to=32000, justify='center',
-                width=7, bd=2, textvariable=self.varWireNo)
+                width=7, borderwidth=2, textvariable=self.varWireNo)
         self.spnWireNo.grid()
         self.cvsConnect = tk.Canvas(lfm3, width=6, height=10, bd=2,
                 relief=tk.SUNKEN, bg='white')
         self.cvsConnect.grid(row=0, column=2)
         tk.Canvas(lfm3, width=1, height=2).grid(row=1, column=1)
-        tk.Button(lfm3, text='Connect', command=ka.doConnect).grid(row=2,
-                columnspan=3, ipady=2, sticky='EW')
+        self.btnConnect = tk.Button(lfm3, text='Connect', command=ka.doConnect)
+        self.btnConnect.grid(row=2, columnspan=3, ipady=2, sticky='EW')
 
         # get configuration settings
         sw = self.root.winfo_screenwidth()
@@ -171,6 +174,22 @@ class KOBWindow:
         self.varCodeSenderOn.set(kc.CodeSenderOn)
         self.varCodeSenderLoop.set(kc.CodeSenderLoop)
         self.varWireNo.set(kc.WireNo)
+
+##        print("\n\n----------\n\nget_widget_attributes")
+##        get_widget_attributes(pwd2)
+
+def get_widget_attributes(widget):
+    """display widget attributes for debugging GUI"""
+    all_widgets = widget.winfo_children()
+    print("\n", all_widgets)
+    for widg in all_widgets:
+        print("\nWidget Name: {}".format(widg.winfo_class()))
+        keys = widg.keys()
+        for key in keys:
+            print("Attribute: {:<20}".format(key), end=' ')
+            value = widg[key]
+            vtype = type(value)
+            print("Type: {:<30} Value: {}".format(str(vtype), value))
 
 ## TAKE CARE OF THESE
 ##    kw.txtStnList.insert('0.0', sl.getStationList())
