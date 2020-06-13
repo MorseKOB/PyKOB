@@ -591,12 +591,12 @@ def read_config():
         __option = "Station"
         __key = __STATION_KEY
         _station = user_config.get(__CONFIG_SECTION, __key)
-        if not _station or _station.upper() == "NONE":
+        if (not _station) or (_station.upper() != "NONE"):
             station = _station
         __option = "Wire"
         __key = __WIRE_KEY
         _wire = user_config.get(__CONFIG_SECTION, __key)
-        if not _wire or _wire.upper() == "NONE":
+        if (not _wire) or (_wire.upper() != "NONE"):
             wire = _wire
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
