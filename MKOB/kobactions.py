@@ -23,17 +23,13 @@ SOFTWARE.
 """
 
 """
-
 kobactions.py
 
 Defines actions for MKOB
-
 """
 
-##import tkinter as tk
 import tkinter.messagebox as mb
 from pykob import kob, internet, morse
-from pykob import log  # TEMP
 import kobconfig as kc
 import stationlist as sl
 import time
@@ -53,24 +49,11 @@ def internetCallback(code):
         myKOB.sounder(code)
         myReader.decode(code)
 
-nChars = 0
 def readerCallback(char, spacing):
-    global nChars  # TEMP
-##    if spacing > 50:
-##        print('\n>', end='')
-##    elif spacing > 0.5:
-##        print(' ', end='')
-##    print(char, end='', flush=True)
     if spacing > 0.5:
-        kw.txtReader.insert('end', ' ')
+        kw.txtReader.insert('end', " ")
     kw.txtReader.insert('end', char)
-    nChars += 1
-    if nChars >= 5:
-##        print(kw.txtReader['height'])
-##        kw.txtReader.see('end-1c')
-        kw.txtReader.see('end')
-        kw.txtReader.update_idletasks()
-        nChars = 0
+    kw.txtReader.yview_moveto(1)
 
 myKOB = kob.KOB(port=kc.Port, audio=kc.Audio, callback=None)
 myInternet = internet.Internet(officeID=kc.OfficeID, callback=internetCallback)
@@ -133,6 +116,3 @@ def doConnect():
 ##            kw.txtKeyboard.tag_add('highlight', 'mark')
 ##        else:
 ##            time.sleep(0.1)
-
-def note(txt):
-    kw.txtReader.insert(tk.END, '\n<' + txt + '>')
