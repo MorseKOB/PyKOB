@@ -29,13 +29,13 @@ Defines actions for MKOB
 """
 
 import tkinter.messagebox as mb
-from pykob import kob, internet, morse
+from pykob import config, kob, internet, morse
 import kobconfig as kc
 import stationlist as sl
 import time
 
 import pykob  # for version number
-print('PyKOB ' + pykob.VERSION)
+print("PyKOB " + pykob.VERSION)
 
 kw = None  # initialized by KOBWindow
 mySender = None
@@ -55,8 +55,8 @@ def readerCallback(char, spacing):
     kw.txtReader.insert('end', char)
     kw.txtReader.yview_moveto(1)
 
-myKOB = kob.KOB(port=kc.Port, audio=kc.Audio, callback=None)
-myInternet = internet.Internet(officeID=kc.OfficeID, callback=internetCallback)
+myKOB = kob.KOB(port=config.serial_port, audio=config.sound, callback=None)
+myInternet = internet.Internet(config.station, callback=internetCallback)
 
 # File menu
 
@@ -65,7 +65,7 @@ def doFileNew():
 
 def doFileOpen():
 ##    newFile()
-    kw.txtKeyboard.insert(tk.END, '~  Now is the time for all good men to come to the aid of their country.  +')
+    kw.txtKeyboard.insert(tk.END, "~  Now is the time for all good men to come to the aid of their country.  +")
     kw.txtKeyboard.mark_set('mark', '0.0')
     kw.txtKeyboard.mark_gravity('mark', tk.LEFT)
     kw.txtKeyboard.tag_config('highlight', underline=1)
@@ -78,20 +78,32 @@ def doFileExit():
 # Help menu
 
 def doHelpAbout():
-    mb.showinfo(title='About', message=kw.VERSION)
+    mb.showinfo(title="About", message=kw.VERSION)
+
+def doOfficeID(event=None):
+    global myInternet
+    kc.OfficeID = kw.varOfficeID.get()
+    config.set_station(kc.OfficeID)
+    config.save_config()
+    myInternet.officeID = kc.OfficeID.encode(encoding='ascii')
 
 def doWPM(event=None):
     global mySender, myReader
-##    print('doWPM')  # TEMP
-    try:
-        wpm = int(kw.spnWPM.get())
-        mySender = morse.Sender(wpm=wpm, cwpm=kc.CWPM,
-                codeType=kc.CodeType, spacing=kc.Spacing)
-        myReader = morse.Reader(wpm=wpm, codeType=kc.CodeType,
-                callback=readerCallback)
-    except:
-        log.err('doWPM')  # TEMP
-        pass
+    kc.WPM = int(kw.spnWPM.get())
+    config.set_text_speed(kw.spnWPM.get())
+    config.save_config()
+    mySender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
+            codeType=kc.CodeType, spacing=kc.Spacing)
+    myReader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
+            callback=readerCallback)
+
+def doWireNo(event=None):
+    global connected
+    kc.WireNo = int(kw.spnWireNo.get())
+    config.set_wire(kw.spnWireNo.get())
+    config.save_config()
+    if connected:
+        myInternet.connect(kc.WireNo)
 
 def doConnect():
     global connected
@@ -99,7 +111,7 @@ def doConnect():
     color = 'red' if connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
     if connected:
-        myInternet.connect(int(kw.spnWireNo.get()))
+        myInternet.connect(kc.WireNo)
     else:
         myInternet.disconnect()
 

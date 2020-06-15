@@ -23,11 +23,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-VERSION = '1.2.1a'
+VERSION = '1.2.2'
 
 """
 
 Change history:
+
+1.2.2  2020-06-13
+- get 'station' and 'wire' settings correctly from config
 
 1.2.1  2020-04-18
 - added config module
