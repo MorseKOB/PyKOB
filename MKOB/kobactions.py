@@ -30,7 +30,7 @@ Defines actions for MKOB
 
 """
 
-##import tkinter as tk
+import tkinter as tk
 import tkinter.messagebox as mb
 from pykob import kob, internet, morse
 from pykob import log  # TEMP
@@ -73,7 +73,7 @@ def readerCallback(char, spacing):
         nChars = 0
 
 myKOB = kob.KOB(port=kc.Port, audio=kc.Audio, callback=None)
-myInternet = internet.Internet(officeID=kc.OfficeID, callback=internetCallback)
+myInternet = internet.Internet(callback=internetCallback)
 
 # File menu
 
@@ -116,7 +116,7 @@ def doConnect():
     color = 'red' if connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
     if connected:
-        myInternet.connect(int(kw.spnWireNo.get()))
+        myInternet.connect(int(kw.spnWireNo.get()), kw.entOfficeID.get())
     else:
         myInternet.disconnect()
 

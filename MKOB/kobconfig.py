@@ -30,7 +30,7 @@ Preference settings for MKOB.
 
 """
 
-OfficeID       = 'AC Les - Seattle, WA'
+OfficeID       = '<MKOB - ENTER A STATION/OFFICE ID>'
 
 Port           = None        # e.g., 'COM3', 'COM4', None
 Audio          = True        # simulated sounder on or off

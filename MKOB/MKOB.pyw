@@ -32,12 +32,17 @@ Python version of MorseKOB 2.5
 import tkinter as tk
 import kobwindow as kw
 import kobactions as ka
+import sys
 import threading
 
 VERSION = "MorseKOB 4.0.0"
 
-root = tk.Tk()
-kw.KOBWindow(root, VERSION)
-root.mainloop()
-##ka.running = False
-print('normal exit')
+try:
+    root = tk.Tk()
+    kw.KOBWindow(root, VERSION)
+    root.mainloop()
+    ##ka.running = False
+    print('normal exit')
+except KeyboardInterrupt:
+    print()
+sys.exit(0)

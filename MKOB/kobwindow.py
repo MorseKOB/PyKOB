@@ -121,9 +121,9 @@ class KOBWindow:
 
         # office ID
         self.varOfficeID = tk.StringVar()
-        entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
+        self.entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
                 textvariable=self.varOfficeID)
-        entOfficeID.grid(row=1, column=0, sticky=tk.E+tk.W, padx=3, pady=6)
+        self.entOfficeID.grid(row=1, column=0, sticky=tk.E+tk.W, padx=3, pady=6)
 
         # circuit closer / WPM
         lfm1 = tk.LabelFrame(frm4, padx=5, pady=5)
@@ -182,7 +182,7 @@ class KOBWindow:
         self.varCodeSenderLoop.set(kc.CodeSenderLoop)
         self.varWireNo.set(kc.WireNo)
 
-## TAKE CARE OF THESE
+## TODO: TAKE CARE OF THESE
 ##    kw.txtStnList.insert('0.0', sl.getStationList())
     
 ##def start():
