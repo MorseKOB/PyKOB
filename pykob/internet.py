@@ -137,3 +137,9 @@ class Internet:
             idPacket = idPacketFormat.pack(DAT, 492, self.officeID,
                     self.sentSeqNo, 1, self.version)
             self.socket.sendto(idPacket, self.address)
+
+    def set_officeID(self, officeId):
+        """Sets the office/station ID for use on a connected wire
+
+        self.officeID = officeId
+    
