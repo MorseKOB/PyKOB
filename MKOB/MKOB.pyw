@@ -31,6 +31,9 @@ Python version of MorseKOB 2.5
 
 Revision history:
 
+4.0.3
+- use Internet.set_officeID to change user's ID
+
 4.0.2
 - fetch and save config settings
 
@@ -46,7 +49,7 @@ import kobactions as ka
 import sys
 import threading
 
-VERSION = "MorseKOB 4.0.2"
+VERSION = "MorseKOB 4.0.3"
 
 try:
     root = tk.Tk()
@@ -54,7 +57,6 @@ try:
     kw.KOBWindow(root, VERSION)
     root.mainloop()
     ##ka.running = False
-    print('normal exit')
 except KeyboardInterrupt:
     print()
 sys.exit(0)

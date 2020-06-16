@@ -34,7 +34,7 @@ import threading
 import time
 from pykob import VERSION, log
 
-HOST = 'mtc-kob.dyndns.org'
+HOST = "mtc-kob.dyndns.org"
 PORT = 7890
 
 DIS = 2  # Disconnect
@@ -42,9 +42,9 @@ DAT = 3  # Code or ID
 CON = 4  # Connect
 ACK = 5  # Ack
 
-shortPacketFormat = struct.Struct('<hh')  # cmd, wire
-idPacketFormat = struct.Struct('<hh 128s 4x i i 8x 208x 128s 8x')  # cmd, byts, id, seq, idflag, ver
-codePacketFormat = struct.Struct('<hh 128s 4x i 12x 51i i 128s 8x')  # cmd, byts, id, seq, code list, n, txt
+shortPacketFormat = struct.Struct("<hh")  # cmd, wire
+idPacketFormat = struct.Struct("<hh 128s 4x i i 8x 208x 128s 8x")  # cmd, byts, id, seq, idflag, ver
+codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts, id, seq, code list, n, txt
 
 NUL = '\x00'
 
@@ -53,7 +53,7 @@ class Internet:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
-        self.version = ('PyKOB ' + VERSION).encode(encoding='ascii')
+        self.version = ("PyKOB " + VERSION).encode(encoding='ascii')
         self.officeID = officeID.encode(encoding='ascii')
         self.wireNo = 0
         self.sentSeqNo = 0
@@ -105,10 +105,10 @@ class Internet:
                     self.rcvdSeqNo = seqNo
                     return code
             else:
-                log.log('PyKOB.internet received invalid record length: {0}'.
+                log.log("PyKOB.internet received invalid record length: {0}".
                         format(nBytes))
 
-    def write(self, code, txt=''):
+    def write(self, code, txt=""):
         n = len(code)
         if n == 0:
             return
@@ -129,7 +129,7 @@ class Internet:
             self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                     socket.SOCK_DGRAM)[0][4]
         except:
-            log.log('PyKOB.internet ignoring DNS lookup error')
+            log.log("PyKOB.internet ignoring DNS lookup error")
         if self.wireNo:
             shortPacket = shortPacketFormat.pack(CON, self.wireNo)
             self.socket.sendto(shortPacket, self.address)
@@ -139,7 +139,6 @@ class Internet:
             self.socket.sendto(idPacket, self.address)
 
     def set_officeID(self, officeId):
-        """Sets the office/station ID for use on a connected wire
+        """Sets the office/station ID for use on a connected wire"""
 
         self.officeID = officeId
-    

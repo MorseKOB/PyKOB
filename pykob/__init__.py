@@ -23,11 +23,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-VERSION = '1.2.2'
+VERSION = '1.2.3'
 
 """
 
 Change history:
+
+1.2.3  2020-06-16
+- add `Internet.set_officeID` method
 
 1.2.2  2020-06-13
 - get 'station' and 'wire' settings correctly from config

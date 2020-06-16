@@ -85,7 +85,7 @@ def doOfficeID(event=None):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
-    myInternet.officeID = kc.OfficeID.encode(encoding='ascii')
+    myInternet.set_officeID(kc.OfficeID.encode(encoding='ascii'))
 
 def doWPM(event=None):
     global mySender, myReader
