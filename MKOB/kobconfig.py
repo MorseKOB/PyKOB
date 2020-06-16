@@ -23,30 +23,34 @@ SOFTWARE.
 """
 
 """
-
 kobconfig.py
 
 Preference settings for MKOB.
-
 """
 
-OfficeID       = '<MKOB - ENTER A STATION/OFFICE ID>'
+from pykob import config
 
-Port           = None        # e.g., 'COM3', 'COM4', None
-Audio          = True        # simulated sounder on or off
+OfficeID       = config.station         # user's ID (e.g., office call, name, location)
 
-WPM            = 30          # overall code speed
-CWPM           = 18          # minimum character speed (Farnsworth)
-Spacing        = 0           # 0: character, 1: word (Farnsworth spacing)
-CodeType       = 0           # 0: American, 1: International
+Port           = config.serial_port     # e.g., 'COM3', 'COM4', None
+Audio          = config.sound           # simulated sounder on or off
 
-WireNo         = 105         # wire number
-Connect        = False       # automatically connect on startup
+WPM            = config.text_speed      # overall code speed
+CWPM           = config.min_char_speed  # minimum character speed (Farnsworth)
+Spacing        = 1 if config.spacing == 'WORD' else 0
+                                        # 0: character, 1: word (Farnsworth spacing)
+CodeType       = 1 if config.code_type == 'INTERNATIONAL' else 0
+                                        # 0: American, 1: International
+if not config.wire:
+    config.set_wire("101")
+    config.save_config()
+    
+WireNo         = int(config.wire)       # wire number
+Connect        = False                  # automatically connect on startup
 
-CircuitCloser  = True        # initial checkbox settings
-CodeSenderOn   = True        #    "
-CodeSenderLoop = False       #    "
+CircuitCloser  = True                   # initial checkbox settings
+CodeSenderOn   = True                   #    "
+CodeSenderLoop = False                  #    "
 
-WindowSize     = (800, 500)  # size of KOB window (in pixels)
-Position       = (-1, -1)    # location of upper left corner of window
-                             #    (-1, -1): center in screen
+WindowSize     = (800, 500)             # size of KOB window (in pixels)
+Position       = (-1, -1)               # location of upper left corner of window

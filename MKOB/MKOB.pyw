@@ -24,21 +24,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""MKOB.pyw
+"""
+MKOB.pyw
 
 Python version of MorseKOB 2.5
+
+Revision history:
+
+4.0.2
+- fetch and save config settings
+
+4.0.1  2020-06-10
+- fix jitter in code reader window
+- tweak widget attributes
 """
 
 import tkinter as tk
+import kobconfig as kc
 import kobwindow as kw
 import kobactions as ka
 import sys
 import threading
 
-VERSION = "MorseKOB 4.0.0"
+VERSION = "MorseKOB 4.0.2"
 
 try:
     root = tk.Tk()
+    ##root.iconbitmap("resources/mkob.ico")  # fails with Linux
     kw.KOBWindow(root, VERSION)
     root.mainloop()
     ##ka.running = False

@@ -25,7 +25,7 @@ SOFTWARE.
 from distutils.core import setup
 
 setup(name = 'PyKOB',
-      version = '1.1.4',
+      version = '1.2',
       description = 'MorseKOB library package',
       author = 'Les Kerr',
       author_email = 'les@morsekob.org',

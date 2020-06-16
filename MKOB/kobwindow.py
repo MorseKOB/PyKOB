@@ -23,21 +23,20 @@ SOFTWARE.
 """
 
 """
-
 kobwindow.py
 
 Creates the main KOB window for MKOB and lays out its widgets
 (controls).
-
 """
 
 import tkinter as tk
-import tkinter.ttk as ttk
-import kobactions as ka
+import tkinter.scrolledtext as tkst 
 import kobconfig as kc
+import kobactions as ka
 
 class KOBWindow:
     def __init__(self, root, VERSION):
+        
         self.VERSION = VERSION
         ka.kw = self
         
@@ -46,6 +45,7 @@ class KOBWindow:
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(VERSION)
+        
 
         # File menu
         menu = tk.Menu()
@@ -63,67 +63,60 @@ class KOBWindow:
         helpMenu.add_command(label='About', command=ka.doHelpAbout)
 
         # paned windows
-        pwd1 = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
-        pwd1.grid(sticky=tk.N+tk.E+tk.S+tk.W, padx=6, pady=6)    
-        pwd2 = ttk.PanedWindow(pwd1, orient=tk.VERTICAL)
-        pwd1.add(pwd2, weight=2)
+        pwd1 = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashwidth=4,
+                borderwidth=0)  # left/right side
+        pwd1.grid(sticky='NESW', padx=6, pady=6)    
+        pwd2 = tk.PanedWindow(pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
+        pwd1.add(pwd2, stretch='first')
 
         # frames
-        frm1 = tk.Frame(pwd2, padx=3, pady=0)
+        frm1 = tk.Frame(pwd2, padx=3, pady=0)  # reader
         frm1.rowconfigure(0, weight=1)
         frm1.columnconfigure(0, weight=2)
-        pwd2.add(frm1, weight=1)
+        pwd2.add(frm1, stretch='always')
 
-        frm2 = tk.Frame(pwd2, padx=3, pady=6)
+        frm2 = tk.Frame(pwd2, padx=3, pady=6)  # keyboard
         frm2.rowconfigure(0, weight=1)
         frm2.columnconfigure(0, weight=1)
-        pwd2.add(frm2, weight=1)
+        pwd2.add(frm2, stretch='always')
 
-        frm3 = tk.Frame(pwd1)
+        frm3 = tk.Frame(pwd1)  # right side
         frm3.rowconfigure(0, weight=1)
         frm3.columnconfigure(0, weight=1)
-        pwd1.add(frm3, weight=1)
+        pwd1.add(frm3)
 
-        frm4 = tk.Frame(frm3)
+        frm4 = tk.Frame(frm3)  # right side rows
         frm4.columnconfigure(0, weight=1)
         frm4.grid(row=2)
 
         # reader
-        self.txtReader = tk.Text(frm1, width=40, height=15, wrap=tk.WORD, bd=2,
-                padx=2, pady=2,
-                spacing1=0, spacing2=5, spacing3=0,
+        self.txtReader = tkst.ScrolledText(frm1, width=40, height=15, wrap='word', bd=2,
+                padx=2, pady=2, spacing1=0, spacing2=5, spacing3=0,
                 font=('Helvetica', -14))
-        self.txtReader.grid(row=0, column=0, sticky=tk.N+tk.E+tk.S+tk.W)
-        scrlReader = tk.Scrollbar(frm1, command=self.txtReader.yview)
-        scrlReader.grid(row=0, column=1, sticky=tk.N+tk.S)
-        self.txtReader['yscrollcommand'] = scrlReader.set
+        self.txtReader.grid(row=0, column=0, sticky='NESW')
+        self.txtReader.rowconfigure(0, weight=1)
+        self.txtReader.columnconfigure(0, weight=2)
 
         # keyboard
-        self.txtKeyboard = tk.Text(frm2, width=40, height=5, wrap=tk.WORD, bd=2,
+        self.txtKeyboard = tkst.ScrolledText(frm2, width=40, height=5, wrap='word', bd=2,
                 font=('Helvetica', -14))
-        self.txtKeyboard.grid(row=0, column=0, sticky=tk.N+tk.E+tk.S+tk.W)
-        scrlKeyboard = tk.Scrollbar(frm2, command=self.txtKeyboard.yview)
-        scrlKeyboard.grid(row=0, column=1, sticky=tk.N+tk.S)
-        self.txtKeyboard['yscrollcommand'] = scrlKeyboard.set
+        self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.txtKeyboard.tag_config('highlight', underline=1)
         self.txtKeyboard.mark_set('mark', '0.0')
-        self.txtKeyboard.mark_gravity('mark', tk.LEFT)
+        self.txtKeyboard.mark_gravity('mark', 'left')
         self.txtKeyboard.tag_add('highlight', 'mark')
         
         # station list
-        self.txtStnList = tk.Text(frm3, width=10, height=8, wrap=tk.NONE, bd=2,
+        self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, wrap='none', bd=2,
                 font=('Helvetica', -14))
-        self.txtStnList.grid(row=0, column=0, sticky=tk.N+tk.E+tk.S+tk.W,
-                padx=3, pady=0)
-        scrlStnList = tk.Scrollbar(frm3, command=self.txtStnList.yview)
-        scrlStnList.grid(row=0, column=1, sticky=tk.N+tk.S)
-        self.txtStnList['yscrollcommand'] = scrlStnList.set
-
+        self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
+        
         # office ID
         self.varOfficeID = tk.StringVar()
         self.entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
                 textvariable=self.varOfficeID)
-        self.entOfficeID.grid(row=1, column=0, sticky=tk.E+tk.W, padx=3, pady=6)
+        self.entOfficeID.bind('<Any-KeyRelease>', ka.doOfficeID)
+        self.entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
 
         # circuit closer / WPM
         lfm1 = tk.LabelFrame(frm4, padx=5, pady=5)
@@ -132,37 +125,37 @@ class KOBWindow:
         chkCktClsr = tk.Checkbutton(lfm1, text='Circuit Closer',
                 variable=self.varCircuitCloser)
         chkCktClsr.grid(row=0, column=0)
-        tk.Label(lfm1, text='  WPM').grid(row=0, column=1)
-        self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify=tk.CENTER,
-                width=4, bd=2, command=ka.doWPM)
+        tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
+        self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify='center',
+                width=4, borderwidth=2, command=ka.doWPM)
         self.spnWPM.bind('<Any-KeyRelease>', ka.doWPM)
         self.spnWPM.grid(row=0, column=2)
 
         # code sender
         lfm2 = tk.LabelFrame(frm4, text='Code Sender', padx=5, pady=5)
-        lfm2.grid(row=1, column=0, padx=3, pady=6, sticky=tk.N+tk.E+tk.S+tk.W)
+        lfm2.grid(row=1, column=0, padx=3, pady=6, sticky='NESW')
         self.varCodeSenderOn = tk.IntVar()
         chkCodeSenderOn = tk.Checkbutton(lfm2, text='On',
                 variable=self.varCodeSenderOn)
-        chkCodeSenderOn.grid(row=0, column=0, sticky=tk.W)
+        chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderLoop = tk.IntVar()
         chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Loop',
                 variable=self.varCodeSenderLoop)
-        chkCodeSenderLoop.grid(row=1, column=0, sticky=tk.W)
+        chkCodeSenderLoop.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect
         lfm3 = tk.LabelFrame(frm4, text='Wire No.', padx=5, pady=5)
-        lfm3.grid(row=1, column=1, padx=3, pady=6, sticky=tk.N+tk.S)
-        self.varWireNo = tk.StringVar()
-        self.spnWireNo = tk.Spinbox(lfm3, from_=1, to=32000, justify=tk.CENTER,
-                width=7, bd=2, textvariable=self.varWireNo)
+        lfm3.grid(row=1, column=1, padx=3, pady=6, sticky='NS')
+        self.spnWireNo = tk.Spinbox(lfm3, from_=1, to=32000, justify='center',
+                width=7, borderwidth=2, command=ka.doWireNo)
+        self.spnWireNo.bind('<Any-KeyRelease>', ka.doWireNo)
         self.spnWireNo.grid()
         self.cvsConnect = tk.Canvas(lfm3, width=6, height=10, bd=2,
                 relief=tk.SUNKEN, bg='white')
         self.cvsConnect.grid(row=0, column=2)
         tk.Canvas(lfm3, width=1, height=2).grid(row=1, column=1)
-        tk.Button(lfm3, text='Connect', command=ka.doConnect).grid(row=2,
-                columnspan=3, ipady=2, sticky=tk.E+tk.W)
+        self.btnConnect = tk.Button(lfm3, text='Connect', command=ka.doConnect)
+        self.btnConnect.grid(row=2, columnspan=3, ipady=2, sticky='EW')
 
         # get configuration settings
         sw = self.root.winfo_screenwidth()
@@ -180,9 +173,26 @@ class KOBWindow:
         ka.doWPM()
         self.varCodeSenderOn.set(kc.CodeSenderOn)
         self.varCodeSenderLoop.set(kc.CodeSenderLoop)
-        self.varWireNo.set(kc.WireNo)
+        self.spnWireNo.delete(0)
+        self.spnWireNo.insert(tk.END, kc.WireNo)
 
-## TODO: TAKE CARE OF THESE
+##        print("\n\n----------\n\nget_widget_attributes")
+##        get_widget_attributes(pwd2)
+
+def get_widget_attributes(widget):
+    """display widget attributes for debugging GUI"""
+    all_widgets = widget.winfo_children()
+    print("\n", all_widgets)
+    for widg in all_widgets:
+        print("\nWidget Name: {}".format(widg.winfo_class()))
+        keys = widg.keys()
+        for key in keys:
+            print("Attribute: {:<20}".format(key), end=' ')
+            value = widg[key]
+            vtype = type(value)
+            print("Type: {:<30} Value: {}".format(str(vtype), value))
+
+## TODO:
 ##    kw.txtStnList.insert('0.0', sl.getStationList())
     
 ##def start():
