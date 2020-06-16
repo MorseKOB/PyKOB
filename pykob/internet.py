@@ -49,12 +49,12 @@ codePacketFormat = struct.Struct('<hh 128s 4x i 12x 51i i 128s 8x')  # cmd, byts
 NUL = '\x00'
 
 class Internet:
-    def __init__(self, callback=None):
+    def __init__(self, officeID, callback=None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
         self.version = ('PyKOB ' + VERSION).encode(encoding='ascii')
-        self.officeID = "<PyKOB - Office/Station>"
+        self.officeID = officeID.encode(encoding='ascii')
         self.wireNo = 0
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
@@ -69,9 +69,8 @@ class Internet:
             callbackThread.daemon = True
             callbackThread.start()
 
-    def connect(self, wireNo, officeID):
+    def connect(self, wireNo):
         self.wireNo = wireNo
-        self.officeID = officeID.encode(encoding='ascii')
         self.sendID()
 
     def disconnect(self):
