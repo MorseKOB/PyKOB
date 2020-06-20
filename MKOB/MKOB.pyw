@@ -29,21 +29,34 @@ MKOB.pyw
 
 Python version of MorseKOB 2.5
 
-MorseKOB 4.0.1  2020-06-10
+Revision history:
+
+4.0.3
+- use Internet.set_officeID to change user's ID
+
+4.0.2
+- fetch and save config settings
+
+4.0.1  2020-06-10
 - fix jitter in code reader window
 - tweak widget attributes
 """
 
 import tkinter as tk
+import kobconfig as kc
 import kobwindow as kw
 import kobactions as ka
+import sys
 import threading
 
-VERSION = "MorseKOB 4.0.1"
+VERSION = "MorseKOB 4.0.3"
 
-root = tk.Tk()
-##root.iconbitmap("resources/mkob.ico")  # fails with Linux
-kw.KOBWindow(root, VERSION)
-root.mainloop()
-##ka.running = False
-print('normal exit')
+try:
+    root = tk.Tk()
+    ##root.iconbitmap("resources/mkob.ico")  # fails with Linux
+    kw.KOBWindow(root, VERSION)
+    root.mainloop()
+    ##ka.running = False
+except KeyboardInterrupt:
+    print()
+sys.exit(0)

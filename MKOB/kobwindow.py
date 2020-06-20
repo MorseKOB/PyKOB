@@ -31,11 +31,12 @@ Creates the main KOB window for MKOB and lays out its widgets
 
 import tkinter as tk
 import tkinter.scrolledtext as tkst 
-import kobactions as ka
 import kobconfig as kc
+import kobactions as ka
 
 class KOBWindow:
     def __init__(self, root, VERSION):
+        
         self.VERSION = VERSION
         ka.kw = self
         
@@ -90,8 +91,7 @@ class KOBWindow:
 
         # reader
         self.txtReader = tkst.ScrolledText(frm1, width=40, height=15, wrap='word', bd=2,
-                padx=2, pady=2,
-                spacing1=0, spacing2=5, spacing3=0,
+                padx=2, pady=2, spacing1=0, spacing2=5, spacing3=0,
                 font=('Helvetica', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
@@ -109,14 +109,14 @@ class KOBWindow:
         # station list
         self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, wrap='none', bd=2,
                 font=('Helvetica', -14))
-        self.txtStnList.grid(row=0, column=0, sticky='NESW',
-                padx=3, pady=0)
+        self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
         
         # office ID
         self.varOfficeID = tk.StringVar()
-        entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
+        self.entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
                 textvariable=self.varOfficeID)
-        entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
+        self.entOfficeID.bind('<Any-KeyRelease>', ka.doOfficeID)
+        self.entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
 
         # circuit closer / WPM
         lfm1 = tk.LabelFrame(frm4, padx=5, pady=5)
@@ -146,9 +146,9 @@ class KOBWindow:
         # wire no. / connect
         lfm3 = tk.LabelFrame(frm4, text='Wire No.', padx=5, pady=5)
         lfm3.grid(row=1, column=1, padx=3, pady=6, sticky='NS')
-        self.varWireNo = tk.StringVar()
         self.spnWireNo = tk.Spinbox(lfm3, from_=1, to=32000, justify='center',
-                width=7, borderwidth=2, textvariable=self.varWireNo)
+                width=7, borderwidth=2, command=ka.doWireNo)
+        self.spnWireNo.bind('<Any-KeyRelease>', ka.doWireNo)
         self.spnWireNo.grid()
         self.cvsConnect = tk.Canvas(lfm3, width=6, height=10, bd=2,
                 relief=tk.SUNKEN, bg='white')
@@ -173,7 +173,8 @@ class KOBWindow:
         ka.doWPM()
         self.varCodeSenderOn.set(kc.CodeSenderOn)
         self.varCodeSenderLoop.set(kc.CodeSenderLoop)
-        self.varWireNo.set(kc.WireNo)
+        self.spnWireNo.delete(0)
+        self.spnWireNo.insert(tk.END, kc.WireNo)
 
 ##        print("\n\n----------\n\nget_widget_attributes")
 ##        get_widget_attributes(pwd2)
@@ -191,7 +192,7 @@ def get_widget_attributes(widget):
             vtype = type(value)
             print("Type: {:<30} Value: {}".format(str(vtype), value))
 
-## TAKE CARE OF THESE
+## TODO:
 ##    kw.txtStnList.insert('0.0', sl.getStationList())
     
 ##def start():
