@@ -54,7 +54,10 @@ class Internet:
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
         self.version = ("PyKOB " + VERSION).encode(encoding='ascii')
-        self.officeID = officeID.encode(encoding='ascii')
+        if officeID:
+            self.officeID = officeID.encode(encoding='ascii')
+        else:
+            self.officeID = ""
         self.wireNo = 0
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
