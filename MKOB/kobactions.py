@@ -55,8 +55,56 @@ def readerCallback(char, spacing):
     kw.txtReader.insert('end', char)
     kw.txtReader.yview_moveto(1)
 
+station_ID_list = []
+station_ID_times = []
+
+def ID_monitor_callback(id):
+    """update the station list when an ID is sent or received"""
+    global station_ID_list, station_ID_times
+    global connected
+    if not connected:
+        return
+    i = len(station_ID_list) - 1
+    while i >= 0:
+        if station_ID_list[i] == id:
+            break
+        i -= 1
+    if i < 0:
+        station_ID_list += [id]
+        station_ID_times += [0]
+        i = len(station_ID_list) - 1
+    station_ID_times[i] = time.time()
+    display_station_list()
+
+def sender_monitor_callback(id):
+    """update the station list when a new sender is detected"""
+    print("sender:", id)
+
+def display_station_list():
+    """purge inactive stations and display the updated station list"""
+    global station_ID_list, station_ID_times
+    now = time.time()
+    # find and purge inactive stations
+    while True:
+        i = len(station_ID_list) - 1
+        while i >= 0:
+            if now > station_ID_times[i] + 60:  # inactive station
+                break
+            i -= 1
+        if i < 0:  # all stations are active
+            break
+        # purge inactive station
+        station_ID_list = station_ID_list[:i] + station_ID_list[i+1:]
+        station_ID_list = station_ID_list[:i] + station_ID_list[i+1:]
+    # display station list
+    kw.txtStnList.delete('1.0', 'end')
+    for i in range(len(station_ID_list)):
+        kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))
+
 myKOB = kob.KOB(port=config.serial_port, audio=config.sound, callback=None)
 myInternet = internet.Internet(config.station, callback=internetCallback)
+myInternet.monitor_IDs(ID_monitor_callback)
+myInternet.monitor_sender(sender_monitor_callback)
 
 # File menu
 
@@ -85,7 +133,7 @@ def doOfficeID(event=None):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
-    myInternet.set_officeID(kc.OfficeID.encode(encoding='ascii'))
+    myInternet.set_officeID(kc.OfficeID)
 
 def doWPM(event=None):
     global mySender, myReader

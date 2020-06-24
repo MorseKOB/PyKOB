@@ -23,11 +23,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-VERSION = '1.2.3'
+VERSION = '1.2.4'
 
 """
 
 Change history:
+
+1.2.4  2020-06-23
+- add capability to monitor office IDs and current sender
 
 1.2.3  2020-06-16
 - add `Internet.set_officeID` method

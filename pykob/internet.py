@@ -71,6 +71,8 @@ class Internet:
             callbackThread = threading.Thread(target=self.callbackRead)
             callbackThread.daemon = True
             callbackThread.start()
+        self.ID_callback = None
+        self.sender_callback = None
 
     def connect(self, wireNo):
         self.wireNo = wireNo
@@ -98,8 +100,11 @@ class Internet:
                 cmd, byts, stnID, seqNo, code = cp[0], cp[1], cp[2], cp[3], cp[4:]
                 stnID, sep, fill = stnID.decode(encoding='ascii').partition(NUL)
                 n = code[51]
-                if n == 0 and seqNo == self.rcvdSeqNo + 2:  # ID packet
-                    self.rcvdSeqNo = seqNo  # update sender's, ignore others
+                if n == 0:  # ID packet
+                    if self.ID_callback:
+                        self.ID_callback(stnID)
+                    if seqNo == self.rcvdSeqNo + 2:
+                        self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
                 if n > 0 and seqNo != self.rcvdSeqNo:  # code packet
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
                         code = (-0x7fff,) + code[1:n]
@@ -140,8 +145,18 @@ class Internet:
             idPacket = idPacketFormat.pack(DAT, 492, self.officeID,
                     self.sentSeqNo, 1, self.version)
             self.socket.sendto(idPacket, self.address)
+            if self.ID_callback:
+                self.ID_callback(self.officeID.decode(encoding='ascii'))
 
-    def set_officeID(self, officeId):
+    def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
+        self.officeID = officeID.encode(encoding='ascii')
 
-        self.officeID = officeId
+    def monitor_IDs(self, ID_callback):
+        """start monitoring incoming and outgoing station IDs"""
+        self.ID_callback = ID_callback
+
+    def monitor_sender(self, sender_callback):
+        """start monitoring changes in current sender"""
+        self.sender_callback = sender_callback
+        
