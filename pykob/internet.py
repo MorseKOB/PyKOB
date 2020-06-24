@@ -106,6 +106,8 @@ class Internet:
                     if seqNo == self.rcvdSeqNo + 2:
                         self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
                 if n > 0 and seqNo != self.rcvdSeqNo:  # code packet
+                    if self.sender_callback:
+                        self.sender_callback(stnID)
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
                         code = (-0x7fff,) + code[1:n]
                     else:

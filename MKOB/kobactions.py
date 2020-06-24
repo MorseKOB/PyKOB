@@ -31,7 +31,6 @@ Defines actions for MKOB
 import tkinter.messagebox as mb
 from pykob import config, kob, internet, morse
 import kobconfig as kc
-import stationlist as sl
 import time
 
 import pykob  # for version number
@@ -43,6 +42,7 @@ myReader = None
 myInternet = None
 ##running = True
 connected = False
+sender_ID = ""
 
 def internetCallback(code):
     if connected:
@@ -64,21 +64,35 @@ def ID_monitor_callback(id):
     global connected
     if not connected:
         return
-    i = len(station_ID_list) - 1
-    while i >= 0:
-        if station_ID_list[i] == id:
-            break
-        i -= 1
-    if i < 0:
-        station_ID_list += [id]
-        station_ID_times += [0]
+    try:
+        i = station_ID_list.index(id)
+    except:
+        station_ID_list.append(id)
+        station_ID_times.append(0)
         i = len(station_ID_list) - 1
     station_ID_times[i] = time.time()
     display_station_list()
 
 def sender_monitor_callback(id):
     """update the station list when a new sender is detected"""
-    print("sender:", id)
+    global station_ID_list, station_ID_times
+    global connected
+    global sender_ID
+    if not connected:
+        return
+    if id == sender_ID:
+        return
+    sender_ID = id
+    kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
+    try:
+        i = station_ID_list.index(id)
+    except:
+        return
+    station_ID_list.append(station_ID_list[i])
+    station_ID_list.pop(i)
+    station_ID_times.append(station_ID_times[i])
+    station_ID_times.pop(i)
+    display_station_list()
 
 def display_station_list():
     """purge inactive stations and display the updated station list"""
@@ -95,7 +109,7 @@ def display_station_list():
             break
         # purge inactive station
         station_ID_list = station_ID_list[:i] + station_ID_list[i+1:]
-        station_ID_list = station_ID_list[:i] + station_ID_list[i+1:]
+        station_ID_times = station_ID_times[:i] + station_ID_times[i+1:]
     # display station list
     kw.txtStnList.delete('1.0', 'end')
     for i in range(len(station_ID_list)):
@@ -162,6 +176,7 @@ def doConnect():
         myInternet.connect(kc.WireNo)
     else:
         myInternet.disconnect()
+        kw.txtStnList.delete('1.0', 'end')
 
 ##def codeSender():
 ##    while running:
