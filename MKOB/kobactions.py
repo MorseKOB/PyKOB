@@ -83,6 +83,7 @@ def sender_monitor_callback(id):
     if id == sender_ID:
         return
     sender_ID = id
+    myReader.flush()
     kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
     try:
         i = station_ID_list.index(id)
