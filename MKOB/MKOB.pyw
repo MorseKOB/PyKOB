@@ -31,6 +31,9 @@ Python version of MorseKOB 2.5
 
 Revision history:
 
+4.0.4  2020-06-23
+- implement station list
+
 4.0.3
 - use Internet.set_officeID to change user's ID
 
@@ -49,7 +52,7 @@ import kobactions as ka
 import sys
 import threading
 
-VERSION = "MorseKOB 4.0.3"
+VERSION = "MorseKOB 4.0.4"
 
 try:
     root = tk.Tk()
