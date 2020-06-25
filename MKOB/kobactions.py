@@ -28,6 +28,7 @@ kobactions.py
 Defines actions for MKOB
 """
 
+import tkinter as tk
 import tkinter.messagebox as mb
 from pykob import config, kob, internet, morse
 import kobconfig as kc
