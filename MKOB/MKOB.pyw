@@ -28,21 +28,6 @@ SOFTWARE.
 MKOB.pyw
 
 Python version of MorseKOB 2.5
-
-Revision history:
-
-4.0.4  2020-06-25
-- implement station list
-
-4.0.3
-- use Internet.set_officeID to change user's ID
-
-4.0.2
-- fetch and save config settings
-
-4.0.1  2020-06-10
-- fix jitter in code reader window
-- tweak widget attributes
 """
 
 import tkinter as tk
@@ -52,7 +37,7 @@ import kobactions as ka
 import sys
 import threading
 
-VERSION = "MorseKOB 4.0.4"
+VERSION = "MorseKOB 4.0.5"
 
 try:
     root = tk.Tk()
