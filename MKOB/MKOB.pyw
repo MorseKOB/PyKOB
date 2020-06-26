@@ -31,7 +31,7 @@ Python version of MorseKOB 2.5
 
 Revision history:
 
-4.0.4  2020-06-23
+4.0.4  2020-06-25
 - implement station list
 
 4.0.3

@@ -31,10 +31,13 @@ Defines actions for MKOB
 import tkinter.messagebox as mb
 from pykob import config, kob, internet, morse
 import kobconfig as kc
+import kobstationlist as ks
 import time
 
 import pykob  # for version number
 print("PyKOB " + pykob.VERSION)
+
+# global variables
 
 kw = None  # initialized by KOBWindow
 mySender = None
@@ -42,84 +45,6 @@ myReader = None
 myInternet = None
 ##running = True
 connected = False
-sender_ID = ""
-
-def internetCallback(code):
-    if connected:
-        myKOB.sounder(code)
-        myReader.decode(code)
-
-def readerCallback(char, spacing):
-    if spacing > 0.5:
-        kw.txtReader.insert('end', " ")
-    kw.txtReader.insert('end', char)
-    kw.txtReader.yview_moveto(1)
-
-station_ID_list = []
-station_ID_times = []
-
-def ID_monitor_callback(id):
-    """update the station list when an ID is sent or received"""
-    global station_ID_list, station_ID_times
-    global connected
-    if not connected:
-        return
-    try:
-        i = station_ID_list.index(id)
-    except:
-        station_ID_list.append(id)
-        station_ID_times.append(0)
-        i = len(station_ID_list) - 1
-    station_ID_times[i] = time.time()
-    display_station_list()
-
-def sender_monitor_callback(id):
-    """update the station list when a new sender is detected"""
-    global station_ID_list, station_ID_times
-    global connected
-    global sender_ID
-    if not connected:
-        return
-    if id == sender_ID:
-        return
-    sender_ID = id
-    myReader.flush()
-    kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
-    try:
-        i = station_ID_list.index(id)
-    except:
-        return
-    station_ID_list.append(station_ID_list[i])
-    station_ID_list.pop(i)
-    station_ID_times.append(station_ID_times[i])
-    station_ID_times.pop(i)
-    display_station_list()
-
-def display_station_list():
-    """purge inactive stations and display the updated station list"""
-    global station_ID_list, station_ID_times
-    now = time.time()
-    # find and purge inactive stations
-    while True:
-        i = len(station_ID_list) - 1
-        while i >= 0:
-            if now > station_ID_times[i] + 60:  # inactive station
-                break
-            i -= 1
-        if i < 0:  # all stations are active
-            break
-        # purge inactive station
-        station_ID_list = station_ID_list[:i] + station_ID_list[i+1:]
-        station_ID_times = station_ID_times[:i] + station_ID_times[i+1:]
-    # display station list
-    kw.txtStnList.delete('1.0', 'end')
-    for i in range(len(station_ID_list)):
-        kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))
-
-myKOB = kob.KOB(port=config.serial_port, audio=config.sound, callback=None)
-myInternet = internet.Internet(config.station, callback=internetCallback)
-myInternet.monitor_IDs(ID_monitor_callback)
-myInternet.monitor_sender(sender_monitor_callback)
 
 # File menu
 
@@ -142,6 +67,8 @@ def doFileExit():
 
 def doHelpAbout():
     mb.showinfo(title="About", message=kw.VERSION)
+
+# actions for control events
 
 def doOfficeID(event=None):
     global myInternet
@@ -166,10 +93,12 @@ def doWireNo(event=None):
     config.set_wire(kw.spnWireNo.get())
     config.save_config()
     if connected:
+        ks.clear_station_list()
         myInternet.connect(kc.WireNo)
 
 def doConnect():
     global connected
+    myReader.flush()
     connected = not connected
     color = 'red' if connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
@@ -177,7 +106,27 @@ def doConnect():
         myInternet.connect(kc.WireNo)
     else:
         myInternet.disconnect()
-        kw.txtStnList.delete('1.0', 'end')
+        ks.clear_station_list()
+
+# callback functions
+
+def internetCallback(code):
+    if connected:
+        myKOB.sounder(code)
+        myReader.decode(code)
+
+def readerCallback(char, spacing):
+    if spacing > 0.5:
+        kw.txtReader.insert('end', " ")
+    kw.txtReader.insert('end', char)
+    kw.txtReader.yview_moveto(1)
+
+# initialization
+
+myKOB = kob.KOB(port=config.serial_port, audio=config.sound, callback=None)
+myInternet = internet.Internet(config.station, callback=internetCallback)
+ks.init(myInternet)
+
 
 ##def codeSender():
 ##    while running:
@@ -192,3 +141,4 @@ def doConnect():
 ##            kw.txtKeyboard.tag_add('highlight', 'mark')
 ##        else:
 ##            time.sleep(0.1)
+
