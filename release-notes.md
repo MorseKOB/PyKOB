@@ -1,9 +1,8 @@
-Release notes
+# Release notes
 
-This is a provisional file where I can record changes I've made to the MKOB GUI app and the PyKOB library package. The format of this file is very much subject to change. It may even be split into separate files if MKOB and PyKOB end up having their own repositories. —@leskerr
+This is a provisional file where I can record changes I've made to the MKOB GUI app and the PyKOB library package. The format of this file is very much subject to change. It may even be split into separate files if MKOB and PyKOB end up having their own repositories. @leskerr
 
-
-MKOB change history:
+## MKOB change history:
 
 4.0.5  2020-06-26
 - tweak reader window line spacing
@@ -22,8 +21,7 @@ MKOB change history:
 - fix jitter in code reader window
 - tweak widget attributes
 
-
-PyKOB change history:
+## PyKOB change history:
 
 1.2.4  2020-06-23
 - add capability to monitor office IDs and current sender
@@ -51,10 +49,7 @@ PyKOB change history:
 
 1.1.0  2018-01-07
 - morse: redesigned decode section to adapt to incoming Morse speed and handle
-    tapped dots and dashes; (temporarily) removed autoflush
-
-1.0.1
-- morse: added lock mechanism to prevent autoflush from double-decoding
+    tapped dots and dashes
 
 1.0.0  2014-11-11
 - changed package name from morsekob to PyKOB
