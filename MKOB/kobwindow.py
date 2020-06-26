@@ -33,12 +33,14 @@ import tkinter as tk
 import tkinter.scrolledtext as tkst 
 import kobconfig as kc
 import kobactions as ka
+import kobstationlist as ks
 
 class KOBWindow:
     def __init__(self, root, VERSION):
         
         self.VERSION = VERSION
         ka.kw = self
+        ks.kw = self
         
         # window
         self.root = root
