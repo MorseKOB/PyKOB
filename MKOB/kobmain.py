@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 MIT License
 
@@ -25,22 +23,36 @@ SOFTWARE.
 """
 
 """
-MKOB.pyw
+kobmain.py
 
-Python version of MorseKOB 2.5
+Handle the flow of Morse code throughout the program.
 """
 
-import tkinter as tk
-import sys
-import kobwindow
+from pykob import kob, internet
+import kobconfig as kc
+import kobactions as ka
+import kobstationlist
 
-VERSION = "MorseKOB 4.0.6"
+mySender = None
+myReader = None
+myInternet = None
+connected = False
 
-try:
-    root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # fails with Linux
-    kobwindow.KOBWindow(root, VERSION)
-    root.mainloop()
-except KeyboardInterrupt:
-    print()
-sys.exit(0)
+# callback functions
+
+def internetCallback(code):
+    if connected:
+        myKOB.sounder(code)
+        myReader.decode(code)
+
+def readerCallback(char, spacing):
+    if spacing > 0.5:
+        ka.kw.txtReader.insert('end', " ")
+    ka.kw.txtReader.insert('end', char)
+    ka.kw.txtReader.yview_moveto(1)
+
+# initialization
+
+myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound, callback=None)
+myInternet = internet.Internet(kc.config.station, callback=internetCallback)
+kobstationlist.init()

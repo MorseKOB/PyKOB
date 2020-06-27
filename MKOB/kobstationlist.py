@@ -28,25 +28,22 @@ kobstationlist.py
 Manage the station list window.
 """
 
-import kobactions as ka
 import time
+import kobactions as ka
+import kobmain as km
 
-kw = None  # initialized by KOBWindow
-myInternet = None
 station_ID_list = []
 station_ID_times = []
 sender_ID = ""
 
-def init(inet):
-    global myInternet
-    myInternet = inet
-    myInternet.monitor_IDs(ID_monitor_callback)
-    myInternet.monitor_sender(sender_monitor_callback)
+def init():
+    km.myInternet.monitor_IDs(ID_monitor_callback)
+    km.myInternet.monitor_sender(sender_monitor_callback)
 
 def ID_monitor_callback(id):
     """update the station list when an ID is sent or received"""
     global station_ID_list, station_ID_times
-    if not ka.connected:
+    if not km.connected:
         clear_station_list()
         return
     try:
@@ -61,14 +58,14 @@ def ID_monitor_callback(id):
 def sender_monitor_callback(id):
     """update the station list when a new sender is detected"""
     global station_ID_list, station_ID_times, sender_ID
-    if not ka.connected:
+    if not km.connected:
         clear_station_list()
         return
     if id == sender_ID:
         return
     sender_ID = id
-    ka.myReader.flush()
-    kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
+    km.myReader.flush()
+    ka.kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
     try:
         i = station_ID_list.index(id)
         station_ID_list.pop(i)
@@ -85,7 +82,7 @@ def clear_station_list():
     station_ID_list = []
     station_ID_times = []
     sender_ID = ""
-    kw.txtStnList.delete('1.0', 'end')
+    ka.kw.txtStnList.delete('1.0', 'end')
 
 def display_station_list():
     """purge inactive stations and display the updated station list"""
@@ -104,6 +101,6 @@ def display_station_list():
         station_ID_list.pop(i)
         station_ID_times.pop(i)
     # display station list
-    kw.txtStnList.delete('1.0', 'end')
+    ka.kw.txtStnList.delete('1.0', 'end')
     for i in range(len(station_ID_list)):
-        kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))
+        ka.kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))
