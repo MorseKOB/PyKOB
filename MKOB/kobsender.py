@@ -23,38 +23,38 @@ SOFTWARE.
 """
 
 """
-kobmain.py
+kobsender.py
 
-Handle the flow of Morse code throughout the program.
+Send code from the keyboard.
 """
 
-from pykob import kob, internet
-import kobconfig as kc
+import threading
+import time
 import kobactions as ka
-import kobstationlist
-import kobsender
+import kobmain as km
 
-mySender = None
-myReader = None
-myInternet = None
-connected = False
+def init():
+    keyboard_send_thread = threading.Thread(target=keyboard_send)
+    keyboard_send_thread.daemon = True
+    keyboard_send_thread.start()
 
-# callback functions
+def keyboard_send():
+    """thread to send Morse from the code sender window"""
+    time.sleep(1)  # wait for kobwindows to initialize on startup
+    kw = ka.kw
+    kw.txtKeyboard.tag_config('highlight', background='gray75',
+            underline=0)
+    kw.txtKeyboard.tag_remove('highlight', '1.0', 'end')
+    kw.txtKeyboard.mark_set('mark', '1.0')
+    while True:
+        if kw.txtKeyboard.compare('mark', '<', 'end-1c') and \
+                kw.varCodeSenderOn.get():
+            kw.txtKeyboard.tag_add('highlight', 'mark')
+            c = kw.txtKeyboard.get('mark')
+            code = km.mySender.encode(c)
+            km.myKOB.sounder(code)
+            kw.txtKeyboard.tag_remove('highlight', 'mark')
+            kw.txtKeyboard.mark_set('mark', 'mark+1c')
+        else:
+            time.sleep(0.1)
 
-def internetCallback(code):
-    if connected:
-        myKOB.sounder(code)
-        myReader.decode(code)
-
-def readerCallback(char, spacing):
-    if spacing > 0.5:
-        ka.kw.txtReader.insert('end', " ")
-    ka.kw.txtReader.insert('end', char)
-    ka.kw.txtReader.yview_moveto(1)
-
-# initialization
-
-myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound, callback=None)
-myInternet = internet.Internet(kc.config.station, callback=internetCallback)
-kobstationlist.init()
-kobsender.init()
