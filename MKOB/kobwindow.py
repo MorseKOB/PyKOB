@@ -104,6 +104,7 @@ class KOBWindow:
         self.txtKeyboard.mark_set('mark', '0.0')
         self.txtKeyboard.mark_gravity('mark', 'left')
         self.txtKeyboard.tag_add('highlight', 'mark')
+        self.txtKeyboard.focus_set()
         
         # station list
         self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, bd=2,
@@ -138,7 +139,7 @@ class KOBWindow:
                 variable=self.varCodeSenderOn)
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderLoop = tk.IntVar()
-        chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Loop',
+        chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Repeat',
                 variable=self.varCodeSenderLoop)
         chkCodeSenderLoop.grid(row=1, column=0, sticky='W')
 

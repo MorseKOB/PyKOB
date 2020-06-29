@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 """
-kobsender.py
+kobkeyboard.py
 
 Send code from the keyboard.
 """
@@ -52,7 +52,7 @@ def keyboard_send():
             kw.txtKeyboard.tag_add('highlight', 'mark')
             c = kw.txtKeyboard.get('mark')
             code = km.mySender.encode(c)
-            km.myKOB.sounder(code)
+            km.from_keyboard(code)
             kw.txtKeyboard.tag_remove('highlight', 'mark')
             kw.txtKeyboard.mark_set('mark', 'mark+1c')
         else:

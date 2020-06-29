@@ -28,23 +28,57 @@ kobmain.py
 Handle the flow of Morse code throughout the program.
 """
 
-from pykob import kob, internet
+from pykob import kob, morse, internet
 import kobconfig as kc
 import kobactions as ka
 import kobstationlist
-import kobsender
+import kobkeyboard
 
 mySender = None
 myReader = None
 myInternet = None
 connected = False
 
-# callback functions
+kob_latched = True
+keyboard_latched = True
+internet_latched = True
 
-def internetCallback(code):
-    if connected:
+sender_ID = ""
+
+def from_KOB(code):
+    global kob_latched, keyboard_latched, internet_latched
+    if keyboard_latched and internet_latched:
+        kob_latched = False
+        myReader.decode(code)
+        myInternet.write(code)
+    if len(code) > 0 and code[len(code)-1] == +1:
+        kob_latched = True
+        myReader.flush()
+
+def from_keyboard(code):
+    global kob_latched, keyboard_latched, internet_latched
+    if kob_latched and internet_latched:
+        keyboard_latched = False
         myKOB.sounder(code)
         myReader.decode(code)
+        myInternet.write(code)
+    if len(code) > 0 and code[len(code)-1] == +1:
+        keyboard_latched = True
+        myReader.flush()
+
+def from_internet(code):
+    global kob_latched, keyboard_latched, internet_latched
+    if not connected:
+        return
+    if kob_latched and keyboard_latched:
+        internet_latched = False
+        myKOB.sounder(code)
+        myReader.decode(code)
+    if len(code) > 0 and code[len(code)-1] == +1:
+        internet_latched = True
+        myReader.flush()
+
+# callback functions
 
 def readerCallback(char, spacing):
     if spacing > 0.5:
@@ -54,7 +88,8 @@ def readerCallback(char, spacing):
 
 # initialization
 
-myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound, callback=None)
-myInternet = internet.Internet(kc.config.station, callback=internetCallback)
+myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound,
+        callback=from_KOB)
+myInternet = internet.Internet(kc.config.station, callback=from_internet)
 kobstationlist.init()
-kobsender.init()
+kobkeyboard.init()
