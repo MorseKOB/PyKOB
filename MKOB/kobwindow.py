@@ -25,22 +25,20 @@ SOFTWARE.
 """
 kobwindow.py
 
-Creates the main KOB window for MKOB and lays out its widgets
+Create the main KOB window for MKOB and lay out its widgets
 (controls).
 """
 
 import tkinter as tk
 import tkinter.scrolledtext as tkst 
-import kobconfig as kc
 import kobactions as ka
-import kobstationlist as ks
+import kobconfig as kc
 
 class KOBWindow:
     def __init__(self, root, VERSION):
         
         self.VERSION = VERSION
         ka.kw = self
-        ks.kw = self
         
         # window
         self.root = root
@@ -106,6 +104,7 @@ class KOBWindow:
         self.txtKeyboard.mark_set('mark', '0.0')
         self.txtKeyboard.mark_gravity('mark', 'left')
         self.txtKeyboard.tag_add('highlight', 'mark')
+        self.txtKeyboard.focus_set()
         
         # station list
         self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, bd=2,
@@ -140,7 +139,7 @@ class KOBWindow:
                 variable=self.varCodeSenderOn)
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderLoop = tk.IntVar()
-        chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Loop',
+        chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Repeat',
                 variable=self.varCodeSenderLoop)
         chkCodeSenderLoop.grid(row=1, column=0, sticky='W')
 
@@ -176,43 +175,3 @@ class KOBWindow:
         self.varCodeSenderLoop.set(kc.CodeSenderLoop)
         self.spnWireNo.delete(0)
         self.spnWireNo.insert(tk.END, kc.WireNo)
-
-##        print("\n\n----------\n\nget_widget_attributes")
-##        get_widget_attributes(pwd2)
-
-def get_widget_attributes(widget):
-    """display widget attributes for debugging GUI"""
-    all_widgets = widget.winfo_children()
-    print("\n", all_widgets)
-    for widg in all_widgets:
-        print("\nWidget Name: {}".format(widg.winfo_class()))
-        keys = widg.keys()
-        for key in keys:
-            print("Attribute: {:<20}".format(key), end=' ')
-            value = widg[key]
-            vtype = type(value)
-            print("Type: {:<30} Value: {}".format(str(vtype), value))
-
-## TODO:
-##    kw.txtStnList.insert('0.0', sl.getStationList())
-    
-##def start():
-##    global running
-##    running = True
-##    runThread = threading.Thread(target=run)
-##    runThread.daemon = True
-##    runThread.start()
-##
-##def stop():
-##    global running
-##    running = False
-##        
-##def run():
-##    s = '~  This is a test  +   '
-##    while running:
-##        for c in s:
-##            if not running:
-##                break
-##            txtReader.insert(tk.END, c)
-##            code = mySender.encode(c)
-##            myKOB.sounder(code)

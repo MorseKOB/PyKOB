@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 MIT License
 
@@ -25,22 +23,38 @@ SOFTWARE.
 """
 
 """
-MKOB.pyw
+kobkeyboard.py
 
-Python version of MorseKOB 2.5
+Send code from the keyboard.
 """
 
-import tkinter as tk
-import sys
-import kobwindow
+import threading
+import time
+import kobactions as ka
+import kobmain as km
 
-VERSION = "MorseKOB 4.0.6"
+def init():
+    keyboard_send_thread = threading.Thread(target=keyboard_send)
+    keyboard_send_thread.daemon = True
+    keyboard_send_thread.start()
 
-try:
-    root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # fails with Linux
-    kobwindow.KOBWindow(root, VERSION)
-    root.mainloop()
-except KeyboardInterrupt:
-    print()
-sys.exit(0)
+def keyboard_send():
+    """thread to send Morse from the code sender window"""
+    time.sleep(1)  # wait for kobwindows to initialize on startup
+    kw = ka.kw
+    kw.txtKeyboard.tag_config('highlight', background='gray75',
+            underline=0)
+    kw.txtKeyboard.tag_remove('highlight', '1.0', 'end')
+    kw.txtKeyboard.mark_set('mark', '1.0')
+    while True:
+        if kw.txtKeyboard.compare('mark', '<', 'end-1c') and \
+                kw.varCodeSenderOn.get():
+            kw.txtKeyboard.tag_add('highlight', 'mark')
+            c = kw.txtKeyboard.get('mark')
+            code = km.mySender.encode(c)
+            km.from_keyboard(code)
+            kw.txtKeyboard.tag_remove('highlight', 'mark')
+            kw.txtKeyboard.mark_set('mark', 'mark+1c')
+        else:
+            time.sleep(0.1)
+
