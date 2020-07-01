@@ -28,6 +28,7 @@ kobmain.py
 Handle the flow of Morse code throughout the program.
 """
 
+import time
 from pykob import kob, morse, internet
 import kobconfig as kc
 import kobactions as ka
@@ -42,54 +43,97 @@ connected = False
 kob_latched = True
 keyboard_latched = True
 internet_latched = True
+latch_code = (-1000, +1)  # code sequence to force latching
 
 sender_ID = ""
 
 def from_KOB(code):
+    """handle inputs received from the external key"""
     global kob_latched, keyboard_latched, internet_latched
-    if keyboard_latched and internet_latched:
-        kob_latched = False
-        myReader.decode(code)
-        myInternet.write(code)
+    kob_latched = False
+    if keyboard_latched:
+        if connected:
+            myInternet.write(code)
+        if internet_latched:
+            update_sender(kc.config.station)
+            myReader.decode(code)
     if len(code) > 0 and code[len(code)-1] == +1:
         kob_latched = True
         myReader.flush()
 
 def from_keyboard(code):
     global kob_latched, keyboard_latched, internet_latched
-    if kob_latched and internet_latched:
-        keyboard_latched = False
-        myKOB.sounder(code)
-        myReader.decode(code)
-        myInternet.write(code)
+    keyboard_latched = False
+    if kob_latched:
+        if connected:
+            myInternet.write(code)
+        if internet_latched:
+            myKOB.sounder(code)
+            update_sender(kc.config.station)
+            myReader.decode(code)
     if len(code) > 0 and code[len(code)-1] == +1:
         keyboard_latched = True
         myReader.flush()
 
 def from_internet(code):
     global kob_latched, keyboard_latched, internet_latched
-    if not connected:
-        return
-    if kob_latched and keyboard_latched:
-        internet_latched = False
+    internet_latched = False
+    if connected and kob_latched and keyboard_latched:
         myKOB.sounder(code)
         myReader.decode(code)
     if len(code) > 0 and code[len(code)-1] == +1:
         internet_latched = True
         myReader.flush()
+        
+def toggle_connect():
+    """connect or disconnect when user clicks on the Connect button"""
+    global connected
+    connected = not connected
+    update_connection()
 
+def update_connection():
+    """ handle toggled connect or wire no. change"""
+    global kob_latched, keyboard_latched, internet_latched
+    global connected
+    if connected:
+        myInternet.connect(kc.WireNo)
+    else:
+        myInternet.disconnect()
+        myReader.flush()
+        time.sleep(0.5)  # wait for any buffered code to complete
+        connected = False  # just to make sure
+        if not internet_latched:
+            internet_latched = True
+            if kob_latched and keyboard_latched:
+                myKOB.sounder(latch_code)
+                myReader.decode(latch_code)
+                myReader.flush()
+    kobstationlist.clear_station_list()
+    
 # callback functions
 
+def update_sender(id):
+    """display station ID in reader window when there's a new sender"""
+    global sender_ID
+    if id != sender_ID:
+        sender_ID = id
+        myReader.flush()
+        ka.codereader_append("\n<{}>".format(sender_ID))
+        kobstationlist.new_sender(sender_ID)
+
 def readerCallback(char, spacing):
+    """display characters returned from the decoder"""
+    s = char
     if spacing > 0.5:
-        ka.kw.txtReader.insert('end', " ")
-    ka.kw.txtReader.insert('end', char)
-    ka.kw.txtReader.yview_moveto(1)
+        s = " " + s
+    ka.codereader_append(s)
 
 # initialization
 
 myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound,
-        callback=from_KOB)
+        callback=from_KOB if kc.config.serial_port else None)
+                # workaround for callback until issue #87 is fixed
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
-kobstationlist.init()
+myInternet.monitor_IDs(kobstationlist.refresh_stations)
+myInternet.monitor_sender(update_sender)
 kobkeyboard.init()

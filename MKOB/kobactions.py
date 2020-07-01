@@ -84,16 +84,14 @@ def doWireNo(event=None):
     config.set_wire(kw.spnWireNo.get())
     config.save_config()
     if km.connected:
-        ks.clear_station_list()
         km.myInternet.connect(kc.WireNo)
 
 def doConnect():
-    km.myReader.flush()
-    km.connected = not km.connected
+    km.toggle_connect()
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
-    if km.connected:
-        km.myInternet.connect(kc.WireNo)
-    else:
-        km.myInternet.disconnect()
-        ks.clear_station_list()
+
+def codereader_append(s):
+    """append a string to the end of the code reader window"""
+    kw.txtReader.insert('end', s)
+    kw.txtReader.yview_moveto(1)

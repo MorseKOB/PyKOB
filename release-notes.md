@@ -4,8 +4,9 @@ This is a provisional file where I can record changes I've made to the MKOB GUI 
 
 ## MKOB change history:
 
-4.0.6  2020-06-27
+4.0.6  2020-06-29
 - restructure modules; add kobmain
+- enable external key
 
 4.0.5  2020-06-26
 - tweak reader window line spacing
