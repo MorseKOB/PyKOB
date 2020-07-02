@@ -54,6 +54,7 @@ def readerCallback(char, spacing):
     if fullSpace:
         outFile.write(' ')
     outFile.write(char)
+    outFile.flush()
 
 try:
     WIRE     = 109  # default KOB wire to connect to
