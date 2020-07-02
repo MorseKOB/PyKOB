@@ -143,8 +143,9 @@ def readerCallback(char, spacing):
 
 # initialization
 
-myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound,
-        callback=from_KOB if kc.config.serial_port else None)
+myKOB = kob.KOB(port=kc.config.serial_port if kc.config.sounder else None,
+        audio=kc.config.sound,
+        callback=from_KOB if kc.config.sounder else None)
                 # workaround for callback until issue #87 is fixed
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
 myInternet.monitor_IDs(kobstationlist.refresh_stations)
