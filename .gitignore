@@ -1,6 +1,8 @@
-zips/
-*.exe
-__pycache__/
-*.pyc
 build/
+dist/
+zips/
+__pycache__/
+*.exe
+*.pyc
+.DS_Store
 log.txt

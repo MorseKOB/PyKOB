@@ -30,6 +30,7 @@ Provides classes for sending and reading American and International Morse code.
 
 import sys, os
 import codecs
+from threading import Timer
 
 AMERICAN = 0         # American Morse
 INTERNATIONAL = 1    # International Morse
@@ -153,8 +154,13 @@ class Reader:
         self.markBuf   = [0, 0]      # length of last dot or dash in character
         self.nChars    = 0           # number of complete characters in buffer
         self.callback  = callback    # function to call when character decoded
+        self.flusher   = None        # holds Timer (thread) to call flush if no code received
 
     def decode(self, codeSeq):
+        # Code received - cancel an existing 'flusher'
+        if self.flusher:
+            self.flusher.cancel()
+            self.flusher = None
         self.updateWPM(codeSeq)
         i = 0
         for i in range(0, len(codeSeq), 2):
@@ -170,6 +176,8 @@ class Reader:
             else:
                 self.codeBuf[self.nChars] += '.'  # dot
             self.markBuf[self.nChars] = mk
+        self.flusher = Timer(((8.0 * self.truDot) / 1000.0), self.flush)  # if idle 8 dot times call `flush`
+        self.flusher.start()
 
     def setWPM(self, wpm):
         self.wpm = wpm
@@ -189,6 +197,9 @@ class Reader:
                 self.wpm = 1200. / self.dotLen
 
     def flush(self):
+        if self.flusher:
+            self.flusher.cancel()
+            self.flusher = None
         self.decodeChar(MAXINT)
         self.decodeChar(MAXINT)  # this is intentional, although maybe not needed
 

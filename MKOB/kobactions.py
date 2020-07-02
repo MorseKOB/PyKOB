@@ -28,6 +28,7 @@ kobactions.py
 Handle actions for controls on main MKOB window
 """
 
+import tkinter as tk
 import tkinter.messagebox as mb
 import time
 from pykob import config, kob, internet, morse
