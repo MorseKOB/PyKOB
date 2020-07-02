@@ -62,6 +62,7 @@ def from_KOB(code):
         myReader.flush()
 
 def from_keyboard(code):
+    """handle inputs received from the keyboard sender"""
     global kob_latched, keyboard_latched, internet_latched
     keyboard_latched = False
     if kob_latched:
@@ -76,6 +77,7 @@ def from_keyboard(code):
         myReader.flush()
 
 def from_internet(code):
+    """handle inputs received from the internet"""
     global kob_latched, keyboard_latched, internet_latched
     internet_latched = False
     if connected and kob_latched and keyboard_latched:
@@ -87,15 +89,11 @@ def from_internet(code):
         
 def toggle_connect():
     """connect or disconnect when user clicks on the Connect button"""
-    global connected
-    connected = not connected
-    update_connection()
-
-def update_connection():
-    """ handle toggled connect or wire no. change"""
     global kob_latched, keyboard_latched, internet_latched
     global connected
+    connected = not connected
     if connected:
+        kobstationlist.clear_station_list()
         myInternet.connect(kc.WireNo)
     else:
         myInternet.disconnect()
@@ -108,7 +106,22 @@ def update_connection():
                 myKOB.sounder(latch_code)
                 myReader.decode(latch_code)
                 myReader.flush()
-    kobstationlist.clear_station_list()
+        kobstationlist.clear_station_list()
+
+def change_wire():
+    global kob_latched, keyboard_latched, internet_latched
+    global connected
+    connected = False
+    myReader.flush()
+    time.sleep(0.5)  # wait for any buffered code to complete
+    if not internet_latched:
+        internet_latched = True
+        if kob_latched and keyboard_latched:
+            myKOB.sounder(latch_code)
+            myReader.decode(latch_code)
+            myReader.flush()
+    myInternet.connect(kc.WireNo)
+    connected = True
     
 # callback functions
 
