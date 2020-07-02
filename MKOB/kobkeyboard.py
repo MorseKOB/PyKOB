@@ -23,19 +23,38 @@ SOFTWARE.
 """
 
 """
+kobkeyboard.py
 
-stationlist.py
-
-Gets the activity page from the KOB server and returns it as a formatted
-string.
-
+Send code from the keyboard.
 """
 
-from urllib.request import urlopen
+import threading
+import time
+import kobactions as ka
+import kobmain as km
 
-def getStationList():
-    s = urlopen('http://mtc-kob.dyndns.org/').read().decode('utf-8')
-    s = re.sub('.*?</tr>.*?(<tr>.*</tr>).*', '\\1', s, 1, re.DOTALL)
-    s = re.sub('<tr><td>(.*?)</td><td.*?>(.*?)</td></tr>',
-            '\\1: \\2', s, 0)
-    return s
+def init():
+    keyboard_send_thread = threading.Thread(target=keyboard_send)
+    keyboard_send_thread.daemon = True
+    keyboard_send_thread.start()
+
+def keyboard_send():
+    """thread to send Morse from the code sender window"""
+    time.sleep(1)  # wait for kobwindows to initialize on startup
+    kw = ka.kw
+    kw.txtKeyboard.tag_config('highlight', background='gray75',
+            underline=0)
+    kw.txtKeyboard.tag_remove('highlight', '1.0', 'end')
+    kw.txtKeyboard.mark_set('mark', '1.0')
+    while True:
+        if kw.txtKeyboard.compare('mark', '<', 'end-1c') and \
+                kw.varCodeSenderOn.get():
+            kw.txtKeyboard.tag_add('highlight', 'mark')
+            c = kw.txtKeyboard.get('mark')
+            code = km.mySender.encode(c)
+            km.from_keyboard(code)
+            kw.txtKeyboard.tag_remove('highlight', 'mark')
+            kw.txtKeyboard.mark_set('mark', 'mark+1c')
+        else:
+            time.sleep(0.1)
+
