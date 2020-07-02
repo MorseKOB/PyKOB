@@ -176,7 +176,7 @@ class Reader:
             else:
                 self.codeBuf[self.nChars] += '.'  # dot
             self.markBuf[self.nChars] = mk
-        self.flusher = Timer(0.5, self.flush)  # TODO: should time be based on WPM/CWPM?
+        self.flusher = Timer(((6.0 * self.truDot) / 1000.0), self.flush)  # after 3 dot times call `flush` if not cancelled
         self.flusher.start()
 
     def setWPM(self, wpm):
