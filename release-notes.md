@@ -6,6 +6,7 @@ This is a provisional file where I can record changes I've made to the MKOB GUI 
 
 4.0.7  2020-07-03
 - fix VERSION
+- gray out unimplemented checkboxes
 
 4.0.6  2020-06-29
 - restructure modules; add kobmain

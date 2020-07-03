@@ -51,7 +51,7 @@ Connect        = False                  # automatically connect on startup
 
 CircuitCloser  = True                   # initial checkbox settings
 CodeSenderOn   = True                   #    "
-CodeSenderLoop = False                  #    "
+CodeSenderRepeat = False                #    "
 
 WindowSize     = (800, 500)             # size of KOB window (in pixels)
 Position       = (-1, -1)               # location of upper left corner of window
