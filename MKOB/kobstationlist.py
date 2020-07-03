@@ -34,13 +34,8 @@ import kobmain as km
 
 station_ID_list = []
 station_ID_times = []
-sender_ID = ""
 
-def init():
-    km.myInternet.monitor_IDs(ID_monitor_callback)
-    km.myInternet.monitor_sender(sender_monitor_callback)
-
-def ID_monitor_callback(id):
+def refresh_stations(id):
     """update the station list when an ID is sent or received"""
     global station_ID_list, station_ID_times
     if not km.connected:
@@ -55,17 +50,12 @@ def ID_monitor_callback(id):
     station_ID_times[i] = time.time()
     display_station_list()
 
-def sender_monitor_callback(id):
+def new_sender(id):
     """update the station list when a new sender is detected"""
-    global station_ID_list, station_ID_times, sender_ID
+    global station_ID_list, station_ID_times
     if not km.connected:
         clear_station_list()
         return
-    if id == sender_ID:
-        return
-    sender_ID = id
-    km.myReader.flush()
-    ka.kw.txtReader.insert('end', "\n<{}>".format(sender_ID))
     try:
         i = station_ID_list.index(id)
         station_ID_list.pop(i)
@@ -78,10 +68,9 @@ def sender_monitor_callback(id):
 
 def clear_station_list():
     """reset the station list"""
-    global station_ID_list, station_ID_times, sender_ID
+    global station_ID_list, station_ID_times
     station_ID_list = []
     station_ID_times = []
-    sender_ID = ""
     ka.kw.txtStnList.delete('1.0', 'end')
 
 def display_station_list():

@@ -47,7 +47,7 @@ def doFileNew():
     kw.txtKeyboard.delete('1.0', tk.END)
 
 def doFileOpen():
-## TODO:    newFile()
+## TODO: newFile()
     kw.txtKeyboard.insert(tk.END, "~  Now is the time for all good men to come to the aid of their country.  +")
     kw.txtKeyboard.mark_set('mark', '0.0')
     kw.txtKeyboard.mark_gravity('mark', tk.LEFT)
@@ -85,16 +85,14 @@ def doWireNo(event=None):
     config.set_wire(kw.spnWireNo.get())
     config.save_config()
     if km.connected:
-        ks.clear_station_list()
-        km.myInternet.connect(kc.WireNo)
+        km.change_wire()
 
 def doConnect():
-    km.myReader.flush()
-    km.connected = not km.connected
+    km.toggle_connect()
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
-    if km.connected:
-        km.myInternet.connect(kc.WireNo)
-    else:
-        km.myInternet.disconnect()
-        ks.clear_station_list()
+
+def codereader_append(s):
+    """append a string to the code reader window"""
+    kw.txtReader.insert('end', s)
+    kw.txtReader.yview_moveto(1)

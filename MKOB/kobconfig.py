@@ -32,7 +32,8 @@ from pykob import config
 
 OfficeID       = config.station         # user's ID (e.g., office call, name, location)
 
-Port           = config.serial_port     # e.g., 'COM3', 'COM4', None
+Port           = config.serial_port     # e.g., 'COM3', '/dev/ttyUSB0', None
+Sounder        = config.sounder         # external sounder on or off
 Audio          = config.sound           # simulated sounder on or off
 
 WPM            = config.text_speed      # overall code speed

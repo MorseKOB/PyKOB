@@ -35,6 +35,7 @@ import sys
 import kobwindow
 
 VERSION = "MorseKOB 4.0.6"
+print(VERSION)
 
 try:
     root = tk.Tk()
