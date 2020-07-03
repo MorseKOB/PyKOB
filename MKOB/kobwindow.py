@@ -44,7 +44,7 @@ class KOBWindow:
         self.root = root
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
-        root.title(VERSION)
+        root.title("MorseKOB " + VERSION)
         
 
         # File menu

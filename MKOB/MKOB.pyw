@@ -34,8 +34,8 @@ import tkinter as tk
 import sys
 import kobwindow
 
-VERSION = "MorseKOB 4.0.6"
-print(VERSION)
+VERSION = "4.0.7"
+print("MorseKOB " + VERSION)
 
 try:
     root = tk.Tk()
