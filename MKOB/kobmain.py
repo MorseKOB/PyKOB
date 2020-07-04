@@ -52,7 +52,7 @@ def from_KOB(code):
     global kob_latched, keyboard_latched, internet_latched
     kob_latched = False
     if keyboard_latched:
-        if connected:
+        if connected and kc.Remote:
             myInternet.write(code)
         if internet_latched:
             update_sender(kc.config.station)
@@ -66,7 +66,7 @@ def from_keyboard(code):
     global kob_latched, keyboard_latched, internet_latched
     keyboard_latched = False
     if kob_latched:
-        if connected:
+        if connected and kc.Remote:
             myInternet.write(code)
         if internet_latched:
             myKOB.sounder(code)
@@ -143,10 +143,13 @@ def readerCallback(char, spacing):
 
 # initialization
 
-myKOB = kob.KOB(port=kc.config.serial_port if kc.config.sounder else None,
-        audio=kc.config.sound,
-        callback=from_KOB if kc.config.sounder else None)
-                # workaround for callback until issue #87 is fixed
+if kc.Local:
+    myKOB = kob.KOB(port=kc.config.serial_port if kc.config.sounder else None,
+            audio=kc.config.sound,
+            callback=from_KOB if kc.config.sounder else None)
+                    # workaround for callback until issue #87 is fixed
+else:
+    myKOB = kob.KOB(port=None, audio=False, callback=None)
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
 myInternet.monitor_IDs(kobstationlist.refresh_stations)
 myInternet.monitor_sender(update_sender)

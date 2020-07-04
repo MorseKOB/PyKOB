@@ -47,7 +47,10 @@ if not config.wire:
     config.save_config()
     
 WireNo         = int(config.wire)       # wire number
-Connect        = False                  # automatically connect on startup
+
+Local          = config.local           # monitor traffic on local sounder and audio
+Remote         = config.remote          # send traffic to internet
+##Connect        = False                  # automatically connect on startup
 
 CircuitCloser  = True                   # initial checkbox settings
 CodeSenderOn   = True                   #    "
