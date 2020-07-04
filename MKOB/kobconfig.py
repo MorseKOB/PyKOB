@@ -38,9 +38,9 @@ Audio          = config.sound           # simulated sounder on or off
 
 WPM            = config.text_speed      # overall code speed
 CWPM           = config.min_char_speed  # minimum character speed (Farnsworth)
-Spacing        = 1 if config.spacing == 'WORD' else 0
+Spacing        = 1 if config.spacing == config.Spacing.word else 0
                                         # 0: character, 1: word (Farnsworth spacing)
-CodeType       = 1 if config.code_type == 'INTERNATIONAL' else 0
+CodeType       = 1 if config.code_type == config.CodeType.international else 0
                                         # 0: American, 1: International
 if not config.wire:
     config.set_wire("101")
