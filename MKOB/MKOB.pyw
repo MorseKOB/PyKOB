@@ -35,12 +35,13 @@ import sys
 import kobwindow
 
 VERSION = "4.0.7"
-print("MorseKOB " + VERSION)
+MKOB_VERSION_TEXT = "MorseKOB " + VERSION
+print(MKOB_VERSION_TEXT)
 
 try:
     root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # fails with Linux
-    kobwindow.KOBWindow(root, VERSION)
+##    root.iconbitmap("resources/mkob.ico")  # TODO: fails with Linux
+    kobwindow.KOBWindow(root, MKOB_VERSION_TEXT)
     root.mainloop()
 except KeyboardInterrupt:
     print()
