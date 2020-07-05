@@ -38,20 +38,23 @@ Audio          = config.sound           # simulated sounder on or off
 
 WPM            = config.text_speed      # overall code speed
 CWPM           = config.min_char_speed  # minimum character speed (Farnsworth)
-Spacing        = 1 if config.spacing == 'WORD' else 0
+Spacing        = 1 if config.spacing == config.Spacing.word else 0
                                         # 0: character, 1: word (Farnsworth spacing)
-CodeType       = 1 if config.code_type == 'INTERNATIONAL' else 0
+CodeType       = 1 if config.code_type == config.CodeType.international else 0
                                         # 0: American, 1: International
 if not config.wire:
     config.set_wire("101")
     config.save_config()
     
 WireNo         = int(config.wire)       # wire number
-Connect        = False                  # automatically connect on startup
+
+Local          = config.local           # monitor traffic on local sounder and audio
+Remote         = config.remote          # send traffic to internet
+##Connect        = False                  # automatically connect on startup
 
 CircuitCloser  = True                   # initial checkbox settings
 CodeSenderOn   = True                   #    "
-CodeSenderLoop = False                  #    "
+CodeSenderRepeat = False                #    "
 
 WindowSize     = (800, 500)             # size of KOB window (in pixels)
 Position       = (-1, -1)               # location of upper left corner of window

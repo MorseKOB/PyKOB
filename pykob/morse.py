@@ -234,7 +234,8 @@ class Reader:
         if self.nChars == 2:
             code = self.codeBuf[0]
             s = self.lookupChar(code)
-            if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen:
+            if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
+                    self.codeType == AMERICAN:
                 s = 'L'
             elif s == 'E':
                 if self.markBuf[0] == 1:

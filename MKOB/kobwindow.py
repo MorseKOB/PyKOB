@@ -35,18 +35,15 @@ import kobactions as ka
 import kobconfig as kc
 
 class KOBWindow:
-    def __init__(self, root, VERSION):
-        
-        self.VERSION = VERSION
-        ka.kw = self
+    def __init__(self, root, MKOB_VERSION_TEXT):       
         
         # window
         self.root = root
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
-        root.title(VERSION)
+        root.title(MKOB_VERSION_TEXT)
+        ka.kw = self
         
-
         # File menu
         menu = tk.Menu()
         root.config(menu=menu)
@@ -124,6 +121,7 @@ class KOBWindow:
         self.varCircuitCloser = tk.IntVar()
         chkCktClsr = tk.Checkbutton(lfm1, text='Circuit Closer',
                 variable=self.varCircuitCloser)
+        chkCktClsr.config(state='disabled')  # TODO: temporary
         chkCktClsr.grid(row=0, column=0)
         tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
         self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify='center',
@@ -137,11 +135,13 @@ class KOBWindow:
         self.varCodeSenderOn = tk.IntVar()
         chkCodeSenderOn = tk.Checkbutton(lfm2, text='On',
                 variable=self.varCodeSenderOn)
+        chkCodeSenderOn.config(state='disabled')  # TODO: temporary
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
-        self.varCodeSenderLoop = tk.IntVar()
-        chkCodeSenderLoop = tk.Checkbutton(lfm2, text='Repeat',
-                variable=self.varCodeSenderLoop)
-        chkCodeSenderLoop.grid(row=1, column=0, sticky='W')
+        self.varCodeSenderRepeat = tk.IntVar()
+        chkCodeSenderRepeat = tk.Checkbutton(lfm2, text='Repeat',
+                variable=self.varCodeSenderRepeat)
+        chkCodeSenderRepeat.config(state='disabled')  # TODO: temporary
+        chkCodeSenderRepeat.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect
         lfm3 = tk.LabelFrame(frm4, text='Wire No.', padx=5, pady=5)
@@ -172,6 +172,6 @@ class KOBWindow:
         self.spnWPM.insert(tk.END, kc.WPM)
         ka.doWPM()
         self.varCodeSenderOn.set(kc.CodeSenderOn)
-        self.varCodeSenderLoop.set(kc.CodeSenderLoop)
+        self.varCodeSenderRepeat.set(kc.CodeSenderRepeat)
         self.spnWireNo.delete(0)
         self.spnWireNo.insert(tk.END, kc.WireNo)
