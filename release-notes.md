@@ -18,6 +18,7 @@ These notes need to be fleshed out before MKOB is released.
 ### What's different
 
 - have to type ~ to open the wire when sending from the keyboard and + to close it
+- missing packets are indicated by a double underscore instead of an asterisk; long pauses also
 
 ### Known issues
 

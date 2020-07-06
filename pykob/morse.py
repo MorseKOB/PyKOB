@@ -116,7 +116,7 @@ class Sender:
 """
 Code reader class
 
-Optional callback function is called whenever a character is decoded:
+Callback function is called whenever a character is decoded:
     def callback(char, spacing)
         char - decoded character
         spacing - spacing adjustment in space widths (can be negative)
