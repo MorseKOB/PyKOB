@@ -136,10 +136,12 @@ def update_sender(id):
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
-    s = char
-    if spacing > 0.5:
-        s = " " + s
-    ka.codereader_append(s)
+    n = int(spacing + 0.5)
+    if n > 5:
+        sp = "__" if char != "~" else ""
+    else:
+        sp = n * " "
+    ka.codereader_append(sp + char)
 
 # initialization
 
