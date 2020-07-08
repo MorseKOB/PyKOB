@@ -253,7 +253,7 @@ class Reader:
         if code != '' and s == '':
             s = '[' + code + ']'
         if s != '':
-            self.callback(s, float(sp1) / (3 * self.dotLen) - 1)
+            self.callback(s, float(sp1) / (3 * self.truDot) - 1)
 
     def lookupChar(self, code):
         if code in decodeTable[self.codeType]:
