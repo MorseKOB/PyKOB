@@ -58,14 +58,14 @@ from pykob import log
 
 @unique
 class Spacing(Enum):
-    none = "NONE"
-    char = "CHAR"
-    word = "WORD"
+    none = -1
+    char = 0
+    word = 1
 
 @unique
 class CodeType(Enum):
-    international = "INTERNATIONAL"
-    american = "AMERICAN"
+    american = 0
+    international = 1
 
 # Application name
 __APP_NAME = "pykob"
@@ -192,7 +192,7 @@ def set_code_type(s):
     else:
         log.err("TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s))
         return
-    user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type.value)
+    user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type.name.upper())
 
 
 def set_local(l):
@@ -346,7 +346,7 @@ def set_spacing(s):
     else:
         log.err("SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s))
         return
-    user_config.set(__CONFIG_SECTION, __SPACING_KEY, spacing.value)
+    user_config.set(__CONFIG_SECTION, __SPACING_KEY, spacing.name.upper())
 
 
 def set_station(s):
@@ -425,12 +425,12 @@ def print_config():
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
-    print("Code type:", code_type.value)
+    print("Code type:", code_type.name.upper())
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
-    print("Spacing:", spacing.value)
+    print("Spacing:", spacing.name.upper())
     print("Station:", noneOrValueFromStr(station))
     print("Wire:", noneOrValueFromStr(wire))
     print("Character speed", min_char_speed)
@@ -609,7 +609,7 @@ def read_config():
 read_config()
 
 code_type_override = argparse.ArgumentParser(add_help=False)
-code_type_override.add_argument("-T", "--type", default=code_type.value, \
+code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="type", dest="code_type")
 
 local_override = argparse.ArgumentParser(add_help=False)
@@ -647,7 +647,7 @@ help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured."
 metavar="sounder", dest="sounder")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
-spacing_override.add_argument("-s", "--spacing", default=spacing.value, \
+spacing_override.add_argument("-s", "--spacing", default=spacing.name.upper(), \
 help="The spacing (NONE|CHAR|WORD) to use.", metavar="spacing", dest="spacing")
 
 station_override = argparse.ArgumentParser(add_help=False)
