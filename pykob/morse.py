@@ -31,11 +31,8 @@ Provides classes for sending and reading American and International Morse code.
 import sys, os
 import codecs
 from threading import Timer
+from pykob import config
 
-AMERICAN = 0         # American Morse
-INTERNATIONAL = 1    # International Morse
-CHARSPACING = 0      # add Farnsworth spacing between all characters
-WORDSPACING = 1      # add Farnsworth spacing only between words
 DOTSPERWORD = 45     # dot units per word, including all spaces
                      #   (MORSE is 43, PARIS is 47)
 MAXINT = sys.maxsize # a very large integer
@@ -50,31 +47,36 @@ dir = os.path.dirname(os.path.abspath(__file__))
 def readEncodeTable(codeType, filename):
     fn = os.path.join(dir, filename)
     f = codecs.open(fn, encoding='utf-8')
+    cti = 0 if codeType == config.CodeType.american else 1
     f.readline()  # ignore first line
     for s in f:
         a, t, c = s.rstrip().partition('\t')
         encodeTable[codeType][a] = c  # dictionary key is character
     f.close()
-readEncodeTable(AMERICAN, 'codetable-american.txt')
-readEncodeTable(INTERNATIONAL, 'codetable-international.txt')
+
+readEncodeTable(config.CodeType.american, 'codetable-american.txt')
+readEncodeTable(config.code_type.international, 'codetable-international.txt')
 
 class Sender:
-    def __init__(self, wpm, cwpm=0, codeType=AMERICAN, spacing=CHARSPACING):
+    def __init__(self, wpm, cwpm=0, codeType=config.CodeType.american, spacing=config.Spacing.char):
         self.codeType = codeType
         cwpm = max(wpm, cwpm)
         self.dotLen    = int(1200 / cwpm)  # dot length (ms)
         self.charSpace = 3 * self.dotLen  # space between characters (ms)
         self.wordSpace = 7 * self.dotLen  # space between words (ms)
-        if codeType == AMERICAN:
+        if codeType == config.CodeType.american:
             self.charSpace += int((60000 / cwpm - self.dotLen *
                     DOTSPERWORD) / 6)
             self.wordSpace = 2 * self.charSpace
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
-        if spacing == CHARSPACING:
+        if spacing == config.Spacing.char:
             self.charSpace += int(delta / 6)
             self.wordSpace += int(delta / 3)
-        elif spacing == WORDSPACING:
+        elif spacing == config.Spacing.word:
             self.wordSpace += int(delta)
+        else: # no Farnsworth spacing
+            self.charSpace = 0
+            self.wordSpace = 0
         self.space = self.wordSpace  # delay before next code element (ms)
         
     def encode(self, char):
@@ -235,7 +237,7 @@ class Reader:
             code = self.codeBuf[0]
             s = self.lookupChar(code)
             if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
-                    self.codeType == AMERICAN:
+                    self.codeType == config.CodeType.american:
                 s = 'L'
             elif s == 'E':
                 if self.markBuf[0] == 1:
@@ -256,7 +258,8 @@ class Reader:
             self.callback(s, float(sp1) / (3 * self.truDot) - 1)
 
     def lookupChar(self, code):
-        if code in decodeTable[self.codeType]:
-            return(decodeTable[self.codeType][code])
+        codeTableIndex = 0 if self.codeType == config.CodeType.american else 1
+        if code in decodeTable[codeTableIndex]:
+            return(decodeTable[codeTableIndex][code])
         else:
             return('')

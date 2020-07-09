@@ -29,7 +29,7 @@ Handle the flow of Morse code throughout the program.
 """
 
 import time
-from pykob import kob, morse, internet
+from pykob import kob, morse, internet, config
 import kobconfig as kc
 import kobactions as ka
 import kobstationlist
@@ -138,7 +138,7 @@ def update_sender(id):
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
-    if kc.CodeType == 0:  # TODO: use config enum for American
+    if kc.CodeType == config.CodeType.american:
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
         sp = spacing
