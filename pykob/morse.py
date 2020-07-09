@@ -68,6 +68,7 @@ class Sender:
             self.charSpace += int((60000 / cwpm - self.dotLen *
                     DOTSPERWORD) / 6)
             self.wordSpace = 2 * self.charSpace
+        print ("wpm", wpm, "cwpm", cwpm) # ZZZ
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
         if spacing == config.Spacing.char:
             self.charSpace += int(delta / 6)
