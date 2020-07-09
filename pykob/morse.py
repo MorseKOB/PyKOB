@@ -51,7 +51,7 @@ def readEncodeTable(codeType, filename):
     f.readline()  # ignore first line
     for s in f:
         a, t, c = s.rstrip().partition('\t')
-        encodeTable[codeType][a] = c  # dictionary key is character
+        encodeTable[cti][a] = c  # dictionary key is character
     f.close()
 
 readEncodeTable(config.CodeType.american, 'codetable-american.txt')
@@ -142,11 +142,11 @@ def readDecodeTable(codeType, filename):
         a, t, c = s.rstrip().partition('\t')
         decodeTable[codeType][c] = a  # dictionary key is code
     f.close()
-readDecodeTable(AMERICAN, 'codetable-american.txt')
-readDecodeTable(INTERNATIONAL, 'codetable-international.txt')
+readDecodeTable(0, 'codetable-american.txt') # American code table is at 0 index
+readDecodeTable(1, 'codetable-international.txt') # International code table is at 1 index
 
 class Reader:
-    def __init__(self, wpm=20, codeType=AMERICAN, callback=None):
+    def __init__(self, wpm=20, codeType=config.CodeType.american, callback=None):
         self.codeType  = codeType    # American or International
         self.wpm       = wpm         # current code speed estimate
         self.dotLen    = int(1200. / wpm)  # nominal dot length (ms)
