@@ -29,11 +29,13 @@ Handle the flow of Morse code throughout the program.
 """
 
 import time
-from pykob import kob, morse, internet
+from pykob import kob, morse, internet, config
 import kobconfig as kc
 import kobactions as ka
 import kobstationlist
 import kobkeyboard
+
+NNBSP = "\u202f"  # narrow no-break space
 
 mySender = None
 myReader = None
@@ -136,12 +138,26 @@ def update_sender(id):
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
-    n = int(spacing + 0.5)
-    if n > 5:
-        sp = "__" if char != "~" else ""
+    if kc.CodeType == config.CodeType.american:
+        sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
-        sp = n * " "
-    ka.codereader_append(sp + char)
+        sp = spacing
+    if sp > 5:
+        txt = "__" if char != "~" else ""
+    elif sp < -0.2:
+        txt = ""
+    elif sp < 0.2:
+        txt = NNBSP
+    elif sp < 0.5:
+        txt = 2 * NNBSP
+    elif sp < 0.8:
+        txt = NNBSP + " "
+    else:
+        n = int(sp - 0.8) + 2
+        txt = n * " "
+    txt += char
+    ka.codereader_append(txt)
+##    print("kobmain: {:.2f} '{}'".format(spacing, txt))  # TODO: temporary
 
 # initialization
 

@@ -58,14 +58,14 @@ from pykob import log
 
 @unique
 class Spacing(Enum):
-    none = -1
-    char = 0
-    word = 1
+    none = 0
+    char = 1
+    word = 2
 
 @unique
 class CodeType(Enum):
-    american = 0
-    international = 1
+    american = 1
+    international = 2
 
 # Application name
 __APP_NAME = "pykob"
