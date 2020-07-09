@@ -88,14 +88,14 @@ class KOBWindow:
 
         # reader
         self.txtReader = tkst.ScrolledText(frm1, width=40, height=15, bd=2,
-                wrap='word', font=('Helvetica', -14))
+                wrap='word', font=('Arial', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
         self.txtReader.columnconfigure(0, weight=2)
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(frm2, width=40, height=5, bd=2,
-                wrap='word', font=('Helvetica', -14))
+                wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.txtKeyboard.tag_config('highlight', underline=1)
         self.txtKeyboard.mark_set('mark', '0.0')
@@ -105,7 +105,7 @@ class KOBWindow:
         
         # station list
         self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, bd=2,
-                wrap='none', font=('Helvetica', -14))
+                wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
         
         # office ID
