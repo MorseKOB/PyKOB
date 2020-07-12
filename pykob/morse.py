@@ -83,7 +83,8 @@ class Sender:
     def encode(self, char):
         c = char.upper()
         code = ()
-        if not c in encodeTable[self.codeType]:
+        cti = 0 if self.codeType == config.CodeType.american else 1
+        if not c in encodeTable[cti]:
             if c == '-' or c == '\'' or c == 'curly apostrophe':  # Linux
                         # doesn't recognize the UTF-8 encoding of this file
                 self.space += int((self.wordSpace - self.charSpace) / 2)
@@ -98,7 +99,7 @@ class Sender:
             else:
                 self.space += self.wordSpace - self.charSpace
         else:
-            for e in encodeTable[self.codeType][c]:
+            for e in encodeTable[cti][c]:
                 if e == ' ':
                     self.space = 3 * self.dotLen
                 else:
