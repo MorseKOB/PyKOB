@@ -80,8 +80,11 @@ class Sender:
             self.wordSpace = 0
         self.space = self.wordSpace  # delay before next code element (ms)
         
-    def encode(self, char):
+    def encode(self, char, printChar=False):
         c = char.upper()
+        if (printChar):
+            print(c, end="")
+            sys.stdout.flush()
         code = ()
         cti = 0 if self.codeType == config.CodeType.american else 1
         if not c in encodeTable[cti]:

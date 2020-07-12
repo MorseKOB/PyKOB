@@ -98,7 +98,7 @@ try:
     myKOB.sounder(mySender.encode('~')) # Open the circuit
     time.sleep(0.200)
     for c in __text:
-        code = mySender.encode(c)
+        code = mySender.encode(c, True)
         myKOB.sounder(code)
     time.sleep(0.350)
     myKOB.sounder(mySender.encode('+')) # Close the circuit
