@@ -1,0 +1,3 @@
+# Paths to the local pykob module
+print('processing mkob.pth')
+../pykob
