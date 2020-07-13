@@ -183,7 +183,7 @@ class Reader:
             else:
                 self.codeBuf[self.nChars] += '.'  # dot
             self.markBuf[self.nChars] = mk
-        self.flusher = Timer(((8.0 * self.truDot) / 1000.0), self.flush)  # if idle 8 dot times call `flush`
+        self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle 8 dot times call `flush`
         self.flusher.start()
 
     def setWPM(self, wpm):
