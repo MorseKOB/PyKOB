@@ -68,7 +68,7 @@ class Sender:
             self.charSpace += int((60000 / cwpm - self.dotLen *
                     DOTSPERWORD) / 6)
             self.wordSpace = 2 * self.charSpace
-        print ("wpm", wpm, "cwpm", cwpm) # ZZZ
+##        print ("wpm", wpm, "cwpm", cwpm) # ZZZ probably don't need anymore
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
         if spacing == config.Spacing.char:
             self.charSpace += int(delta / 6)
@@ -83,8 +83,7 @@ class Sender:
     def encode(self, char, printChar=False):
         c = char.upper()
         if (printChar):
-            print(c, end="")
-            sys.stdout.flush()
+            print(c, end="", flush=True)
         code = ()
         cti = 0 if self.codeType == config.CodeType.american else 1
         if not c in encodeTable[cti]:
@@ -183,7 +182,7 @@ class Reader:
             else:
                 self.codeBuf[self.nChars] += '.'  # dot
             self.markBuf[self.nChars] = mk
-        self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle 8 dot times call `flush`
+        self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`
         self.flusher.start()
 
     def setWPM(self, wpm):
