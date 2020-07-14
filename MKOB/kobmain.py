@@ -133,7 +133,7 @@ def update_sender(id):
     if id != sender_ID:
         sender_ID = id
         myReader.flush()
-        ka.codereader_append("\n<{}>".format(sender_ID))
+        ka.codereader_append("\n\n<{}>".format(sender_ID))
         kobstationlist.new_sender(sender_ID)
 
 def readerCallback(char, spacing):
@@ -157,7 +157,8 @@ def readerCallback(char, spacing):
         txt = n * " "
     txt += char
     ka.codereader_append(txt)
-##    print("kobmain: {:.2f} '{}'".format(spacing, txt))  # TODO: temporary
+    if char == "=":
+        ka.codereader_append("\n")
 
 # initialization
 
