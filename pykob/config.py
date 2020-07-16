@@ -112,8 +112,8 @@ serial_port = None
 
 # User Settings
 code_type = CodeType.american
-local = False
-remote = False
+local = True
+remote = True
 sound = True
 sounder = False
 spacing = Spacing.none
@@ -525,9 +525,9 @@ def read_config():
 
     user_config_defaults = {\
         __CODE_TYPE_KEY:"AMERICAN", \
-        __LOCAL_KEY:"OFF", \
+        __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
-        __REMOTE_KEY:"OFF", \
+        __REMOTE_KEY:"ON", \
         __SOUND_KEY:"ON", \
         __SOUNDER_KEY:"OFF", \
         __SPACING_KEY:"NONE", \
