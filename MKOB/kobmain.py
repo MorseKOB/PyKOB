@@ -129,12 +129,15 @@ def change_wire():
 
 def update_sender(id):
     """display station ID in reader window when there's a new sender"""
-    global sender_ID
-    if id != sender_ID:
+    global sender_ID, myReader
+    if id != sender_ID:  # new sender
         sender_ID = id
         myReader.flush()
         ka.codereader_append("\n\n<{}>".format(sender_ID))
         kobstationlist.new_sender(sender_ID)
+        myReader = morse.Reader(
+                wpm=kc.WPM, codeType=kc.CodeType,
+                callback=readerCallback)  # reset to nominal code speed
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -142,7 +145,7 @@ def readerCallback(char, spacing):
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
         sp = spacing
-    if sp > 5:
+    if sp > 10:
         txt = "__" if char != "~" else ""
     elif sp < -0.2:
         txt = ""
