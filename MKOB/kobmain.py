@@ -145,8 +145,10 @@ def readerCallback(char, spacing):
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
         sp = spacing
-    if sp > 10:
-        txt = "__" if char != "~" else ""
+    if sp > 100:
+        txt = " * "
+    elif sp > 10:
+        txt = "  —  " if char != "~" else ""
     elif sp < -0.2:
         txt = ""
     elif sp < 0.2:
