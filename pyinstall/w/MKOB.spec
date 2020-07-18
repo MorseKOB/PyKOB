@@ -3,8 +3,8 @@
 block_cipher = None
 
 
-a = Analysis(['MKOB/MKOB.pyw'],
-             pathex=['/Users/esilky/code/morse/PyKOB'],
+a = Analysis(['MKOB\\MKOB.pyw'],
+             pathex=['C:\\Users\\esilk\\code\\morse\\PyKOB'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -19,19 +19,19 @@ pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
-          a.binaries,
-          a.zipfiles,
-          a.datas,
           [],
+          exclude_binaries=True,
           name='MKOB',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          upx_exclude=[],
-          runtime_tmpdir=None,
           console=False )
-app = BUNDLE(exe,
-             name='MKOB.app',
-             icon=None,
-             bundle_identifier=None)
+coll = COLLECT(exe,
+               a.binaries,
+               a.zipfiles,
+               a.datas,
+               strip=False,
+               upx=True,
+               upx_exclude=[],
+               name='MKOB')
