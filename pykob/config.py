@@ -658,4 +658,3 @@ wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \
 help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")
 
-exit
