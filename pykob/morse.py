@@ -28,8 +28,9 @@ morse.py
 Provides classes for sending and reading American and International Morse code.
 """
 
-import sys, os
+import sys
 import codecs
+from pathlib import Path
 from threading import Timer
 from pykob import config
 
@@ -41,11 +42,16 @@ MAXINT = sys.maxsize # a very large integer
 Code sender class
 """
 
+# Resource folder
+root_folder = Path(__file__).parent
+data_folder = root_folder / "data"
+
 # read code tables
 encodeTable = [{}, {}]  # one dictionary each for American and International
-dir = os.path.dirname(os.path.abspath(__file__))
+
 def readEncodeTable(codeType, filename):
-    fn = os.path.join(dir, filename)
+    fn = data_folder / filename
+    # print("Load encode table: ", fn)
     f = codecs.open(fn, encoding='utf-8')
     cti = 0 if codeType == config.CodeType.american else 1
     f.readline()  # ignore first line
@@ -139,7 +145,7 @@ ALPHA           = 0.5  # weight given to wpm update values (for smoothing)
 # read code tables
 decodeTable = [{}, {}]  # one dictionary each for American and International
 def readDecodeTable(codeType, filename):
-    fn = os.path.dirname(os.path.abspath(__file__)) + '/' + filename
+    fn = data_folder / filename
     f = codecs.open(fn, encoding='utf-8')
     f.readline()  # ignore first line
     for s in f:

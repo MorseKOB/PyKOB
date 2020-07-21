@@ -1,9 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
+from pathlib import Path
 
 block_cipher = None
 
+project_folder = Path("../.."")
+mkob_folder = project_folder / "MKOB"
+resources_folder = mkob_folder / "resources"
+resources = resources_folder / "*"
+pykob_folder = project_folder / "pykob"
+pykob_code_tables = pykob_folder / "codetable-*"
+pykob_audio = pykob_folder /
 
-a = Analysis(['MKOB\\MKOB.pyw'],
+data_files = [
+    ( 'resources)
+]
+a = Analysis(['../../MKOB/MKOB.pyw'],
              pathex=['C:\\Users\\esilk\\code\\morse\\PyKOB'],
              binaries=[],
              datas=[],

@@ -28,9 +28,10 @@ audio module
 Provides audio for simulated sounder.
 """
 
-import os
 import wave
+from pathlib import Path
 from pykob import log
+
 try:
     import pyaudio
     ok = True
@@ -47,11 +48,16 @@ iFrame = [0, 0]
 sound = 0
 if ok:
     pa = pyaudio.PyAudio()
-    filename = ['clack48.wav', 'click48.wav']
-    path = os.path.dirname(os.path.abspath(__file__))
-    for i in range(2):
-        fn = os.path.join(path, filename[i])
-        f = wave.open(fn, mode='rb')
+    # Resource folder
+    root_folder = Path(__file__).parent
+    resource_folder = root_folder / "resources"
+    # Audio files
+    audio_files = ['clack48.wav', 'click48.wav']
+
+    for i in range(len(audio_files)):
+        fn = resource_folder / audio_files[i]
+        # print("Load audio file:", fn)
+        f = wave.open(str(fn), mode='rb')
         nChannels = f.getnchannels()
         sampleWidth = f.getsampwidth()
         sampleFormat = pa.get_format_from_width(sampleWidth)
