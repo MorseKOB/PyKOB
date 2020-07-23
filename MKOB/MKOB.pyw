@@ -34,7 +34,7 @@ import tkinter as tk
 import sys
 import kobwindow
 
-VERSION = "4.0.8"
+VERSION = "4.0.9"
 MKOB_VERSION_TEXT = "MorseKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 
