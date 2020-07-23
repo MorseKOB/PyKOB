@@ -54,10 +54,7 @@ class Internet:
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
         self.version = ("PyKOB " + VERSION).encode(encoding='ascii')
-        if officeID:
-            self.officeID = officeID.encode(encoding='ascii')
-        else:
-            self.officeID = ""
+        self.officeID = officeID if officeID != None else ""
         self.wireNo = 0
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
@@ -124,7 +121,7 @@ class Internet:
             return
         codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='ascii'))
         self.sentSeqNo += 1
-        codePacket = codePacketFormat.pack(DAT, 492, self.officeID,
+        codePacket = codePacketFormat.pack(DAT, 492, self.officeID.encode('ascii'),
                 self.sentSeqNo, *codeBuf)
         for i in range(2):
             self.socket.sendto(codePacket, self.address)
@@ -144,15 +141,15 @@ class Internet:
             shortPacket = shortPacketFormat.pack(CON, self.wireNo)
             self.socket.sendto(shortPacket, self.address)
             self.sentSeqNo += 2
-            idPacket = idPacketFormat.pack(DAT, 492, self.officeID,
+            idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('ascii'),
                     self.sentSeqNo, 1, self.version)
             self.socket.sendto(idPacket, self.address)
             if self.ID_callback:
-                self.ID_callback(self.officeID.decode(encoding='ascii'))
+                self.ID_callback(self.officeID)
 
     def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
-        self.officeID = officeID.encode(encoding='ascii')
+        self.officeID = officeID if officeID != None else ""
 
     def monitor_IDs(self, ID_callback):
         """start monitoring incoming and outgoing station IDs"""
