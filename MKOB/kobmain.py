@@ -165,6 +165,15 @@ def readerCallback(char, spacing):
     if char == "=":
         ka.codereader_append("\n")
 
+def reset_wire_state():
+    """log the current latching states and reinitialize"""
+    global kob_latched, keyboard_latched, internet_latched
+    print("Reset\n kob_latched: {}\n keyboard_latched: {}\n internet_latched: {}"
+            .format(kob_latched, keyboard_latched, internet_latched))
+    kob_latched = True
+    keyboard_latched = True
+    internet_latched = True
+
 # initialization
 
 if kc.Local:

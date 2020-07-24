@@ -96,3 +96,8 @@ def codereader_append(s):
     """append a string to the code reader window"""
     kw.txtReader.insert('end', s)
     kw.txtReader.yview_moveto(1)
+
+def escape(event):
+    """regain control of the wire"""
+    codereader_append("\n<Reset>")
+    km.reset_wire_state()
