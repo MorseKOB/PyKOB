@@ -1,8 +1,10 @@
-build/
-dist/
+build*/
+dist*/
 zips/
 __pycache__/
 .DS_Store
+*.pyo
 *.pyc
+*.toc
 .DS_Store
 log.txt

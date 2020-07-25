@@ -214,7 +214,7 @@ def main(argv):
         config.save_config()
 
     config.print_config()
-    exit
+    sys.exit(0)
 
 if __name__ == "__main__":
     try:
