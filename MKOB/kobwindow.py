@@ -42,6 +42,7 @@ class KOBWindow:
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(MKOB_VERSION_TEXT)
+        root.bind_all('<KeyPress-Escape>', ka.escape)
         ka.kw = self
         
         # File menu
