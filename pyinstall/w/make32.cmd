@@ -8,4 +8,4 @@ set _BUILD_DIR_=buildW32
 set _DIST_DIR_=distW32
 set _PKG_NAME_=MKOB-W32
 
-call make.cmd
+call make_common.cmd
