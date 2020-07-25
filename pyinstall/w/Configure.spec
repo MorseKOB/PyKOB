@@ -4,7 +4,7 @@ from pathlib import Path
 
 block_cipher = None
 
-project_folder = Path('.').resolve()
+project_folder = Path('../..').resolve()
 pykob_folder = project_folder / 'pykob'
 pykob_data_folder = pykob_folder / 'data'
 pykob_data = pykob_data_folder / '*'
