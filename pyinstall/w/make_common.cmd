@@ -13,7 +13,7 @@ if exist %_DIST_DIR_% rmdir /S /Q %_DIST_DIR_%
 rem Run PyInstaller with a specific Python install to generate 
 rem the appropriate bundle in the configured 'dist*' folder
 echo Building Configure...
-%_PYTHON_EXE_% -m PyInstaller --workpath=%_BUILD_DIR_% --distpath=%_DIST_DIR_% Configure.spec
+%_PYTHON_EXE_% -m PyInstaller --clean --noconfirm --workpath=%_BUILD_DIR_% --distpath=%_DIST_DIR_% Configure.spec
 if errorlevel 1 (
     echo PyInstaller Failure on Configure: %errorlevel%
     GOTO ERROR_EXIT
@@ -22,18 +22,20 @@ if errorlevel 1 (
 rem %_PYTHON_EXE_% -m PyInstaller --distpath=%_DIST_DIR_% Sample.py
 rem %_PYTHON_EXE_% -m PyInstaller --distpath=%_DIST_DIR_% Clock.py
 echo Building MKOB...
-%_PYTHON_EXE_% -m PyInstaller --workpath=%_BUILD_DIR_% --distpath=%_DIST_DIR_% MKOB.spec
+%_PYTHON_EXE_% -m PyInstaller --clean --noconfirm --workpath=%_BUILD_DIR_% --distpath=%_DIST_DIR_% MKOB.spec
 if errorlevel 1 (
     echo PyInstaller Failure: %errorlevel%
     GOTO ERROR_EXIT
 )
 
 echo Copy Configure.exe into the MKOB folder
-copy %_DIST_DIR_%\Configure\Configure.exe %_DIST_DIR_%\MKOB4
+@echo on
+copy %_DIST_DIR_%\Configure\Configure.exe %_DIST_DIR_%\MKOB4\Configure.exe
+@echo off
 
 echo Create ZIP for %_PKG_NAME_%
 echo  to %_DIST_DIR_%\%_PKG_NAME_%.zip
-powershell Compress-Archive %_DIST_DIR_%\* %_DIST_DIR_%\%_PKG_NAME_%.zip
+powershell Compress-Archive -CompressionLevel Optimal -Path %_DIST_DIR_%\MKOB4\* -DestinationPath %_DIST_DIR_%\%_PKG_NAME_%.zip
 if errorlevel 1 (
     echo Powershell Compress-Archive Failure: %errorlevel%
     GOTO ERROR_EXIT
@@ -42,5 +44,5 @@ if errorlevel 1 (
 exit /b 0
 
 :ERROR_EXIT
-    if exist %_DIST_DIR_% rmdir /S /Q %_DIST_DIR_%
+    rem if exist %_DIST_DIR_% rmdir /S /Q %_DIST_DIR_%
     exit /b %errorlevel%
