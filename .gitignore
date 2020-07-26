@@ -1,8 +1,12 @@
-build/
-dist/
+build*/
+dist*/
 zips/
 __pycache__/
-*.exe
+.DS_Store
+*.pyo
 *.pyc
+*.toc
 .DS_Store
 log.txt
+pyinstall/w/Configure/
+pyinstall/w/MKOB/

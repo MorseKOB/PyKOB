@@ -23,13 +23,22 @@ SOFTWARE.
 """
 
 from distutils.core import setup
+from pathlib import Path
 
-setup(name = 'PyKOB',
-      version = '1.2',
-      description = 'MorseKOB library package',
-      author = 'Les Kerr',
-      author_email = 'les@morsekob.org',
-      url = 'http://sites.google.com/site/morsekob',
-      packages = ['pykob'],
-      package_data = {'pykob': ['*.wav', '*.txt']}
+# Resource/Data folder
+root_folder = Path(__file__).parent.resolve()
+resource_folder = root_folder / "pykob/resources"
+data_folder = root_folder / "pykob/data"
+print("Root:", str(root_folder))
+print("Data:", str(data_folder))
+print("Recources:", str(resource_folder))
+
+setup(name = "PyKOB",
+      version = "1.2",
+      description = "MorseKOB library package",
+      author = "Les Kerr",
+      author_email = "les@morsekob.org",
+      url = "https://github.com/MorseKOB/PyKOB/",
+      packages = ["pykob"],
+      package_data = {"pykob": ["resources/*.wav", "data/*.txt"]}
      )
