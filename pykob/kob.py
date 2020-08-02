@@ -52,7 +52,7 @@ class KOB:
         if port and ok:
             try:
                 self.port = serial.Serial(port)
-                self.port.setDTR(True)
+                self.port.dtr(True)
             except:
                 log.err('serial_port {} not available.'.format(port))
                 self.port = None
@@ -65,7 +65,7 @@ class KOB:
         self.setSounder(True)
         time.sleep(0.5)
         if self.port:
-            self.keyState = self.port.getDSR()  # True: closed, False: open
+            self.keyState = self.port.dsr()  # True: closed, False: open
             self.tLastKey = time.time()  # time of last key transition
             self.cktClose = self.keyState  # True: circuit latched closed
             if self.echo:
@@ -84,7 +84,7 @@ class KOB:
     def key(self):
         code = ()
         while True:
-            s = self.port.getDSR()
+            s = self.port.dsr()
             if s != self.keyState:
                 self.keyState = s
                 t = time.time()
@@ -134,12 +134,12 @@ class KOB:
             self.sdrState = state
             if state:
                 if self.port:
-                    self.port.setRTS(True)
+                    self.port.rts(True)
                 if self.audio:
                     audio.play(1)  # click
             else:
                 if self.port:
-                    self.port.setRTS(False)
+                    self.port.rts(False)
                 if self.audio:
                     audio.play(0)  # clack
 
