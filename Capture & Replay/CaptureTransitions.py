@@ -52,7 +52,7 @@ print('CaptureTransitions {} - {}'.format(VERSION, time.asctime()))
 sys.stdout.flush()
 
 port = serial.Serial(PORT)
-port.dtr =True
+port.dtr = True
 s0 = port.dsr
 
 t = [0] * N

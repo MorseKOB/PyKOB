@@ -52,7 +52,7 @@ class KOB:
         if port and ok:
             try:
                 self.port = serial.Serial(port)
-                self.port.dtr(True)
+                self.port.dtr = True
             except:
                 log.err('serial_port {} not available.'.format(port))
                 self.port = None
