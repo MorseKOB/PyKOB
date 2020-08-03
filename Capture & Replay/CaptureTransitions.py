@@ -52,15 +52,15 @@ print('CaptureTransitions {} - {}'.format(VERSION, time.asctime()))
 sys.stdout.flush()
 
 port = serial.Serial(PORT)
-port.dtr(True)
-s0 = port.dsr()
+port.dtr =True
+s0 = port.dsr
 
 t = [0] * N
 t[0] = time.time()
 n = 1
 try:
     while True:
-        s1 = port.dsr()
+        s1 = port.dsr
         if s0 != s1:
             t[n] = time.time()
             n += 1
