@@ -49,7 +49,7 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 NUL = '\x00'
 
 class Internet:
-    def __init__(self, officeID, callback=None):
+    def __init__(self, officeID, callback=None, record_callback=None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
@@ -58,13 +58,14 @@ class Internet:
         self.wireNo = 0
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
-        self.tLastListener = 0
+        self.tLastListener = 0.0
         self.disconnect()  # to establish a UDP connection with the server
         keepAliveThread = threading.Thread(target=self.keepAlive)
         keepAliveThread.daemon = True
         keepAliveThread.start()
         self.callback = callback
-        if callback:
+        self.record_callback = record_callback
+        if callback or record_callback:
             callbackThread = threading.Thread(target=self.callbackRead)
             callbackThread.daemon = True
             callbackThread.start()
@@ -83,7 +84,10 @@ class Internet:
     def callbackRead(self):
         while True:
             code = self.read()
-            self.callback(code)
+            if self.callback:
+                self.callback(code)
+            if self.record_callback:
+                self.record_callback(code)
 
     def read(self):
         while True:
@@ -102,7 +106,7 @@ class Internet:
                         self.ID_callback(stnID)
                     if seqNo == self.rcvdSeqNo + 2:
                         self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
-                if n > 0 and seqNo != self.rcvdSeqNo:  # code packet
+                elif n > 0 and seqNo != self.rcvdSeqNo:  # code packet
                     if self.sender_callback:
                         self.sender_callback(stnID)
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
@@ -110,6 +114,7 @@ class Internet:
                     else:
                         code = code[:n]
                     self.rcvdSeqNo = seqNo
+                    log.debug(code)
                     return code
             else:
                 log.log("PyKOB.internet received invalid record length: {0}".
@@ -158,4 +163,9 @@ class Internet:
     def monitor_sender(self, sender_callback):
         """start monitoring changes in current sender"""
         self.sender_callback = sender_callback
+
+    def record_code(self, record_callback):
+        """Start recording code received and sent"""
+        self.record_callback = record_callback
+    
         

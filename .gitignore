@@ -10,3 +10,5 @@ __pycache__/
 log.txt
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
+Capture-Replay/*.txt
+test.*.json

@@ -40,7 +40,7 @@ import time
 from pykob import internet
 
 VERSION = '1.3'
-ID = 'AC - monitoring'
+ID = sys.argv[2] if len(sys.argv) > 1 else 'AC - monitoring'
 
 wire = int(sys.argv[1])
 

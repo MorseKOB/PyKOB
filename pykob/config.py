@@ -53,17 +53,17 @@ import pykob
 import socket
 import sys
 from distutils.util import strtobool
-from enum import Enum, unique
+from enum import Enum, IntEnum, unique
 from pykob import log
 
 @unique
-class Spacing(Enum):
+class Spacing(IntEnum):
     none = 0
     char = 1
     word = 2
 
 @unique
-class CodeType(Enum):
+class CodeType(IntEnum):
     american = 1
     international = 2
 

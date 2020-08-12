@@ -76,7 +76,7 @@ def play(snd):
 
 def callback(in_data, frame_count, time_info, status_flags):
     if frame_count != BUFFERSIZE:
-        log.log('Unexpected frame count request from PyAudio:', frame_count)
+        log.err('Unexpected frame count request from PyAudio:', frame_count)
     if iFrame[sound] + frame_count < nFrames[sound]:
         startByte = iFrame[sound] * frameWidth
         endByte = (iFrame[sound] + frame_count) * frameWidth

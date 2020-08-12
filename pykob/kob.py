@@ -31,13 +31,14 @@ Handles external key and/or sounder.
 import sys
 import threading
 import time
+from enum import Enum, IntEnum, unique
 from pykob import audio, log
 try:
     import serial
-    ok = True
+    serialAvailable = True
 except:
     log.log('pySerial not installed.')
-    ok = False
+    serialAvailable = False
 
 DEBOUNCE  = 0.010  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
@@ -47,14 +48,19 @@ if sys.platform == 'win32':
     from ctypes import windll
     windll.winmm.timeBeginPeriod(1)  # set clock resoluton to 1 ms (Windows only)
 
+@unique
+class CodeSource(IntEnum):
+    local = 1
+    wire = 2
+
 class KOB:
     def __init__(self, port=None, audio=False, echo=False, callback=None):
-        if port and ok:
+        if port and serialAvailable:
             try:
                 self.port = serial.Serial(port)
                 self.port.setDTR(True)
             except:
-                log.err('serial_port {} not available.'.format(port))
+                log.info('Interface for key and sounder on serial port {} not available. Key and sounder will not be used.'.format(port))
                 self.port = None
         else:
             self.port = None
@@ -71,10 +77,21 @@ class KOB:
             if self.echo:
                 self.setSounder(self.keyState)
         self.callback = callback
+        self.recorder = None
         if callback:
             callbackThread = threading.Thread(target=self.callbackRead)
             callbackThread.daemon = True
             callbackThread.start()
+
+    @property
+    def recorder(self):
+        """ Recorder instance or None """
+        return self.__recorder
+    
+    @recorder.setter
+    def recorder(self, recorder):
+        """ Recorder instance or None """
+        self.__recorder = recorder
 
     def callbackRead(self):
         while True:
@@ -111,7 +128,9 @@ class KOB:
                 return code
             time.sleep(0.001)
 
-    def sounder(self, code):
+    def sounder(self, code, code_source=CodeSource.local):
+        if self.__recorder:
+            self.__recorder.record(code_source, code)
         for c in code:
             if c < -3000:
                 c = -500
