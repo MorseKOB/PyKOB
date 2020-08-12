@@ -11,4 +11,5 @@ log.txt
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
 Capture-Replay/*.txt
+Clock.*.json
 test.*.json

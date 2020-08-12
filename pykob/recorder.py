@@ -46,8 +46,7 @@ recordings in addition to making recordings.
 
 import json
 import time
-from kob import CodeSource
-from pykob import config
+from pykob import config, kob
 
 def getTimestamp():
     """
@@ -141,9 +140,9 @@ if __name__ == "__main__":
     print("HI")
     code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
             -180, +60, -60, +60, -1000, +1)
-    myRecorder.record(code, CodeSource.local)
+    myRecorder.record(code, kob.CodeSource.local)
     # Append more text to the same file
     for c in "This is a test":
         code = mySender.encode(c, True)
-        myRecorder.record(code, CodeSource.local)
+        myRecorder.record(code, kob.CodeSource.local)
 

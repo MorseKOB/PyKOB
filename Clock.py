@@ -31,6 +31,11 @@ Cuckoo clock substitute.
 Serial port, text speed, and audio preferences should be specified by running the
 "configure.sh" script or executing "python3 Configure.py".
 """
+import argparse
+import sys
+import time
+from pykob import config, kob, morse, log, recorder
+from distutils.util import strtobool
 
 #
 # For numeric-to-text translation.  Note that "0" is only referneced for midnight, and then it's
@@ -112,20 +117,16 @@ def announcement(hours, minutes):
 #
 # Send a message as morse on the sounder:
 #
-def announce(s, kob, sender):
+def announce(s, kob, sender, recorder, source=kob.CodeSource.local):
     global local_text
     if local_text: print('>', s)
     for c in s:
         code = sender.encode(c)
         kob.sounder(code)
+        if recorder:
+            recorder.record(code, source)
 
 try:
-    import argparse
-    import sys
-    import time
-    from pykob import config, kob, morse, log
-    from distutils.util import strtobool
-
     #log.log("Starting Clock")
 
     arg_parser = argparse.ArgumentParser(description="Morse Cuckoo Clock", parents=\
@@ -141,6 +142,7 @@ try:
     arg_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements  (24-hour value 0-2400)", metavar="time", dest="End")
     arg_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
     arg_parser.add_argument("-P", "--print", action='store_true', default=False, help="Print the text sent as code to the sounder", dest="Text")
+    arg_parser.add_argument("--record", action='store_true', default=False, help="Record the code to the `Clock.'ts'.json` file", dest="Record")
     args = arg_parser.parse_args()
     
     port = args.serial_port # serial port for KOB interface
@@ -172,6 +174,12 @@ try:
         sys.exit(1)
     annc_interval = args.Interval * 60      # announcement interval (sec)
     local_text = args.Text
+
+    myRecorder = None
+    if (args.Record):
+        ts = recorder.getTimestamp()
+        targetFileName = "Clock." + str(ts) + ".json"
+        myRecorder = recorder.Recorder(targetFileName, None, station_id="Clock")
     
     myKOB = kob.KOB(port=port, audio=sound)
     mySender = morse.Sender(text_speed)
@@ -179,7 +187,7 @@ try:
     # Announce the current time right now
     now = time.localtime()
     msg = announcement(now.tm_hour, now.tm_min)
-    announce(msg, myKOB, mySender)
+    announce(msg, myKOB, mySender, myRecorder)
 
     # Loop, making announcements as configured (every hour, on the hour, during the daytime)
     while True:
@@ -192,7 +200,7 @@ try:
             if now < next_time:
                 time.sleep(next_time - now)
             msg = announcement(clock_hour(next_time), clock_minutes(next_time))
-            announce(msg, myKOB, mySender)
+            announce(msg, myKOB, mySender, myRecorder, kob.CodeSource.local)
         else:
             # print("sleeping for {0} seconds until midnight...")
             time.sleep(24*3600 - now)  # wait until midnight and start over
