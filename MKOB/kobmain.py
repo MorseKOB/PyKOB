@@ -29,7 +29,7 @@ Handle the flow of Morse code throughout the program.
 """
 
 import time
-from pykob import kob, morse, internet, config
+from pykob import kob, morse, internet, config, recorder
 import kobconfig as kc
 import kobactions as ka
 import kobstationlist
@@ -39,6 +39,7 @@ NNBSP = "\u202f"  # narrow no-break space
 
 mySender = None
 myReader = None
+myRecorder = None
 myInternet = None
 connected = False
 
@@ -73,6 +74,8 @@ def from_keyboard(code):
         if internet_latched:
             myKOB.sounder(code)
             update_sender(kc.config.station)
+            if myRecorder:
+                myRecorder.record(code, kob.CodeSource.local)
             myReader.decode(code)
     if len(code) > 0 and code[len(code)-1] == +1:
         keyboard_latched = True
@@ -85,6 +88,8 @@ def from_internet(code):
     if connected and kob_latched and keyboard_latched:
         myKOB.sounder(code)
         myReader.decode(code)
+        if myRecorder:
+            myRecorder.record(code, kob.CodeSource.wire)
     if len(code) > 0 and code[len(code)-1] == +1:
         internet_latched = True
         myReader.flush()
@@ -123,6 +128,8 @@ def change_wire():
             myReader.decode(latch_code)
             myReader.flush()
     myInternet.connect(kc.WireNo)
+    if myRecorder:
+        myRecorder.wire = kc.WireNo
     connected = True
     
 # callback functions
@@ -138,6 +145,8 @@ def update_sender(id):
         myReader = morse.Reader(
                 wpm=kc.WPM, codeType=kc.CodeType,
                 callback=readerCallback)  # reset to nominal code speed
+        if myRecorder:
+            myRecorder.station_id = sender_ID
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -186,4 +195,8 @@ else:
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
 myInternet.monitor_IDs(kobstationlist.refresh_stations)
 myInternet.monitor_sender(update_sender)
+# ZZZ temp always enable recorder - goal is to provide menu option
+ts = recorder.getTimestamp()
+targetFileName = "MKOB." + str(ts) + ".json"
+myRecorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo)
 kobkeyboard.init()

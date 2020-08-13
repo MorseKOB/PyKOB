@@ -115,11 +115,11 @@ class Recorder:
         timestamp = getTimestamp()
         data = {
             "ts":timestamp,
-            "source":source,
-            "station":self.__station_id,
-            "wire":self.__wire,
-            "type":self.__code_type,
-            "code":code
+            "t":self.__code_type,
+            "w":self.__wire,
+            "s":self.__station_id,
+            "o":source,
+            "c":code
         }
         with open(self.__target_file_path, "a+") as fp:
             json.dump(data, fp)
