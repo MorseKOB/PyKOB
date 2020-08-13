@@ -62,11 +62,9 @@ def getTimestamp():
     return ts
     
 class Recorder:
-    def __init__(self, target_file_path, source_file_path, code_type=config.CodeType.american, \
-        station_id="", wire=-1):
+    def __init__(self, target_file_path, source_file_path, station_id="", wire=-1):
         self.__target_file_path = target_file_path
         self.__source_file_path = source_file_path
-        self.__code_type = code_type
         self.__station_id = station_id
         self.__wire = wire
 
@@ -84,14 +82,6 @@ class Recorder:
     @property
     def target_file_path(self):
         return self.__target_file_path
-
-    @property
-    def code_type(self):
-        return self.__code_type
-    
-    @code_type.setter
-    def code_type(self, code_type):
-        self.__code_type = code_type
 
     @property
     def station_id(self):
@@ -116,7 +106,6 @@ class Recorder:
         timestamp = getTimestamp()
         data = {
             "ts":timestamp,
-            "t":self.__code_type,
             "w":self.__wire,
             "s":self.__station_id,
             "o":source,
