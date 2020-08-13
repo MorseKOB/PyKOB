@@ -46,6 +46,7 @@ recordings in addition to making recordings.
 
 import json
 import time
+from datetime import datetime
 from pykob import config, kob
 
 def getTimestamp():
@@ -125,6 +126,33 @@ class Recorder:
             json.dump(data, fp)
             fp.write('\n')
 
+    def playback(self, kob, showDateTime=False):
+        """
+        Play a recording to the configured sounder.
+        """
+        self.__lastTS = -1.0  # Used to time playback
+        with open(self.__source_file_path, "r") as fp:
+            for line in fp:
+                data = json.loads(line)
+                ts = data['ts'] # Get the timestamp to know when to play
+                dateTimeStr = ""
+                if showDateTime:
+                    dateTime = datetime.fromtimestamp(ts / 1000.0)
+                    dateTimeStr = str(dateTime.ctime()) + ": "
+                print(dateTimeStr, line, end='')
+                #print(data)
+                if self.__lastTS < 0.0:
+                    self.__lastTS = ts
+                timediff = (ts - self.__lastTS) / 1000.0  # Time difference in seconds
+                #print("Time diff: ", timediff)
+                if timediff > 0 and timediff < 5.0: # ZZZ - 5 second will be configurable
+                    #print("Sleep: ", timediff)
+                    time.sleep(timediff)
+                self.__lastTS = ts
+                code = data['c']
+                kob.sounder(code)
+
+
 """
 Test code
 """
@@ -133,7 +161,7 @@ if __name__ == "__main__":
     from pykob import morse
 
     test_target_filename = "test." + str(getTimestamp()) + ".json"
-    myRecorder = Recorder(test_target_filename, None, station_id="Test Recorder", wire=-1)
+    myRecorder = Recorder(test_target_filename, test_target_filename, station_id="Test Recorder", wire=-1)
     mySender = morse.Sender(20)
 
     # 'HI' at 20 wpm as a test
@@ -145,4 +173,8 @@ if __name__ == "__main__":
     for c in "This is a test":
         code = mySender.encode(c, True)
         myRecorder.record(code, kob.CodeSource.local)
+    print()
+    # Play the file
+    myKOB = kob.KOB(port=None, audio=True)
+    myRecorder.playback(myKOB)
 
