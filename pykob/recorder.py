@@ -128,16 +128,16 @@ class Recorder:
                 if showDateTime:
                     dateTime = datetime.fromtimestamp(ts / 1000.0)
                     dateTimeStr = str(dateTime.ctime()) + ": "
-                print(dateTimeStr, line, end='')
                 #print(data)
                 if self.__lastTS < 0.0:
                     self.__lastTS = ts
                 timediff = (ts - self.__lastTS) / 1000.0  # Time difference in seconds
                 #print("Time diff: ", timediff)
-                if timediff > 0 and timediff < 5.0: # ZZZ - 5 second will be configurable
-                    #print("Sleep: ", timediff)
+                if timediff > 5:
+                    print("Sleep: ", timediff)
                     time.sleep(timediff)
                 self.__lastTS = ts
+                print(dateTimeStr, line, end='')
                 code = data['c']
                 kob.sounder(code)
 
