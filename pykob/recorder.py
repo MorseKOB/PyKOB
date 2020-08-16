@@ -128,11 +128,9 @@ class Recorder:
                 if showDateTime:
                     dateTime = datetime.fromtimestamp(ts / 1000.0)
                     dateTimeStr = str(dateTime.ctime()) + ": "
-                #print(data)
                 if self.__lastTS < 0.0:
                     self.__lastTS = ts
                 timediff = (ts - self.__lastTS) / 1000.0  # Time difference in seconds
-                #print("Time diff: ", timediff)
                 if timediff > 5:
                     print("Sleep: ", timediff)
                     time.sleep(timediff)

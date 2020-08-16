@@ -3,6 +3,7 @@ dist*/
 zips/
 __pycache__/
 .DS_Store
+*.log
 *.pyo
 *.pyc
 *.toc
