@@ -60,7 +60,7 @@ class KOB:
                 self.port = serial.Serial(port)
                 self.port.dtr = True
             except:
-                log.info('Interface for key and sounder on serial port {} not available. Key and sounder will not be used.'.format(port))
+                log.info("Interface for key and sounder on serial port '{}' not available. Key and sounder will not be used.".format(port))
                 self.port = None
         else:
             self.port = None

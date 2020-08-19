@@ -30,16 +30,25 @@ logs status, debug and error messages.
 import sys
 import datetime
 
-def log(msg, type='INFO'):
+def log(type, msg, dt=None):
+    dtl = dt if dt else str(datetime.datetime.now())[:19]
+    sys.stdout.write('{0} \t{1}: \t{2}\n'.format(dtl, type, msg))
+    sys.stdout.flush()
+
+def logErr(msg):
     dt = str(datetime.datetime.now())[:19]
+    log('ERROR', msg, dt) # Output to the normap output
     sys.stderr.write('{0} \t{1}: \t{2}\n'.format(dt, type, msg))
     sys.stderr.flush()
     
-def err(msg):
-    typ, val, trc = sys.exc_info()
-    log('{0}: \t({1})'.format(msg, val), type='ERROR')
-
 def debug(msg):
-    log(msg, type='DEBUG')
+    log('DEBUG', msg)
     sys.stderr.flush()
     
+def info(msg):
+    log('INFO', msg)
+    
+def err(msg):
+    typ, val, trc = sys.exc_info()
+    logErr('{0}: \t({1})'.format(msg, val), type='ERROR')
+
