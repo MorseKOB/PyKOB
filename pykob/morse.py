@@ -66,7 +66,10 @@ readEncodeTable(config.code_type.international, 'codetable-international.txt')
 class Sender:
     def __init__(self, wpm, cwpm=0, codeType=config.CodeType.american, spacing=config.Spacing.char):
         self.codeType = codeType
-        cwpm = max(wpm, cwpm)
+        if spacing == config.Spacing.none:
+            cwpm = wpm  # send characters at overall code speed
+        else:
+            cwpm = max(wpm, cwpm)  # send at Farnsworth speed
         self.dotLen    = int(1200 / cwpm)  # dot length (ms)
         self.charSpace = 3 * self.dotLen  # space between characters (ms)
         self.wordSpace = 7 * self.dotLen  # space between words (ms)
@@ -81,9 +84,6 @@ class Sender:
             self.wordSpace += int(delta / 3)
         elif spacing == config.Spacing.word:
             self.wordSpace += int(delta)
-        else: # no Farnsworth spacing
-            self.charSpace = 0
-            self.wordSpace = 0
         self.space = self.wordSpace  # delay before next code element (ms)
         
     def encode(self, char, printChar=False):
