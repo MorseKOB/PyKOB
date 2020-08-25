@@ -71,6 +71,19 @@ def doOfficeID(event=None):
     config.save_config()
     km.myInternet.set_officeID(kc.OfficeID)
 
+def doCircuitCloser(event=None):
+    km.circuit_closer = kw.varCircuitCloser.get() == 1
+    if km.circuit_closer:
+        km.reset_wire_state()  # regain control of the wire
+
+def checkCircuitCloser():
+    kw.varCircuitCloser.set(1)
+    doCircuitCloser()
+    
+def uncheckCircuitCloser():
+    kw.varCircuitCloser.set(0)
+    doCircuitCloser()
+    
 def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
     config.set_text_speed(kw.spnWPM.get())
@@ -98,6 +111,6 @@ def codereader_append(s):
     kw.txtReader.yview_moveto(1)
 
 def escape(event):
-    """regain control of the wire"""
-    codereader_append("\n<Reset>")
-    km.reset_wire_state()
+    """toggle Circuit Closer checkbox"""
+    kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
+    doCircuitCloser()

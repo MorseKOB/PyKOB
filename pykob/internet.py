@@ -114,7 +114,7 @@ class Internet:
                     else:
                         code = code[:n]
                     self.rcvdSeqNo = seqNo
-                    log.debug(code)
+##                    log.debug(code)
                     return code
             else:
                 log.log("PyKOB.internet received invalid record length: {0}".

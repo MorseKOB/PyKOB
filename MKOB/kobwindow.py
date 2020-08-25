@@ -121,8 +121,7 @@ class KOBWindow:
         lfm1.grid(row=0, column=0, columnspan=2, padx=3, pady=6)
         self.varCircuitCloser = tk.IntVar()
         chkCktClsr = tk.Checkbutton(lfm1, text='Circuit Closer',
-                variable=self.varCircuitCloser)
-        chkCktClsr.config(state='disabled')  # TODO: temporary
+                variable=self.varCircuitCloser, command=ka.doCircuitCloser)
         chkCktClsr.grid(row=0, column=0)
         tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
         self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify='center',
