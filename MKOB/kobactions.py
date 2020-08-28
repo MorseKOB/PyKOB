@@ -65,24 +65,22 @@ def doHelpAbout():
 
 # actions for control events
 
-def doOfficeID(event=None):
+def doOfficeID(event):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
     km.myInternet.set_officeID(kc.OfficeID)
 
 def doCircuitCloser(event=None):
-    km.circuit_closer = kw.varCircuitCloser.get() == 1
-    if km.circuit_closer:
-        km.reset_wire_state()  # regain control of the wire
+    km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
-def checkCircuitCloser():
-    kw.varCircuitCloser.set(1)
-    doCircuitCloser()
-    
-def uncheckCircuitCloser():
-    kw.varCircuitCloser.set(0)
-    doCircuitCloser()
+##def closeCircuitCloser():
+##    kw.varCircuitCloser.set(1)
+##    doCircuitCloser()
+##    
+##def openCircuitCloser():
+##    kw.varCircuitCloser.set(0)
+##    doCircuitCloser()
     
 def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
@@ -93,7 +91,7 @@ def doWPM(event=None):
     km.myReader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
             callback=km.readerCallback)
 
-def doWireNo(event=None):
+def doWireNo(event):
     kc.WireNo = int(kw.spnWireNo.get())
     config.set_wire(kw.spnWireNo.get())
     config.save_config()
@@ -111,6 +109,7 @@ def codereader_append(s):
     kw.txtReader.yview_moveto(1)
 
 def escape(event):
-    """toggle Circuit Closer checkbox"""
+    """toggle Circuit Closer and regain control of the wire"""
     kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
     doCircuitCloser()
+    km.reset_wire_state()  # regain control of the wire
