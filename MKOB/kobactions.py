@@ -71,17 +71,9 @@ def doOfficeID(event):
     config.save_config()
     km.myInternet.set_officeID(kc.OfficeID)
 
-def doCircuitCloser(event=None):
+def doCircuitCloser():
     km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
-##def closeCircuitCloser():
-##    kw.varCircuitCloser.set(1)
-##    doCircuitCloser()
-##    
-##def openCircuitCloser():
-##    kw.varCircuitCloser.set(0)
-##    doCircuitCloser()
-    
 def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
     config.set_text_speed(kw.spnWPM.get())
@@ -91,7 +83,7 @@ def doWPM(event=None):
     km.myReader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
             callback=km.readerCallback)
 
-def doWireNo(event):
+def doWireNo(event=None):
     kc.WireNo = int(kw.spnWireNo.get())
     config.set_wire(kw.spnWireNo.get())
     config.save_config()

@@ -52,32 +52,6 @@ unlatch_code = (-0x7fff, +2)  # code sequence to unlatch
 
 sender_ID = ""
 
-##def set_local_loop_active():
-##    """set local_loop_active to reflect Circuit Closer checkbox state"""
-##    global local_loop_active, internet_active
-##    if ka.kw.varCircuitCloser.set(1) and not local_loop_active:
-##        if connected and kc.Remote:
-##            myInternet.write(latch_code)
-##        if not internet_active:
-##            if kc.Local:
-##                myKOB.sounder(latch_code)
-##            update_sender(kc.config.station)
-##            if myRecorder:
-##                myRecorder.record(code, kob.CodeSource.local)
-##            myReader.decode(latch_code)
-##        local_loop_active = True
-##    if ka.kw.varCircuitCloser.set(0) and local_loop_active:
-##        if connected and kc.Remote:
-##            myInternet.write(unlatch_code)
-##        if not internet_active:
-##            if kc.Local:
-##                myKOB.sounder(unlatch_code)
-##            update_sender(kc.config.station)
-##            if myRecorder:
-##                myRecorder.record(code, kob.CodeSource.local)
-##            myReader.decode(unlatch_code)
-##        local_loop_active = False
-
 def set_local_loop_active(state):
     """set local_loop_active state and update Circuit Closer checkbox"""
     global local_loop_active
@@ -123,11 +97,11 @@ def from_internet(code):
     """handle inputs received from the internet"""
     global local_loop_active, internet_active
     if connected:
-        if not local_loop_active:
-            myKOB.sounder(code)
-            myReader.decode(code)
-            if myRecorder:
-                myRecorder.record(code, kob.CodeSource.wire)
+##        if not local_loop_active:
+        myKOB.sounder(code)
+        myReader.decode(code)
+        if myRecorder:
+            myRecorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
             internet_active = False
             myReader.flush()  # ZZZ is this necessary/desirable?
@@ -140,9 +114,9 @@ def from_circuit_closer(state):
     code = latch_code if state == 1 else unlatch_code
     if not internet_active:
         if kc.Local:
+            update_sender(kc.config.station)
             myKOB.sounder(code)
             myReader.decode(code)
-        update_sender(kc.config.station)
         if myRecorder:
             myRecorder.record(code, kob.CodeSource.local)
     if connected and kc.Remote:

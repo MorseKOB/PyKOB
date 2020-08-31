@@ -50,5 +50,5 @@ def info(msg):
     
 def err(msg):
     typ, val, trc = sys.exc_info()
-    logErr('{0}: \t({1})'.format(msg, val), type='ERROR')
+    log('ERROR', '{0}: \t({1})'.format(msg, val))
 
