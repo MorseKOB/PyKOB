@@ -1,6 +1,6 @@
 # Release notes
 
-## MorseKOB 4.1.0 (relative to MorseKOB 2.5)
+## MorseKOB 4.0 (relative to MorseKOB 2.5)
 
 These notes need to be fleshed out before MKOB is released.
 
@@ -11,14 +11,13 @@ These notes need to be fleshed out before MKOB is released.
 
 ### What's missing
 
-- can't use Escape key to regain control of the wire
 - no Preferences screen for setting options (have to use Configure utility for now)
-- no support (yet) for sounder driver interface
+- no support (yet) for `Basic` mode interface
 
 ### What's different
 
-- have to type ~ to open the wire when sending from the keyboard and + to close it
-- missing packets are indicated by a double underscore instead of an asterisk; long pauses also
+- when sending from the keyboard, typing ~ opens the wire  and + closes it
+- long pauses are represented in the reader window as a long dash
 
 ### Known issues
 

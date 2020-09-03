@@ -61,7 +61,8 @@ class KOBWindow:
         helpMenu.add_command(label='About', command=ka.doHelpAbout)
 
         # paned windows
-        pwd1 = tk.PanedWindow(root, orient=tk.HORIZONTAL, sashwidth=4,
+        pwd1 = tk.PanedWindow(
+                root, orient=tk.HORIZONTAL, sashwidth=4,
                 borderwidth=0)  # left/right side
         pwd1.grid(sticky='NESW', padx=6, pady=6)    
         pwd2 = tk.PanedWindow(pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
@@ -88,14 +89,16 @@ class KOBWindow:
         frm4.grid(row=2)
 
         # reader
-        self.txtReader = tkst.ScrolledText(frm1, width=40, height=15, bd=2,
+        self.txtReader = tkst.ScrolledText(
+                frm1, width=40, height=15, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
         self.txtReader.columnconfigure(0, weight=2)
 
         # keyboard
-        self.txtKeyboard = tkst.ScrolledText(frm2, width=40, height=5, bd=2,
+        self.txtKeyboard = tkst.ScrolledText(
+                frm2, width=40, height=5, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.txtKeyboard.tag_config('highlight', underline=1)
@@ -105,13 +108,15 @@ class KOBWindow:
         self.txtKeyboard.focus_set()
         
         # station list
-        self.txtStnList = tkst.ScrolledText(frm3, width=10, height=8, bd=2,
+        self.txtStnList = tkst.ScrolledText(
+                frm3, width=10, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
         
         # office ID
         self.varOfficeID = tk.StringVar()
-        self.entOfficeID = tk.Entry(frm3, bd=2, font=('Helvetica', -14),
+        self.entOfficeID = tk.Entry(
+                frm3, bd=2, font=('Helvetica', -14),
                 textvariable=self.varOfficeID)
         self.entOfficeID.bind('<Any-KeyRelease>', ka.doOfficeID)
         self.entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
@@ -120,12 +125,13 @@ class KOBWindow:
         lfm1 = tk.LabelFrame(frm4, padx=5, pady=5)
         lfm1.grid(row=0, column=0, columnspan=2, padx=3, pady=6)
         self.varCircuitCloser = tk.IntVar()
-        chkCktClsr = tk.Checkbutton(lfm1, text='Circuit Closer',
-                variable=self.varCircuitCloser)
-        chkCktClsr.config(state='disabled')  # TODO: temporary
+        chkCktClsr = tk.Checkbutton(
+                lfm1, text='Circuit Closer', variable=self.varCircuitCloser,
+                command=ka.doCircuitCloser)
         chkCktClsr.grid(row=0, column=0)
         tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
-        self.spnWPM = tk.Spinbox(lfm1, from_=5, to=40, justify='center',
+        self.spnWPM = tk.Spinbox(
+                lfm1, from_=5, to=40, justify='center',
                 width=4, borderwidth=2, command=ka.doWPM)
         self.spnWPM.bind('<Any-KeyRelease>', ka.doWPM)
         self.spnWPM.grid(row=0, column=2)
@@ -134,24 +140,26 @@ class KOBWindow:
         lfm2 = tk.LabelFrame(frm4, text='Code Sender', padx=5, pady=5)
         lfm2.grid(row=1, column=0, padx=3, pady=6, sticky='NESW')
         self.varCodeSenderOn = tk.IntVar()
-        chkCodeSenderOn = tk.Checkbutton(lfm2, text='On',
-                variable=self.varCodeSenderOn)
+        chkCodeSenderOn = tk.Checkbutton(
+                lfm2, text='On', variable=self.varCodeSenderOn)
         chkCodeSenderOn.config(state='disabled')  # TODO: temporary
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderRepeat = tk.IntVar()
-        chkCodeSenderRepeat = tk.Checkbutton(lfm2, text='Repeat',
-                variable=self.varCodeSenderRepeat)
+        chkCodeSenderRepeat = tk.Checkbutton(
+                lfm2, text='Repeat', variable=self.varCodeSenderRepeat)
         chkCodeSenderRepeat.config(state='disabled')  # TODO: temporary
         chkCodeSenderRepeat.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect
         lfm3 = tk.LabelFrame(frm4, text='Wire No.', padx=5, pady=5)
         lfm3.grid(row=1, column=1, padx=3, pady=6, sticky='NS')
-        self.spnWireNo = tk.Spinbox(lfm3, from_=1, to=32000, justify='center',
+        self.spnWireNo = tk.Spinbox(
+                lfm3, from_=1, to=32000, justify='center',
                 width=7, borderwidth=2, command=ka.doWireNo)
         self.spnWireNo.bind('<Any-KeyRelease>', ka.doWireNo)
         self.spnWireNo.grid()
-        self.cvsConnect = tk.Canvas(lfm3, width=6, height=10, bd=2,
+        self.cvsConnect = tk.Canvas(
+                lfm3, width=6, height=10, bd=2,
                 relief=tk.SUNKEN, bg='white')
         self.cvsConnect.grid(row=0, column=2)
         tk.Canvas(lfm3, width=1, height=2).grid(row=1, column=1)

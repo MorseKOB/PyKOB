@@ -55,6 +55,7 @@ class CodeSource(IntEnum):
 
 class KOB:
     def __init__(self, port=None, audio=False, echo=False, callback=None):
+        self.callback = callback
         if port and serialAvailable:
             try:
                 self.port = serial.Serial(port)
@@ -62,8 +63,10 @@ class KOB:
             except:
                 log.info("Interface for key and sounder on serial port '{}' not available. Key and sounder will not be used.".format(port))
                 self.port = None
+                self.callback = None
         else:
             self.port = None
+            self.callback = None
         self.audio = audio
         self.echo = echo
         self.sdrState = False  # True: mark, False: space
@@ -76,9 +79,8 @@ class KOB:
             self.cktClose = self.keyState  # True: circuit latched closed
             if self.echo:
                 self.setSounder(self.keyState)
-        self.callback = callback
         self.recorder = None
-        if callback:
+        if self.callback:
             callbackThread = threading.Thread(target=self.callbackRead)
             callbackThread.daemon = True
             callbackThread.start()

@@ -43,60 +43,92 @@ myRecorder = None
 myInternet = None
 connected = False
 
-kob_latched = True
-keyboard_latched = True
-internet_latched = True
-latch_code = (-1000, +1)  # code sequence to force latching
+local_loop_active = False  # True if sending on key or keyboard
+internet_active = False  # True if a remote station is sending
+
+latch_code = (-0x7fff, +1)  # code sequence to force latching
+unlatch_code = (-0x7fff, +2)  # code sequence to unlatch
 
 sender_ID = ""
 
-def from_KOB(code):
+def set_local_loop_active(state):
+    """set local_loop_active state and update Circuit Closer checkbox"""
+    global local_loop_active
+    local_loop_active = state
+    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
+
+def from_key(code):
     """handle inputs received from the external key"""
-    global kob_latched, keyboard_latched, internet_latched
-    kob_latched = False
-    if keyboard_latched:
-        if connected and kc.Remote:
-            myInternet.write(code)
-        if internet_latched:
-            update_sender(kc.config.station)
-            myReader.decode(code)
-    if len(code) > 0 and code[len(code)-1] == +1:
-        kob_latched = True
-        myReader.flush()
+    global internet_active
+    if not internet_active:
+        myKOB.setSounder(True)
+        update_sender(kc.config.station)
+        myReader.decode(code)
+        if myRecorder:
+            myRecorder.record(code, kob.CodeSource.local)
+    if connected and kc.Remote:
+        myInternet.write(code)
+    if len(code) > 0 and code[-1] == +1:
+        set_local_loop_active(False)
+        myReader.flush()  # ZZZ is this necessary/desirable?
+    else:
+        set_local_loop_active(True)
 
 def from_keyboard(code):
     """handle inputs received from the keyboard sender"""
-    global kob_latched, keyboard_latched, internet_latched
-    keyboard_latched = False
-    if kob_latched:
-        if connected and kc.Remote:
-            myInternet.write(code)
-        if internet_latched:
+    # ZZZ combine common code with `from_key()`
+    global internet_active
+    if not internet_active:
+        if kc.Local:
             myKOB.sounder(code)
-            update_sender(kc.config.station)
-            if myRecorder:
-                myRecorder.record(code, kob.CodeSource.local)
-            myReader.decode(code)
-    if len(code) > 0 and code[len(code)-1] == +1:
-        keyboard_latched = True
-        myReader.flush()
+        update_sender(kc.config.station)
+        myReader.decode(code)
+        if myRecorder:
+            myRecorder.record(code, kob.CodeSource.local)
+    if connected and kc.Remote:
+        myInternet.write(code)
+    if len(code) > 0 and code[-1] == +1:
+        set_local_loop_active(False)
+        myReader.flush()  # ZZZ is this necessary/desirable?
+    else:
+        set_local_loop_active(True)
 
 def from_internet(code):
     """handle inputs received from the internet"""
-    global kob_latched, keyboard_latched, internet_latched
-    internet_latched = False
-    if connected and kob_latched and keyboard_latched:
+    global local_loop_active, internet_active
+    if connected:
         myKOB.sounder(code)
         myReader.decode(code)
         if myRecorder:
             myRecorder.record(code, kob.CodeSource.wire)
-    if len(code) > 0 and code[len(code)-1] == +1:
-        internet_latched = True
-        myReader.flush()
+        if len(code) > 0 and code[-1] == +1:
+            internet_active = False
+            myReader.flush()  # ZZZ is this necessary/desirable?
+        else:
+            internet_active = True
+
+def from_circuit_closer(state):
+    """handle change of Circuit Closer state"""
+    global local_loop_active, internet_active
+    code = latch_code if state == 1 else unlatch_code
+    if not internet_active:
+        if kc.Local:
+            update_sender(kc.config.station)
+            myKOB.sounder(code)
+            myReader.decode(code)
+        if myRecorder:
+            myRecorder.record(code, kob.CodeSource.local)
+    if connected and kc.Remote:
+        myInternet.write(code)
+    if len(code) > 0 and code[-1] == +1:
+        set_local_loop_active(False)
+        myReader.flush()  # ZZZ is this necessary/desirable?
+    else:
+        set_local_loop_active(True)
         
 def toggle_connect():
     """connect or disconnect when user clicks on the Connect button"""
-    global kob_latched, keyboard_latched, internet_latched
+    global local_loop_active, internet_active
     global connected
     connected = not connected
     if connected:
@@ -105,32 +137,33 @@ def toggle_connect():
     else:
         myInternet.disconnect()
         myReader.flush()
-        time.sleep(0.5)  # wait for any buffered code to complete
+        time.sleep(1.0)  # wait for any buffered code to complete
         connected = False  # just to make sure
-        if not internet_latched:
-            internet_latched = True
-            if kob_latched and keyboard_latched:
-                myKOB.sounder(latch_code)
-                myReader.decode(latch_code)
-                myReader.flush()
-        kobstationlist.clear_station_list()
-
-def change_wire():
-    global kob_latched, keyboard_latched, internet_latched
-    global connected
-    connected = False
-    myReader.flush()
-    time.sleep(0.5)  # wait for any buffered code to complete
-    if not internet_latched:
-        internet_latched = True
-        if kob_latched and keyboard_latched:
+        if not local_loop_active:
             myKOB.sounder(latch_code)
             myReader.decode(latch_code)
             myReader.flush()
-    myInternet.connect(kc.WireNo)
+        kobstationlist.clear_station_list()
+    internet_active = False
+
+def change_wire():
+    global local_loop_active, internet_active
+    global connected
+    if connected:
+        connected = False
+        myReader.flush()
+        time.sleep(1.0)  # wait for any buffered code to complete
+        if internet_active:
+            internet_active = False
+            if not local_loop_active:
+                myKOB.sounder(latch_code)
+                myReader.decode(latch_code)
+                myReader.flush()
+        myInternet.connect(kc.WireNo)
+        connected = True
     if myRecorder:
         myRecorder.wire = kc.WireNo
-    connected = True
+    internet_active = False
     
 # callback functions
 
@@ -155,7 +188,7 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = " * " if char != "~" else ""
+        txt = "" if char == "~" or char == "+" else " * "
     elif sp > 10:
         txt = "  —  "
     elif sp < -0.2:
@@ -175,23 +208,16 @@ def readerCallback(char, spacing):
         ka.codereader_append("\n")
 
 def reset_wire_state():
-    """log the current latching states and reinitialize"""
-    global kob_latched, keyboard_latched, internet_latched
-    print("Reset\n kob_latched: {}\n keyboard_latched: {}\n internet_latched: {}"
-            .format(kob_latched, keyboard_latched, internet_latched))
-    kob_latched = True
-    keyboard_latched = True
-    internet_latched = True
+    """log the current internet state and regain control of the wire"""
+    global internet_active
+    print(
+            "Circuit Closer {}, internet_active was {}".format(
+            local_loop_active, internet_active))
+    internet_active = False
 
 # initialization
 
-if kc.Local:
-    myKOB = kob.KOB(port=kc.config.serial_port if kc.config.sounder else None,
-            audio=kc.config.sound,
-            callback=from_KOB if kc.config.sounder else None)
-                    # workaround for callback until issue #87 is fixed
-else:
-    myKOB = kob.KOB(port=None, audio=False, callback=None)
+myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound, callback=from_key)
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
 myInternet.monitor_IDs(kobstationlist.refresh_stations)
 myInternet.monitor_sender(update_sender)
