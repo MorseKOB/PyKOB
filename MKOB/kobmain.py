@@ -46,7 +46,6 @@ connected = False
 local_loop_active = False  # True if sending on key or keyboard
 internet_active = False  # True if a remote station is sending
 
-# TODO: check the delays on these codes
 latch_code = (-0x7fff, +1)  # code sequence to force latching
 unlatch_code = (-0x7fff, +2)  # code sequence to unlatch
 
@@ -62,6 +61,7 @@ def from_key(code):
     """handle inputs received from the external key"""
     global internet_active
     if not internet_active:
+        myKOB.setSounder(True)
         update_sender(kc.config.station)
         myReader.decode(code)
         if myRecorder:
@@ -97,7 +97,6 @@ def from_internet(code):
     """handle inputs received from the internet"""
     global local_loop_active, internet_active
     if connected:
-##        if not local_loop_active:
         myKOB.sounder(code)
         myReader.decode(code)
         if myRecorder:
