@@ -146,7 +146,6 @@ class KOB:
                     self.tLastSdr = t
                 else:
                     self.tLastSdr = tNext
-                    log.debug("kob.sounder sleeping... {}".format(dt))
                     time.sleep(dt)
             if c > 1:
                 self.setSounder(False)
