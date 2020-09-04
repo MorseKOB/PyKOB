@@ -114,7 +114,6 @@ class Internet:
                     else:
                         code = code[:n]
                     self.rcvdSeqNo = seqNo
-                    log.debug(code)
                     return code
             else:
                 log.log("PyKOB.internet received invalid record length: {0}".
@@ -124,13 +123,17 @@ class Internet:
         n = len(code)
         if n == 0:
             return
+        if n > 50:
+            log.log("WARNING", "PyKOB.internet: code sequence too long")
+            return
         codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='ascii'))
         self.sentSeqNo += 1
-        codePacket = codePacketFormat.pack(DAT, 492, self.officeID.encode('ascii'),
+        codePacket = codePacketFormat.pack(
+                DAT, 492, self.officeID.encode('ascii'),
                 self.sentSeqNo, *codeBuf)
         for i in range(2):
             self.socket.sendto(codePacket, self.address)
-        
+
     def keepAlive(self):
         while True:
             self.sendID()

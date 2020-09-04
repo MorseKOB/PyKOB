@@ -51,8 +51,12 @@ def keyboard_send():
                 kw.varCodeSenderOn.get():
             kw.txtKeyboard.tag_add('highlight', 'mark')
             c = kw.txtKeyboard.get('mark')
+            if c == '~':
+                kw.varCircuitCloser.set(0)
             code = km.mySender.encode(c)
             km.from_keyboard(code)
+            if c == '+':
+                kw.varCircuitCloser.set(1)
             kw.txtKeyboard.tag_remove('highlight', 'mark')
             kw.txtKeyboard.mark_set('mark', 'mark+1c')
         else:

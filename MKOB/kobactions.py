@@ -65,11 +65,14 @@ def doHelpAbout():
 
 # actions for control events
 
-def doOfficeID(event=None):
+def doOfficeID(event):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
     km.myInternet.set_officeID(kc.OfficeID)
+
+def doCircuitCloser():
+    km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
 def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
@@ -98,6 +101,7 @@ def codereader_append(s):
     kw.txtReader.yview_moveto(1)
 
 def escape(event):
-    """regain control of the wire"""
-    codereader_append("\n<Reset>")
-    km.reset_wire_state()
+    """toggle Circuit Closer and regain control of the wire"""
+    kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
+    doCircuitCloser()
+    km.reset_wire_state()  # regain control of the wire
