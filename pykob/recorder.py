@@ -121,6 +121,7 @@ class Recorder:
         """
         self.__lastTS = -1.0  # Used to time playback
         with open(self.__source_file_path, "r") as fp:
+            lastCode = []
             for line in fp:
                 data = json.loads(line)
                 ts = data['ts'] # Get the timestamp to know when to play
@@ -131,7 +132,7 @@ class Recorder:
                 if self.__lastTS < 0.0:
                     self.__lastTS = ts
                 timediff = (ts - self.__lastTS) / 1000.0  # Time difference in seconds
-                if timediff > 2.0:
+                if timediff > 0.25 and (len(lastCode) > 0):
                     # For very long delays, sleep a maximum of 8 seconds
                     # ZZZ - 8 second msx will be configurable
                     if timediff > 8.0:
@@ -147,6 +148,7 @@ class Recorder:
                 kob.sounder(code)
                 codePlayDuration = getTimestamp() - codePlayStart
                 self.__lastTS = ts + codePlayDuration # Remember the file timestamp plus the time to play the code
+                lastCode = code
 
 
 """
