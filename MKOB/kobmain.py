@@ -29,7 +29,9 @@ Handle the flow of Morse code throughout the program.
 """
 
 import time
-from pykob import kob, morse, internet, config, recorder
+from datetime import datetime
+
+from pykob import kob, morse, internet, config, recorder, log
 import kobconfig as kc
 import kobactions as ka
 import kobstationlist
@@ -223,6 +225,11 @@ myInternet.monitor_IDs(kobstationlist.refresh_stations)
 myInternet.monitor_sender(update_sender)
 # ZZZ temp always enable recorder - goal is to provide menu option
 ts = recorder.getTimestamp()
-targetFileName = "MKOB." + str(ts) + ".json"
+dt = datetime.fromtimestamp(ts / 1000.0)
+print(dt.year, dt.month, dt.day, '-', dt.hour, dt.min, dt.second)
+dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
+
+targetFileName = "Session-" + dateTimeStr + ".json"
+log.info("Record to '{}'".format(targetFileName))
 myRecorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo)
 kobkeyboard.init()
