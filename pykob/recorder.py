@@ -147,7 +147,8 @@ class Recorder:
                 codePlayStart = getTimestamp()
                 kob.sounder(code)
                 codePlayDuration = getTimestamp() - codePlayStart
-                self.__lastTS = ts + codePlayDuration # Remember the file timestamp plus the time to play the code
+                print("tsd: {} codePlayDuration: {}".format(round((ts - self.__lastTS) / 1000.0, 6), round(codePlayDuration, 6)))
+                self.__lastTS = ts
                 lastCode = code
 
 
