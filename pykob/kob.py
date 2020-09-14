@@ -104,15 +104,15 @@ class KOB:
     def key(self):
         code = ()
         while True:
+            t = time.time()
             s = self.port.dsr
             if s != self.keyState:
                 self.keyState = s
-                t = time.time()
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
                 if self.echo:
                     self.setSounder(s)
-                time.sleep(DEBOUNCE)  # MAYBE COMPUTE THIS BASED ON CURRENT TIME
+                time.sleep(DEBOUNCE)
                 if s:
                     code += (-dt,)
                 elif self.cktClose:
@@ -122,10 +122,10 @@ class KOB:
                 else:
                     code += (dt,)
             if not s and code and \
-                    time.time() > self.tLastKey + CODESPACE:
+                    t > self.tLastKey + CODESPACE:
                 return code
             if s and not self.cktClose and \
-                    time.time() > self.tLastKey + CKTCLOSE:
+                    t > self.tLastKey + CKTCLOSE:
                 code += (+1,)  # latch circuit closed
                 self.cktClose = True
                 return code
@@ -142,7 +142,7 @@ class KOB:
         for c in code:
             t = time.time()
             if c < -3000:  # long pause, change of senders, or missing packet
-                print("KOB.sounder long pause:", c, code)  ### ZZZ
+##                print("KOB.sounder long pause:", c, code)  ### ZZZ
                 c = -1
                 self.tLastSdr = t + 1.0
             if c > 0:  # start of mark

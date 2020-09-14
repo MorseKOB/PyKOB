@@ -120,9 +120,6 @@ class Recorder:
         Play a recording to the configured sounder.
         """
         with open(self.__source_file_path, "r") as fp:
-            startTime = time.time()  # Get the current time when this playback starts
-            firstTS = -1  # Save the first timestamp in the playback
-##            lastCode = []
             for line in fp:
                 dateTimeStr = ""
                 if showDateTime:
@@ -130,28 +127,24 @@ class Recorder:
                     dateTimeStr = str(dateTime.ctime()) + ": "
 ##                print(dateTimeStr, line, end='')
                 data = json.loads(line)
-                ts = data['ts'] # Get the timestamp to know when to play
-                if firstTS < 0:
-                   firstTS = ts
-                timediff = startTime + (ts - firstTS) / 1000.0 - time.time()  # Time difference in seconds
-                if timediff > 0:
+                code = data['c']
+                if code == []:  # Ignore empty code packets
+                    next
+                pause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
+                # However the way `KOB.sounder` handles longer pauses, although it makes sense for
+                # real-time transmissions, is flawed for playback. Better to handle long pauses here.
+                # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
+                # handling in `KOB.sounder`.
+                if pause > 1.0 and pause < 32.767:
                     # For very long delays, sleep a maximum of 5 seconds
                     # ZZZ - 5 second msx will be configurable
-                    if timediff > 5.0:
-                        print("Realtime pause of {} seconds being reduced to 5 seconds".format(round(timediff, 3)))
-                        firstTS += timediff - 5.0  # Adjust start time to account for shortened pause
-                        timediff = 5.0
-                    timediff = round(timediff, 4)
-##                    print("Sleep: ", timediff)
-                    time.sleep(timediff)
-                code = data['c']
-##                # Keep track of how long it takes to sound the code
-##                codePlayStart = getTimestamp()
+                    if pause > 5.0:
+                        print("Realtime pause of {} seconds being reduced to 5 seconds".format(round(pause, 3)))
+                        pause = 5.0
+                    time.sleep(pause)
+                    code[0] = -1  # Remove pause from code seqence since it's already handled
                 kob.sounder(code)
-##                codePlayDuration = getTimestamp() - codePlayStart
-##                print("tsd: {} codePlayDuration: {}".format(round((ts - self.__lastTS) / 1000.0, 6), round(codePlayDuration, 6)))
-##                self.__lastTS = ts
-##                lastCode = code
 
 
 """
