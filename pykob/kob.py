@@ -37,7 +37,7 @@ try:
     import serial
     serialAvailable = True
 except:
-    log.log('pySerial not installed.')
+    log.log("pySerial not installed.")
     serialAvailable = False
 
 DEBOUNCE  = 0.010  # time to ignore transitions due to contact bounce (sec)
@@ -55,6 +55,7 @@ class CodeSource(IntEnum):
 
 class KOB:
     def __init__(self, port=None, audio=False, echo=False, callback=None):
+        self.t0 = -1.0  ### ZZZ Keep track of when the playback started
         self.callback = callback
         if port and serialAvailable:
             try:
@@ -128,26 +129,36 @@ class KOB:
                 code += (+1,)  # latch circuit closed
                 self.cktClose = True
                 return code
+            if len(code) >= 50:  # code sequences can't have more than 50 elements
+                return code
             time.sleep(0.001)
 
     def sounder(self, code, code_source=CodeSource.local):
+        if self.t0 < 0:  ### ZZZ capture start time
+            self.t0 = time.time()  ### ZZZ
+##        print("KOB.sounder", round(time.time()-self.t0, 3), code)  ### ZZZ
         if self.__recorder:
             self.__recorder.record(code_source, code)
         for c in code:
-            if c < -3000:
-                c = -500
-            if c == 1 or c > 2:
+            t = time.time()
+            if c < -3000:  # long pause, change of senders, or missing packet
+                print("KOB.sounder long pause:", c, code)  ### ZZZ
+                c = -1
+                self.tLastSdr = t + 1.0
+            if c > 0:  # start of mark
                 self.setSounder(True)
-            if c < 0 or c > 2:
-                tNext = self.tLastSdr + abs(c) / 1000.
-                t = time.time()
-                dt = tNext - t
-                if dt <= 0:
-                    self.tLastSdr = t
-                else:
-                    self.tLastSdr = tNext
-                    time.sleep(dt)
-            if c > 1:
+            tNext = self.tLastSdr + abs(c) / 1000.
+            dt = tNext - t
+            if dt <= 0:
+                print(
+                        "KOB.sounder buffer empty:",
+                        round(time.time()-self.t0, 3),
+                        round(dt, 3), c, code)  ### ZZZ
+                self.tLastSdr = t
+            else:
+                self.tLastSdr = tNext
+                time.sleep(dt)
+            if c > 1:  # end of (nonlatching) mark
                 self.setSounder(False)
 
     def setSounder(self, state):
