@@ -129,7 +129,7 @@ class Recorder:
                 data = json.loads(line)
                 code = data['c']
                 if code == []:  # Ignore empty code packets
-                    next
+                    continue
                 pause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
                 # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
                 # However the way `KOB.sounder` handles longer pauses, although it makes sense for
