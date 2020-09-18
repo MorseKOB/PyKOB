@@ -60,6 +60,7 @@ try:
         [\
         config.serial_port_override, \
         config.code_type_override, \
+        config.interface_type_override, \
         config.sound_override, \
         config.sounder_override, \
         config.spacing_override, \

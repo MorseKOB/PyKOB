@@ -67,6 +67,12 @@ class CodeType(IntEnum):
     american = 1
     international = 2
 
+@unique
+class InterfaceType(IntEnum):
+    key_sounder = 1
+    loop = 2
+    keyer = 3
+
 # Application name
 __APP_NAME = "pykob"
 # INI Section
@@ -75,6 +81,7 @@ __CONFIG_SECTION = "PYKOB"
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
 __CODE_TYPE_KEY = "CODE_TYPE"
+__INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 __LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
@@ -112,6 +119,7 @@ serial_port = None
 
 # User Settings
 code_type = CodeType.american
+interface_type = InterfaceType.loop
 local = True
 remote = True
 sound = True
@@ -190,9 +198,36 @@ def set_code_type(s):
     elif s=="I" or s=="INTERNATIONAL":
         code_type = CodeType.international
     else:
-        log.err("TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s))
-        return
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
     user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type.name.upper())
+
+
+def set_interface_type(s):
+    """Sets the Interface Type (for Key-Sounder, Loop or Keyer)
+
+    Parameters
+    ----------
+    s : str
+        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.  
+        The value `L|LOOP` will set the interface type to 'InterfaceType.loop'.
+        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.  
+    """
+
+    global interface_type
+    s = s.upper()
+    if s=="KS" or s=="KEY_SOUNDER":
+        interface_type = InterfaceType.key_sounder
+    elif s=="L" or s=="LOOP":
+        interface_type = InterfaceType.loop
+    elif s=="K" or s=="KEYER":
+        interface_type = InterfaceType.keyer
+    else:
+        msg = "TYPE value '{}' is not a valid `Interface Type` value of 'KEY_SOUNDER', 'LOOP' or 'KEYER'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+    user_config.set(__CONFIG_SECTION, __INTERFACE_TYPE_KEY, interface_type.name.upper())
 
 
 def set_local(l):
@@ -344,8 +379,9 @@ def set_spacing(s):
     elif s=="W" or s=="WORD":
         spacing = Spacing.word
     else:
-        log.err("SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s))
-        return
+        msg = "SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
     user_config.set(__CONFIG_SECTION, __SPACING_KEY, spacing.name.upper())
 
 
@@ -426,6 +462,7 @@ def print_config():
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
     print("Code type:", code_type.name.upper())
+    print("Interface type:", interface_type.name.upper())
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("Sound:", onOffFromBool(sound))
@@ -470,6 +507,7 @@ def read_config():
     global serial_port
     #
     global code_type
+    global interface_type
     global local
     global min_char_speed
     global remote
@@ -525,6 +563,7 @@ def read_config():
 
     user_config_defaults = {\
         __CODE_TYPE_KEY:"AMERICAN", \
+        __INTERFACE_TYPE_KEY:"LOOP", \
         __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
@@ -559,6 +598,17 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
+        __option = "Interface type"
+        __key = __INTERFACE_TYPE_KEY
+        _interface_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        if _interface_type == "KEY_SOUNDER":
+            interface_type = InterfaceType.key_sounder
+        elif _interface_type == "LOOP":
+            interface_type = InterfaceType.loop
+        elif _interface_type == "KEYER":
+            interface_type = InterfaceType.keyer
+        else:
+            raise ValueError(_interface_type)
         __option = "Local copy"
         __key = __LOCAL_KEY
         local = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -611,6 +661,10 @@ read_config()
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="type", dest="code_type")
+
+interface_type_override = argparse.ArgumentParser(add_help=False)
+interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(), \
+help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface", dest="interface_type")
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", default=local, \
