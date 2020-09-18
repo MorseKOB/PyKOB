@@ -138,7 +138,7 @@ MINDASHLEN      = 1.5  # dot vs dash threshold (in dots)
 MINMORSESPACE   = 2.0  # intrasymbol space vs Morse (in dots)
 MAXMORSESPACE   = 6.0  # maximum length of Morse space (in dots)
 MINCHARSPACE    = 2.7  # intrasymbol space vs character space (in dots)
-MINLLEN         = 5.5  # minimum length of L character (in dots)
+MINLLEN         = 5.0  # minimum length of L character (in dots)
 MORSERATIO      = 0.95 # length of Morse space relative to surrounding spaces
 ALPHA           = 0.5  # weight given to wpm update values (for smoothing)
 
