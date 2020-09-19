@@ -33,6 +33,7 @@ Command line parameters:
     -p | --port <port>                 : Set the system PORT (COM or tty) value to use for a sounder
     -L | --local <ON|OFF>              : Enable/disable local copy of code  
     -R | --remote <ON|OFF>             : Enable/disable sending code to remote wire (over the internet)
+    -I | --interface KEY_SOUNDER|LOOP|KEYER : Set the interface type
     -a | --sound <ON|OFF>              : Enable the computer sound to simulate a sounder
     -A | --sounder <ON|OFF>            : Use a physical sounder (`port` must be configured)
     -t | --textspeed wpm               : Set the text speed in words per minute
@@ -53,29 +54,40 @@ NONE_CFG_VALUE = "NONE"
 
 def help():
     print(" Configure settings/preferences for PyKOB")
-    print("  Usage: Configure {[{-h|--help} | {-p|--port port} \
-{-L|--local [ON|OFF]} {-R|--remote [ON|OFF]} \
-{-a|--sound [ON|OFF]} {-c|--chars n} {-s|--spacing [NONE|CHAR|WORD]} \
-{-w|--words n} {-A|--sounder [ON|OFF]} \
-{-S|--station [station|NONE]} {-W|--wire n} \
-{-i|--sysInfo}]}")
+    print("  Usage: Configure \
+{[{-h|--help} | \
+{-i|--sysInfo} \
+{-p|--port port} \
+{-t|--textspeed n} \
+{-c|--charspeed n} \
+{-I|--interface KEY_SOUNDER|LOOP|KEYER} \
+{-a|--sound ON|OFF} \
+{-A|--sounder ON|OFF} \
+{-L|--local ON|OFF} \
+{-R|--remote ON|OFF} \
+{-s|--spacing NONE|CHAR|WORD} \
+{-T|--type type} \
+{-S|--station station|NONE} \
+{-W|--wire n} \
+]}")
     print("      Values are:")
-    print("          -h | --help:                           Print this help message.")
+    print("          -h | --help:                             Print this help message.")
     print("")
-    print("          -i | --sysInfo:                        Print information about the system that relates to MorseKOB")
+    print("          -i | --sysInfo:                          Print information about the system that relates to MorseKOB")
     print("")
-    print("          -p | --port <serial_port|NONE>:        Set the serial communication port for the interface.")
+    print("          -p | --port <serial_port|NONE>:          Set the serial communication port for the interface.")
     print("")
-    print("          -t | --textspeed <words_per_minute>:   Set the overall code speed in WPM.")
-    print("          -c | --charspeed <words_per_minute>:   Set the minimum character speed in WPM (used for Farnsworth timing).")
-    print("          -a | --sound ON|OFF:                   Set preference for using the computer sound to simulate a sounder.")
-    print("          -A | --sounder ON|OFF:                 Set preference for using a physical sounder ('PORT' must be configured).")
-    print("          -L | --local ON|OFF:                   Produce local copy of generated/transmitted text.")
-    print("          -R | --remote ON|OFF:                  Transmit over the internet on the specified wire.")
-    print("          -s | --spacing NONE|CHAR|WORD:         How to apply Farnsworth spacing.")
-    print("          -T | --type AMERICAN|INTERNATIONAL:    Set the code type.")
-    print("          -S | --station <station|NONE>:         Set the Station ID.")
-    print("          -W | --wire <wire-number>:             Set the Wire number to connect to.")
+    print("          -t | --textspeed <words_per_minute>:     Set the overall code speed in WPM.")
+    print("          -c | --charspeed <words_per_minute>:     Set the minimum character speed in WPM (used for Farnsworth timing).")
+    print("          -I | --interface KEY_SOUNDER|LOOP|KEYER  Set the interface type.")
+    print("          -a | --sound ON|OFF:                     Set preference for using the computer sound to simulate a sounder.")
+    print("          -A | --sounder ON|OFF:                   Set preference for using a physical sounder ('PORT' must be configured).")
+    print("          -L | --local ON|OFF:                     Produce local copy of generated/transmitted text.")
+    print("          -R | --remote ON|OFF:                    Transmit over the internet on the specified wire.")
+    print("          -s | --spacing NONE|CHAR|WORD:           How to apply Farnsworth spacing.")
+    print("          -T | --type AMERICAN|INTERNATIONAL:      Set the code type.")
+    print("          -S | --station <station|NONE>:           Set the Station ID.")
+    print("          -W | --wire <wire-number>:               Set the Wire number to connect to.")
 
 def missingArgsErr(msg):
     print(msg)
@@ -110,6 +122,7 @@ def main(argv):
     # User preferences
     local = None
     remote = None
+    interface_type = None
     sound = None
     sounder = None
     spacing = None
@@ -120,8 +133,8 @@ def main(argv):
     text_speed = None
 
     try:
-        opts, args = getopt.getopt(argv,"hp:t:c:L:R:a:A:s:T:S:W:i",["help", "port=", \
-            "textspeed=", "charspeed=", "local=", "remote=", "sound=", "sounder=", "spacing=", "type=", "station=", \
+        opts, args = getopt.getopt(argv,"hp:t:c:L:R:I:a:A:s:T:S:W:i",["help", "port=", \
+            "textspeed=", "charspeed=", "local=", "remote=", "interface=", "sound=", "sounder=", "spacing=", "type=", "station=", \
             "wire=", "sysInfo"])
     except getopt.GetoptError as ex:
         print(" {}".format(ex.args[0]))
@@ -144,6 +157,8 @@ def main(argv):
             min_char_speed = arg
         elif opt in ("-t", "--textspeed"):
             text_speed = arg
+        elif opt in ("-I", "--interface"):
+            interface_type = arg
         elif opt in ("-a", "--sound"):
             sound = arg
         elif opt in ("-A", "--sounder"):
@@ -182,6 +197,10 @@ def main(argv):
         #print(text_speed)
         config.set_text_speed(text_speed)
         save_config = True
+    if interface_type:
+        #print(interface_type)
+        config.set_interface_type(interface_type)
+        save_config = True
     if sound:
         #print(sound)
         sound = stringOrNone(sound)
@@ -219,6 +238,10 @@ def main(argv):
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
+    except ValueError as ex:
+        print(ex.args[0])
+        sys.exit(1)     # Indicate this was an abnormal exit
     except KeyboardInterrupt:
         print()
-        sys.exit(1)     # Indicate this was an abnormal exit
+        sys.exit(0)     # Indicate this was a normal exit
+    
