@@ -152,10 +152,10 @@ class KOB:
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
-                print(
-                        "KOB.sounder buffer empty:",
-                        round(time.time()-self.t0, 3),
-                        round(dt, 3), c, code)  ### ZZZ
+##                print(
+##                        "KOB.sounder buffer empty:",
+##                        round(time.time()-self.t0, 3),
+##                        round(dt, 3), c, code)  ### ZZZ
                 self.tLastSdr = t
             else:
                 self.tLastSdr = tNext
