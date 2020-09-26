@@ -63,7 +63,8 @@ def from_key(code):
     """handle inputs received from the external key"""
     global internet_active
     if not internet_active:
-        myKOB.setSounder(True)
+        if kc.config.interface_type == config.interface_type.loop:
+            myKOB.setSounder(True)
         update_sender(kc.config.station)
         myReader.decode(code)
         if myRecorder:
@@ -219,7 +220,8 @@ def reset_wire_state():
 
 # initialization
 
-myKOB = kob.KOB(port=kc.config.serial_port, audio=kc.config.sound, callback=from_key)
+myKOB = kob.KOB(
+        port=kc.config.serial_port, interfaceType=kc.config.interface_type, audio=kc.config.sound, callback=from_key)
 myInternet = internet.Internet(kc.config.station, callback=from_internet)
 myInternet.monitor_IDs(kobstationlist.refresh_stations)
 myInternet.monitor_sender(update_sender)

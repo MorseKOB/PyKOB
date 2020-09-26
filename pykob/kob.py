@@ -54,7 +54,9 @@ class CodeSource(IntEnum):
     wire = 2
 
 class KOB:
-    def __init__(self, port=None, interfaceType=config.interface_type.loop, audio=False, callback=None):
+    def __init__(
+            self, port=None, interfaceType=config.interface_type.loop,
+            audio=False, callback=None):
         self.t0 = -1.0  ### ZZZ Keep track of when the playback started
         self.callback = callback
         if port and serialAvailable:
@@ -78,7 +80,7 @@ class KOB:
             self.keyState = self.port.dsr  # True: closed, False: open
             self.tLastKey = time.time()  # time of last key transition
             self.cktClose = self.keyState  # True: circuit latched closed
-            if self.interfaceType:
+            if self.interfaceType == config.interface_type.key_sounder:
                 self.setSounder(self.keyState)
         self.recorder = None
         if self.callback:
@@ -110,7 +112,7 @@ class KOB:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
-                if self.interfaceType:
+                if self.interfaceType == config.interface_type.key_sounder:
                     self.setSounder(s)
                 time.sleep(DEBOUNCE)
                 if s:
@@ -150,10 +152,10 @@ class KOB:
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
-                print(
-                        "KOB.sounder buffer empty:",
-                        round(time.time()-self.t0, 3),
-                        round(dt, 3), c, code)  ### ZZZ
+##                print(
+##                        "KOB.sounder buffer empty:",
+##                        round(time.time()-self.t0, 3),
+##                        round(dt, 3), c, code)  ### ZZZ
                 self.tLastSdr = t
             else:
                 self.tLastSdr = tNext
