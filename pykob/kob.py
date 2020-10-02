@@ -105,7 +105,7 @@ class KOB:
         code = ()
         while True:
             t = time.time()
-            s = self.port.dsr
+            s = not self.port.dsr # invert for RS-323 modem signal
             if s != self.keyState:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
