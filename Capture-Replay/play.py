@@ -39,12 +39,13 @@ try:
     arg_parser = argparse.ArgumentParser(description="MorseKOB record player", parents=\
      [\
       config.serial_port_override, \
-      config.code_type_override, \
       config.sound_override, \
       config.sounder_override])
     arg_parser.add_argument('playbackFile', metavar='file',
-                    help='file (in recorder format) to be played back')
-    arg_parser.add_argument("--datetime", action='store_true', default=False, help="Display the date and time the data was recorded", dest="showDatetime")
+                    help='file (in MorseKOB recorder format) to be played back.')
+    arg_parser.add_argument("--list", action="store_true", default=False, help="Display the recorded data as it is played.", dest="listData")
+    arg_parser.add_argument("--speedfactor", type=int, metavar="n", default=100, help="Factor (percentage) to adjust playback speed by (Default 100).", dest="speedFactor")
+    arg_parser.add_argument("--maxsilence", type=int, metavar="n", default=5, help="Longest silence duration to play, in seconds. A value of '0' will reproduce all silence as recorded (Defalut 5).", dest="maxSilence")
     args = arg_parser.parse_args()
     
     port = args.serial_port # serial port for KOB interface
@@ -56,11 +57,11 @@ try:
         fp = open(playbackFile, 'r')
         fp.close()
     except FileNotFoundError:
-        log.err("File not found: {}".format(playbackFile))
+        log.err("Recording file not found: {}".format(playbackFile))
 
     myKOB = kob.KOB(port=port, audio=sound)
     myRecorder = recorder.Recorder(None, playbackFile, station_id="Player")
-    myRecorder.playback(myKOB, showDateTime=args.showDatetime)
+    myRecorder.playback(myKOB, list_data=args.listData, max_silence=args.maxSilence, speed_factor=args.speedFactor)
 
 except KeyboardInterrupt:
     print()

@@ -115,36 +115,45 @@ class Recorder:
             json.dump(data, fp)
             fp.write('\n')
 
-    def playback(self, kob, showDateTime=False):
+    def playback(self, kob, list_data=False, max_silence=0, speed_factor=100):
         """
         Play a recording to the configured sounder.
         """
+        lts = -1 # Keep the last timestamp
         with open(self.__source_file_path, "r") as fp:
             for line in fp:
-                dateTimeStr = ""
-                if showDateTime:
-                    dateTime = datetime.fromtimestamp(ts / 1000.0)
-                    dateTimeStr = str(dateTime.ctime()) + ": "
-##                print(dateTimeStr, line, end='')
                 data = json.loads(line)
                 code = data['c']
+                ts = data['ts']
+                if lts < 0:
+                    lst = ts
+                if list_data:
+                    dateTime = datetime.fromtimestamp(ts / 1000.0)
+                    dateTimeStr = str(dateTime.ctime()) + ": "
+                    print(dateTimeStr, line, end='')
                 if code == []:  # Ignore empty code packets
                     continue
-                pause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
                 # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
                 # However the way `KOB.sounder` handles longer pauses, although it makes sense for
                 # real-time transmissions, is flawed for playback. Better to handle long pauses here.
                 # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
                 # handling in `KOB.sounder`.
-                if pause > 1.0 and pause < 32.767:
-                    # For very long delays, sleep a maximum of 5 seconds
-                    # ZZZ - 5 second msx will be configurable
-                    if pause > 5.0:
-                        print("Realtime pause of {} seconds being reduced to 5 seconds".format(round(pause, 3)))
-                        pause = 5.0
+                if codePause > 1.0 and codePause < 32.767:
+                    # For very long delays, sleep a maximum of `max_silence` seconds
+                    pause = round((ts - lts)/1000, 4)
+                    if max_silence > 0 and pause > max_silence:
+                        print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, max_silence))
+                        pause = max_silence
                     time.sleep(pause)
-                    code[0] = -1  # Remove pause from code seqence since it's already handled
+                    code[0] = -1  # Remove pause from code sequence since it's already handled
+                if speed_factor != 100:
+                    sf = 1.0 / (speed_factor / 100.0)
+                    for i in range(len(code)):
+                        if code[i] < 0 or code[i] > 2:
+                            code[i] = round(sf * code[i])
                 kob.sounder(code)
+                lts = ts
 
 
 """
