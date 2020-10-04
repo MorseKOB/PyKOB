@@ -54,6 +54,9 @@ def doFileOpen():
     kw.txtKeyboard.tag_config('highlight', underline=1)
     kw.txtKeyboard.tag_add('highlight', 'mark')
 
+def doFilePlay():
+    print("Play a file...")
+    
 def doFileExit():
     kw.root.destroy()
     kw.root.quit()
