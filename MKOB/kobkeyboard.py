@@ -44,11 +44,15 @@ def keyboard_send():
     kw = ka.kw
     kw.txtKeyboard.tag_config('highlight', background='gray75',
             underline=0)
-    kw.txtKeyboard.tag_remove('highlight', '1.0', 'end')
     kw.txtKeyboard.mark_set('mark', '1.0')
+    kw.txtKeyboard.mark_gravity('mark', 'left')
     while True:
+        if kw.txtKeyboard.compare('mark', '==', 'end-1c') and \
+                kw.varCodeSenderRepeat.get():
+            kw.txtKeyboard.mark_set('mark', '1.0')
         if kw.txtKeyboard.compare('mark', '<', 'end-1c') and \
                 kw.varCodeSenderOn.get():
+            kw.txtKeyboard.see('mark')
             kw.txtKeyboard.tag_add('highlight', 'mark')
             c = kw.txtKeyboard.get('mark')
             if c == '~':
