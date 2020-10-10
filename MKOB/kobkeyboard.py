@@ -53,7 +53,7 @@ def keyboard_send():
             c = kw.txtKeyboard.get('mark')
             if c == '~':
                 kw.varCircuitCloser.set(0)
-            code = km.mySender.encode(c)
+            code = km.Sender.encode(c)
             km.from_keyboard(code)
             if c == '+':
                 kw.varCircuitCloser.set(1)

@@ -36,20 +36,28 @@ The information is recorded in packets in a JSON structure that includes:
 5. Code type
 6. Code Sequence (key timing information)
 
-Though the name of the class is `recorder` it is typical that a 'recorder' can also 
-play back. For example, a 'tape recorder', a 'video casset recorder (VCR)', 
-a 'digital video recorder' (DVR), etc. can all play back what they (and compatible 
-devices) have recorded. This class is no exception. It provides methods to play back 
+Though the name of the class is `recorder` it is typical that a 'recorder' can also
+play back. For example, a 'tape recorder', a 'video casset recorder (VCR)',
+a 'digital video recorder' (DVR), etc. can all play back what they (and compatible
+devices) have recorded. This class is no exception. It provides methods to play back
 recordings in addition to making recordings.
 
 """
-
 import json
 import time
 from datetime import datetime
 from pykob import config, kob
 
-def getTimestamp():
+@unique
+class PlaybackState(IntEnum):
+    """
+    The current state of recording playback.
+    """
+    idle = 0
+    playing = 3
+    paused = 4
+
+def get_timestamp():
     """
     Return the current  millisecond timestamp.
 
@@ -62,48 +70,103 @@ def getTimestamp():
     return ts
     
 class Recorder:
-    def __init__(self, target_file_path, source_file_path, station_id="", wire=-1):
+    """
+    Recorder class provides functionality to record and playback a code stream.
+    """
+
+    def __init__(self, target_file_path=None, source_file_path=None, \
+            station_id="", wire=-1, station_id_callback=None, wire_callback=None):
         self.__target_file_path = target_file_path
         self.__source_file_path = source_file_path
         self.__station_id = station_id
         self.__wire = wire
+        self.__station_id_callback = station_id_callback
+        self.__wire_callback = wire_callback
 
-        # Test that we can access the files with appropriate access
-        if (self.__source_file_path == None and self.__target_file_path == None):
-            raise ValueError("Source File Path and Target File Path are both 'None'. At least one must be specified.")
-        if self.__source_file_path:
-            # Open to read
-            self.__source_file = None # ZZZ open for reading or throw an error
+    @property
+    def station_id_callback(self):
+        """
+        The callback called for each station ID played.
+        """
+        return __station_id_callback
+
+    @station_id_callback.setter
+    def station_id_callback(self, station_id_callback):
+        """
+        Set the Station ID callback called for each station ID while the 
+        recording is played back.
+        """
+        self.__station_id_callback = station_id_callback
+
+    @property
+    def wire_callback(self):
+        return self.__wire_callback
+    
+    @wire_callback.setter
+    def wire_callback(self, wire_callback):
+        self.__wire_callback = wire_callback
 
     @property
     def source_file_path(self):
+        """
+        The path to the source file used to play back a code sequence stored in PyKOB JSON format.
+        """
         return self.__source_file_path
+
+    @source_file_path.setter
+    def source_file_path(self, path):
+        """
+        Set the source file path.
+        """
+        self.__source_file_path = path
 
     @property
     def target_file_path(self):
+        """
+        The path to the target file used to record a code sequence in PyKOB JSON format.
+        """
         return self.__target_file_path
+
+    @target_file_path.setter
+    def target_file_path(self, target_file_path):
+        """
+        Set the target file path to record to.
+        """
+        self.__target_file_path = target_file_path
 
     @property
     def station_id(self):
+        """
+        The Station ID.
+        """
         return self.__station_id
 
     @station_id.setter
     def station_id(self, station_id):
+        """
+        Set the Station ID.
+        """
         self.__station_id = station_id
 
     @property
     def wire(self):
+        """
+        The Wire.
+        """
         return self.__wire
 
     @wire.setter
     def wire(self, wire):
+        """
+        Set the Wire.
+        """
         self.__wire = wire
 
     def record(self, code, source):
         """
         Record a code sequence in JSON format with additional context information.
         """
-        timestamp = getTimestamp()
+        timestamp = get_timestamp()
         data = {
             "ts":timestamp,
             "w":self.__wire,
@@ -115,24 +178,39 @@ class Recorder:
             json.dump(data, fp)
             fp.write('\n')
 
-    def playback(self, kob, list_data=False, max_silence=0, speed_factor=100):
+    def playback(self, list_data=False, max_silence=0, speed_factor=100, 
+            code_callback=None, station_callback=None, wire_callback=None):
         """
         Play a recording to the configured sounder.
         """
         lts = -1 # Keep the last timestamp
+        lstation = None
+        lwire = None
         with open(self.__source_file_path, "r") as fp:
             for line in fp:
                 data = json.loads(line)
                 code = data['c']
                 ts = data['ts']
+                wire = data['w']
+                station = data['s']
+                if not wire == lwire:
+                    lwire = wire
+                    if wire_callback:
+                        wire_callback(wire)
+                if not station == lstation:
+                    lstation = station
+                    if station_callback:
+                        station_callback(station)
                 if lts < 0:
-                    lst = ts
+                    lts = ts
                 if list_data:
                     dateTime = datetime.fromtimestamp(ts / 1000.0)
                     dateTimeStr = str(dateTime.ctime()) + ": "
                     print(dateTimeStr, line, end='')
                 if code == []:  # Ignore empty code packets
                     continue
+                self.__wire = data['w']
+                self.__station_id = data['s']
                 codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
                 # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
                 # However the way `KOB.sounder` handles longer pauses, although it makes sense for
@@ -149,11 +227,20 @@ class Recorder:
                     code[0] = -1  # Remove pause from code sequence since it's already handled
                 if speed_factor != 100:
                     sf = 1.0 / (speed_factor / 100.0)
-                    for i in range(len(code)):
-                        if code[i] < 0 or code[i] > 2:
-                            code[i] = round(sf * code[i])
-                kob.sounder(code)
+                    for c in code:
+                        if c < 0 or c > 2:
+                            c = round(sf * c)
+                if code_callback:
+                    self.code_callback(code)
                 lts = ts
+
+    def resume_playback():
+        """
+        Resume a paused playback.
+
+        The `playback` method must have been called to set up the necessary state.
+        """
+
 
 
 """
@@ -163,19 +250,19 @@ if __name__ == "__main__":
     # Self-test
     from pykob import morse
 
-    test_target_filename = "test." + str(getTimestamp()) + ".json"
+    test_target_filename = "test." + str(get_timestamp()) + ".json"
     myRecorder = Recorder(test_target_filename, test_target_filename, station_id="Test Recorder", wire=-1)
     mySender = morse.Sender(20)
 
     # 'HI' at 20 wpm as a test
     print("HI")
-    code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
+    codesequence = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
             -180, +60, -60, +60, -1000, +1)
-    myRecorder.record(code, kob.CodeSource.local)
+    myRecorder.record(codesequence, kob.CodeSource.local)
     # Append more text to the same file
     for c in "This is a test":
-        code = mySender.encode(c, True)
-        myRecorder.record(code, kob.CodeSource.local)
+        codesequence = mySender.encode(c, True)
+        myRecorder.record(codesequence, kob.CodeSource.local)
     print()
     # Play the file
     myKOB = kob.KOB(port=None, audio=True)

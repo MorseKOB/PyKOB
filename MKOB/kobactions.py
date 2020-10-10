@@ -30,6 +30,7 @@ Handle actions for controls on main MKOB window
 
 import tkinter as tk
 import tkinter.messagebox as mb
+import tkinter.filedialog as fd
 import time
 from pykob import config, kob, internet, morse
 import kobconfig as kc
@@ -56,6 +57,11 @@ def doFileOpen():
 
 def doFilePlay():
     print("Play a file...")
+    pf = fd.askopenfilename()
+    print(" File: ", pf)
+    if km.Recorder:
+        km.Recorder.source_file_path = pf
+        km.Recorder.playback(km.KOB, list_data=True, max_silence=5)
     
 def doFileExit():
     kw.root.destroy()
@@ -72,7 +78,7 @@ def doOfficeID(event):
     kc.OfficeID = kw.varOfficeID.get()
     config.set_station(kc.OfficeID)
     config.save_config()
-    km.myInternet.set_officeID(kc.OfficeID)
+    km.Internet.set_officeID(kc.OfficeID)
 
 def doCircuitCloser():
     km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
@@ -81,9 +87,9 @@ def doWPM(event=None):
     kc.WPM = int(kw.spnWPM.get())
     config.set_text_speed(kw.spnWPM.get())
     config.save_config()
-    km.mySender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
+    km.Sender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
             codeType=kc.CodeType, spacing=kc.Spacing)
-    km.myReader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
+    km.Reader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
             callback=km.readerCallback)
 
 def doWireNo(event=None):
