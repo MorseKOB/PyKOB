@@ -105,10 +105,6 @@ class KOBWindow:
                 frm2, width=40, height=5, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
-        self.txtKeyboard.tag_config('highlight', underline=1)
-        self.txtKeyboard.mark_set('mark', '0.0')
-        self.txtKeyboard.mark_gravity('mark', 'left')
-        self.txtKeyboard.tag_add('highlight', 'mark')
         self.txtKeyboard.focus_set()
         
         # station list
@@ -146,12 +142,10 @@ class KOBWindow:
         self.varCodeSenderOn = tk.IntVar()
         chkCodeSenderOn = tk.Checkbutton(
                 lfm2, text='On', variable=self.varCodeSenderOn)
-        chkCodeSenderOn.config(state='disabled')  # TODO: temporary
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderRepeat = tk.IntVar()
         chkCodeSenderRepeat = tk.Checkbutton(
                 lfm2, text='Repeat', variable=self.varCodeSenderRepeat)
-        chkCodeSenderRepeat.config(state='disabled')  # TODO: temporary
         chkCodeSenderRepeat.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect

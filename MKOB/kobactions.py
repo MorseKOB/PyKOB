@@ -108,7 +108,7 @@ def doConnect():
 def codereader_append(s):
     """append a string to the code reader window"""
     kw.txtReader.insert('end', s)
-    kw.txtReader.yview_moveto(1)
+    kw.txtReader.see('end')
 
 def event_escape(event):
     """toggle Circuit Closer and regain control of the wire"""

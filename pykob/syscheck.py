@@ -40,6 +40,13 @@ except:
     print('PyKOB not installed')
 
 try:
+    import pyaudio
+    pa = pyaudio.PyAudio()
+    print('PyAudio ' + pyaudio.get_portaudio_version_text())
+except:
+    print('PyAudio not installed')
+
+try:
     import serial
     print('pySerial ' + serial.VERSION)
     import serial.tools.list_ports
@@ -47,11 +54,3 @@ try:
         print(p[1])
 except:
     print('pySerial not installed')
-
-try:
-    import pyaudio
-    pa = pyaudio.PyAudio()
-    print('PyAudio ' + pyaudio.get_portaudio_version_text())
-except:
-    print('PyAudio not installed')
-

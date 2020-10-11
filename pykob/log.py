@@ -37,7 +37,7 @@ def log(type, msg, dt=None):
 
 def logErr(msg):
     dt = str(datetime.datetime.now())[:19]
-    log('ERROR', msg, dt) # Output to the normap output
+    log('ERROR', msg, dt) # Output to the normal output
     sys.stderr.write('{0} \t{1}: \t{2}\n'.format(dt, type, msg))
     sys.stderr.flush()
     
@@ -51,4 +51,3 @@ def info(msg):
 def err(msg):
     typ, val, trc = sys.exc_info()
     log('ERROR', '{0}: \t({1})'.format(msg, val))
-
