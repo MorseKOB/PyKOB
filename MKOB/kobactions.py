@@ -60,8 +60,9 @@ def doFilePlay():
     pf = fd.askopenfilename()
     print(" File: ", pf)
     if km.Recorder:
+        km.disconnect()
         km.Recorder.source_file_path = pf
-        km.Recorder.playback(km.KOB, list_data=True, max_silence=5)
+        km.Recorder.playback_start(list_data=True, max_silence=5)
     
 def doFileExit():
     kw.root.destroy()
@@ -109,8 +110,25 @@ def codereader_append(s):
     kw.txtReader.insert('end', s)
     kw.txtReader.yview_moveto(1)
 
-def escape(event):
+def event_escape(event):
     """toggle Circuit Closer and regain control of the wire"""
     kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
     doCircuitCloser()
     km.reset_wire_state()  # regain control of the wire
+
+def event_playback_pauseresume(event):
+    """
+    Pause/Resume a recording if currently playing/paused.
+
+    This does not play 'from scratch'. A playback must have been started 
+    for this to have any effect.
+    """
+    if km.Recorder:
+        km.Recorder.playback_pause_resume()
+
+def event_playback_stop(event):
+    """
+    Stop playback of a recording if playing.
+    """
+    if km.Recorder:
+        km.Recorder.playback_stop()

@@ -42,7 +42,9 @@ class KOBWindow:
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(MKOB_VERSION_TEXT)
-        root.bind_all('<KeyPress-Escape>', ka.escape)
+        root.bind_all('<KeyPress-Escape>', ka.event_escape)
+        root.bind_all('<Control-KeyPress-s>', ka.event_playback_stop)
+        root.bind_all('<Control-KeyPress-p>', ka.event_playback_pauseresume)
         ka.kw = self
         
         # File menu

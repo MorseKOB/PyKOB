@@ -111,7 +111,18 @@ def from_internet(code):
         else:
             internet_active = True
 
+def from_recorder(code):
+    """handle inputs received from the recorder during playback"""
+    if connected:
+        disconnect()
+    KOB.sounder(code)
+    Reader.decode(code)
+
 def wire_callback(wireChange):
+    """
+    Update the wire textbox, but don't save it to the configuration.
+    """
+    
 
 def from_circuit_closer(state):
     """handle change of Circuit Closer state"""
@@ -131,7 +142,14 @@ def from_circuit_closer(state):
         Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
-        
+
+def disconnect():
+    """
+    Disconnect if connected.
+    """
+    if connected:
+        toggle_connect()
+
 def toggle_connect():
     """connect or disconnect when user clicks on the Connect button"""
     global local_loop_active, internet_active
@@ -233,8 +251,7 @@ ts = recorder.get_timestamp()
 dt = datetime.fromtimestamp(ts / 1000.0)
 print(dt.year, dt.month, dt.day, '-', dt.hour, dt.min, dt.second)
 dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
-
 targetFileName = "Session-" + dateTimeStr + ".json"
 log.info("Record to '{}'".format(targetFileName))
-Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo)
+Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, code_callback=from_recorder, station_id_callback=update_sender)
 kobkeyboard.init()
