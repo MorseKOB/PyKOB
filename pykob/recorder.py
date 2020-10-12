@@ -254,8 +254,10 @@ class Recorder:
         with open(self.__source_file_path, "r") as fp:
             for line in fp:
                 if self.__stop_playback.is_set():
+                    # Playback stop was requested
                     self.__playback_state = PlaybackState.idle
-                    return # Playback stop was requested
+                    self.__resume_playback.clear()
+                    return
                 data = json.loads(line)
                 code = data['c']
                 ts = data['ts']
@@ -277,22 +279,25 @@ class Recorder:
                 # real-time transmissions, is flawed for playback. Better to handle long pauses here.
                 # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
                 # handling in `KOB.sounder`.
-                if codePause > 1.0 and codePause < 32.767 and self.__playback_state == PlaybackState.playing:
+                if codePause > 2.0 and codePause < 32.767 and self.__playback_state == PlaybackState.playing:
                     # For very long delays, sleep a maximum of `max_silence` seconds
                     pause = round((ts - self.__pblts)/1000, 4)
                     if self.__max_silence > 0 and pause > self.__max_silence:
                         print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
                         pause = self.__max_silence
-                    time.sleep(pause)
-                    code[0] = -1  # Remove pause from code sequence since it's already handled
+                    pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
+                    if pause > 0:
+                        time.sleep(pause)
+                    code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is already handled
                 while self.__playback_state == PlaybackState.paused:
                     self.__resume_playback.wait() # Wait for playback to be resumed
                     if self.__stop_playback.is_set(): # See if we should stop
                         self.__playback_state = PlaybackState.idle
+                        self.__resume_playback.clear()
                         return
                     self.__playback_state = PlaybackState.playing
 
-                if self.__speed_factor != 100:
+                if not self.__speed_factor == 100:
                     sf = 1.0 / (self.__speed_factor / 100.0)
                     for c in code:
                         if c < 0 or c > 2:
