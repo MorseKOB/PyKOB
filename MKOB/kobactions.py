@@ -32,7 +32,7 @@ import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.filedialog as fd
 import time
-from pykob import config, kob, internet, morse
+from pykob import config, kob, internet, morse, recorder
 import kobconfig as kc
 import kobmain as km
 import kobstationlist as ks
@@ -58,7 +58,7 @@ def doFileOpen():
 def doFilePlay():
     print("Play a file...")
     pf = fd.askopenfilename()
-    print(" File: ", pf)
+    print(" Play: ", pf)
     if km.Recorder:
         km.disconnect()
         km.Recorder.source_file_path = pf
@@ -101,6 +101,9 @@ def doWireNo(event=None):
         km.change_wire()
 
 def doConnect():
+    if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:
+        return # If the recorder is playing a recording to not allow connection
+
     km.toggle_connect()
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)

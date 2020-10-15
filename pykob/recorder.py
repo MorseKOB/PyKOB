@@ -78,28 +78,55 @@ class Recorder:
     """
 
     def __init__(self, target_file_path=None, source_file_path=None, \
-            station_id="", wire=-1, code_callback=None, station_id_callback=None, wire_callback=None):
+            station_id="", wire=-1, \
+            play_code_callback=None, \
+            play_finished_callback=None, \
+            play_station_id_callback=None, \
+            play_wire_callback=None, \
+            play_station_list_callback=None):
         self.__target_file_path = target_file_path
         self.__source_file_path = source_file_path
         self.__station_id = station_id
         self.__wire = wire
-        self.__code_callback = code_callback
-        self.__station_id_callback = station_id_callback
-        self.__wire_callback = wire_callback
+
+        self.__play_code_callback = play_code_callback
+        self.__play_finished_callback = play_finished_callback
+        self.__play_station_id_callback = play_station_id_callback
+        self.__play_station_list_callback = play_station_list_callback
+        self.__play_wire_callback = play_wire_callback
+
         self.__playback_state = PlaybackState.idle
         self.__pblts = -1 # Playback last timestamp
+
         self.__playback_thread = None
+
         self.__resume_playback = threading.Event()
         self.__stop_playback = threading.Event()
+
         self.__playback_code = None
         self.__list_data = False
         self.__max_silence = 0
         self.__speed_factor = 100
-#        if code_callback:
-#            self.__playback_code = queue.Queue() # FIFO queue to hold code as it's read for playback
-#            self.__playbackThread = threading.Thread(target=self.callbackPlay)
-#            self.__playbackThread.daemon = True
-#            self.__playbackThread.start()
+
+        # Information about the current playback file
+        self.__p_lines = 0          # Number of lines in the file
+        self.__p_fts = 0            # First (earliest) timestamp
+        self.__p_lts = 0            # Last (latest) timestamp
+        self.__p_stations = set()   # Set of all stations in the recording
+
+    @property
+    def playback_stations(self):
+        """
+        Set of the stations contained in the recording being played.
+        """
+        return self.__p_stations
+
+    @property
+    def playback_state(self):
+        """
+        The current PlaybackState.
+        """
+        return self.__playback_state
 
     @property
     def source_file_path(self):
@@ -143,8 +170,8 @@ class Recorder:
         """
         if self.__station_id != station_id:
             self.__station_id = station_id
-            if self.__station_id_callback:
-                self.__station_id_callback(station_id)
+            if self.__play_station_id_callback:
+                self.__play_station_id_callback(station_id)
 
     @property
     def wire(self):
@@ -160,8 +187,8 @@ class Recorder:
         """
         if self.__wire != wire:
             self.__wire = wire
-            if self.__wire_callback:
-                self.__wire_callback(wire)
+            if self.__play_wire_callback:
+                self.__play_wire_callback(wire)
 
     def record(self, code, source, wire=None, station_id=None):
         """
@@ -228,84 +255,120 @@ class Recorder:
             self.__playback_thread = None
             self.__stop_playback.set()
             self.__resume_playback.set() # Set resume flag incase playback was paused
-            pt.join()
-            self.__resume_playback.clear()
-            self.__stop_playback.clear()
+#            pt.join()
+#            self.__resume_playback.clear()
+#            self.__stop_playback.clear()
 
     def playback_start(self, list_data=False, max_silence=0, speed_factor=100):
         """
         Play a recording to the configured sounder.
         """
         self.playback_stop()
+        self.__resume_playback.clear()
+        self.__stop_playback.clear()
+
         #
-        self.__list_data = list_data
-        self.__max_silence = max_silence
-        self.__speed_factor = speed_factor
-        self.__playback_thread = threading.Thread(target=self.callbackPlay)
-        self.__playback_thread.start()
-
-    def callbackPlay(self):
-        self.__pblts = -1 # Keep the last timestamp
-
-        if not self.source_file_path:
-            return
-
-        self.__playback_state = PlaybackState.playing
+        # Get information from the current playback recording file.
         with open(self.__source_file_path, "r") as fp:
+            self.__p_fts = -1
+            self.__p_lts = 0
+            self.__p_stations.clear()
             for line in fp:
-                if self.__stop_playback.is_set():
-                    # Playback stop was requested
-                    self.__playback_state = PlaybackState.idle
-                    self.__resume_playback.clear()
-                    return
                 data = json.loads(line)
-                code = data['c']
                 ts = data['ts']
                 wire = data['w']
                 station = data['s']
-                if self.__pblts < 0:
-                    self.__pblts = ts
-                if self.__list_data:
-                    dateTime = datetime.fromtimestamp(ts / 1000.0)
-                    dateTimeStr = str(dateTime.ctime()) + ": "
-                    print(dateTimeStr, line, end='')
-                if code == []:  # Ignore empty code packets
-                    continue
-                self.wire = wire
-                self.station_id = station
-                codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
-                # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
-                # However the way `KOB.sounder` handles longer pauses, although it makes sense for
-                # real-time transmissions, is flawed for playback. Better to handle long pauses here.
-                # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
-                # handling in `KOB.sounder`.
-                if codePause > 2.0 and codePause < 32.767 and self.__playback_state == PlaybackState.playing:
-                    # For very long delays, sleep a maximum of `max_silence` seconds
-                    pause = round((ts - self.__pblts)/1000, 4)
-                    if self.__max_silence > 0 and pause > self.__max_silence:
-                        print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
-                        pause = self.__max_silence
-                    pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
-                    if pause > 0:
-                        time.sleep(pause)
-                    code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is already handled
-                while self.__playback_state == PlaybackState.paused:
-                    self.__resume_playback.wait() # Wait for playback to be resumed
-                    if self.__stop_playback.is_set(): # See if we should stop
+                ts = data['ts']
+                station = data['s']
+                # Get the first and last timestamps from the recording
+                if self.__p_fts == -1 or ts < self.__p_fts:
+                    self.__p_fts = ts # Set the 'first' timestamp
+                if self.__p_lts < ts:
+                    self.__p_lts = ts
+                # Generate the station list from the recording
+                self.__p_stations.add(station)
+        self.__list_data = list_data
+        self.__max_silence = max_silence
+        self.__speed_factor = speed_factor
+        self.__playback_thread = threading.Thread(name='Recorder-Playback', daemon=True, target=self.callbackPlay)
+        self.__playback_thread.start()
+
+    def callbackPlay(self):
+        """
+        Called by the playback thread `run` to playback recorded code.
+        """
+        self.__pblts = -1 # Keep the last timestamp
+
+        try:
+            if not self.source_file_path:
+                return
+
+            self.__playback_state = PlaybackState.playing
+            #
+            # With the information from the recording, call the station callback (if set)
+            print('Stations in recording:')
+            for s in self.__p_stations:
+                print(' Station: ', s)
+                if self.__play_station_list_callback:
+                    self.__play_station_list_callback(s)
+            with open(self.__source_file_path, "r") as fp:
+                for line in fp:
+                    if self.__stop_playback.is_set():
+                        # Playback stop was requested
                         self.__playback_state = PlaybackState.idle
                         self.__resume_playback.clear()
                         return
-                    self.__playback_state = PlaybackState.playing
+                    data = json.loads(line)
+                    code = data['c']        # Code sequence
+                    ts = data['ts']         # Timestamp
+                    wire = data['w']        # Wire number
+                    station = data['s']     # Station ID
+                    source = data['o']      # Source/Origin (numeric value from kob.CodeSource)
+                    if self.__pblts < 0:
+                        self.__pblts = ts
+                    if self.__list_data:
+                        dateTime = datetime.fromtimestamp(ts / 1000.0)
+                        dateTimeStr = str(dateTime.ctime()) + ": "
+                        print(dateTimeStr, line, end='')
+                    if code == []:  # Ignore empty code packets
+                        continue
+                    self.wire = wire
+                    self.station_id = station
+                    codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                    # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
+                    # However the way `KOB.sounder` handles longer pauses, although it makes sense for
+                    # real-time transmissions, is flawed for playback. Better to handle long pauses here.
+                    # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
+                    # handling in `KOB.sounder`.
+                    if codePause > 2.0 and codePause < 32.767 and self.__playback_state == PlaybackState.playing:
+                        # For very long delays, sleep a maximum of `max_silence` seconds
+                        pause = round((ts - self.__pblts)/1000, 4)
+                        if self.__max_silence > 0 and pause > self.__max_silence:
+                            print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
+                            pause = self.__max_silence
+                        pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
+                        if pause > 0:
+                            time.sleep(pause)
+                        code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is already handled
+                    while self.__playback_state == PlaybackState.paused:
+                        self.__resume_playback.wait() # Wait for playback to be resumed
+                        if self.__stop_playback.is_set(): # See if we should stop
+                            self.__playback_state = PlaybackState.idle
+                            self.__resume_playback.clear()
+                            return
+                        self.__playback_state = PlaybackState.playing
 
-                if not self.__speed_factor == 100:
-                    sf = 1.0 / (self.__speed_factor / 100.0)
-                    for c in code:
-                        if c < 0 or c > 2:
-                            c = round(sf * c)
-                if self.__code_callback:
-                    self.__code_callback(code)
-                self.__pblts = ts
-
+                    if not self.__speed_factor == 100:
+                        sf = 1.0 / (self.__speed_factor / 100.0)
+                        for c in code:
+                            if c < 0 or c > 2:
+                                c = round(sf * c)
+                    if self.__play_code_callback:
+                        self.__play_code_callback(code)
+                    self.__pblts = ts
+        finally:
+            if self.__play_finished_callback:
+                self.__play_finished_callback()
 
 """
 Test code

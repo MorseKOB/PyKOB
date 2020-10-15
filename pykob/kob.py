@@ -52,6 +52,7 @@ if sys.platform == 'win32':
 class CodeSource(IntEnum):
     local = 1
     wire = 2
+    player = 3
 
 class KOB:
     def __init__(
@@ -84,9 +85,8 @@ class KOB:
                 self.setSounder(self.keyState)
         self.recorder = None
         if self.callback:
-            callbackThread = threading.Thread(target=self.callbackRead)
-            callbackThread.daemon = True
-            callbackThread.start()
+            keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackRead)
+            keyreadThread.start()
 
     @property
     def recorder(self):
@@ -99,6 +99,9 @@ class KOB:
         self.__recorder = recorder
 
     def callbackRead(self):
+        """
+        Called by the KeyRead thread `run` to read code from the key.
+        """
         while True:
             code = self.key()
             self.callback(code)
@@ -139,7 +142,7 @@ class KOB:
         if self.t0 < 0:  ### ZZZ capture start time
             self.t0 = time.time()  ### ZZZ
 ##        print("KOB.sounder", round(time.time()-self.t0, 3), code)  ### ZZZ
-        if self.__recorder:
+        if self.__recorder and not code_source == CodeSource.player:
             self.__recorder.record(code_source, code)
         for c in code:
             t = time.time()

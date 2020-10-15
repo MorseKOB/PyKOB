@@ -111,8 +111,10 @@ def from_internet(code):
         else:
             internet_active = True
 
-def from_recorder(code):
-    """handle inputs received from the recorder during playback"""
+def from_recorder(code, source=None):
+    """
+    handle inputs received from the recorder during playback.
+    """
     if connected:
         disconnect()
     KOB.sounder(code)
@@ -205,6 +207,12 @@ def update_sender(id):
         if Recorder:
             Recorder.station_id = sender_ID
 
+def add_to_sender_list(sender):
+    """
+    Add a sender to the sender list.
+    """
+
+
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
     if kc.CodeType == config.CodeType.american:
@@ -253,5 +261,8 @@ print(dt.year, dt.month, dt.day, '-', dt.hour, dt.min, dt.second)
 dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
 targetFileName = "Session-" + dateTimeStr + ".json"
 log.info("Record to '{}'".format(targetFileName))
-Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, code_callback=from_recorder, station_id_callback=update_sender)
+Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
+    code_callback=from_recorder, \
+    station_id_callback=update_sender, \
+    station_list_callback=kobstationlist.new_sender)
 kobkeyboard.init()
