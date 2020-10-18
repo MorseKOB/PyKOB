@@ -113,18 +113,20 @@ def from_internet(code):
 
 def from_recorder(code, source=None):
     """
-    handle inputs received from the recorder during playback.
+    Handle inputs received from the recorder during playback.
     """
     if connected:
         disconnect()
     KOB.sounder(code)
     Reader.decode(code)
 
-def wire_callback(wireChange):
+def recorder_wire_callback(wire):
     """
-    Update the wire textbox, but don't save it to the configuration.
+    Called from the recorder playback when a wire changes for a sender.
     """
-    
+    Reader.flush()
+    ka.codereader_append("\n\n<<{}>>".format(wire))
+
 
 def from_circuit_closer(state):
     """handle change of Circuit Closer state"""
@@ -264,5 +266,6 @@ log.info("Record to '{}'".format(targetFileName))
 Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
     play_code_callback=from_recorder, \
     play_station_id_callback=update_sender, \
-    play_station_list_callback=kobstationlist.refresh_stations)
+    play_station_list_callback=kobstationlist.refresh_stations, \
+    play_wire_callback=recorder_wire_callback)
 kobkeyboard.init()
