@@ -27,7 +27,7 @@ kobactions.py
 
 Handle actions for controls on main MKOB window
 """
-
+import os
 import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.filedialog as fd
@@ -57,12 +57,17 @@ def doFileOpen():
 
 def doFilePlay():
     print("Play a file...")
-    pf = fd.askopenfilename()
-    print(" Play: ", pf)
-    if km.Recorder:
-        km.disconnect()
-        km.Recorder.source_file_path = pf
-        km.Recorder.playback_start(list_data=True, max_silence=5)
+    pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
+    if pf:
+        print(" Play: ", pf)
+        if km.Recorder:
+            km.disconnect()
+            km.kobstationlist.clear_station_list()
+            km.Recorder.source_file_path = pf
+            codereader_clear()
+            dirpath, filename = os.path.split(pf)
+            codereader_append('[{}]'.format(filename))
+            km.Recorder.playback_start(list_data=True, max_silence=5)
     
 def doFileExit():
     kw.root.destroy()
@@ -112,6 +117,10 @@ def codereader_append(s):
     """append a string to the code reader window"""
     kw.txtReader.insert('end', s)
     kw.txtReader.see('end')
+
+def codereader_clear():
+    """clear the code reader window"""
+    kw.txtReader.delete('1.0', 'end')
 
 def event_escape(event):
     """toggle Circuit Closer and regain control of the wire"""

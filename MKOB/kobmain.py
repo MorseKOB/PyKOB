@@ -264,5 +264,5 @@ log.info("Record to '{}'".format(targetFileName))
 Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
     play_code_callback=from_recorder, \
     play_station_id_callback=update_sender, \
-    play_station_list_callback=kobstationlist.new_sender)
+    play_station_list_callback=kobstationlist.refresh_stations)
 kobkeyboard.init()
