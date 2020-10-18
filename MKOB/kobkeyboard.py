@@ -34,7 +34,7 @@ import kobactions as ka
 import kobmain as km
 
 def init():
-    keyboard_send_thread = threading.Thread(target=keyboard_send)
+    keyboard_send_thread = threading.Thread(name='Keyboard-Send', target=keyboard_send)
     keyboard_send_thread.daemon = True
     keyboard_send_thread.start()
 
@@ -57,7 +57,7 @@ def keyboard_send():
             c = kw.txtKeyboard.get('mark')
             if c == '~':
                 kw.varCircuitCloser.set(0)
-            code = km.mySender.encode(c)
+            code = km.Sender.encode(c)
             km.from_keyboard(code)
             if c == '+':
                 kw.varCircuitCloser.set(1)

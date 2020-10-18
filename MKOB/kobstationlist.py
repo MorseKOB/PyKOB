@@ -38,9 +38,6 @@ station_ID_times = []
 def refresh_stations(id):
     """update the station list when an ID is sent or received"""
     global station_ID_list, station_ID_times
-    if not km.connected:
-        clear_station_list()
-        return
     try:
         i = station_ID_list.index(id)
     except:
@@ -53,9 +50,6 @@ def refresh_stations(id):
 def new_sender(id):
     """update the station list when a new sender is detected"""
     global station_ID_list, station_ID_times
-    if not km.connected:
-        clear_station_list()
-        return
     try:
         i = station_ID_list.index(id)
         station_ID_list.pop(i)

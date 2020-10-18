@@ -37,6 +37,7 @@ import kobwindow
 VERSION = "4.0.13"
 MKOB_VERSION_TEXT = "MorseKOB " + VERSION
 print(MKOB_VERSION_TEXT)
+print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     root = tk.Tk()

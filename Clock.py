@@ -177,7 +177,7 @@ try:
 
     myRecorder = None
     if (args.Record):
-        ts = recorder.getTimestamp()
+        ts = recorder.get_timestamp()
         targetFileName = "Clock." + str(ts) + ".json"
         myRecorder = recorder.Recorder(targetFileName, None, station_id="Clock")
     
