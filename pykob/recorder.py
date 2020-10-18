@@ -197,14 +197,12 @@ class Recorder:
         """
         if self.__playback_state == PlaybackState.idle: # Only record if not playing back a recording
             timestamp = get_timestamp()
-            if wire:
-                self.wire(wire)
-            if station_id:
-                self.station_id(station_id)
+            self.wire(wire)
+            self.station_id(station_id)
             data = {
                 "ts":timestamp,
-                "w":self.__wire,
-                "s":self.__station_id,
+                "w":self.wire,
+                "s":self.station_id,
                 "o":source,
                 "c":code
             }
@@ -264,6 +262,8 @@ class Recorder:
         self.playback_stop()
         self.__playback_resume_flag.clear()
         self.__playback_stop_flag.clear()
+        self.__station_id = None
+        self.__wire = None
 
         #
         # Get information from the current playback recording file.
@@ -376,6 +376,7 @@ class Recorder:
         finally:
             if self.__play_finished_callback:
                 self.__play_finished_callback()
+            print("Playback done.")
 
     def callbackPlayStationList(self):
         """

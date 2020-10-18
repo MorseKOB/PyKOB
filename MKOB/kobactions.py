@@ -65,6 +65,7 @@ def doFilePlay():
             km.kobstationlist.clear_station_list()
             km.Recorder.source_file_path = pf
             codereader_clear()
+            km.sender_ID = None
             dirpath, filename = os.path.split(pf)
             codereader_append('[{}]'.format(filename))
             km.Recorder.playback_start(list_data=True, max_silence=5)
