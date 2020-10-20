@@ -171,7 +171,7 @@ class Recorder:
         """
         if self.__station_id != station_id:
             self.__station_id = station_id
-            if self.__play_station_id_callback:
+            if self.__play_station_id_callback and not self.playback_state == PlaybackState.idle:
                 self.__play_station_id_callback(station_id)
 
     @property
@@ -188,7 +188,7 @@ class Recorder:
         """
         if self.__wire != wire:
             self.__wire = wire
-            if self.__play_wire_callback:
+            if self.__play_wire_callback and not self.playback_state == PlaybackState.idle:
                 self.__play_wire_callback(wire)
 
     def record(self, code, source):
