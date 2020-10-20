@@ -105,6 +105,8 @@ def doWireNo(event=None):
     config.save_config()
     if km.connected:
         km.change_wire()
+    if km.Recorder:
+        km.Recorder.wire = kc.WireNo
 
 def doConnect():
     if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:

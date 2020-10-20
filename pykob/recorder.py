@@ -77,8 +77,8 @@ class Recorder:
     Recorder class provides functionality to record and playback a code stream.
     """
 
-    def __init__(self, target_file_path=None, source_file_path=None, \
-            station_id="", wire=-1, \
+    def __init__(self, target_file_path:str=None, source_file_path:str=None, \
+            station_id:str="", wire:int=-1, \
             play_code_callback=None, \
             play_finished_callback=None, \
             play_station_id_callback=None, \
@@ -130,42 +130,42 @@ class Recorder:
         return self.__playback_state
 
     @property
-    def source_file_path(self):
+    def source_file_path(self) -> str:
         """
         The path to the source file used to play back a code sequence stored in PyKOB JSON format.
         """
         return self.__source_file_path
 
     @source_file_path.setter
-    def source_file_path(self, path):
+    def source_file_path(self, path: str):
         """
         Set the source file path.
         """
         self.__source_file_path = path
 
     @property
-    def target_file_path(self):
+    def target_file_path(self) -> str:
         """
         The path to the target file used to record a code sequence in PyKOB JSON format.
         """
         return self.__target_file_path
 
     @target_file_path.setter
-    def target_file_path(self, target_file_path):
+    def target_file_path(self, target_file_path: str):
         """
         Set the target file path to record to.
         """
         self.__target_file_path = target_file_path
 
     @property
-    def station_id(self):
+    def station_id(self) -> str:
         """
         The Station ID.
         """
         return self.__station_id
 
     @station_id.setter
-    def station_id(self, station_id):
+    def station_id(self, station_id: str):
         """
         Set the Station ID.
         """
@@ -175,14 +175,14 @@ class Recorder:
                 self.__play_station_id_callback(station_id)
 
     @property
-    def wire(self):
+    def wire(self) -> int:
         """
         The Wire.
         """
         return self.__wire
 
     @wire.setter
-    def wire(self, wire):
+    def wire(self, wire: int):
         """
         Set the Wire.
         """
@@ -191,14 +191,12 @@ class Recorder:
             if self.__play_wire_callback:
                 self.__play_wire_callback(wire)
 
-    def record(self, code, source, wire=None, station_id=None):
+    def record(self, code, source):
         """
         Record a code sequence in JSON format with additional context information.
         """
         if self.__playback_state == PlaybackState.idle: # Only record if not playing back a recording
             timestamp = get_timestamp()
-            self.wire(wire)
-            self.station_id(station_id)
             data = {
                 "ts":timestamp,
                 "w":self.wire,
