@@ -31,65 +31,66 @@ Manage the station list window.
 import time
 import kobactions as ka
 import kobmain as km
+from threading import RLock
 
 station_ID_list = []
 station_ID_times = []
 
+__stationlist_update_lock = RLock()
+
 def refresh_stations(id):
     """update the station list when an ID is sent or received"""
     global station_ID_list, station_ID_times
-    if not km.connected:
-        clear_station_list()
-        return
-    try:
-        i = station_ID_list.index(id)
-    except:
-        station_ID_list.append(id)
-        station_ID_times.append(0)
-        i = len(station_ID_list) - 1
-    station_ID_times[i] = time.time()
-    display_station_list()
+    with __stationlist_update_lock:
+        try:
+            i = station_ID_list.index(id)
+        except:
+            station_ID_list.append(id)
+            station_ID_times.append(0)
+            i = len(station_ID_list) - 1
+        station_ID_times[i] = time.time()
+        display_station_list()
 
 def new_sender(id):
     """update the station list when a new sender is detected"""
     global station_ID_list, station_ID_times
-    if not km.connected:
-        clear_station_list()
-        return
-    try:
-        i = station_ID_list.index(id)
-        station_ID_list.pop(i)
-        station_ID_times.pop(i)
-    except:
-        pass
-    station_ID_list.append(id)
-    station_ID_times.append(time.time())
-    display_station_list()
+    with __stationlist_update_lock:
+        try:
+            i = station_ID_list.index(id)
+            station_ID_list.pop(i)
+            station_ID_times.pop(i)
+        except:
+            pass
+        station_ID_list.append(id)
+        station_ID_times.append(time.time())
+        display_station_list()
 
 def clear_station_list():
     """reset the station list"""
     global station_ID_list, station_ID_times
-    station_ID_list = []
-    station_ID_times = []
-    ka.kw.txtStnList.delete('1.0', 'end')
+    with __stationlist_update_lock:
+        station_ID_list = []
+        station_ID_times = []
+        ka.kw.txtStnList.delete('1.0', 'end')
 
 def display_station_list():
     """purge inactive stations and display the updated station list"""
     global station_ID_list, station_ID_times
-    now = time.time()
-    # find and purge inactive stations
-    while True:
-        i = len(station_ID_list) - 1
-        while i >= 0:
-            if now > station_ID_times[i] + 60:  # inactive station
+    with __stationlist_update_lock:
+        now = time.time()
+        # find and purge inactive stations
+        while True:
+            i = len(station_ID_list) - 1
+            while i >= 0:
+                if now > station_ID_times[i] + 60:  # inactive station
+                    break
+                i -= 1
+            if i < 0:  # all stations are active
                 break
-            i -= 1
-        if i < 0:  # all stations are active
-            break
-        # purge inactive station
-        station_ID_list.pop(i)
-        station_ID_times.pop(i)
-    # display station list
-    ka.kw.txtStnList.delete('1.0', 'end')
-    for i in range(len(station_ID_list)):
-        ka.kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))
+            # purge inactive station
+            station_ID_list.pop(i)
+            station_ID_times.pop(i)
+        # display station list
+        ka.kw.txtStnList.delete('1.0', 'end')
+        for i in range(len(station_ID_list)):
+            ka.kw.txtStnList.insert('end', "{}\n".format(station_ID_list[i]))

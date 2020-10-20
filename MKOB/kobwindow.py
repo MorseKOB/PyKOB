@@ -42,7 +42,9 @@ class KOBWindow:
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(MKOB_VERSION_TEXT)
-        root.bind_all('<KeyPress-Escape>', ka.escape)
+        root.bind_all('<KeyPress-Escape>', ka.event_escape)
+        root.bind_all('<Control-KeyPress-s>', ka.event_playback_stop)
+        root.bind_all('<Control-KeyPress-p>', ka.event_playback_pauseresume)
         ka.kw = self
         
         # File menu
@@ -52,6 +54,8 @@ class KOBWindow:
         menu.add_cascade(label='File', menu=fileMenu)
         fileMenu.add_command(label='New', command=ka.doFileNew)
         fileMenu.add_command(label='Open...', command=ka.doFileOpen)
+        fileMenu.add_separator()
+        fileMenu.add_command(label='Play...', command=ka.doFilePlay)
         fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=ka.doFileExit)
 
@@ -101,10 +105,6 @@ class KOBWindow:
                 frm2, width=40, height=5, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
-        self.txtKeyboard.tag_config('highlight', underline=1)
-        self.txtKeyboard.mark_set('mark', '0.0')
-        self.txtKeyboard.mark_gravity('mark', 'left')
-        self.txtKeyboard.tag_add('highlight', 'mark')
         self.txtKeyboard.focus_set()
         
         # station list
@@ -142,12 +142,10 @@ class KOBWindow:
         self.varCodeSenderOn = tk.IntVar()
         chkCodeSenderOn = tk.Checkbutton(
                 lfm2, text='On', variable=self.varCodeSenderOn)
-        chkCodeSenderOn.config(state='disabled')  # TODO: temporary
         chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderRepeat = tk.IntVar()
         chkCodeSenderRepeat = tk.Checkbutton(
                 lfm2, text='Repeat', variable=self.varCodeSenderRepeat)
-        chkCodeSenderRepeat.config(state='disabled')  # TODO: temporary
         chkCodeSenderRepeat.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect

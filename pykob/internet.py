@@ -60,15 +60,13 @@ class Internet:
         self.rcvdSeqNo = -1
         self.tLastListener = 0.0
         self.disconnect()  # to establish a UDP connection with the server
-        keepAliveThread = threading.Thread(target=self.keepAlive)
-        keepAliveThread.daemon = True
+        keepAliveThread = threading.Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
         keepAliveThread.start()
         self.callback = callback
         self.record_callback = record_callback
         if callback or record_callback:
-            callbackThread = threading.Thread(target=self.callbackRead)
-            callbackThread.daemon = True
-            callbackThread.start()
+            internetReadThread = threading.Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
+            internetReadThread.start()
         self.ID_callback = None
         self.sender_callback = None
 
@@ -82,6 +80,9 @@ class Internet:
         self.socket.sendto(shortPacket, self.address)
 
     def callbackRead(self):
+        """
+        Called by the Internet Read thread `run` to read code from the internet connection.
+        """
         while True:
             code = self.read()
             if self.callback:

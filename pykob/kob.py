@@ -52,9 +52,12 @@ if sys.platform == 'win32':
 class CodeSource(IntEnum):
     local = 1
     wire = 2
+    player = 3
 
 class KOB:
-    def __init__(self, port=None, interfaceType=config.interface_type.loop, audio=False, callback=None):
+    def __init__(
+            self, port=None, interfaceType=config.interface_type.loop,
+            audio=False, callback=None):
         self.t0 = -1.0  ### ZZZ Keep track of when the playback started
         self.callback = callback
         if port and serialAvailable:
@@ -78,13 +81,12 @@ class KOB:
             self.keyState = self.port.dsr  # True: closed, False: open
             self.tLastKey = time.time()  # time of last key transition
             self.cktClose = self.keyState  # True: circuit latched closed
-            if self.interfaceType:
+            if self.interfaceType == config.interface_type.key_sounder:
                 self.setSounder(self.keyState)
         self.recorder = None
         if self.callback:
-            callbackThread = threading.Thread(target=self.callbackRead)
-            callbackThread.daemon = True
-            callbackThread.start()
+            keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackRead)
+            keyreadThread.start()
 
     @property
     def recorder(self):
@@ -97,6 +99,9 @@ class KOB:
         self.__recorder = recorder
 
     def callbackRead(self):
+        """
+        Called by the KeyRead thread `run` to read code from the key.
+        """
         while True:
             code = self.key()
             self.callback(code)
@@ -110,7 +115,7 @@ class KOB:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
-                if self.interfaceType:
+                if self.interfaceType == config.interface_type.key_sounder:
                     self.setSounder(s)
                 time.sleep(DEBOUNCE)
                 if s:
@@ -137,7 +142,7 @@ class KOB:
         if self.t0 < 0:  ### ZZZ capture start time
             self.t0 = time.time()  ### ZZZ
 ##        print("KOB.sounder", round(time.time()-self.t0, 3), code)  ### ZZZ
-        if self.__recorder:
+        if self.__recorder and not code_source == CodeSource.player:
             self.__recorder.record(code_source, code)
         for c in code:
             t = time.time()
@@ -150,10 +155,10 @@ class KOB:
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
-                print(
-                        "KOB.sounder buffer empty:",
-                        round(time.time()-self.t0, 3),
-                        round(dt, 3), c, code)  ### ZZZ
+##                print(
+##                        "KOB.sounder buffer empty:",
+##                        round(time.time()-self.t0, 3),
+##                        round(dt, 3), c, code)  ### ZZZ
                 self.tLastSdr = t
             else:
                 self.tLastSdr = tNext

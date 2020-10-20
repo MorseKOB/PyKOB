@@ -2,13 +2,13 @@ build*/
 dist*/
 zips/
 __pycache__/
+.vscode/
 .DS_Store
 *.log
 *.pyo
 *.pyc
 *.toc
 *.zip
-.DS_Store
 log.txt
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
