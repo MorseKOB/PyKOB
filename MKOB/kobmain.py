@@ -256,10 +256,13 @@ KOB = kob.KOB(
 Internet = internet.Internet(kc.config.station, callback=from_internet)
 Internet.monitor_IDs(kobstationlist.refresh_stations)
 Internet.monitor_sender(update_sender)
+# Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
+if config.invert_key_input:
+    print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+        "To enable/disable this setting use `Configure --iki`.")
 # ZZZ temp always enable recorder - goal is to provide menu option
 ts = recorder.get_timestamp()
 dt = datetime.fromtimestamp(ts / 1000.0)
-print(dt.year, dt.month, dt.day, '-', dt.hour, dt.min, dt.second)
 dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
 targetFileName = "Session-" + dateTimeStr + ".json"
 log.info("Record to '{}'".format(targetFileName))

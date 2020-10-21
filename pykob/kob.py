@@ -78,7 +78,7 @@ class KOB:
         self.setSounder(True)
         time.sleep(0.5)
         if self.port:
-            self.keyState = self.port.dsr  # True: closed, False: open
+            self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
             self.tLastKey = time.time()  # time of last key transition
             self.cktClose = self.keyState  # True: circuit latched closed
             if self.interfaceType == config.interface_type.key_sounder:
@@ -110,7 +110,7 @@ class KOB:
         code = ()
         while True:
             t = time.time()
-            s = not self.port.dsr # invert for RS-323 modem signal
+            s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
             if s != self.keyState:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
