@@ -33,6 +33,7 @@ import tkinter as tk
 import tkinter.scrolledtext as tkst 
 import kobactions as ka
 import kobconfig as kc
+import kobmain
 
 class KOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):       
@@ -182,3 +183,7 @@ class KOBWindow:
         self.varCodeSenderRepeat.set(kc.CodeSenderRepeat)
         self.spnWireNo.delete(0)
         self.spnWireNo.insert(tk.END, kc.WireNo)
+
+        # Now that the windows and controls are initialized, initialize the kobmain module.
+        kobmain.init()
+        

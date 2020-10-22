@@ -43,6 +43,7 @@ try:
     root = tk.Tk()
 ##    root.iconbitmap("resources/mkob.ico")  # TODO: fails with Linux
     kobwindow.KOBWindow(root, MKOB_VERSION_TEXT)
+    
     root.mainloop()
 except KeyboardInterrupt:
     print()

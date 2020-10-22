@@ -27,74 +27,15 @@ SOFTWARE.
 
 Configures system values and user preferences for the suite of PyKOB applications.
 
-Command line parameters:
-    -h | --help                        : Print help information for using the application
-    -i | --sysInfo                     : Print information about the system that relates to PyKOB
-    -p | --port <port>                 : Set the system PORT (COM or tty) value to use for a sounder
-    -L | --local <ON|OFF>              : Enable/disable local copy of code  
-    -R | --remote <ON|OFF>             : Enable/disable sending code to remote wire (over the internet)
-    -I | --interface KEY_SOUNDER|LOOP|KEYER : Set the interface type
-    -a | --sound <ON|OFF>              : Enable the computer sound to simulate a sounder
-    -A | --sounder <ON|OFF>            : Use a physical sounder (`port` must be configured)
-    -t | --textspeed wpm               : Set the text speed in words per minute
-    -c | --charspeed                   : Set the minimum character speed in words per minute (used for Farnsworth timing)
-    -s | --spacing NONE|CHAR|WORD      : Set preferance for how to apply Farnsworth spacing
-    -T | --type AMERICAN|INTERNATIONAL : Set the code type
-    -S | --station <station|NONE>      : Set preferance for the station to connect to
-    -W | --wire <wire-number>          : Set preference for wire number to connect to
-Examples:
-    configure --port COM3
-    configure --charspeed 20 -t 16 --sound ON
-
+Provides a Command Line Interface (CLI) the the pykob.config module.
 """
-import sys, getopt
+import argparse
+import sys
 from pykob import config
 
 NONE_CFG_VALUE = "NONE"
 
-def help():
-    print(" Configure settings/preferences for PyKOB")
-    print("  Usage: Configure \
-{[{-h|--help} | \
-{-i|--sysInfo} \
-{-p|--port port} \
-{-t|--textspeed n} \
-{-c|--charspeed n} \
-{-I|--interface KEY_SOUNDER|LOOP|KEYER} \
-{-a|--sound ON|OFF} \
-{-A|--sounder ON|OFF} \
-{-L|--local ON|OFF} \
-{-R|--remote ON|OFF} \
-{-s|--spacing NONE|CHAR|WORD} \
-{-T|--type type} \
-{-S|--station station|NONE} \
-{-W|--wire n} \
-]}")
-    print("      Values are:")
-    print("          -h | --help:                             Print this help message.")
-    print("")
-    print("          -i | --sysInfo:                          Print information about the system that relates to MorseKOB")
-    print("")
-    print("          -p | --port <serial_port|NONE>:          Set the serial communication port for the interface.")
-    print("")
-    print("          -t | --textspeed <words_per_minute>:     Set the overall code speed in WPM.")
-    print("          -c | --charspeed <words_per_minute>:     Set the minimum character speed in WPM (used for Farnsworth timing).")
-    print("          -I | --interface KEY_SOUNDER|LOOP|KEYER  Set the interface type.")
-    print("          -a | --sound ON|OFF:                     Set preference for using the computer sound to simulate a sounder.")
-    print("          -A | --sounder ON|OFF:                   Set preference for using a physical sounder ('PORT' must be configured).")
-    print("          -L | --local ON|OFF:                     Produce local copy of generated/transmitted text.")
-    print("          -R | --remote ON|OFF:                    Transmit over the internet on the specified wire.")
-    print("          -s | --spacing NONE|CHAR|WORD:           How to apply Farnsworth spacing.")
-    print("          -T | --type AMERICAN|INTERNATIONAL:      Set the code type.")
-    print("          -S | --station <station|NONE>:           Set the Station ID.")
-    print("          -W | --wire <wire-number>:               Set the Wire number to connect to.")
-
-def missingArgsErr(msg):
-    print(msg)
-    help()
-    exit
-
-def stringOrNone(s):
+def stringOrNone(s:str) -> str:
     """Return `None` if the value is "NONE" (case insensitive) or the value
 
     Parameters
@@ -106,7 +47,6 @@ def stringOrNone(s):
     ------
     None or `String value`
     """
-
     r = None if s.upper() == "NONE" else s
     return r
 
@@ -120,6 +60,7 @@ def main(argv):
     # System configuration
     port = None
     # User preferences
+    invert_key_input = None
     local = None
     remote = None
     interface_type = None
@@ -133,104 +74,83 @@ def main(argv):
     text_speed = None
 
     try:
-        opts, args = getopt.getopt(argv,"hp:t:c:L:R:I:a:A:s:T:S:W:i",["help", "port=", \
-            "textspeed=", "charspeed=", "local=", "remote=", "interface=", "sound=", "sounder=", "spacing=", "type=", "station=", \
-            "wire=", "sysInfo"])
-    except getopt.GetoptError as ex:
-        print(" {}".format(ex.args[0]))
-        print()
-        help()
-        sys.exit(2)
+        arg_parser = argparse.ArgumentParser(description="Display the PyKOB configuration as well as key system values. "
+            + "Allow configuration values to be set and saved.", \
+            parents=\
+            [\
+            config.code_type_override, \
+            config.interface_type_override, \
+            config.invert_key_input_override, \
+            config.local_override, \
+            config.min_char_speed_override, \
+            config.remote_override, \
+            config.serial_port_override, \
+            config.sound_override, \
+            config.sounder_override, \
+            config.spacing_override, \
+            config.station_override, \
+            config.text_speed_override, \
+            config.wire_override])
 
-    # Process the options
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            help()
-            sys.exit()
-        elif opt in ("-p", "--port"):
-            port = arg
-        elif opt in ("-L", "--local"):
-            local = arg
-        elif opt in ("-R", "--remote"):
-            remote = arg
-        elif opt in ("-c", "--charspeed"):
-            min_char_speed = arg
-        elif opt in ("-t", "--textspeed"):
-            text_speed = arg
-        elif opt in ("-I", "--interface"):
-            interface_type = arg
-        elif opt in ("-a", "--sound"):
-            sound = arg
-        elif opt in ("-A", "--sounder"):
-            sounder = arg
-        elif opt in ("-s", "--spacing"):
-            spacing = arg
-        elif opt in ("-T", "--type"):
-            code_type = arg
-        elif opt in ("-S", "--station"):
-            station = arg
-        elif opt in ("-W", "--wire"):
-            wire = arg
-        elif opt in ("-i", "--sysInfo"):
-            config.print_system_info()
+        args = arg_parser.parse_args()
 
-    # Set config values if they were specified
-    save_config = False
-    if port:
-        #print(port)
-        port = stringOrNone(port)
-        config.set_serial_port(port)
-        save_config = True
-    if local:
-        #print(local)
-        config.set_local(local)
-        save_config = True
-    if remote:
-        #print(remote)
-        config.set_remote(remote)
-        save_config = True
-    if min_char_speed:
-        #print(min_char_speed)
-        config.set_min_char_speed(min_char_speed)
-        save_config = True
-    if text_speed:
-        #print(text_speed)
-        config.set_text_speed(text_speed)
-        save_config = True
-    if interface_type:
-        #print(interface_type)
-        config.set_interface_type(interface_type)
-        save_config = True
-    if sound:
-        #print(sound)
-        sound = stringOrNone(sound)
-        config.set_sound(sound)
-        save_config = True
-    if sounder:
-        #print(sounder)
-        config.set_sounder(sounder)
-        save_config = True
-    if spacing:
-        #print(spacing)
-        config.set_spacing(spacing)
-        save_config = True
-    if code_type:
-        #print(code_type)
-        config.set_code_type(code_type)
-        save_config = True
-    if station:
-        #print(station)
-        station = stringOrNone(station)
-        config.set_station(station)
-        save_config = True
-    if wire:
-        #print(wire)
-        wire = stringOrNone(wire)
-        config.set_wire(wire)
-        save_config = True
+        # Set config values if they were specified
+        save_config = False
+        if not args.code_type == config.code_type:
+            config.set_code_type(args.code_type)
+            save_config = True
+        if not args.interface_type == config.interface_type:
+            config.set_interface_type(args.interface_type)
+            save_config = True
+        if not args.invert_key_input == config.invert_key_input:
+            config.set_invert_key_input(args.invert_key_input)
+            save_config = True
+        if not args.local == config.local:
+            config.set_local(args.local)
+            save_config = True
+        if not args.min_char_speed == config.min_char_speed:
+            config.set_min_char_speed(args.min_char_speed)
+            save_config = True
+        if not args.remote == config.remote:
+            config.set_remote(args.remote)
+            save_config = True
+        if not args.serial_port == config.serial_port:
+            config.set_serial_port(args.serial_port)
+            save_config = True
+        if not args.sound == config.sound:
+            config.set_sound(args.sound)
+            save_config = True
+        if not args.sounder == config.sounder:
+            config.set_sounder(args.sounder)
+            save_config = True
+        if not args.spacing == config.spacing:
+            config.set_spacing(args.spacing)
+            save_config = True
+        if not args.station == config.station:
+            config.set_station(args.station)
+            save_config = True
+        if not args.text_speed == config.text_speed:
+            config.set_text_speed(args.text_speed)
+            save_config = True
+        if not args.wire == config.wire:
+            config.set_wire(args.wire)
+            save_config = True
 
-    if save_config:
-        config.save_config()
+        # If any of the configuration values changed, save the configuration.
+        if save_config:
+            config.save_config()
+    except Exception as ex:
+        print("Error processing arguments: {}".format(ex))
+        sys.exit(1)
+
+    # If no arguments were given print the system info in addition to the configuration.
+    if len(argv) == 0:
+        print("======================================")
+        print("        System Information")
+        print("======================================")
+        config.print_system_info()
+        print("======================================")
+        print("          Configuration")
 
     config.print_config()
     sys.exit(0)
