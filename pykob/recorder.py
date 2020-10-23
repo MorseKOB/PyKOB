@@ -349,21 +349,23 @@ class Recorder:
                         pause = 0
                         if codePause == 32.767 and len(code) > 1 and code[1] == 2:
                             # Probable sender change. See if it is...
-                            if not station == self.station_id:
-                                print("Sender change.")
-                            else:
-                                print("Dropped packet or other problem.")
+                            if self.__list_data:
+                                if not station == self.station_id:
+                                    print("Sender change.")
+                                else:
+                                    print("Dropped packet or other problem.")
                             pause = round((ts - self.__pblts)/1000, 4)
                         elif codePause > 2.0 and codePause < 32.767:
                             # Long pause in sent code
-                            pause = round((ts - self.__pblts)/1000, 4) - 2.0 # Subtract 2 seconds so kob has some to handle
+                            pause = round((((ts - self.__pblts)/1000) - 2.0), 4) # Subtract 2 seconds so kob has some to handle
                             code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
                         if pause > 0:
                             # Long pause or a station/sender change.
                             # Pause for timestamp difference.
                             # For very long delays, sleep a maximum of `max_silence` seconds
                             if self.__max_silence > 0 and pause > self.__max_silence:
-                                print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
+                                if self.__list_data:
+                                    print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
                                 pause = self.__max_silence
                             if (not codePause == 32.767) and (pause > 2.0):
                                 pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
