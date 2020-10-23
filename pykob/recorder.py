@@ -337,24 +337,38 @@ class Recorder:
                         print(dateTimeStr, line, end='')
                     if code == []:  # Ignore empty code packets
                         continue
-                    self.wire = wire
-                    self.station_id = station
                     codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
-                    # For short pauses (< 1 sec), `KOB.sounder` can handle them more precisely.
+                    # For short pauses (< 2 sec), `KOB.sounder` can handle them more precisely.
                     # However the way `KOB.sounder` handles longer pauses, although it makes sense for
                     # real-time transmissions, is flawed for playback. Better to handle long pauses here.
                     # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
                     # handling in `KOB.sounder`.
-                    if codePause > 2.0 and codePause < 32.767 and self.__playback_state == PlaybackState.playing:
-                        # For very long delays, sleep a maximum of `max_silence` seconds
-                        pause = round((ts - self.__pblts)/1000, 4)
-                        if self.__max_silence > 0 and pause > self.__max_silence:
-                            print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
-                            pause = self.__max_silence
-                        pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
+                    #
+                    # Also check for station change code sequence. If so, pause for recorded timestamp difference
+                    if self.__playback_state == PlaybackState.playing:
+                        pause = 0
+                        if codePause == 32.767 and len(code) > 1 and code[1] == 2:
+                            # Probable sender change. See if it is...
+                            if not station == self.station_id:
+                                print("Sender change.")
+                            else:
+                                print("Dropped packet or other problem.")
+                            pause = round((ts - self.__pblts)/1000, 4)
+                        elif codePause > 2.0 and codePause < 32.767:
+                            # Long pause in sent code
+                            pause = round((ts - self.__pblts)/1000, 4) - 2.0 # Subtract 2 seconds so kob has some to handle
+                            code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
                         if pause > 0:
-                            time.sleep(pause)
-                        code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is already handled
+                            # Long pause or a station/sender change.
+                            # Pause for timestamp difference.
+                            # For very long delays, sleep a maximum of `max_silence` seconds
+                            if self.__max_silence > 0 and pause > self.__max_silence:
+                                print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
+                                pause = self.__max_silence
+                            if (not codePause == 32.767) and (pause > 2.0):
+                                pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
+                            if pause > 0:
+                                time.sleep(pause)
                     while self.__playback_state == PlaybackState.paused:
                         self.__playback_resume_flag.wait() # Wait for playback to be resumed
                         if self.__playback_stop_flag.is_set(): # See if we should stop
@@ -368,6 +382,8 @@ class Recorder:
                         for c in code:
                             if c < 0 or c > 2:
                                 c = round(sf * c)
+                    self.wire = wire
+                    self.station_id = station
                     if self.__play_code_callback:
                         self.__play_code_callback(code)
                     self.__pblts = ts
