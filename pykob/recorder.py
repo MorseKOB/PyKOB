@@ -47,9 +47,10 @@ import json
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum, IntEnum, unique
 from pykob import config, kob, log
+from threading import Lock, RLock
 
 @unique
 class PlaybackState(IntEnum):
@@ -60,7 +61,7 @@ class PlaybackState(IntEnum):
     playing = 1
     paused = 2
 
-def get_timestamp():
+def get_timestamp() -> int:
     """
     Return the current  millisecond timestamp.
 
@@ -72,6 +73,38 @@ def get_timestamp():
     ts = int(time.time() * 1000)
     return ts
     
+def date_time_from_ts(ts: int) -> str:
+    """
+    Return a Date-Time string from a timestamp.
+
+    ts : int
+        milliseconds since the epec
+    Return
+    ------
+    dtstr : string
+        A string with the date and time
+    """
+    dateTime = datetime.fromtimestamp(ts / 1000.0)
+    dateTimeStr = str(dateTime.ctime()) + ": "
+    return dateTimeStr
+
+def hms_from_ts(ts1: int, ts2: int) -> str:
+    """
+    Return a string with HH:MM:SS from a pair of timestamp values.
+
+    ts1 : int
+        Timestamp 1
+    ts2 : int
+        Timestamp 2
+    Return
+    ------
+    hms : string
+        A string in the form HH:MM:SS calculated from the two timestamps.
+    """
+    duration = abs(ts1 - ts2)
+    tdelta = timedelta(milliseconds=duration)
+    return str(tdelta)
+
 class Recorder:
     """
     Recorder class provides functionality to record and playback a code stream.
@@ -96,7 +129,6 @@ class Recorder:
         self.__play_wire_callback = play_wire_callback
 
         self.__playback_state = PlaybackState.idle
-        self.__pblts = -1 # Playback last timestamp
 
         self.__playback_thread = None
         self.__p_stations_thread = None
@@ -110,10 +142,15 @@ class Recorder:
         self.__speed_factor = 100
 
         # Information about the current playback file
-        self.__p_lines = 0          # Number of lines in the file
-        self.__p_fts = 0            # First (earliest) timestamp
-        self.__p_lts = 0            # Last (latest) timestamp
-        self.__p_stations = set()   # Set of all stations in the recording
+        self.__p_line_no = 0            # Current line number being processed/played
+        self.__p_lines = 0              # Number of lines in the file
+        self.__p_fts = 0                # First (earliest) timestamp
+        self.__p_lts = 0                # Last (latest) timestamp
+        self.__p_fpts_index = []        # List of tuples with timestamp, file-position and station-change
+        self.__p_stations = set()       # Set of all stations in the recording
+        self.__p_fp = None              # File pointer for current playback file while playing
+        self.__p_pblts = -1             # Playback last timestamp
+        self.__p_fileop_lock = Lock()   # Lock to protect file operation access from play and seek threads
 
     @property
     def playback_stations(self):
@@ -208,6 +245,145 @@ class Recorder:
                 json.dump(data, fp)
                 fp.write('\n')
 
+    def playback_move_seconds(self, seconds: int):
+        """
+        Change the current playback position forward/backward 'seconds' seconds.
+
+        A recording must be playing or this method does nothing.
+        """
+        # ###
+        # This calculates a new file position using the current line number being played 
+        # and using the index to find the position to move forward or backward based on 
+        # the requested change and the timestamps in the index.
+        #
+        # The movement will be => than the request based on the timestamps for the lines 
+        # in the recording.
+        #
+        # This is done using the file-operation lock so the playback can't change while 
+        # the position is being changed. By using the index, this method doesn't take 
+        # long to change the position. Since the playback is going to change anyway, 
+        # the pause doesn't really matter.
+        # ###
+        if seconds == 0:
+            return
+        with self.__p_fileop_lock: # Lock out any other file access first
+            if self.__p_fp:
+                current_lineno = self.__p_line_no
+                indexlen = len(self.__p_fpts_index)
+                if current_lineno > 0 and current_lineno < indexlen - 1:
+                    current_ts = self.__p_fpts_index[current_lineno][0]
+                    current_pos = self.__p_fpts_index[current_lineno][1]
+                    target_ts = current_ts + (seconds * 1000) # Calculate the target timestamp
+                    nts = current_ts
+                    new_pos = current_pos
+                    # Move forward or backward?
+                    if seconds > 0:
+                        # Forward...
+                        for i in range(current_lineno, indexlen - 1):
+                            nts = self.__p_fpts_index[i][0]
+                            if nts >= target_ts or i == indexlen - 1:
+                                # If we move one line and the timestamp is >= target, we are done
+                                new_pos = self.__p_fpts_index[i][1] # An index entry is [ts,fpos,station-change]
+                                print(" Move forward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                    i, current_lineno, new_pos, current_pos, nts, current_ts))
+                                self.__p_line_no = i
+                                self.__p_fp.seek(new_pos)
+                                self.__p_pblts = nts # set last timestamp to the new timestamp so there isn't a delay when played
+                                break
+                    else:
+                        # Backward...
+                        for i in range(current_lineno, 0, -1):
+                            nts = self.__p_fpts_index[i][0]
+                            if nts <= target_ts or i == 0:
+                                # If we move one line and the timestamp is <= target, we are done
+                                new_pos = self.__p_fpts_index[i][1] # An index entry is [ts,fpos,station-change]
+                                print(" Move backward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                    i, current_lineno, new_pos, current_pos, nts, current_ts))
+                                self.__p_line_no = i
+                                self.__p_fp.seek(new_pos)
+                                self.__p_pblts = nts # set last timestamp to the new timestamp so there isn't a delay when played
+                                break
+
+    def playback_move_to_sender_begin(self):
+        """
+        Change the current playback position back to the beginning of the 
+        current sender.
+
+        A recording must be playing or this method does nothing.
+        """
+        # ###
+        # This calculates a new file position using the current line number being played 
+        # and using the index to find the position to move backward to based on 
+        # the sender/station change flag in the index.
+        #
+        # This is done using the file-operation lock so the playback can't change while 
+        # the position is being changed. By using the index, this method doesn't take 
+        # long to change the position. Since the playback is going to change anyway, 
+        # the pause doesn't really matter.
+        # ###
+        with self.__p_fileop_lock: # Lock out any other file access first
+            if self.__p_fp:
+                current_lineno = self.__p_line_no
+                indexlen = len(self.__p_fpts_index)
+                if current_lineno > 0 and current_lineno < indexlen - 1:
+                    current_ts = self.__p_fpts_index[current_lineno][0]
+                    current_pos = self.__p_fpts_index[current_lineno][1]
+                    # Move back through the index checking for a station change
+                    for i in range(current_lineno, 0, -1):
+                        sc = self.__p_fpts_index[i][2] # An index entry is [ts,fpos,station-change]
+                        if sc:
+                            # We found a station change. Go back one more line if possible.
+                            if i > 0:
+                                i -= 1
+                            new_pos = self.__p_fpts_index[i][1]
+                            nts = self.__p_fpts_index[i][0]
+                            print(" Move back to beginning of sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                i, current_lineno, new_pos, current_pos, nts, current_ts))
+                            self.__p_line_no = i
+                            self.__p_fp.seek(new_pos)
+                            self.__p_pblts = nts # set last timestamp to the new timestamp so there isn't a delay when played
+                            break
+
+    def playback_move_to_sender_end(self):
+        """
+        Change the current playback position to the end of the 
+        current sender.
+
+        A recording must be playing or this method does nothing.
+        """
+        # ###
+        # This calculates a new file position using the current line number being played 
+        # and using the index to find the position to move forward to based on 
+        # the sender/station change flag in the index.
+        #
+        # This is done using the file-operation lock so the playback can't change while 
+        # the position is being changed. By using the index, this method doesn't take 
+        # long to change the position. Since the playback is going to change anyway, 
+        # the pause doesn't really matter.
+        # ###
+        with self.__p_fileop_lock: # Lock out any other file access first
+            if self.__p_fp:
+                current_lineno = self.__p_line_no
+                indexlen = len(self.__p_fpts_index)
+                if current_lineno > 0 and current_lineno < indexlen - 1:
+                    current_ts = self.__p_fpts_index[current_lineno][0]
+                    current_pos = self.__p_fpts_index[current_lineno][1]
+                    # Move forward through the index checking for a station change
+                    for i in range(current_lineno, indexlen-1):
+                        sc = self.__p_fpts_index[i][2] # An index entry is [ts,fpos,station-change]
+                        if sc:
+                            # We found a station change. Go back one line if possible.
+                            if i > 0:
+                                i -= 1
+                            new_pos = self.__p_fpts_index[i][1]
+                            nts = self.__p_fpts_index[i][0]
+                            print(" Move forward to next sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                i, current_lineno, new_pos, current_pos, nts, current_ts))
+                            self.__p_line_no = i
+                            self.__p_fp.seek(new_pos)
+                            self.__p_pblts = nts # set last timestamp to the new timestamp so there isn't a delay when played
+                            break
+
     def playback_resume(self):
         """
         Resume a paused playback.
@@ -260,39 +436,56 @@ class Recorder:
         self.playback_stop()
         self.__playback_resume_flag.clear()
         self.__playback_stop_flag.clear()
+
+        self.__p_fts = -1
+        self.__p_lts = 0
+        self.__p_stations.clear()
+        self.__p_fpts_index = []
+        self.__p_line_no = 0
+        self.__p_lines = 0
         self.__station_id = None
         self.__wire = None
-
         #
         # Get information from the current playback recording file.
         with open(self.__source_file_path, "r") as fp:
-            self.__p_fts = -1
-            self.__p_lts = 0
-            self.__p_stations.clear()
-            lineno = 0
-            for line in fp:
-                lineno +=1
+            self.__p_fpts_index.append((0,0,False)) # Store line 0 as Time=0, Pos=0, Sender-Change=False
+            previous_station = None
+            # NOTE: Can't iterate over the file lines as it disables `tell()` and `seek()`.
+            line = fp.readline()
+            while line:
                 try:
+                    fpos = fp.tell()
                     data = json.loads(line)
                     ts = data['ts']
                     wire = data['w']
                     station = data['s']
                     ts = data['ts']
                     station = data['s']
+                    # Store the file position and timestamp in the index to use 
+                    # for seeking to a line based on time or line number
+                    self.__p_fpts_index.append((ts,fpos,station != previous_station))
+                    previous_station = station
                     # Get the first and last timestamps from the recording
                     if self.__p_fts == -1 or ts < self.__p_fts:
                         self.__p_fts = ts # Set the 'first' timestamp
                     if self.__p_lts < ts:
                         self.__p_lts = ts
+                    # Update the number of lines
+                    self.__p_lines +=1
                     # Generate the station list from the recording
                     self.__p_stations.add(station)
+                    # Read the next line
+                    line = fp.readline()
                 except Exception as ex:
-                    log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self.__source_file_path, lineno, ex))
+                    log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self.__source_file_path, self.__p_line_no, ex))
                     return
+        # Calculate recording file values to aid playback functions
+        # Print some values about the recording
+        print(" Lines: {}  Start: {}  End: {}  Duration: {}".format(self.__p_lines, date_time_from_ts(self.__p_fts), date_time_from_ts(self.__p_lts), hms_from_ts(self.__p_lts, self.__p_fts)))
         self.__list_data = list_data
         self.__max_silence = max_silence
         self.__speed_factor = speed_factor
-        self.__playback_thread = threading.Thread(name='Recorder-Playback', daemon=True, target=self.callbackPlay)
+        self.__playback_thread = threading.Thread(name='Recorder-Playback-Play', daemon=True, target=self.callbackPlay)
         self.__playback_thread.start()
         if self.__play_station_list_callback:
             self.__p_stations_thread = threading.Thread(name='Recorder-Playback-StationList', daemon=True, target=self.callbackPlayStationList)
@@ -302,7 +495,8 @@ class Recorder:
         """
         Called by the playback thread `run` to playback recorded code.
         """
-        self.__pblts = -1 # Keep the last timestamp
+        self.__p_line_no = 0
+        self.__p_pblts = -1 # Keep the last timestamp
 
         try:
             if not self.source_file_path:
@@ -316,83 +510,89 @@ class Recorder:
                 print(' Station: ', s)
                 if self.__play_station_list_callback:
                     self.__play_station_list_callback(s)
-            with open(self.__source_file_path, "r") as fp:
-                for line in fp:
-                    if self.__playback_stop_flag.is_set():
-                        # Playback stop was requested
-                        self.__playback_state = PlaybackState.idle
-                        self.__playback_resume_flag.clear()
-                        return
-                    data = json.loads(line)
-                    code = data['c']        # Code sequence
-                    ts = data['ts']         # Timestamp
-                    wire = data['w']        # Wire number
-                    station = data['s']     # Station ID
-                    source = data['o']      # Source/Origin (numeric value from kob.CodeSource)
-                    if self.__pblts < 0:
-                        self.__pblts = ts
-                    if self.__list_data:
-                        dateTime = datetime.fromtimestamp(ts / 1000.0)
-                        dateTimeStr = str(dateTime.ctime()) + ": "
-                        print(dateTimeStr, line, end='')
-                    if code == []:  # Ignore empty code packets
-                        continue
-                    codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
-                    # For short pauses (< 2 sec), `KOB.sounder` can handle them more precisely.
-                    # However the way `KOB.sounder` handles longer pauses, although it makes sense for
-                    # real-time transmissions, is flawed for playback. Better to handle long pauses here.
-                    # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
-                    # handling in `KOB.sounder`.
-                    #
-                    # Also check for station change code sequence. If so, pause for recorded timestamp difference
-                    if self.__playback_state == PlaybackState.playing:
-                        pause = 0
-                        if codePause == 32.767 and len(code) > 1 and code[1] == 2:
-                            # Probable sender change. See if it is...
-                            if self.__list_data:
-                                if not station == self.station_id:
-                                    print("Sender change.")
-                                else:
-                                    print("Dropped packet or other problem.")
-                            pause = round((ts - self.__pblts)/1000, 4)
-                        elif codePause > 2.0 and codePause < 32.767:
-                            # Long pause in sent code
-                            pause = round((((ts - self.__pblts)/1000) - 2.0), 4) # Subtract 2 seconds so kob has some to handle
-                            code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
-                        if pause > 0:
-                            # Long pause or a station/sender change.
-                            # Pause for timestamp difference.
-                            # For very long delays, sleep a maximum of `max_silence` seconds
-                            if self.__max_silence > 0 and pause > self.__max_silence:
-                                if self.__list_data:
-                                    print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
-                                pause = self.__max_silence
-                            if (not codePause == 32.767) and (pause > 2.0):
-                                pause -= 2.0 # Adjust the pause to allow the sounder and reader to do a 2 second pause
-                            if pause > 0:
-                                time.sleep(pause)
-                    while self.__playback_state == PlaybackState.paused:
-                        self.__playback_resume_flag.wait() # Wait for playback to be resumed
-                        if self.__playback_stop_flag.is_set(): # See if we should stop
+            with open(self.__source_file_path, "r") as self.__p_fp:
+                with self.__p_fileop_lock:
+                    # NOTE: Can't iterate over the file lines as it disables `tell()` and `seek()`.
+                    line = self.__p_fp.readline()
+                    self.__p_line_no += 1
+                while line:
+                    # Get the file lock and read the contents of the line
+                    with self.__p_fileop_lock:
+                        while self.__playback_state == PlaybackState.paused:
+                            self.__playback_resume_flag.wait() # Wait for playback to be resumed
+                            self.__playback_state = PlaybackState.playing
+                        if self.__playback_stop_flag.is_set():
+                            # Playback stop was requested
                             self.__playback_state = PlaybackState.idle
                             self.__playback_resume_flag.clear()
                             return
-                        self.__playback_state = PlaybackState.playing
+                        data = json.loads(line)
+                        #
+                        code = data['c']        # Code sequence
+                        ts = data['ts']         # Timestamp
+                        wire = data['w']        # Wire number
+                        station = data['s']     # Station ID
+                        source = data['o']      # Source/Origin (numeric value from kob.CodeSource)
+                        pblts = self.__p_pblts
+                        self.__p_pblts = ts
+                        # Done with lock
 
-                    if not self.__speed_factor == 100:
-                        sf = 1.0 / (self.__speed_factor / 100.0)
-                        for c in code:
-                            if c < 0 or c > 2:
-                                c = round(sf * c)
-                    self.wire = wire
-                    self.station_id = station
-                    if self.__play_code_callback:
-                        self.__play_code_callback(code)
-                    self.__pblts = ts
+                    try:
+                        if pblts < 0:
+                            pblts = ts
+                        if self.__list_data:
+                            print(date_time_from_ts(ts), line, end='')
+                        if code == []:  # Ignore empty code packets
+                            continue
+                        codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                        # For short pauses (< 2 sec), `KOB.sounder` can handle them more precisely.
+                        # However the way `KOB.sounder` handles longer pauses, although it makes sense for
+                        # real-time transmissions, is flawed for playback. Better to handle long pauses here.
+                        # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
+                        # handling in `KOB.sounder`.
+                        #
+                        # Also check for station change code sequence. If so, pause for recorded timestamp difference
+                        if self.__playback_state == PlaybackState.playing:
+                            pause = 0
+                            if codePause == 32.767 and len(code) > 1 and code[1] == 2:
+                                # Probable sender change. See if it is...
+                                if not station == self.station_id:
+                                    if self.__list_data:
+                                        print("Sender change.")
+                                    pause = round((ts - pblts)/1000, 4)
+                            elif codePause > 2.0 and codePause < 32.767:
+                                # Long pause in sent code
+                                pause = round((((ts - pblts)/1000) - 2.0), 4) # Subtract 2 seconds so kob has some to handle
+                                code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
+                            if pause > 0:
+                                # Long pause or a station/sender change.
+                                # For very long delays, sleep a maximum of `max_silence` seconds
+                                if self.__max_silence > 0 and pause > self.__max_silence:
+                                    if self.__list_data:
+                                        print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self.__max_silence))
+                                    pause = self.__max_silence
+                                time.sleep(pause)
+                        if not self.__speed_factor == 100:
+                            sf = 1.0 / (self.__speed_factor / 100.0)
+                            for c in code:
+                                if c < 0 or c > 2:
+                                    c = round(sf * c)
+                        self.wire = wire
+                        self.station_id = station
+                        if self.__play_code_callback:
+                            self.__play_code_callback(code)
+                    finally:
+                        # Read the next line to be ready to continue the processing loop.
+                        with self.__p_fileop_lock:
+                            line = self.__p_fp.readline()
+                            self.__p_line_no += 1
         finally:
             if self.__play_finished_callback:
                 self.__play_finished_callback()
+            with self.__p_fileop_lock:
+                self.__p_fp = None
             print("Playback done.")
+
 
     def callbackPlayStationList(self):
         """

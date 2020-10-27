@@ -46,6 +46,10 @@ class KOBWindow:
         root.bind_all('<KeyPress-Escape>', ka.event_escape)
         root.bind_all('<Control-KeyPress-s>', ka.event_playback_stop)
         root.bind_all('<Control-KeyPress-p>', ka.event_playback_pauseresume)
+        root.bind_all('<Control-KeyPress-h>', ka.event_playback_move_back15)
+        root.bind_all('<Control-KeyPress-l>', ka.event_playback_move_forward15)
+        root.bind_all('<Control-KeyPress-j>', ka.event_playback_move_sender_start)
+        root.bind_all('<Control-KeyPress-k>', ka.event_playback_move_sender_end)
         ka.kw = self
         
         # File menu
@@ -186,4 +190,10 @@ class KOBWindow:
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()
+
+    def make_keyboard_focus(self):
+        """
+        Make the keyboard window the active (focused) window.
+        """
+        self.txtKeyboard.focus_set()
         
