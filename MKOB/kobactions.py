@@ -69,6 +69,7 @@ def doFilePlay():
             dirpath, filename = os.path.split(pf)
             codereader_append('[{}]'.format(filename))
             km.Recorder.playback_start(list_data=True, max_silence=5)
+    kw.make_keyboard_focus()
     
 def doFileExit():
     kw.root.destroy()
@@ -126,11 +127,53 @@ def codereader_clear():
     kw.txtReader.delete('1.0', 'end')
 
 def event_escape(event):
-    """toggle Circuit Closer and regain control of the wire"""
+    """
+    toggle Circuit Closer and regain control of the wire
+    """
     kw.varCircuitCloser.set(not kw.varCircuitCloser.get())
     doCircuitCloser()
     km.reset_wire_state()  # regain control of the wire
 
+def event_playback_move_back15(event):
+    """
+    Move the playback position back 15 seconds.
+    """
+    print("Playback - move back 15 seconds...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_seconds(-15)
+
+def event_playback_move_forward15(event):
+    """
+    Move the playback position forward 15 seconds.
+    """
+    print("Playback - move forward 15 seconds...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_seconds(15)
+        
+def event_playback_move_sender_start(event):
+    """
+    Move the playback position to the start of the current sender.
+    """
+    print("Playback - move to sender start...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_to_sender_begin()
+        
+def event_playback_move_sender_end(event):
+    """
+    Move the playback position to the end of the current sender.
+    """
+    print("Playback - move to next sender...")
+    if km.Recorder:
+        if km.Reader:
+            km.Reader.flush()  # Flush the Reader content before moving.
+        km.Recorder.playback_move_to_sender_end()
+        
 def event_playback_pauseresume(event):
     """
     Pause/Resume a recording if currently playing/paused.
