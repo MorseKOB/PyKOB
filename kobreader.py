@@ -23,17 +23,42 @@ SOFTWARE.
 """
 
 """
-kobevents.py
+kobreader.py
 
-Event strings used to perform actions on window widgits.
+Manage the reader window.
 
-If standard events exist they should be used rather than creating/using custom 
-events.
+Calls to the 'handle_' methods should be made on the main GUI thread as a result of the GUI handling 
+message events.
 """
 
-# Define event messages
-EVENT_CLEAR_READER = "<<Clear_Reader>>" # Clear the reader window
-EVENT_CLEAR_SENDERS = "<<Clear_Senders>>" # Clear the sender window and sender list
-EVENT_CURRENT_SENDER = "<<Current_Sender>>" # Record the current sender (station)
-EVENT_STATION_ACTIVE = "<<Station_Active>>" # A station has indicated that it is still listening
-EVENT_APPEND_TEXT = "<<Append_Text>>" # Append text to a text window/widgit
+import kobevents as ke
+import kobwindow
+
+root = None # Must be set from the root window
+kw = None # Must be set from the root window
+
+def append_text(text: str):
+    """
+    Generate an event to add text to the reader window.
+    """
+    root.event_generate(ke.EVENT_APPEND_TEXT, when='tail', data=text)
+
+def handle_append_text(event_data):
+    """
+    Event handler to append text to the window.
+    """
+    text = event_data
+    kw.txtReader.insert('end', text)
+    kw.txtReader.see('end')
+
+def clear():
+    """
+    Generate an event to clear the Reader window
+    """
+    root.event_generate(ke.EVENT_CLEAR_READER, when='tail')
+
+def handle_clear(event_data):
+    """
+    Event handler to clear the contents.
+    """
+    kw.txtReader.delete('1.0', 'end')

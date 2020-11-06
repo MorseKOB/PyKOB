@@ -35,6 +35,7 @@ import time
 from pykob import config, kob, internet, morse, recorder
 import kobconfig as kc
 import kobmain as km
+import kobreader as krdr
 import kobstationlist as ks
 
 import pykob  # for version number
@@ -117,14 +118,15 @@ def doConnect():
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
 
-def codereader_append(s):
-    """append a string to the code reader window"""
-    kw.txtReader.insert('end', s)
-    kw.txtReader.see('end')
-
+def codereader_append(text: str):
+    """
+    Append text to the code reader.
+    """
+    krdr.append_text(text)
+    
 def codereader_clear():
     """clear the code reader window"""
-    kw.txtReader.delete('1.0', 'end')
+    krdr.clear()
 
 def event_escape(event):
     """

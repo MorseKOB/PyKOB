@@ -130,5 +130,5 @@ def display_station_list():
     global __active_stations
     # Delete the current window contents
     ka.kw.txtStnList.delete('1.0', 'end')
-    for station_name in sorted(__active_stations, key=lambda k: (__active_stations[k][2], __active_stations[k][1])): # Sort by received from time
+    for station_name in sorted(__active_stations, key=lambda k: (__active_stations[k][2], __active_stations[k][1])): # Sort by received then connected from time
         ka.kw.txtStnList.insert('end', "{}\n".format(station_name))
