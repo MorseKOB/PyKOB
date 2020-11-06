@@ -34,6 +34,8 @@ import tkinter.scrolledtext as tkst
 import kobactions as ka
 import kobconfig as kc
 import kobmain
+import kobevents
+import kobstationlist as ksl
 
 class KOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):       
@@ -117,6 +119,16 @@ class KOBWindow:
                 frm3, width=10, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
+        # register action events for station list
+        ksl.root = self.root
+        self.root.bind('<<Clear>>', ksl.handle_clear_station_list) # ZZZ - how to access TK event names?
+        ## need to use tk commands in order to provide access to the 'data' element of an event
+        ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ksl.handle_update_current_sender)
+        cmd = root.register(ksl.handle_update_current_sender)
+        root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
+        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
+        cmd = root.register(ksl.handle_update_station_active)
+        root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
         
         # office ID
         self.varOfficeID = tk.StringVar()

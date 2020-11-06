@@ -117,8 +117,7 @@ class Internet:
                     self.rcvdSeqNo = seqNo
                     return code
             else:
-                log.log("PyKOB.internet received invalid record length: {0}".
-                        format(nBytes))
+                log.log("WARNING", "PyKOB.internet received invalid record length: {0}".format(nBytes))
 
     def write(self, code, txt=""):
         n = len(code)
@@ -145,7 +144,7 @@ class Internet:
             self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
                     socket.SOCK_DGRAM)[0][4]
         except:
-            log.log("PyKOB.internet ignoring DNS lookup error")
+            log.log("WARNING", "PyKOB.internet ignoring DNS lookup error")
         if self.wireNo:
             shortPacket = shortPacketFormat.pack(CON, self.wireNo)
             self.socket.sendto(shortPacket, self.address)
