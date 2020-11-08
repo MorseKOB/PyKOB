@@ -29,11 +29,14 @@ Create the main KOB window for MKOB and lay out its widgets
 (controls).
 """
 
+import kobmain
+import kobevents
 import tkinter as tk
 import tkinter.scrolledtext as tkst 
 import kobactions as ka
 import kobconfig as kc
-import kobmain
+import kobstationlist as ksl
+import kobreader as krdr
 
 class KOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):       
@@ -104,6 +107,16 @@ class KOBWindow:
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
         self.txtReader.columnconfigure(0, weight=2)
+        # register action events for reader window
+        krdr.root = self.root
+        krdr.kw = self
+        ## need to use tk commands in order to provide access to the 'data' element of an event
+        ### self.root.bind('<<Clear_Reader>>', krdr.handle_clear)
+        cmd = root.register(krdr.handle_clear)
+        root.tk.call("bind", root, kobevents.EVENT_CLEAR_READER, cmd)
+        ### self.root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
+        cmd = root.register(krdr.handle_append_text)
+        root.tk.call("bind", root, kobevents.EVENT_APPEND_TEXT, cmd + " %d")
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(
@@ -117,6 +130,18 @@ class KOBWindow:
                 frm3, width=10, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
+        # register action events for station list
+        ksl.root = self.root
+        ## need to use tk commands in order to provide access to the 'data' element of an event
+        ### self.root.bind('<<Clear_Senders>>', ksl.handle_clear_station_list)
+        cmd = root.register(ksl.handle_clear_station_list)
+        root.tk.call("bind", root, kobevents.EVENT_CLEAR_SENDERS, cmd)
+        ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ksl.handle_update_current_sender)
+        cmd = root.register(ksl.handle_update_current_sender)
+        root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
+        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
+        cmd = root.register(ksl.handle_update_station_active)
+        root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
         
         # office ID
         self.varOfficeID = tk.StringVar()

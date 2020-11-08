@@ -40,7 +40,6 @@ def init():
 
 def keyboard_send():
     """thread to send Morse from the code sender window"""
-    time.sleep(1)  # wait for kobwindows to initialize on startup
     kw = ka.kw
     kw.txtKeyboard.tag_config('highlight', background='gray75',
             underline=0)

@@ -202,7 +202,7 @@ def update_sender(id):
         sender_ID = id
         Reader.flush()
         ka.codereader_append("\n\n<{}>".format(sender_ID))
-        kobstationlist.new_sender(sender_ID)
+        kobstationlist.update_current_sender(sender_ID)
         Reader = morse.Reader(
                 wpm=kc.WPM, codeType=kc.CodeType,
                 callback=readerCallback)  # reset to nominal code speed
@@ -260,8 +260,8 @@ def init():
     KOB = kob.KOB(
             port=kc.config.serial_port, interfaceType=kc.config.interface_type, audio=kc.config.sound, callback=from_key)
     Internet = internet.Internet(kc.config.station, callback=from_internet)
-    Internet.monitor_IDs(kobstationlist.refresh_stations)
-    Internet.monitor_sender(update_sender)
+    Internet.monitor_IDs(kobstationlist.update_station_active)
+    Internet.monitor_sender(kobstationlist.update_current_sender)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
         log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
@@ -275,6 +275,6 @@ def init():
     Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
         play_code_callback=from_recorder, \
         play_station_id_callback=update_sender, \
-        play_station_list_callback=kobstationlist.refresh_stations, \
+        play_station_list_callback=kobstationlist.update_station_active, \
         play_wire_callback=recorder_wire_callback)
     kobkeyboard.init()
