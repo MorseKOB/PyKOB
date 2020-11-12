@@ -26,14 +26,15 @@ SOFTWARE.
 kobevents.py
 
 Event strings used to perform actions on window widgits.
-
 If standard events exist they should be used rather than creating/using custom 
 events.
+
 """
 
 # Define event messages
-EVENT_CLEAR_READER = "<<Clear_Reader>>" # Clear the reader window
-EVENT_CLEAR_SENDERS = "<<Clear_Senders>>" # Clear the sender window and sender list
 EVENT_CURRENT_SENDER = "<<Current_Sender>>" # Record the current sender (station)
+EVENT_PLAYER_WIRE_CHANGE = "<<Player_Wire_Change>>" # The player detected a wire change
+EVENT_READER_APPEND_TEXT = "<<Reader_Append_Text>>" # Append text to the reader window
+EVENT_READER_CLEAR = "<<Clear_Reader>>" # Clear the reader window
 EVENT_STATION_ACTIVE = "<<Station_Active>>" # A station has indicated that it is still listening
-EVENT_APPEND_TEXT = "<<Append_Text>>" # Append text to a text window/widgit
+EVENT_STATIONS_CLEAR = "<<Clear_Stations>>" # Clear the station window and station list

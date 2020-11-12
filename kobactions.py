@@ -34,14 +34,19 @@ import tkinter.filedialog as fd
 import time
 from pykob import config, kob, internet, morse, recorder
 import kobconfig as kc
+import kobevents
 import kobmain as km
 import kobreader as krdr
-import kobstationlist as ks
+import kobstationlist as ksl
 
 import pykob  # for version number
 print("PyKOB " + pykob.VERSION)
 
 kw = None  # initialized by KOBWindow
+
+####
+#### Menu item handlers
+####
 
 # File menu
 
@@ -61,15 +66,14 @@ def doFilePlay():
     pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
     if pf:
         print(" Play: ", pf)
-        if km.Recorder:
-            km.disconnect()
-            km.kobstationlist.clear_station_list()
-            km.Recorder.source_file_path = pf
-            codereader_clear()
-            km.sender_ID = None
-            dirpath, filename = os.path.split(pf)
-            codereader_append('[{}]'.format(filename))
-            km.Recorder.playback_start(list_data=True, max_silence=5)
+        km.disconnect()
+        km.kobstationlist.handle_clear_station_list(None) # okay to call directly as we are in a handler
+        km.Recorder.source_file_path = pf
+        krdr.handle_clear(None)
+        km.sender_ID = None
+        dirpath, filename = os.path.split(pf)
+        krdr.handle_append_text('[{}]\n'.format(filename))
+        km.Recorder.playback_start(list_data=True, max_silence=5)
     kw.make_keyboard_focus()
     
 def doFileExit():
@@ -81,7 +85,9 @@ def doFileExit():
 def doHelpAbout():
     mb.showinfo(title="About", message="MorseKOB " + kw.VERSION)
 
-# actions for control events
+####
+#### Action handlers for control events
+####
 
 def doOfficeID(event):
     kc.OfficeID = kw.varOfficeID.get()
@@ -107,28 +113,62 @@ def doWireNo(event=None):
     config.save_config()
     if km.connected:
         km.change_wire()
-    if km.Recorder:
         km.Recorder.wire = kc.WireNo
 
 def doConnect():
     if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:
-        return # If the recorder is playing a recording to not allow connection
-
+        return # If the recorder is playing a recording do not allow connection
     km.toggle_connect()
     color = 'red' if km.connected else 'white'
     kw.cvsConnect.create_rectangle(0, 0, 20, 20, fill=color)
 
-def codereader_append(text: str):
-    """
-    Append text to the code reader.
-    """
-    krdr.append_text(text)
-    
-def codereader_clear():
-    """clear the code reader window"""
-    krdr.clear()
+####
+#### Trigger event messages ###
+####
 
-def event_escape(event):
+def trigger_player_wire_change(id: int):
+    """
+    Generate an event to indicate that the wire number 
+    from the player has changed.
+    """
+    kw.root.event_generate(kobevents.EVENT_PLAYER_WIRE_CHANGE, when='tail', data=str(id))
+
+def trigger_reader_append_text(text: str):
+    """
+    Generate an event to add text to the reader window.
+    """
+    kw.root.event_generate(kobevents.EVENT_READER_APPEND_TEXT, when='tail', data=text)
+
+def trigger_reader_clear():
+    """
+    Generate an event to clear the Reader window
+    """
+    kw.root.event_generate(kobevents.EVENT_READER_CLEAR, when='tail')
+
+def trigger_station_list_clear():
+    """
+    Generate an event to clear the station list and the window.
+    """
+    kw.root.event_generate(kobevents.EVENT_STATIONS_CLEAR, when='tail')
+
+def trigger_update_current_sender(id: str):
+    """
+    Generate an event to record the current sender.
+    """
+    kw.root.event_generate(kobevents.EVENT_CURRENT_SENDER, when='tail', data=id)
+
+def trigger_update_station_active(id: str):
+    """
+    Generate an event to update the active status (timestamp) of a station.
+    """
+    kw.root.event_generate(kobevents.EVENT_STATION_ACTIVE, when='tail', data=id)
+
+
+####
+#### Event (message) handlers
+####
+
+def handle_escape(event):
     """
     toggle Circuit Closer and regain control of the wire
     """
@@ -136,59 +176,102 @@ def event_escape(event):
     doCircuitCloser()
     km.reset_wire_state()  # regain control of the wire
 
-def event_playback_move_back15(event):
+def handle_playback_move_back15(event):
     """
     Move the playback position back 15 seconds.
     """
     print("Playback - move back 15 seconds...")
-    if km.Recorder:
-        if km.Reader:
-            km.Reader.flush()  # Flush the Reader content before moving.
-        km.Recorder.playback_move_seconds(-15)
+    if km.Reader:
+        km.Reader.flush()  # Flush the Reader content before moving.
+    km.Recorder.playback_move_seconds(-15)
 
-def event_playback_move_forward15(event):
+def handle_playback_move_forward15(event):
     """
     Move the playback position forward 15 seconds.
     """
     print("Playback - move forward 15 seconds...")
-    if km.Recorder:
-        if km.Reader:
-            km.Reader.flush()  # Flush the Reader content before moving.
-        km.Recorder.playback_move_seconds(15)
+    if km.Reader:
+        km.Reader.flush()  # Flush the Reader content before moving.
+    km.Recorder.playback_move_seconds(15)
         
-def event_playback_move_sender_start(event):
+def handle_playback_move_sender_start(event):
     """
     Move the playback position to the start of the current sender.
     """
     print("Playback - move to sender start...")
-    if km.Recorder:
-        if km.Reader:
-            km.Reader.flush()  # Flush the Reader content before moving.
-        km.Recorder.playback_move_to_sender_begin()
+    if km.Reader:
+        km.Reader.flush()  # Flush the Reader content before moving.
+    km.Recorder.playback_move_to_sender_begin()
         
-def event_playback_move_sender_end(event):
+def handle_playback_move_sender_end(event):
     """
     Move the playback position to the end of the current sender.
     """
     print("Playback - move to next sender...")
-    if km.Recorder:
-        if km.Reader:
-            km.Reader.flush()  # Flush the Reader content before moving.
-        km.Recorder.playback_move_to_sender_end()
+    if km.Reader:
+        km.Reader.flush()  # Flush the Reader content before moving.
+    km.Recorder.playback_move_to_sender_end()
         
-def event_playback_pauseresume(event):
+def handle_playback_pauseresume(event):
     """
     Pause/Resume a recording if currently playing/paused.
 
     This does not play 'from scratch'. A playback must have been started 
     for this to have any effect.
     """
-    if km.Recorder:
-        km.Recorder.playback_pause_resume()
+    km.Recorder.playback_pause_resume()
 
-def event_playback_stop(event):
+def handle_playback_stop(event):
     """
     Stop playback of a recording if playing.
     """
-    if km.Recorder:
-        km.Recorder.playback_stop()
+    km.Recorder.playback_stop()
+
+def handle_sender_update(event_data):
+    """
+    Handle a <<Current_Sender>> message by:
+    1. Informing kobmain of a (possibly new) sender
+    2. Informing the station list of a (possibly new) sender
+    3. Informing the recorder of a (possibly new) sender
+
+    event_data is the station ID
+    """
+    km.update_sender(event_data)
+    ksl.handle_update_current_sender(event_data)
+    km.Recorder.station_id = event_data
+
+def handle_clear_stations(event):
+    """
+    Handle a <<Clear_Stations>> message by:
+    1. Telling the station list to clear
+
+    event has no meaningful information
+    """
+    ksl.handle_clear_station_list(event)
+
+def handle_reader_clear(event):
+    """
+    Handle a <<Clear_Reader>> message by:
+    1. Telling the reader window to clear
+
+    event has no meaningful information
+    """
+    krdr.handle_clear()
+
+def handle_reader_append_text(event_data):
+    """
+    Handle a <<Reader_Append_Text>> message by:
+    1. Telling the reader window to append the text in the event_data
+
+    event_data is the text to append
+    """
+    krdr.handle_append_text(event_data)
+
+def handle_player_wire_change(event_data):
+    """
+    Handle a <<Player_Wire_Change>> message by:
+    1. Appending <<wire>> to the reader window
+
+    event_data contains a string version of the wire number
+    """
+    krdr.handle_append_text("\n<<{}>>\n".format(event_data))

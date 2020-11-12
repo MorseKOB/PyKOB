@@ -34,14 +34,7 @@ message events.
 import kobevents as ke
 import kobwindow
 
-root = None # Must be set from the root window
 kw = None # Must be set from the root window
-
-def append_text(text: str):
-    """
-    Generate an event to add text to the reader window.
-    """
-    root.event_generate(ke.EVENT_APPEND_TEXT, when='tail', data=text)
 
 def handle_append_text(event_data):
     """
@@ -50,12 +43,6 @@ def handle_append_text(event_data):
     text = event_data
     kw.txtReader.insert('end', text)
     kw.txtReader.see('end')
-
-def clear():
-    """
-    Generate an event to clear the Reader window
-    """
-    root.event_generate(ke.EVENT_CLEAR_READER, when='tail')
 
 def handle_clear(event_data):
     """

@@ -40,20 +40,24 @@ import kobreader as krdr
 
 class KOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):       
-        
+
+        # KOBWindow pointers for other modules
+        ka.kw = self
+        krdr.kw = self
+        ksl.kw = self
+
         # window
         self.root = root
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(MKOB_VERSION_TEXT)
-        root.bind_all('<KeyPress-Escape>', ka.event_escape)
-        root.bind_all('<Control-KeyPress-s>', ka.event_playback_stop)
-        root.bind_all('<Control-KeyPress-p>', ka.event_playback_pauseresume)
-        root.bind_all('<Control-KeyPress-h>', ka.event_playback_move_back15)
-        root.bind_all('<Control-KeyPress-l>', ka.event_playback_move_forward15)
-        root.bind_all('<Control-KeyPress-j>', ka.event_playback_move_sender_start)
-        root.bind_all('<Control-KeyPress-k>', ka.event_playback_move_sender_end)
-        ka.kw = self
+        root.bind_all('<KeyPress-Escape>', ka.handle_escape)
+        root.bind_all('<Control-KeyPress-s>', ka.handle_playback_stop)
+        root.bind_all('<Control-KeyPress-p>', ka.handle_playback_pauseresume)
+        root.bind_all('<Control-KeyPress-h>', ka.handle_playback_move_back15)
+        root.bind_all('<Control-KeyPress-l>', ka.handle_playback_move_forward15)
+        root.bind_all('<Control-KeyPress-j>', ka.handle_playback_move_sender_start)
+        root.bind_all('<Control-KeyPress-k>', ka.handle_playback_move_sender_end)
         
         # File menu
         menu = tk.Menu()
@@ -107,16 +111,6 @@ class KOBWindow:
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
         self.txtReader.columnconfigure(0, weight=2)
-        # register action events for reader window
-        krdr.root = self.root
-        krdr.kw = self
-        ## need to use tk commands in order to provide access to the 'data' element of an event
-        ### self.root.bind('<<Clear_Reader>>', krdr.handle_clear)
-        cmd = root.register(krdr.handle_clear)
-        root.tk.call("bind", root, kobevents.EVENT_CLEAR_READER, cmd)
-        ### self.root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
-        cmd = root.register(krdr.handle_append_text)
-        root.tk.call("bind", root, kobevents.EVENT_APPEND_TEXT, cmd + " %d")
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(
@@ -130,18 +124,6 @@ class KOBWindow:
                 frm3, width=10, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
-        # register action events for station list
-        ksl.root = self.root
-        ## need to use tk commands in order to provide access to the 'data' element of an event
-        ### self.root.bind('<<Clear_Senders>>', ksl.handle_clear_station_list)
-        cmd = root.register(ksl.handle_clear_station_list)
-        root.tk.call("bind", root, kobevents.EVENT_CLEAR_SENDERS, cmd)
-        ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ksl.handle_update_current_sender)
-        cmd = root.register(ksl.handle_update_current_sender)
-        root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
-        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
-        cmd = root.register(ksl.handle_update_station_active)
-        root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
         
         # office ID
         self.varOfficeID = tk.StringVar()
@@ -193,6 +175,22 @@ class KOBWindow:
         tk.Canvas(lfm3, width=1, height=2).grid(row=1, column=1)
         self.btnConnect = tk.Button(lfm3, text='Connect', command=ka.doConnect)
         self.btnConnect.grid(row=2, columnspan=3, ipady=2, sticky='EW')
+
+        # Register messages and bind handlers
+        ## For messages that need the 'data' element of an event
+        ## need to use tk commands because tkinter doesn't provide wrapper methods.
+        self.root.bind(kobevents.EVENT_STATIONS_CLEAR, ka.handle_clear_stations)
+        ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)
+        cmd = root.register(ka.handle_sender_update)
+        root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
+        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
+        cmd = root.register(ksl.handle_update_station_active)
+        root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
+        self.root.bind(kobevents.EVENT_READER_CLEAR, ka.handle_reader_clear)
+        ### self.root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
+        cmd = root.register(ka.handle_reader_append_text)
+        root.tk.call("bind", root, kobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
+
 
         # get configuration settings
         sw = self.root.winfo_screenwidth()

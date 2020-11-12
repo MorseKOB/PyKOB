@@ -114,17 +114,20 @@ class Recorder:
             station_id:str="", wire:int=-1, \
             play_code_callback=None, \
             play_finished_callback=None, \
-            play_station_id_callback=None, \
+            play_sender_id_callback=None, \
             play_wire_callback=None, \
             play_station_list_callback=None):
         self.__target_file_path = target_file_path
         self.__source_file_path = source_file_path
-        self.__station_id = station_id
-        self.__wire = wire
 
+        self.__recorder_station_id = station_id
+        self.__recorder_wire = wire
+
+        self.__player_station_id = None
+        self.__player_wire = 0
         self.__play_code_callback = play_code_callback
         self.__play_finished_callback = play_finished_callback
-        self.__play_station_id_callback = play_station_id_callback
+        self.__play_sender_id_callback = play_sender_id_callback
         self.__play_station_list_callback = play_station_list_callback
         self.__play_wire_callback = play_wire_callback
 
@@ -199,34 +202,28 @@ class Recorder:
         """
         The Station ID.
         """
-        return self.__station_id
+        return self.__recorder_station_id
 
     @station_id.setter
     def station_id(self, station_id: str):
         """
         Set the Station ID.
         """
-        if self.__station_id != station_id:
-            self.__station_id = station_id
-            if self.__play_station_id_callback and not self.playback_state == PlaybackState.idle:
-                self.__play_station_id_callback(station_id)
+        self.__recorder_station_id = station_id
 
     @property
     def wire(self) -> int:
         """
         The Wire.
         """
-        return self.__wire
+        return self.__recorder_wire
 
     @wire.setter
     def wire(self, wire: int):
         """
-        Set the Wire.
+        Set the recorder Wire.
         """
-        if self.__wire != wire:
-            self.__wire = wire
-            if self.__play_wire_callback and not self.playback_state == PlaybackState.idle:
-                self.__play_wire_callback(wire)
+        self.__recorder_wire = wire
 
     def record(self, code, source):
         """
@@ -443,8 +440,8 @@ class Recorder:
         self.__p_fpts_index = []
         self.__p_line_no = 0
         self.__p_lines = 0
-        self.__station_id = None
-        self.__wire = None
+        self.__recorder_station_id = None
+        self.__recorder_wire = None
         #
         # Get information from the current playback recording file.
         with open(self.__source_file_path, "r") as fp:
@@ -556,7 +553,7 @@ class Recorder:
                             pause = 0
                             if codePause == 32.767 and len(code) > 1 and code[1] == 2:
                                 # Probable sender change. See if it is...
-                                if not station == self.station_id:
+                                if not station == self.__player_station_id:
                                     if self.__list_data:
                                         print("Sender change.")
                                     pause = round((ts - pblts)/1000, 4)
@@ -578,7 +575,11 @@ class Recorder:
                                 if c < 0 or c > 2:
                                     c = round(sf * c)
                         self.wire = wire
-                        self.station_id = station
+                        if self.__play_wire_callback:
+                            self.__play_wire_callback(wire)
+                        self.__player_station_id = station
+                        if self.__play_sender_id_callback:
+                            self.__play_sender_id_callback(station)
                         if self.__play_code_callback:
                             self.__play_code_callback(code)
                     finally:

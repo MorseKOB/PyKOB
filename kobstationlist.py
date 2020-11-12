@@ -32,74 +32,76 @@ message events.
 """
 
 import time
-import kobactions as ka
+import kobwindow as kw
 import kobevents as ke
 import kobmain as km
 
-root = None # Must be set from the root window
-
-__active_stations = {} # Dictionary of station ID to time last pinged, initially connected, and received from ({"id":[ping,connected,received]})
-__last_sender = None # Keep last sender to know when a sender changes
-
-def update_current_sender(id: str):
-    """
-    Generate an event to record the current sender.
-    """
-    root.event_generate(ke.EVENT_CURRENT_SENDER, when='tail', data=id)
-
-def handle_update_current_sender(event_data):
-    """
-    Event handler to record the station that is now sending. Add it if it doesn't exist.
-    Update the ping and received timestamps of the station in the station list.
-    """
-    global __active_stations, __last_sender
-    station_name = event_data
-    now = time.time()
-    __active_stations[station_name] = [now,now,now]
-    if not station_name == __last_sender:
-        __last_sender = station_name
-        trim_station_list()
-        display_station_list()
-
-def update_station_active(id: str):
-    """
-    Generate an event to update the active status (timestamp) of a station.
-    """
-    root.event_generate(ke.EVENT_STATION_ACTIVE, when='tail', data=id)
-
-def handle_update_station_active(event_data):
-    """
-    Update the station ping time. Add the station:[ping,connected,0] if it doesn't exist.
-    """
-    global __active_stations
-    station_name = event_data
-    now = time.time()
-    station_times = []
-    if station_name in __active_stations:
-        station_times = __active_stations[station_name]
-        station_times[0] = now # update ping time
-    else:
-        # create new entry with ping of now, connected of now, and never received from
-        station_times = [now,now, 0] 
-    __active_stations[station_name] = station_times
-    if trim_station_list():
-        display_station_list()
-
-def clear_station_list():
-    """
-    Generate an event to clear the station list and the window.
-    """
-    root.event_generate('<<Clear>>', when='tail')
+__active_stations = [] # List of lists with [station ID, time initially connected, time received from, ping time]
+__last_sender = "" # Keep last sender to know when a sender changes
 
 def handle_clear_station_list(event):
     """
     reset the station list
     """
-    global __active_stations
-    __active_stations = {}
-    ka.kw.txtStnList.delete('1.0', 'end')
+    global __active_stations, __last_sender
+    __active_stations = []
+    __last_sender = ""
+    kw.txtStnList.delete('1.0', 'end')
 
-def trim_station_list() -> bool:
+def handle_update_current_sender(station_name: str):
+    """
+    Update the station last send time. 
+    Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist.
+    If it is a different sender from the last, move it to the end.
+    """
+    global __active_stations, __last_sender
+    now = time.time()
+    station_info = []
+
+    updated = False
+    sender_changed = False
+    for i in range(0, len(__active_stations)): # better way to do this?
+        station_info = __active_stations[i]
+        if (station_info[0] == station_name):
+            # update the last received from time for this station
+            station_info[2] = now
+            if not station_name == __last_sender:
+                __active_stations.pop(i)
+                __active_stations.append(station_info)
+                sender_changed = True
+            updated = True
+            break
+    if not updated:
+        # add an entry
+        __active_stations.append([station_name, now, now, now])
+    if __trim_station_list() or (not updated) or sender_changed:
+        __last_sender = station_name
+        __display_station_list()
+
+def handle_update_station_active(station_name: str):
+    """
+    Update the station ping time. 
+    Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist.
+    """
+    global __active_stations
+    now = time.time()
+    station_info = []
+
+    updated = False
+    for i in range(0, len(__active_stations)): # better way to do this?
+        station_info = __active_stations[i]
+        if (station_info[0] == station_name):
+            # update the ping time for this station
+            station_info[3] = now
+            updated = True
+            break
+    if not updated:
+        # add an entry
+        __active_stations.append([station_name, now, -1, now])
+    if (not updated) or __trim_station_list():
+        __display_station_list()
+
+def __trim_station_list() -> bool:
     """
     Check the timestamp of the stations and remove old ones.
 
@@ -107,21 +109,15 @@ def trim_station_list() -> bool:
     """
     global __active_stations
     now = time.time()
-    station_removed = False
 
-    # find and purge inactive stations 
-    new_station_list = {}
-    for station in __active_stations.items():
-        station_name = station[0]
-        station_times = station[1]
-        if station_times[0] > now - 60: # station active within last minute - keep it
-            new_station_list[station_name] = station_times
-        else:
-            station_removed = True
+    # find and purge inactive stations
+    ## keep stations with ping time (element 3) within a minute of now
+    new_station_list = [row for row in __active_stations if row[3] > now - 60]
+    station_removed = len(new_station_list) < len(__active_stations)
     __active_stations = new_station_list
     return station_removed
 
-def display_station_list():
+def __display_station_list():
     """
     Display the updated station list 
     ordered by last send time (most recent at the bottom).
@@ -129,6 +125,9 @@ def display_station_list():
     """
     global __active_stations
     # Delete the current window contents
-    ka.kw.txtStnList.delete('1.0', 'end')
-    for station_name in sorted(__active_stations, key=lambda k: (__active_stations[k][2], __active_stations[k][1])): # Sort by received then connected from time
-        ka.kw.txtStnList.insert('end', "{}\n".format(station_name))
+    kw.txtStnList.delete('1.0', 'end')
+    # ZZZ need to put these in the proper order
+    for station_info in __active_stations: 
+        #sorted(__active_stations, key=lambda k: (__active_stations[k][2], __active_stations[k][1])): 
+        # Sort by received then connected from time
+        kw.txtStnList.insert('end', "{}\n".format(station_info[0]))
