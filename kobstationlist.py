@@ -50,15 +50,14 @@ def handle_clear_station_list(event):
 
 def handle_update_current_sender(station_name: str):
     """
-    Update the station last send time. 
+    Update the station's last send time. 
     Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist.
     If it is a different sender from the last, move it to the end.
     """
     global __active_stations, __last_sender
     now = time.time()
-    station_info = []
 
-    updated = False
+    existing_entry_updated = False
     sender_changed = False
     for i in range(0, len(__active_stations)): # better way to do this?
         station_info = __active_stations[i]
@@ -69,36 +68,40 @@ def handle_update_current_sender(station_name: str):
                 __active_stations.pop(i)
                 __active_stations.append(station_info)
                 sender_changed = True
-            updated = True
+            existing_entry_updated = True
             break
-    if not updated:
+    if not existing_entry_updated:
         # add an entry
         __active_stations.append([station_name, now, now, now])
-    if __trim_station_list() or (not updated) or sender_changed:
+    if __trim_station_list() or (not existing_entry_updated) or sender_changed:
         __last_sender = station_name
         __display_station_list()
 
 def handle_update_station_active(station_name: str):
     """
-    Update the station ping time. 
-    Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist.
+    Update the station's ping time. 
+    Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist
+    (connected_time is now).
     """
     global __active_stations
     now = time.time()
-    station_info = []
 
-    updated = False
-    for i in range(0, len(__active_stations)): # better way to do this?
+    existing_entry_updated = False
+    for i in range(0, len(__active_stations)): # is there a better way to do this?
         station_info = __active_stations[i]
         if (station_info[0] == station_name):
             # update the ping time for this station
             station_info[3] = now
-            updated = True
+            existing_entry_updated = True
             break
-    if not updated:
-        # add an entry
-        __active_stations.append([station_name, now, -1, now])
-    if (not updated) or __trim_station_list():
+    if not existing_entry_updated:
+        # new station, add an entry
+        station_info = [station_name, now, -1, now]
+        if __last_sender: # if there is a sender add this just before it
+            __active_stations.insert(-1,station_info)
+        else:
+            __active_stations.append(station_info)
+    if  __trim_station_list() or not existing_entry_updated:
         __display_station_list()
 
 def __trim_station_list() -> bool:
