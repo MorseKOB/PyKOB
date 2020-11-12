@@ -190,7 +190,7 @@ def update_sender(id):
     if id != sender_ID:  # new sender
         sender_ID = id
         Reader.flush()
-        ka.trigger_reader_append_text("\n<{}>".format(sender_ID))
+        ka.trigger_reader_append_text("\n\n<{}>".format(sender_ID))
         Reader = morse.Reader(
                 wpm=kc.WPM, codeType=kc.CodeType,
                 callback=readerCallback)  # reset to nominal code speed

@@ -274,4 +274,4 @@ def handle_player_wire_change(event_data):
 
     event_data contains a string version of the wire number
     """
-    krdr.handle_append_text("\n<<{}>>\n".format(event_data))
+    krdr.handle_append_text("\n\n<<{}>>\n".format(event_data))
