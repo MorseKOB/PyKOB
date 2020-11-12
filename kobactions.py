@@ -83,7 +83,7 @@ def doFileExit():
 # Help menu
 
 def doHelpAbout():
-    mb.showinfo(title="About", message="MorseKOB " + kw.VERSION)
+    mb.showinfo(title="About", message=kw.MKOB_VERSION_TEXT)
 
 ####
 #### Action handlers for control events

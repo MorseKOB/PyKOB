@@ -58,7 +58,7 @@ def set_local_loop_active(state):
     """set local_loop_active state and update Circuit Closer checkbox"""
     global local_loop_active
     local_loop_active = state
-    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
+    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)  # ZZZ is this GUI-safe? probably not
 
 def from_key(code):
     """handle inputs received from the external key"""
@@ -73,7 +73,7 @@ def from_key(code):
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-        Reader.flush()  # ZZZ is this necessary/desirable?
+##        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -91,7 +91,7 @@ def from_keyboard(code):
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-        Reader.flush()  # ZZZ is this necessary/desirable?
+##        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -104,7 +104,7 @@ def from_internet(code):
         Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
             internet_active = False
-            Reader.flush()  # ZZZ is this necessary/desirable?
+##            Reader.flush()  # ZZZ is this necessary/desirable?
         else:
             internet_active = True
 
@@ -153,8 +153,8 @@ def toggle_connect():
     else:
         Internet.disconnect()
         Reader.flush()
-        time.sleep(1.0)  # wait for any buffered code to complete
-        connected = False
+##        time.sleep(1.0)  # wait for any buffered code to complete
+##        connected = False  # just to make sure
         if not local_loop_active:
             KOB.sounder(latch_code)
             Reader.decode(latch_code)
@@ -169,7 +169,7 @@ def change_wire():
     if connected:
         connected = False
         Reader.flush()
-        time.sleep(1.0)  # wait for any buffered code to complete ZZZ see if other way to tell
+##        time.sleep(1.0)  # wait for any buffered code to complete
         if internet_active:
             internet_active = False
             if not local_loop_active:
@@ -222,11 +222,8 @@ def readerCallback(char, spacing):
         ka.trigger_reader_append_text("\n")
 
 def reset_wire_state():
-    """log the current internet state and regain control of the wire"""
+    """regain control of the wire"""
     global internet_active
-    print(
-            "Circuit Closer {}, internet_active was {}".format(
-            local_loop_active, internet_active))
     internet_active = False
 
 # initialization

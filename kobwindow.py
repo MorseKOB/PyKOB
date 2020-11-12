@@ -48,6 +48,7 @@ class KOBWindow:
 
         # window
         self.root = root
+        self.MKOB_VERSION_TEXT = MKOB_VERSION_TEXT
         root.rowconfigure(0, weight=1)
         root.columnconfigure(0, weight=1)
         root.title(MKOB_VERSION_TEXT)
