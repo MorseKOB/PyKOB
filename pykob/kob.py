@@ -78,11 +78,15 @@ class KOB:
         self.setSounder(True)
         time.sleep(0.5)
         if self.port:
-            self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
-            self.tLastKey = time.time()  # time of last key transition
-            self.cktClose = self.keyState  # True: circuit latched closed
-            if self.interfaceType == config.interface_type.key_sounder:
-                self.setSounder(self.keyState)
+            try:
+                self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
+                self.tLastKey = time.time()  # time of last key transition
+                self.cktClose = self.keyState  # True: circuit latched closed
+                if self.interfaceType == config.interface_type.key_sounder:
+                    self.setSounder(self.keyState)
+            except(OSError):
+                log.err("Port not available.")
+                self.port = None
         self.recorder = None
         if self.callback:
             keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackRead)
@@ -108,9 +112,14 @@ class KOB:
 
     def key(self):
         code = ()
-        while True:
+        while self.port:
+            try:
+                s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
+            except(OSError):
+                log.err("Port not available.")
+                self.port = None
+                return ""
             t = time.time()
-            s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
             if s != self.keyState:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
@@ -137,6 +146,7 @@ class KOB:
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
             time.sleep(0.001)
+        return ""
 
     def sounder(self, code, code_source=CodeSource.local):
         if self.t0 < 0:  ### ZZZ capture start time
@@ -167,17 +177,20 @@ class KOB:
                 self.setSounder(False)
 
     def setSounder(self, state):
-        if state != self.sdrState:
-            self.sdrState = state
-            if state:
-                if self.port:
-                    self.port.rts = True
-                if self.audio:
-                    audio.play(1)  # click
-            else:
-                if self.port:
-                    self.port.rts = False
-                if self.audio:
-                    audio.play(0)  # clack
-
+        try:
+            if state != self.sdrState:
+                self.sdrState = state
+                if state:
+                    if self.port:
+                        self.port.rts = True
+                    if self.audio:
+                        audio.play(1)  # click
+                else:
+                    if self.port:
+                        self.port.rts = False
+                    if self.audio:
+                        audio.play(0)  # clack
+        except(OSError):
+            log.err("Port not available.")
+            self.port = None
 ##windll.winmm.timeEndPeriod(1)
