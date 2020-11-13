@@ -148,13 +148,17 @@ def toggle_connect():
     global connected
     if not connected:
         ka.trigger_station_list_clear()
+        Internet.monitor_IDs(ka.trigger_update_station_active) # Callback for monitoring stations
+        Internet.monitor_sender(ka.trigger_update_current_sender) # Callback for monitoring current sender
         Internet.connect(kc.WireNo)
         connected = True
     else:
+        connected = False
+        Internet.monitor_IDs(None) # don't monitor stations
+        Internet.monitor_sender(None) # don't monitor current sender
         Internet.disconnect()
         Reader.flush()
 ##        time.sleep(1.0)  # wait for any buffered code to complete
-##        connected = False  # just to make sure
         if not local_loop_active:
             KOB.sounder(latch_code)
             Reader.decode(latch_code)
@@ -237,8 +241,6 @@ def init():
     KOB = kob.KOB(
             port=kc.config.serial_port, interfaceType=kc.config.interface_type, audio=kc.config.sound, callback=from_key)
     Internet = internet.Internet(kc.config.station, callback=from_internet)
-    Internet.monitor_IDs(ka.trigger_update_station_active)
-    Internet.monitor_sender(ka.trigger_update_current_sender)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
         log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
