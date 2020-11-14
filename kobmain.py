@@ -73,7 +73,6 @@ def from_key(code):
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-##        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -91,7 +90,6 @@ def from_keyboard(code):
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-##        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -104,7 +102,6 @@ def from_internet(code):
         Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
             internet_active = False
-##            Reader.flush()  # ZZZ is this necessary/desirable?
         else:
             internet_active = True
 
@@ -148,8 +145,8 @@ def toggle_connect():
     global connected
     if not connected:
         ka.trigger_station_list_clear()
-        Internet.monitor_IDs(ka.trigger_update_station_active) # Callback for monitoring stations
-        Internet.monitor_sender(ka.trigger_update_current_sender) # Callback for monitoring current sender
+        Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
+        Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
         Internet.connect(kc.WireNo)
         connected = True
     else:
@@ -158,7 +155,6 @@ def toggle_connect():
         Internet.monitor_sender(None) # don't monitor current sender
         Internet.disconnect()
         Reader.flush()
-##        time.sleep(1.0)  # wait for any buffered code to complete
         if not local_loop_active:
             KOB.sounder(latch_code)
             Reader.decode(latch_code)
