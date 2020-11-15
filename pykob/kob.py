@@ -76,13 +76,17 @@ class KOB:
         self.sdrState = False  # True: mark, False: space
         self.tLastSdr = time.time()  # time of last sounder transition
         self.setSounder(True)
-        time.sleep(0.5)
+        time.sleep(0.5)  # ZZZ Why is this here?
         if self.port:
-            self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
-            self.tLastKey = time.time()  # time of last key transition
-            self.cktClose = self.keyState  # True: circuit latched closed
-            if self.interfaceType == config.interface_type.key_sounder:
-                self.setSounder(self.keyState)
+            try:
+                self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
+                self.tLastKey = time.time()  # time of last key transition
+                self.cktClose = self.keyState  # True: circuit latched closed
+                if self.interfaceType == config.interface_type.key_sounder:
+                    self.setSounder(self.keyState)
+            except(OSError):
+                log.err("Port not available.")
+                self.port = None
         self.recorder = None
         if self.callback:
             keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackRead)
@@ -108,9 +112,14 @@ class KOB:
 
     def key(self):
         code = ()
-        while True:
+        while self.port:
+            try:
+                s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
+            except(OSError):
+                log.err("Port not available.")
+                self.port = None
+                return ""
             t = time.time()
-            s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
             if s != self.keyState:
                 self.keyState = s
                 dt = int((t - self.tLastKey) * 1000)
@@ -137,28 +146,23 @@ class KOB:
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
             time.sleep(0.001)
+        return ""
 
     def sounder(self, code, code_source=CodeSource.local):
         if self.t0 < 0:  ### ZZZ capture start time
             self.t0 = time.time()  ### ZZZ
-##        print("KOB.sounder", round(time.time()-self.t0, 3), code)  ### ZZZ
         if self.__recorder and not code_source == CodeSource.player:
             self.__recorder.record(code_source, code)
         for c in code:
             t = time.time()
             if c < -3000:  # long pause, change of senders, or missing packet
-##                print("KOB.sounder long pause:", c, code)  ### ZZZ
                 c = -1
-                self.tLastSdr = t + 1.0
+##                self.tLastSdr = t + 1.0
             if c > 0:  # start of mark
                 self.setSounder(True)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
-##                print(
-##                        "KOB.sounder buffer empty:",
-##                        round(time.time()-self.t0, 3),
-##                        round(dt, 3), c, code)  ### ZZZ
                 self.tLastSdr = t
             else:
                 self.tLastSdr = tNext
@@ -167,17 +171,21 @@ class KOB:
                 self.setSounder(False)
 
     def setSounder(self, state):
-        if state != self.sdrState:
-            self.sdrState = state
-            if state:
-                if self.port:
-                    self.port.rts = True
-                if self.audio:
-                    audio.play(1)  # click
-            else:
-                if self.port:
-                    self.port.rts = False
-                if self.audio:
-                    audio.play(0)  # clack
-
-##windll.winmm.timeEndPeriod(1)
+        try:
+            if state != self.sdrState:
+                self.sdrState = state
+                if state:
+                    if self.port:
+                        self.port.rts = True
+                    if self.audio:
+                        audio.play(1)  # click
+                else:
+                    if self.port:
+                        self.port.rts = False
+                    if self.audio:
+                        audio.play(0)  # clack
+        except(OSError):
+            log.err("Port not available.")
+            self.port = None
+##if sys.platform == 'win32':  ### ZZZ This should be executed when the program is closed.
+##    windll.winmm.timeEndPeriod(1)  # Restore default clock resolution. (Windows only)

@@ -58,7 +58,7 @@ def set_local_loop_active(state):
     """set local_loop_active state and update Circuit Closer checkbox"""
     global local_loop_active
     local_loop_active = state
-    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
+    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)  # ZZZ is this GUI-safe? probably not
 
 def from_key(code):
     """handle inputs received from the external key"""
@@ -68,13 +68,11 @@ def from_key(code):
             KOB.setSounder(True)
         update_sender(kc.config.station)
         Reader.decode(code)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.local)
+        Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to start/stop recording
     if connected and kc.Remote:
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -87,13 +85,11 @@ def from_keyboard(code):
             KOB.sounder(code)
         update_sender(kc.config.station)
         Reader.decode(code)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.local)
+        Recorder.record(code, kob.CodeSource.local)
     if connected and kc.Remote:
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
-        Reader.flush()  # ZZZ is this necessary/desirable?
     else:
         set_local_loop_active(True)
 
@@ -103,11 +99,9 @@ def from_internet(code):
     if connected:
         KOB.sounder(code)
         Reader.decode(code)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.wire)
+        Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
             internet_active = False
-            Reader.flush()  # ZZZ is this necessary/desirable?
         else:
             internet_active = True
 
@@ -120,14 +114,6 @@ def from_recorder(code, source=None):
     KOB.sounder(code)
     Reader.decode(code)
 
-def recorder_wire_callback(wire):
-    """
-    Called from the recorder playback when a wire changes for a sender.
-    """
-    Reader.flush()
-    ka.codereader_append("\n\n<<{}>>".format(wire))
-
-
 def from_circuit_closer(state):
     """handle change of Circuit Closer state"""
     global local_loop_active, internet_active
@@ -137,8 +123,7 @@ def from_circuit_closer(state):
             update_sender(kc.config.station)
             KOB.sounder(code)
             Reader.decode(code)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.local)
+        Recorder.record(code, kob.CodeSource.local)
     if connected and kc.Remote:
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
@@ -158,39 +143,43 @@ def toggle_connect():
     """connect or disconnect when user clicks on the Connect button"""
     global local_loop_active, internet_active
     global connected
-    connected = not connected
-    if connected:
-        kobstationlist.clear_station_list()
+    if not connected:
+        ka.trigger_station_list_clear()
+        Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
+        Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
         Internet.connect(kc.WireNo)
+        connected = True
     else:
+        connected = False
+        Internet.monitor_IDs(None) # don't monitor stations
+        Internet.monitor_sender(None) # don't monitor current sender
         Internet.disconnect()
         Reader.flush()
-        time.sleep(1.0)  # wait for any buffered code to complete
-        connected = False  # just to make sure
         if not local_loop_active:
             KOB.sounder(latch_code)
             Reader.decode(latch_code)
             Reader.flush()
-        kobstationlist.clear_station_list()
+        ka.trigger_station_list_clear()
     internet_active = False
 
 def change_wire():
     global local_loop_active, internet_active
     global connected
+    global sender_ID
     if connected:
         connected = False
         Reader.flush()
-        time.sleep(1.0)  # wait for any buffered code to complete
+##        time.sleep(1.0)  # wait for any buffered code to complete
         if internet_active:
             internet_active = False
             if not local_loop_active:
                 KOB.sounder(latch_code)
                 Reader.decode(latch_code)
                 Reader.flush()
+        sender_ID = None
         Internet.connect(kc.WireNo)
         connected = True
-    if Recorder:
-        Recorder.wire = kc.WireNo
+    Recorder.wire = kc.WireNo
     internet_active = False
     
 # callback functions
@@ -201,19 +190,10 @@ def update_sender(id):
     if id != sender_ID:  # new sender
         sender_ID = id
         Reader.flush()
-        ka.codereader_append("\n\n<{}>".format(sender_ID))
-        kobstationlist.update_current_sender(sender_ID)
+        ka.trigger_reader_append_text("\n\n<{}>".format(sender_ID))
         Reader = morse.Reader(
                 wpm=kc.WPM, codeType=kc.CodeType,
                 callback=readerCallback)  # reset to nominal code speed
-        if Recorder:
-            Recorder.station_id = sender_ID
-
-def add_to_sender_list(sender):
-    """
-    Add a sender to the sender list.
-    """
-
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -237,16 +217,13 @@ def readerCallback(char, spacing):
         n = int(sp - 0.8) + 2
         txt = n * " "
     txt += char
-    ka.codereader_append(txt)
+    ka.trigger_reader_append_text(txt)
     if char == "=":
-        ka.codereader_append("\n")
+        ka.trigger_reader_append_text("\n")
 
 def reset_wire_state():
-    """log the current internet state and regain control of the wire"""
+    """regain control of the wire"""
     global internet_active
-    print(
-            "Circuit Closer {}, internet_active was {}".format(
-            local_loop_active, internet_active))
     internet_active = False
 
 # initialization
@@ -260,13 +237,11 @@ def init():
     KOB = kob.KOB(
             port=kc.config.serial_port, interfaceType=kc.config.interface_type, audio=kc.config.sound, callback=from_key)
     Internet = internet.Internet(kc.config.station, callback=from_internet)
-    Internet.monitor_IDs(kobstationlist.update_station_active)
-    Internet.monitor_sender(kobstationlist.update_current_sender)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
         log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
             "To enable/disable this setting use `Configure --iki`.")
-    # ZZZ temp always enable recorder - goal is to provide menu option
+    # ZZZ temp always enable recorder - goal is to provide menu option to start/stop recording
     ts = recorder.get_timestamp()
     dt = datetime.fromtimestamp(ts / 1000.0)
     dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
@@ -274,7 +249,7 @@ def init():
     log.info("Record to '{}'".format(targetFileName))
     Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
         play_code_callback=from_recorder, \
-        play_station_id_callback=update_sender, \
-        play_station_list_callback=kobstationlist.update_station_active, \
-        play_wire_callback=recorder_wire_callback)
+        play_sender_id_callback=ka.trigger_update_current_sender, \
+        play_station_list_callback=ka.trigger_update_station_active, \
+        play_wire_callback=ka.trigger_player_wire_change)
     kobkeyboard.init()
