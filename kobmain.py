@@ -169,7 +169,6 @@ def change_wire():
     if connected:
         connected = False
         Reader.flush()
-##        time.sleep(1.0)  # wait for any buffered code to complete
         if internet_active:
             internet_active = False
             if not local_loop_active:
