@@ -1,6 +1,6 @@
 :: Download MKOB.
 
-::@echo off
+@echo off
 echo Installing MKOB...
 
 :: Create new directory and download MKOB
