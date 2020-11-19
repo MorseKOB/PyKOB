@@ -30,24 +30,28 @@ logs status, debug and error messages.
 import sys
 import datetime
 
-def log(type, msg, dt=None):
+def log(msg, type="", dt=None):
     dtl = dt if dt else str(datetime.datetime.now())[:19]
-    sys.stdout.write('{0} \t{1}: \t{2}\n'.format(dtl, type, msg))
+    typestr = " {0}".format(type) if type else ""
+    sys.stdout.write('{0}{1}: \t{2}\n'.format(dtl, typestr, msg))
     sys.stdout.flush()
 
 def logErr(msg):
-    dt = str(datetime.datetime.now())[:19]
-    log('ERROR', msg, dt) # Output to the normal output
-    sys.stderr.write('{0} \t{1}: \t{2}\n'.format(dt, type, msg))
+    dtstr = str(datetime.datetime.now())[:19]
+    typestr = "ERROR"
+    log(msg, type=typestr, dt=dtstr) # Output to the normal output
+    sys.stderr.write('{0} {1}:\t{2}\n'.format(dtstr, typestr, msg))
     sys.stderr.flush()
     
 def debug(msg):
-    log('DEBUG', msg)
-    sys.stderr.flush()
-    
-def info(msg):
-    log('INFO', msg)
+    log(msg, type="DEBUG")
     
 def err(msg):
     typ, val, trc = sys.exc_info()
-    log('ERROR', '{0}: \t({1})'.format(msg, val))
+    logErr("{0}\n{1}".format(msg, val))
+
+def info(msg):
+    log(msg, type="INFO")
+    
+def warn(msg):
+    log(msg, type="WARN")
