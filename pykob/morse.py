@@ -173,7 +173,7 @@ class Reader:
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
-        self.updateWPM(codeSeq)
+##        self.updateWPM(codeSeq)  ### ZZZ temporarily disable code speed recognition
         i = 0
         for i in range(0, len(codeSeq), 2):
             sp = -codeSeq[i]
@@ -252,9 +252,9 @@ class Reader:
                 s = 'L'
             elif s == 'E':
                 if self.markBuf[0] == 1:
-                    s = '+'
+                    s = '_'
                 elif self.markBuf[0] == 2:
-                    s = '~'
+                    s = '_'
             self.codeBuf[0] = self.codeBuf[1]
             self.spaceBuf[0] = self.spaceBuf[1]
             self.markBuf[0] = self.markBuf[1]

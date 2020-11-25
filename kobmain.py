@@ -201,9 +201,9 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "~" or char == "+" else " * "
+        txt = "" if char == "_" else " * "
     elif sp > 10:
-        txt = "  —  "
+        txt = "     "
     elif sp < -0.2:
         txt = ""
     elif sp < 0.2:
