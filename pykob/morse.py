@@ -77,7 +77,6 @@ class Sender:
             self.charSpace += int((60000 / cwpm - self.dotLen *
                     DOTSPERWORD) / 6)
             self.wordSpace = 2 * self.charSpace
-##        print ("wpm", wpm, "cwpm", cwpm) # ZZZ probably don't need anymore
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
         if spacing == config.Spacing.char:
             self.charSpace += int(delta / 6)
@@ -255,6 +254,7 @@ class Reader:
                     s = '_'
                 elif self.markBuf[0] == 2:
                     s = '_'
+                    sp1 = 0  ### ZZZ eliminate space between underscores
             self.codeBuf[0] = self.codeBuf[1]
             self.spaceBuf[0] = self.spaceBuf[1]
             self.markBuf[0] = self.markBuf[1]
