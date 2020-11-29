@@ -201,19 +201,25 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "~" or char == "+" else " * "
-    elif sp > 10:
-        txt = "  —  "
-    elif sp < -0.2:
-        txt = ""
-    elif sp < 0.2:
-        txt = NNBSP
-    elif sp < 0.5:
-        txt = 2 * NNBSP
-    elif sp < 0.8:
-        txt = NNBSP + " "
+        txt = "" if char == "_" else " * "
+## ZZZ Temporarily disable 'intelligent' spacing
+##    elif sp > 10:
+##        txt = "     "
+##    elif sp < -0.2:
+##        txt = ""
+##    elif sp < 0.2:
+##        txt = NNBSP
+##    elif sp < 0.5:
+##        txt = 2 * NNBSP
+##    elif sp < 0.8:
+##        txt = NNBSP + " "
+##    else:
+##        n = int(sp - 0.8) + 2
+##        txt = n * " "
+    elif sp > 5:
+        txt = "     "
     else:
-        n = int(sp - 0.8) + 2
+        n = int(sp + 0.5)
         txt = n * " "
     txt += char
     ka.trigger_reader_append_text(txt)
