@@ -120,7 +120,7 @@ def from_circuit_closer(state):
     code = latch_code if state == 1 else unlatch_code
     if not internet_active:
         if kc.Local:
-            update_sender(kc.config.station)
+            ka.handle_sender_update(kc.config.station) # Okay to call 'handle_' as this is run on the main thread
             KOB.sounder(code)
             Reader.decode(code)
         Recorder.record(code, kob.CodeSource.local)
