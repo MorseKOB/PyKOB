@@ -40,7 +40,7 @@ except:
     log.log("pySerial not installed.")
     serialAvailable = False
 
-DEBOUNCE  = 0.010  # time to ignore transitions due to contact bounce (sec)
+DEBOUNCE  = 0.015  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.75  # length of mark to signal circuit closure (sec)
 
