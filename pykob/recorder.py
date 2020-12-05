@@ -588,6 +588,7 @@ class Recorder:
                             line = self.__p_fp.readline()
                             self.__p_line_no += 1
         finally:
+            self.__playback_stop_flag.set()
             self.__playback_state = PlaybackState.idle
             if self.__play_finished_callback:
                 self.__play_finished_callback()
