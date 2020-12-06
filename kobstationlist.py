@@ -114,8 +114,8 @@ def __trim_station_list() -> bool:
     now = time.time()
 
     # find and purge inactive stations
-    ## keep stations with ping time (element 3) within a minute of now
-    new_station_list = [row for row in __active_stations if row[3] > now - 60]
+    ## keep stations with ping time (element 3) within the last 2/3rds a minute
+    new_station_list = [row for row in __active_stations if row[3] > now - 40]
     station_removed = len(new_station_list) < len(__active_stations)
     __active_stations = new_station_list
     return station_removed
