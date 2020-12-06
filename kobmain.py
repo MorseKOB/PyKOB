@@ -143,7 +143,9 @@ def toggle_connect():
     """connect or disconnect when user clicks on the Connect button"""
     global local_loop_active, internet_active
     global connected
+    global sender_ID
     if not connected:
+        sender_ID = ""
         ka.trigger_station_list_clear()
         Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
         Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
@@ -158,28 +160,24 @@ def toggle_connect():
         if not local_loop_active:
             KOB.sounder(latch_code)
             Reader.decode(latch_code)
-            Reader.flush()
+        sender_ID = ""
         ka.trigger_station_list_clear()
     internet_active = False
 
 def change_wire():
-    global local_loop_active, internet_active
+    """
+    Change the current wire. If connected, drop the current connection and 
+    connect to the new wire.
+    """
     global connected
-    global sender_ID
-    if connected:
-        connected = False
-        Reader.flush()
-        if internet_active:
-            internet_active = False
-            if not local_loop_active:
-                KOB.sounder(latch_code)
-                Reader.decode(latch_code)
-                Reader.flush()
-        sender_ID = None
-        Internet.connect(kc.WireNo)
-        connected = True
+    # Disconnect, change wire, reconnect.
+    was_connected = connected
+    disconnect()
     Recorder.wire = kc.WireNo
-    internet_active = False
+    if was_connected:
+        time.sleep(0.350) # Needed to allow UTP packets to clear
+        toggle_connect()
+
     
 # callback functions
 
