@@ -134,7 +134,7 @@ class KOBWindow:
         self.entOfficeID.bind('<Any-KeyRelease>', ka.doOfficeID)
         self.entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
 
-        # circuit closer / WPM
+        # circuit closer
         lfm1 = tk.LabelFrame(frm4, padx=5, pady=5)
         lfm1.grid(row=0, column=0, columnspan=2, padx=3, pady=6)
         self.varCircuitCloser = tk.IntVar()
@@ -142,6 +142,7 @@ class KOBWindow:
                 lfm1, text='Circuit Closer', variable=self.varCircuitCloser,
                 command=ka.doCircuitCloser)
         chkCktClsr.grid(row=0, column=0)
+        # WPM
         tk.Label(lfm1, text='  WPM ').grid(row=0, column=1)
         self.spnWPM = tk.Spinbox(
                 lfm1, from_=5, to=40, justify='center',
@@ -177,9 +178,16 @@ class KOBWindow:
         self.btnConnect = tk.Button(lfm3, text='Connect', command=ka.doConnect)
         self.btnConnect.grid(row=2, columnspan=3, ipady=2, sticky='EW')
 
+        ###########################################################################################
         # Register messages and bind handlers
         ## For messages that need the 'data' element of an event
         ## need to use tk commands because tkinter doesn't provide wrapper methods.
+
+        #### Circuit Open/Close
+        self.root.bind(kobevents.EVENT_CIRCUIT_CLOSE, ka.handle_circuit_close)
+        self.root.bind(kobevents.EVENT_CIRCUIT_OPEN, ka.handle_circuit_open)
+        
+        #### Current Sender and Station List
         self.root.bind(kobevents.EVENT_STATIONS_CLEAR, ka.handle_clear_stations)
         ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)
         cmd = root.register(ka.handle_sender_update)
@@ -187,6 +195,8 @@ class KOBWindow:
         ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
         cmd = root.register(ksl.handle_update_station_active)
         root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
+
+        #### Reader
         self.root.bind(kobevents.EVENT_READER_CLEAR, ka.handle_reader_clear)
         ### self.root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
         cmd = root.register(ka.handle_reader_append_text)

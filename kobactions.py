@@ -126,6 +126,18 @@ def doConnect():
 #### Trigger event messages ###
 ####
 
+def trigger_circuit_close():
+    """
+    Generate an event to indicate that the circuit should be closed.
+    """
+    kw.root.event_generate(kobevents.EVENT_CIRCUIT_CLOSE, when='tail')
+
+def trigger_circuit_open():
+    """
+    Generate an event to indicate that the circuit should be opened.
+    """
+    kw.root.event_generate(kobevents.EVENT_CIRCUIT_OPEN, when='tail')
+
 def trigger_player_wire_change(id: int):
     """
     Generate an event to indicate that the wire number 
@@ -167,6 +179,18 @@ def trigger_update_station_active(id: str):
 ####
 #### Event (message) handlers
 ####
+
+def handle_circuit_close(event):
+    """
+    Close the circuit and trigger associated local functions (checkbox, etc.)
+    """
+    km.from_circuit_closer(True)
+
+def handle_circuit_open(event):
+    """
+    Open the circuit and trigger associated local functions (checkbox, sender, etc.)
+    """
+    km.from_circuit_closer(False)
 
 def handle_escape(event):
     """

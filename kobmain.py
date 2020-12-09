@@ -54,44 +54,62 @@ unlatch_code = (-0x7fff, +2)  # code sequence to unlatch
 
 sender_ID = ""
 
-def set_local_loop_active(state):
-    """set local_loop_active state and update Circuit Closer checkbox"""
+def __set_local_loop_active(state):
+    """set local_loop_active state"""
     global local_loop_active
     local_loop_active = state
-    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)  # ZZZ is this GUI-safe? probably not
+
+def __emit_code(code):
+    """
+    Emit local code. That involves:
+    1. Record code if recording is enabled
+    2. Send code to the wire if connected
+
+    This is used from the key or the keyboard threads to emit code once they 
+    determine it should be emitted.
+    """
+    global connected
+    update_sender(kc.config.station)
+    Reader.decode(code)
+    Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to enable/disable recording
+    if connected and kc.Remote:
+        Internet.write(code)
 
 def from_key(code):
-    """handle inputs received from the external key"""
-    global internet_active
-    if not internet_active:
+    """
+    Handle inputs received from the external key.
+    Only send if the circuit is open.
+    Note: typically this will be the case, but it is possible to 
+     close the circuit from the GUI while the key's physical closer 
+     is still open.
+
+    Called from the 'KOB-KeyRead' thread.
+    """
+    global internet_active, local_loop_active
+    if len(code) > 0:
+        if code[-1] == 1:
+            ka.trigger_circuit_close()
+            return
+        elif code[-1] == 2:
+            ka.trigger_circuit_open()
+            return
+    if not internet_active and local_loop_active:
         if kc.config.interface_type == config.interface_type.loop:
             KOB.setSounder(True)
-        update_sender(kc.config.station)
-        Reader.decode(code)
-        Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to start/stop recording
-    if connected and kc.Remote:
-        Internet.write(code)
-    if len(code) > 0 and code[-1] == +1:
-        set_local_loop_active(False)
-    else:
-        set_local_loop_active(True)
+        __emit_code(code)
 
 def from_keyboard(code):
-    """handle inputs received from the keyboard sender"""
-    # ZZZ combine common code with `from_key()`
-    global internet_active
-    if not internet_active:
+    """
+    Handle inputs received from the keyboard sender.
+    Only send if the circuit is open.
+
+    Called from the 'Keyboard-Send' thread.
+    """
+    global internet_active, local_loop_active
+    if not internet_active and local_loop_active:
         if kc.Local:
             KOB.sounder(code)
-        update_sender(kc.config.station)
-        Reader.decode(code)
-        Recorder.record(code, kob.CodeSource.local)
-    if connected and kc.Remote:
-        Internet.write(code)
-    if len(code) > 0 and code[-1] == +1:
-        set_local_loop_active(False)
-    else:
-        set_local_loop_active(True)
+        __emit_code(code)
 
 def from_internet(code):
     """handle inputs received from the internet"""
@@ -115,7 +133,16 @@ def from_recorder(code, source=None):
     Reader.decode(code)
 
 def from_circuit_closer(state):
-    """handle change of Circuit Closer state"""
+    """
+    Handle change of Circuit Closer state.
+    This must be called from the GUI thread handling the Circuit-Closer checkbox, 
+    the ESC keyboard shortcut, or by posting a message.
+
+    A state of:
+     True: 'latch'
+     False: 'unlatch'
+
+    """
     global local_loop_active, internet_active
     code = latch_code if state == 1 else unlatch_code
     if not internet_active:
@@ -127,10 +154,11 @@ def from_circuit_closer(state):
     if connected and kc.Remote:
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
-        set_local_loop_active(False)
-        Reader.flush()  # ZZZ is this necessary/desirable?
+        __set_local_loop_active(False)
+        Reader.flush()
     else:
-        set_local_loop_active(True)
+        __set_local_loop_active(True)
+    ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
 
 def disconnect():
     """
