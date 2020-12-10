@@ -58,6 +58,10 @@ def __set_local_loop_active(state):
     """set local_loop_active state"""
     global local_loop_active
     local_loop_active = state
+    if local_loop_active:
+        if kc.config.interface_type == config.interface_type.loop:
+            KOB.setSounder(True)
+
 
 def __emit_code(code):
     """
@@ -94,8 +98,6 @@ def from_key(code):
             ka.trigger_circuit_open()
             return
     if not internet_active and local_loop_active:
-        if kc.config.interface_type == config.interface_type.loop:
-            KOB.setSounder(True)
         __emit_code(code)
 
 def from_keyboard(code):
@@ -153,10 +155,12 @@ def from_circuit_closer(state):
         Recorder.record(code, kob.CodeSource.local)
     if connected and kc.Remote:
         Internet.write(code)
-    if len(code) > 0 and code[-1] == +1:
+    if len(code) > 0 and code[-1] == 1:
+        # Unlatch
         __set_local_loop_active(False)
         Reader.flush()
     else:
+        # Latch
         __set_local_loop_active(True)
     ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
 
