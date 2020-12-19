@@ -166,27 +166,51 @@ class Reader:
         self.nChars    = 0           # number of complete characters in buffer
         self.callback  = callback    # function to call when character decoded
         self.flusher   = None        # holds Timer (thread) to call flush if no code received
+        self.last      = 0           # value of previous element processed in the code sequence
+        self.mark      = 0           # accumulates the length of a mark as positive code elements are received
+        self.space     = 0           # accumulates the length of a space as negative code elements are received
 
     def decode(self, codeSeq):
+        print("\ndecode", codeSeq)  ###
         # Code received - cancel an existing 'flusher'
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
 ##        self.updateWPM(codeSeq)  ### ZZZ temporarily disable code speed recognition
+        nextSpace = 0  # space before next dot or dash
         i = 0
-        for i in range(0, len(codeSeq), 2):
-            sp = -codeSeq[i]
-            mk = codeSeq[i+1]
-            if self.codeBuf[self.nChars] == '':
-                self.spaceBuf[self.nChars] = sp  # start of new char
-            else:
-                if sp > MINMORSESPACE * self.dotLen:
-                    self.decodeChar(sp)  # possible Morse or word space
-            if mk > MINDASHLEN * self.truDot:
-                self.codeBuf[self.nChars] += '-'  # dash
-            else:
-                self.codeBuf[self.nChars] += '.'  # dot
-            self.markBuf[self.nChars] = mk
+        for i in range(0, len(codeSeq)):
+##            self.displayBuffers("decode loop start " + str(i))  ###
+            c = codeSeq[i]
+##            print("c, self.last, self.space, self.mark", c, self.last, self.space, self.mark)
+            if c < 0:  # space
+                c = -c
+                if self.last < 0:  # continuation of space
+                    self.space += c
+                elif self.last == 1: # continuation of mark
+                    self.mark += c
+                elif self.last > 1:  # start of new space, process previous mark
+                    self.space = c
+                    if self.mark > MINDASHLEN * self.truDot:
+                        self.codeBuf[self.nChars] += '-'  # dash
+                    else:
+                        self.codeBuf[self.nChars] += '.'  # dot
+                    self.mark = 0
+                self.last = -c
+            elif c == 1:  # start of extended mark
+                pass
+            elif c == 2:  # end of extended mark (or continuation of space)
+                pass
+            elif c > 2:  # mark
+                if self.last < 0:  # start of new mark
+                    self.mark = c
+                    if self.space > MINMORSESPACE * self.dotLen:  # possible Morse or word space
+                        self.decodeChar(self.space)
+                elif self.last > 0:  # continuation of mark
+                    self.mark += c
+                self.last = c
+##            self.displayBuffers("decode loop end " + str(i))  ###
+##            print("last, mark, space", self.last, self.mark, self.space, "\n")  ###
         self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`
         self.flusher.setName("Reader-Flusher")
         self.flusher.start()
@@ -209,6 +233,7 @@ class Reader:
                 self.wpm = 1200. / self.dotLen
 
     def flush(self):
+        return  ###
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
@@ -216,34 +241,35 @@ class Reader:
         self.decodeChar(MAXINT)  # this is intentional, although maybe not needed
 
     def decodeChar(self, nextSpace):
-        self.nChars += 1
-        sp1 = self.spaceBuf[0]
-        sp2 = self.spaceBuf[1]
-        sp3 = nextSpace
-        code = ''
-        s = ''
+        self.nChars += 1  # number of complete characters in buffer (1 or 2)
+        self.displayBuffers(">>>decodeChar nextSpace " + str(nextSpace))  ###
+        sp1 = self.spaceBuf[0]  # space before 1st character
+        sp2 = self.spaceBuf[1]  # space before 2nd character
+        sp3 = nextSpace  # space before next character
+        code = ''  # the dots and dashes
+        s = ''  # the decoded character or pair of characters
         if self.nChars == 2 and sp2 < MAXMORSESPACE * self.dotLen and \
-                MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:
-            code = self.codeBuf[0] + ' ' + self.codeBuf[1]
+                MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:  # could be two halves of a spaced character
+            code = self.codeBuf[0] + ' ' + self.codeBuf[1]  # try combining the two halves
             s = self.lookupChar(code)
-            if s != '' and s != '&':
+            if s != '' and s != '&':  # yes, it's a spaced character, clear the whole buffer
                 self.codeBuf[0] = ''
                 self.markBuf[0] = 0
                 self.codeBuf[1] = ''
                 self.spaceBuf[1] = 0
                 self.markBuf[1] = 0
                 self.nChars = 0
-            else:
+            else:  # it's not recognized as a spaced character,
                 code = ''
                 s = ''
-        if self.nChars == 2 and sp2 < MINCHARSPACE * self.dotLen:
+        if self.nChars == 2 and sp2 < MINCHARSPACE * self.dotLen:  # it's a single character, merge the two halves
             self.codeBuf[0] += self.codeBuf[1]
             self.markBuf[0] = self.markBuf[1]
             self.codeBuf[1] = ''
             self.spaceBuf[1] = 0
             self.markBuf[1] = 0
             self.nChars = 1
-        if self.nChars == 2:
+        if self.nChars == 2:  # decode the first character, otherwise wait for the next one to arrive
             code = self.codeBuf[0]
             s = self.lookupChar(code)
             if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
@@ -261,11 +287,12 @@ class Reader:
             self.codeBuf[1] = ''
             self.spaceBuf[1] = 0
             self.markBuf[1] = 0
-            self.nChars -= 1
+            self.nChars = 1
         self.spaceBuf[self.nChars] = nextSpace
         if code != '' and s == '':
             s = '[' + code + ']'
         if s != '':
+            print("    callback", s, sp1)  ###
             self.callback(s, float(sp1) / (3 * self.truDot) - 1)
 
     def lookupChar(self, code):
@@ -274,3 +301,8 @@ class Reader:
             return(decodeTable[codeTableIndex][code])
         else:
             return('')
+
+    def displayBuffers(self, text):
+        print(text, "nChars", self.nChars)
+        for i in range(2):
+            print("{} '{}' {}".format(self.spaceBuf[i], self.codeBuf[i], self.markBuf[i]))
