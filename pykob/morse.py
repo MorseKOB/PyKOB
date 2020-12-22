@@ -166,7 +166,7 @@ class Reader:
         self.nChars    = 0           # number of complete characters in buffer
         self.callback  = callback    # function to call when character decoded
         self.flusher   = None        # holds Timer (thread) to call flush if no code received
-        self.last      = 0           # value of previous element processed in the code sequence
+        self.latched   = False       # True if cicuit has been latched closed by a +1 code element
         self.mark      = 0           # accumulates the length of a mark as positive code elements are received
         self.space     = 0           # accumulates the length of a space as negative code elements are received
 
@@ -183,32 +183,41 @@ class Reader:
 ##            self.displayBuffers("decode loop start " + str(i))  ###
             c = codeSeq[i]
 ##            print("c, self.last, self.space, self.mark", c, self.last, self.space, self.mark)
-            if c < 0:  # space
+            if c < 0:  # start or continuation of space, or continuation of mark (if latched)
                 c = -c
-                if self.last < 0:  # continuation of space
-                    self.space += c
-                elif self.last == 1: # continuation of mark
+                if self.latched:  # circuit has been latched closed
                     self.mark += c
-                elif self.last > 1:  # start of new space, process previous mark
-                    self.space = c
+                elif self.space > 0:  # continuation of space
+                    self.space += c
+                else:  # end of mark
                     if self.mark > MINDASHLEN * self.truDot:
                         self.codeBuf[self.nChars] += '-'  # dash
                     else:
                         self.codeBuf[self.nChars] += '.'  # dot
+                    self.markBuf[self.nChars] = self.mark
                     self.mark = 0
-                self.last = -c
-            elif c == 1:  # start of extended mark
-                pass
-            elif c == 2:  # end of extended mark (or continuation of space)
-                pass
-            elif c > 2:  # mark
-                if self.last < 0:  # start of new mark
-                    self.mark = c
+                    self.space = c
+            elif c == 1:  # start (or continuation) of extended mark
+                self.latched = True
+                if self.space > 0:  # start of mark
                     if self.space > MINMORSESPACE * self.dotLen:  # possible Morse or word space
                         self.decodeChar(self.space)
+                    self.mark = 0
+                    self.space = 0
+                else: # continuation of mark
+                    self.mark += c
+            elif c == 2:  # end of mark (or continuation of space)
+                self.latched = False
+            elif c > 2:  # mark
+                self.latched = False
+                if self.space > 0:  # start of new mark
+                    if self.space > MINMORSESPACE * self.dotLen:  # possible Morse or word space
+                        self.decodeChar(self.space)
+                    self.mark = c
+                    self.space = 0
                 elif self.last > 0:  # continuation of mark
                     self.mark += c
-                self.last = c
+            self.last = codeSeq[i]
 ##            self.displayBuffers("decode loop end " + str(i))  ###
 ##            print("last, mark, space", self.last, self.mark, self.space, "\n")  ###
         self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`

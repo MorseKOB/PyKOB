@@ -73,7 +73,7 @@ def doFilePlay():
         km.sender_ID = None
         dirpath, filename = os.path.split(pf)
         krdr.handle_append_text('[{}]\n'.format(filename))
-        km.Recorder.playback_start(list_data=True, max_silence=5)
+        km.Recorder.playback_start(list_data=False, max_silence=5)
     kw.make_keyboard_focus()
     
 def doFileExit():
