@@ -5,8 +5,6 @@ the MorseKOB functionality. A user interface hasn't been completed yet,
 but the library functions in pykob provide modules and functions that 
 can be used within a Python program to perform MorseKOB operations.
 
-See: https://sites.google.com/site/morsekob/morsekob40
-
 # License
 The following license information apply to the contents of this application, 
 modules, libraries and to libraries and modules used by this application.
