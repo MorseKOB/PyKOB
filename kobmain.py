@@ -199,7 +199,7 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "_" else " * "
+        txt = "" if char == "__" else " * "
 ## ZZZ Temporarily disable 'intelligent' spacing
 ##    elif sp > 10:
 ##        txt = "     "

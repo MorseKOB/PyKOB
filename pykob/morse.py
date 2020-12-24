@@ -134,6 +134,7 @@ Callback function is called whenever a character is decoded:
 """
 
 MINDASHLEN      = 1.5  # dot vs dash threshold (in dots)
+MAXDASHLEN      = 9.0  # long dash vs circuit closure threshold (in dots)
 MINMORSESPACE   = 2.0  # intrasymbol space vs Morse (in dots)
 MAXMORSESPACE   = 6.0  # maximum length of Morse space (in dots)
 MINCHARSPACE    = 2.7  # intrasymbol space vs character space (in dots)
@@ -166,12 +167,12 @@ class Reader:
         self.nChars    = 0           # number of complete characters in buffer
         self.callback  = callback    # function to call when character decoded
         self.flusher   = None        # holds Timer (thread) to call flush if no code received
-        self.latched   = False       # True if cicuit has been latched closed by a +1 code element
+        self.latched   = True        # True if cicuit has been latched closed by a +1 code element
         self.mark      = 0           # accumulates the length of a mark as positive code elements are received
         self.space     = 0           # accumulates the length of a space as negative code elements are received
 
     def decode(self, codeSeq):
-        print("\ndecode", codeSeq)  ###
+##        print("\ndecode", codeSeq)  ###
         # Code received - cancel an existing 'flusher'
         if self.flusher:
             self.flusher.cancel()
@@ -180,9 +181,7 @@ class Reader:
         nextSpace = 0  # space before next dot or dash
         i = 0
         for i in range(0, len(codeSeq)):
-##            self.displayBuffers("decode loop start " + str(i))  ###
             c = codeSeq[i]
-##            print("c, self.last, self.space, self.mark", c, self.last, self.space, self.mark)
             if c < 0:  # start or continuation of space, or continuation of mark (if latched)
                 c = -c
                 if self.latched:  # circuit has been latched closed
@@ -205,7 +204,7 @@ class Reader:
                     self.mark = 0
                     self.space = 0
                 else: # continuation of mark
-                    self.mark += c
+                    pass
             elif c == 2:  # end of mark (or continuation of space)
                 self.latched = False
             elif c > 2:  # mark
@@ -215,12 +214,11 @@ class Reader:
                         self.decodeChar(self.space)
                     self.mark = c
                     self.space = 0
-                elif self.last > 0:  # continuation of mark
+                elif self.mark > 0:  # continuation of mark
                     self.mark += c
-            self.last = codeSeq[i]
 ##            self.displayBuffers("decode loop end " + str(i))  ###
-##            print("last, mark, space", self.last, self.mark, self.space, "\n")  ###
-        self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`
+##            print("latched, mark, space:", self.latched, self.mark, self.space, "\n")  ###
+        self.flusher = Timer(((30.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`  ### ZZZ adjust this value
         self.flusher.setName("Reader-Flusher")
         self.flusher.start()
 
@@ -242,7 +240,7 @@ class Reader:
                 self.wpm = 1200. / self.dotLen
 
     def flush(self):
-        return  ###
+##        return
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
@@ -251,7 +249,7 @@ class Reader:
 
     def decodeChar(self, nextSpace):
         self.nChars += 1  # number of complete characters in buffer (1 or 2)
-        self.displayBuffers(">>>decodeChar nextSpace " + str(nextSpace))  ###
+##        self.displayBuffers(">>>decodeChar nextSpace " + str(nextSpace))  ###
         sp1 = self.spaceBuf[0]  # space before 1st character
         sp2 = self.spaceBuf[1]  # space before 2nd character
         sp3 = nextSpace  # space before next character
@@ -281,7 +279,9 @@ class Reader:
         if self.nChars == 2:  # decode the first character, otherwise wait for the next one to arrive
             code = self.codeBuf[0]
             s = self.lookupChar(code)
-            if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
+            if s == 'T' and self.markBuf[0] > MAXDASHLEN * self.dotLen:
+                s = '__'
+            elif s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
                     self.codeType == config.CodeType.american:
                 s = 'L'
             elif s == 'E':
@@ -301,7 +301,7 @@ class Reader:
         if code != '' and s == '':
             s = '[' + code + ']'
         if s != '':
-            print("    callback", s, sp1)  ###
+##            print("    callback", s, sp1)  ###
             self.callback(s, float(sp1) / (3 * self.truDot) - 1)
 
     def lookupChar(self, code):
@@ -312,6 +312,7 @@ class Reader:
             return('')
 
     def displayBuffers(self, text):
+        """Display the code buffer and other information for troubleshooting"""
         print(text, "nChars", self.nChars)
         for i in range(2):
             print("{} '{}' {}".format(self.spaceBuf[i], self.codeBuf[i], self.markBuf[i]))
