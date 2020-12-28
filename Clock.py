@@ -121,9 +121,9 @@ def announce(s, kob, sender, recorder, source=kob.CodeSource.local):
     global local_text
     if local_text: print('> ', end='', flush=True)
     for c in s:
-        if local_text: print(c, end='', flush=True)
         code = sender.encode(c)
         kob.sounder(code)
+        if local_text: print(c, end='', flush=True)
         if recorder:
             recorder.record(code, source)
     if local_text: print('')
