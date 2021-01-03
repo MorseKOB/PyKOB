@@ -86,6 +86,7 @@ __INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 __LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
+__SERVER_URL_KEY = "SERVER_URL"
 __SOUND_KEY = "SOUND"
 __SOUNDER_KEY = "SOUNDER"
 __SPACING_KEY = "SPACING"
@@ -124,6 +125,7 @@ interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
 remote = True
+server_url = None
 sound = True
 sounder = False
 spacing = Spacing.none
@@ -158,7 +160,7 @@ def noneOrValueFromStr(s):
     ------
         `None` or the string value
 """
-    r = None if not s or not s.strip() else s
+    r = None if not s or not s.strip() or s.upper() == 'NONE' else s
     return r
 
 def create_config_files_if_needed():
@@ -335,6 +337,21 @@ def set_serial_port(p):
     serial_port = noneOrValueFromStr(p)
     app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
 
+def set_server_url(s):
+    """Sets the KOB Server URL to connect to for wires
+
+    Parameters
+    ----------
+    s : str
+        The KOB Server URL or None. Also set to None if the value is 'DEFAULT'.
+    """
+
+    global server_url
+    server_url = noneOrValueFromStr(s)
+    if server_url and server_url.upper() == 'DEFAULT':
+        server_url = None
+    user_config.set(__CONFIG_SECTION, __SERVER_URL_KEY, server_url)
+
 def set_sound(s):
     """Sets the Sound/Audio enable state
 
@@ -481,7 +498,8 @@ def print_system_info():
 def print_config():
     """Print the PyKOB configuration
     """
-
+    url = noneOrValueFromStr(server_url)
+    url = url if url else ''
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
@@ -490,6 +508,7 @@ def print_config():
     print("Invert key input:", onOffFromBool(invert_key_input))
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
+    print("KOB Server URL:", url)
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
     print("Spacing:", spacing.name.upper())
@@ -537,6 +556,7 @@ def read_config():
     global local
     global min_char_speed
     global remote
+    global server_url
     global sound
     global sounder
     global spacing
@@ -594,6 +614,7 @@ def read_config():
         __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
+        __SERVER_URL_KEY:"NONE", \
         __SOUND_KEY:"ON", \
         __SOUNDER_KEY:"OFF", \
         __SPACING_KEY:"NONE", \
@@ -651,6 +672,11 @@ def read_config():
         __option = "Text speed"
         __key = __TEXT_SPEED_KEY
         text_speed = user_config.getint(__CONFIG_SECTION, __key)
+        __option = "Server URL"
+        __key = __SERVER_URL_KEY
+        _server_url = user_config.get(__CONFIG_SECTION, __key)
+        if (not _server_url) or (_server_url.upper() != "NONE"):
+            server_url = _server_url
         __option = "Sound"
         __key = __SOUND_KEY
         sound = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -713,6 +739,10 @@ remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument("-R", "--remote", default=remote, \
 help="Enable/disable transmission over the internet on the specified wire.", \
 metavar="remote-send", dest="remote")
+
+server_url_override = argparse.ArgumentParser(add_help=False)
+server_url_override.add_argument("-U", "--url", default=server_url, \
+help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", default=serial_port, \

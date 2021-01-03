@@ -32,10 +32,10 @@ import socket
 import struct
 import threading
 import time
-from pykob import VERSION, log
+from pykob import VERSION, config, log
 
-HOST = "mtc-kob.dyndns.org"
-PORT = 7890
+HOST_DEFAULT = "mtc-kob.dyndns.org"
+PORT_DEFAULT = 7890
 
 DIS = 2  # Disconnect
 DAT = 3  # Code or ID
@@ -50,8 +50,18 @@ NUL = '\x00'
 
 class Internet:
     def __init__(self, officeID, callback=None, record_callback=None):
+        self.host = HOST_DEFAULT
+        self.port = PORT_DEFAULT
+        s = config.server_url
+        if s:
+            # see if a port was included
+            # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
+            hp = s.split(':',1)
+            if len(hp) == 2:
+                self.port = hp[1]
+            self.host = hp[0]
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
+        self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
         self.version = ("PyKOB " + VERSION).encode(encoding='ascii')
         self.officeID = officeID if officeID != None else ""
@@ -141,7 +151,7 @@ class Internet:
 
     def sendID(self):
         try:
-            self.address = socket.getaddrinfo(HOST, PORT, socket.AF_INET,
+            self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET,
                     socket.SOCK_DGRAM)[0][4]
         except:
             log.info("PyKOB.internet ignoring DNS lookup error")
