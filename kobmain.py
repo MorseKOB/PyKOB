@@ -195,6 +195,7 @@ def update_sender(id):
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
+    Recorder.record([], '', text=char)
     if kc.CodeType == config.CodeType.american:
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:

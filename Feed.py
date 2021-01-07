@@ -57,6 +57,9 @@ Examples:
 
 Change history:
 
+Feed 1.8  2021-01-04
+- updated to use new PyKOB library
+
 Feed 1.7  2020-05-28
 - changed header to `#!/usr/bin/env python3`
 
@@ -76,7 +79,7 @@ import threading
 import pykob
 from pykob import newsreader, morse, internet, kob, log
 
-VERSION     = '1.7'
+VERSION     = '1.8'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
@@ -93,7 +96,7 @@ grpPause = max(float(sys.argv[7]) if n > 7 else 5.0, artPause)
 days = int(sys.argv[8]) if n > 8 else 0
 wait = int(sys.argv[9]) if n > 9 else 0
 
-mySender = morse.Sender(wpm, cwpm, morse.AMERICAN, morse.CHARSPACING)
+mySender = morse.Sender(wpm, cwpm)
 myInternet = internet.Internet(idText)
 myKOB = kob.KOB(port=None, audio=False)
 

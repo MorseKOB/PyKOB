@@ -34,7 +34,8 @@ The information is recorded in packets in a JSON structure that includes:
 3. Station ID
 4. Wire Number
 5. Code type
-6. Code Sequence (key timing information)
+6. The decoded character
+7. Code Sequence (key timing information)
 
 Though the name of the class is `recorder` it is typical that a 'recorder' can also
 play back. For example, a 'tape recorder', a 'video casset recorder (VCR)',
@@ -225,7 +226,7 @@ class Recorder:
         """
         self.__recorder_wire = wire
 
-    def record(self, code, source):
+    def record(self, code, source, text=''):
         """
         Record a code sequence in JSON format with additional context information.
         """
@@ -236,6 +237,7 @@ class Recorder:
                 "w":self.wire,
                 "s":self.station_id,
                 "o":source,
+                "t":text,
                 "c":code
             }
             with open(self.__target_file_path, "a+") as fp:
@@ -630,7 +632,7 @@ if __name__ == "__main__":
     # Append more text to the same file
     for c in "This is a test":
         codesequence = mySender.encode(c, True)
-        myRecorder.record(codesequence, kob.CodeSource.local)
+        myRecorder.record(codesequence, kob.CodeSource.local, c)
     print()
     # Play the file
     myKOB = kob.KOB(port=None, audio=True)

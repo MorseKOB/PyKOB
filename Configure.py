@@ -64,6 +64,7 @@ def main(argv):
     local = None
     remote = None
     interface_type = None
+    server_url = None
     sound = None
     sounder = None
     spacing = None
@@ -85,6 +86,7 @@ def main(argv):
             config.min_char_speed_override, \
             config.remote_override, \
             config.serial_port_override, \
+            config.server_url_override, \
             config.sound_override, \
             config.sounder_override, \
             config.spacing_override, \
@@ -116,6 +118,13 @@ def main(argv):
             save_config = True
         if not args.serial_port == config.serial_port:
             config.set_serial_port(args.serial_port)
+            save_config = True
+        if not args.server_url == config.server_url:
+            s = config.server_url
+            if s and s.upper() == 'DEFAULT':
+                config.set_server_url(None)
+            else:
+                config.set_server_url(args.server_url)
             save_config = True
         if not args.sound == config.sound:
             config.set_sound(args.sound)
