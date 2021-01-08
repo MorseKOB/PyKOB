@@ -28,27 +28,6 @@ kobconfig.py
 Preference settings for MKOB.
 """
 
-from pykob import config
-
-OfficeID       = config.station         # user's ID (e.g., office call, name, location)
-
-Port           = config.serial_port     # e.g., 'COM3', '/dev/ttyUSB0', None
-Sounder        = config.sounder         # external sounder on or off
-Audio          = config.sound           # simulated sounder on or off
-
-WPM            = config.text_speed      # overall code speed
-CWPM           = config.min_char_speed  # minimum character speed (Farnsworth)
-Spacing        = config.spacing         # None, Character, Word (Farnsworth spacing)
-CodeType       = config.code_type       # American, International
-if not config.wire:
-    config.set_wire("101")
-    config.save_config()
-    
-WireNo         = int(config.wire)       # wire number
-
-Remote         = config.remote          # send traffic to internet
-Connect        = config.auto_connect    # automatically connect on startup
-
 CircuitCloser  = True                   # initial checkbox settings
 CodeSenderOn   = True                   #    "
 CodeSenderRepeat = False                #    "

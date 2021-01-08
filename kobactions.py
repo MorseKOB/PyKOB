@@ -33,7 +33,6 @@ import tkinter.messagebox as mb
 import tkinter.filedialog as fd
 import time
 from pykob import config, kob, internet, morse, recorder
-import kobconfig as kc
 import kobevents
 import kobmain as km
 import kobreader as krdr
@@ -90,30 +89,30 @@ def doHelpAbout():
 ####
 
 def doOfficeID(event):
-    kc.OfficeID = kw.varOfficeID.get()
-    config.set_station(kc.OfficeID)
+    officeID = kw.varOfficeID.get()
+    config.set_station(officeID)
     config.save_config()
-    km.Internet.set_officeID(kc.OfficeID)
+    km.Internet.set_officeID(officeID)
 
 def doCircuitCloser():
     km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
 def doWPM(event=None):
-    kc.WPM = int(kw.spnWPM.get())
+    wpm = int(kw.spnWPM.get())
     config.set_text_speed(kw.spnWPM.get())
     config.save_config()
-    km.Sender = morse.Sender(wpm=kc.WPM, cwpm=kc.CWPM,
-            codeType=kc.CodeType, spacing=kc.Spacing)
-    km.Reader = morse.Reader(wpm=kc.WPM, codeType=kc.CodeType,
+    km.Sender = morse.Sender(wpm=wpm, cwpm=wpm,
+            codeType=config.code_type, spacing=config.spacing)
+    km.Reader = morse.Reader(wpm=wpm, codeType=config.code_type,
             callback=km.readerCallback)
 
 def doWireNo(event=None):
-    kc.WireNo = int(kw.spnWireNo.get())
+    wireNo = int(kw.spnWireNo.get())
     config.set_wire(kw.spnWireNo.get())
     config.save_config()
     if km.connected:
         km.change_wire()
-        km.Recorder.wire = kc.WireNo
+        km.Recorder.wire = wireNo
 
 def doConnect():
     if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:

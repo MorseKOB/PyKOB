@@ -37,6 +37,7 @@ import kobactions as ka
 import kobconfig as kc
 import kobstationlist as ksl
 import kobreader as krdr
+from pykob import config
 
 class KOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):       
@@ -202,15 +203,15 @@ class KOBWindow:
             x = (sw - w) // 2
             y = (sh - h) // 2
         self.root.geometry('{}x{}+{}+{}'.format(w, h, x, y))
-        self.varOfficeID.set(kc.OfficeID)
+        self.varOfficeID.set(config.station)
         self.varCircuitCloser.set(kc.CircuitCloser)
         self.spnWPM.delete(0)
-        self.spnWPM.insert(tk.END, kc.WPM)
+        self.spnWPM.insert(tk.END, config.text_speed)
         ka.doWPM()
         self.varCodeSenderOn.set(kc.CodeSenderOn)
         self.varCodeSenderRepeat.set(kc.CodeSenderRepeat)
         self.spnWireNo.delete(0)
-        self.spnWireNo.insert(tk.END, kc.WireNo)
+        self.spnWireNo.insert(tk.END, config.wire)
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()
