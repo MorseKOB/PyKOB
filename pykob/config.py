@@ -83,7 +83,6 @@ __SERIAL_PORT_KEY = "PORT"
 __CODE_TYPE_KEY = "CODE_TYPE"
 __INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 __INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
-__LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
 __SERVER_URL_KEY = "SERVER_URL"
@@ -123,7 +122,6 @@ serial_port = None
 code_type = CodeType.american
 interface_type = InterfaceType.loop
 invert_key_input = False
-local = True
 remote = True
 server_url = None
 sound = True
@@ -254,27 +252,6 @@ def set_invert_key_input(b):
         user_config.set(__CONFIG_SECTION, __INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
     except ValueError as ex:
         log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
-        raise
-
-def set_local(l):
-    """Enable/disable local copy
-
-    When local copy is enabled, the local sound/sounder configuration is  
-    used to locally sound the content being sent to the wire.
-    
-    Parameters
-    ----------
-    l : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
-        will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
-    """
-
-    global local
-    try:
-        local = strtobool(str(l))
-        user_config.set(__CONFIG_SECTION, __LOCAL_KEY, onOffFromBool(local))
-    except ValueError as ex:
-        log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
 def set_remote(r):
@@ -506,7 +483,6 @@ def print_config():
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", onOffFromBool(invert_key_input))
-    print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("KOB Server URL:", url)
     print("Sound:", onOffFromBool(sound))
@@ -553,7 +529,6 @@ def read_config():
     global code_type
     global interface_type
     global invert_key_input
-    global local
     global min_char_speed
     global remote
     global server_url
@@ -611,7 +586,6 @@ def read_config():
         __CODE_TYPE_KEY:"AMERICAN", \
         __INTERFACE_TYPE_KEY:"LOOP", \
         __INVERT_KEY_INPUT_KEY:"OFF", \
-        __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
         __SERVER_URL_KEY:"NONE", \
@@ -660,9 +634,6 @@ def read_config():
         __option = "Invert key input"
         __key = __INVERT_KEY_INPUT_KEY
         invert_key_input = user_config.getboolean(__CONFIG_SECTION, __key)
-        __option = "Local copy"
-        __key = __LOCAL_KEY
-        local = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Minimum character speed"
         __key = __MIN_CHAR_SPEED_KEY
         min_char_speed = user_config.getint(__CONFIG_SECTION, __key)
@@ -725,10 +696,6 @@ help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-t
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
 invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, \
 help="Enable/disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
-
-local_override = argparse.ArgumentParser(add_help=False)
-local_override.add_argument("-L", "--local", default=local, \
-help="Enable/disable local copy of transmitted code.", metavar="local-copy", dest="local")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
