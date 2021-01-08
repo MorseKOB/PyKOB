@@ -243,9 +243,8 @@ def init():
     Internet = internet.Internet(kc.config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
-        log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+        log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
             "To enable/disable this setting use `Configure --iki`.")
-    # ZZZ temp always enable recorder - goal is to provide menu option to start/stop recording
     ts = recorder.get_timestamp()
     dt = datetime.fromtimestamp(ts / 1000.0)
     dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
@@ -257,3 +256,8 @@ def init():
         play_station_list_callback=ka.trigger_update_station_active, \
         play_wire_callback=ka.trigger_player_wire_change)
     kobkeyboard.init()
+    # If the configuration indicates that an application should automatically connect - 
+    # connect to the currently configured wire.
+    if config.auto_connect:
+        ka.doConnect() # Suggest a connect.
+
