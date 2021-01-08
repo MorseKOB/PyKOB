@@ -80,6 +80,7 @@ __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
+__AUTO_CONNECT_KEY = "AUTO_CONNECT"
 __CODE_TYPE_KEY = "CODE_TYPE"
 __INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 __INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
@@ -119,6 +120,7 @@ user_name = None
 serial_port = None
 
 # User Settings
+auto_connect = False
 code_type = CodeType.american
 interface_type = InterfaceType.loop
 invert_key_input = False
@@ -182,6 +184,31 @@ def create_config_files_if_needed():
             os.makedirs(app_config_dir)
         f = open(app_config_file_path, 'w')
         f.close()
+
+def set_auto_connect(s):
+    """Sets the Auto Connect to wire enable state
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    automatically connect to the configured wire.
+
+    Note that this is a 'suggestion'. It isn't used by the base pykob 
+    modules. It should be used by applications (like MKOB) to initiate a connection 
+    to the configured wire.
+    
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable auto-connect. Values of `NO`|`OFF`|`FALSE` will disable auto-connect.
+    """
+
+    global auto_connect
+    try:
+        auto_connect = strtobool(str(s))
+        user_config.set(__CONFIG_SECTION, __AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+    except ValueError as ex:
+        log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_code_type(s):
     """Sets the Code Type (for American or International)
@@ -480,6 +507,7 @@ def print_config():
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
+    print("Auto Connect to Wire:", onOffFromBool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", onOffFromBool(invert_key_input))
@@ -526,6 +554,7 @@ def read_config():
     #
     global serial_port
     #
+    global auto_connect
     global code_type
     global interface_type
     global invert_key_input
@@ -583,6 +612,7 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
+        __AUTO_CONNECT_KEY:"OFF", \
         __CODE_TYPE_KEY:"AMERICAN", \
         __INTERFACE_TYPE_KEY:"LOOP", \
         __INVERT_KEY_INPUT_KEY:"OFF", \
@@ -611,6 +641,9 @@ def read_config():
             serial_port = None
 
         # Get the User config values
+        __option = "Auto Connect to Wire"
+        __key = __AUTO_CONNECT_KEY
+        auto_connect = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Code type"
         __key = __CODE_TYPE_KEY
         _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
@@ -684,6 +717,12 @@ def read_config():
 
 # ### Mainline
 read_config()
+
+auto_connect_override = argparse.ArgumentParser(add_help=False)
+auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF", 
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
+metavar="auto-connect", dest="auto_connect")
 
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
