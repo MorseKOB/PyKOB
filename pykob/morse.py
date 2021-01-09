@@ -32,7 +32,7 @@ import sys
 import codecs
 from pathlib import Path
 from threading import Timer
-from pykob import config
+from pykob import config, log
 
 DOTSPERWORD = 45     # dot units per word, including all spaces
                      #   (MORSE is 43, PARIS is 47)
@@ -330,6 +330,6 @@ class Reader:
 
     def displayBuffers(self, text):
         """Display the code buffer and other information for troubleshooting"""
-        print(text, "nChars", self.nChars)
+        log.debug("{}: nChars = {}".format(text, self.nChars))
         for i in range(2):
             print("{} '{}' {}".format(self.spaceBuf[i], self.codeBuf[i], self.markBuf[i]))
