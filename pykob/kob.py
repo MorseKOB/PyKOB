@@ -158,7 +158,7 @@ class KOB:
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
 ##                self.tLastSdr = t + 1.0
-            if c > 0:  # start of mark
+            if c == 1 or c > 2:  # start of mark
                 self.setSounder(True)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t

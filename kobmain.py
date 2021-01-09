@@ -188,9 +188,10 @@ def update_sender(id):
         sender_ID = id
         Reader.flush()
         ka.trigger_reader_append_text("\n\n<{}>".format(sender_ID))
-        Reader = morse.Reader(
-                wpm=kc.WPM, codeType=kc.CodeType,
-                callback=readerCallback)  # reset to nominal code speed
+### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
+##        Reader = morse.Reader(
+##                wpm=kc.WPM, codeType=kc.CodeType,
+##                callback=readerCallback)  # reset to nominal code speed
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -200,7 +201,7 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "_" else " * "
+        txt = "" if char == "__" else " * "
 ## ZZZ Temporarily disable 'intelligent' spacing
 ##    elif sp > 10:
 ##        txt = "     "
