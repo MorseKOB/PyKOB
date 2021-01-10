@@ -36,7 +36,7 @@ specified number of seconds before sending again.
 Command line parameters (required):
     wire - KOB wire no.
     idText - office call, etc.
-    url - RSS formatted text source (URL) or a PyKOB recording file.
+    URI - RSS formatted text source (URI) or a PyKOB recording file.
     wpm - overall code speed (WPM).
     
 Additional command line parameters (optional):
@@ -49,7 +49,7 @@ Additional command line parameters (optional):
             (default: ignore other senders)
 
 Note: artPause and grpPause can be decimal numbers.  wire, wpm, cwpm, and
-days must be integers.  idText and url should be enclosed in quotes.
+days must be integers.  idText and URI should be enclosed in quotes.
 
 Examples:
     python Feed.py 105 "Today's News, 20 wpm, AC" "http://rss.cnn.com/rss/cnn_topstories.rss" 20
@@ -76,6 +76,7 @@ Feed 1.4  2018-07-10
 - converted from legacy morsekob module to use pykob module
 """
 
+import os
 import sys
 import time, datetime
 import threading
@@ -92,7 +93,7 @@ log.log('Starting Feed {0}'.format(VERSION))
 
 wire = int(sys.argv[1])
 idText = sys.argv[2]
-url = sys.argv[3]
+uri = sys.argv[3]
 wpm = int(sys.argv[4])
 n = len(sys.argv)
 cwpm = int(sys.argv[5]) if n > 5 else 0
@@ -172,11 +173,11 @@ def processRecording():
     """
     Process a PyKOB recording file.
     """
-    global url, grpPause, idText
+    global uri, grpPause, idText
 
     playback_finished.clear()
     while True:
-        myRecorder = recorder.Recorder(None, url, station_id=idText, 
+        myRecorder = recorder.Recorder(None, uri, station_id=idText, 
           play_code_callback=callbackPlay, 
           play_finished_callback=callbackPlayFinished, 
           play_sender_id_callback = callbackSenderId)
@@ -214,9 +215,9 @@ def processRSS():
     """
     Process an RSS file/feed.
     """
-    global url, days, artPause, grpPause
+    global uri, days, artPause, grpPause
     while True:
-        articles = newsreader.getArticles(url)
+        articles = newsreader.getArticles(uri)
         for (title, description, pubDate) in articles:
             if days and pubDate:
                 today = datetime.date.today()
@@ -243,15 +244,27 @@ def processRSS():
         time.sleep(grpPause - artPause)
 
 try:
-    # See if the URL is a PyKOB recorder file or a RSS file/feed
-    filepath = Path(url)
-    fileExists = filepath.exists()
-    isFile = filepath.is_file()
-    isJson = filepath.suffix == ".json"
-    if fileExists and isFile and isJson:
-        # URL is a file that has a '.json' extention
-        # this isn't a foolproof test, but is what we will use  
-        # for now to see if this is a PyKOB recording file.
+    # See if the URI is a PyKOB recorder file or a RSS file/feed
+    isRecording = False
+    # See if the URI is a recording file
+    #  There are more effecient ways to do this with Mac/Linux, 
+    #  but this seems to be needed with Windows.
+    #
+    # `Path` has problems handling paths that aren't local/absolute. The recorder class 
+    # only handles a local file path. If the URI isn't a local file path assume it is 
+    # a URL to a RSS feed.
+    #
+    fileExists = os.path.isfile(uri)
+    if fileExists:
+        # Deal with it as a local file
+        filepath = Path(uri)
+        isJson = filepath.suffix == ".json"
+        if fileExists and isJson:
+            # URI is a file that has a '.json' extention
+            # this isn't a foolproof test, but is what we will use  
+            # for now to see if this is a PyKOB recording file.
+            isRecording = True
+    if isRecording:
         processRecording()
     else:
         processRSS()
