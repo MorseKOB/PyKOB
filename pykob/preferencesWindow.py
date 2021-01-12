@@ -297,6 +297,6 @@ class PreferencesWindow:
         self.root.mainloop()
 
     def dismiss(self):
-        self.root.quit()
+        # self.root.quit()
         self.root.destroy()
 
