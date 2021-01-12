@@ -43,7 +43,7 @@ CodeType       = config.code_type       # American, International
 if not config.wire:
     config.set_wire("101")
     config.save_config()
-    
+
 WireNo         = int(config.wire)       # wire number
 
 Local          = config.local           # monitor traffic on local sounder and audio

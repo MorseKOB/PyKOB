@@ -32,7 +32,7 @@ import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.filedialog as fd
 import time
-from pykob import config, kob, internet, morse, recorder
+from pykob import config, kob, internet, morse, preferencesWindow, recorder
 import kobconfig as kc
 import kobevents
 import kobmain as km
@@ -75,7 +75,10 @@ def doFilePlay():
         krdr.handle_append_text('[{}]\n'.format(filename))
         km.Recorder.playback_start(list_data=False, max_silence=5)
     kw.make_keyboard_focus()
-    
+
+def doFilePreferences():
+    prefs = preferencesWindow.PreferencesWindow()
+
 def doFileExit():
     kw.root.destroy()
     kw.root.quit()

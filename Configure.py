@@ -31,7 +31,9 @@ Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
 import sys
+import tkinter as tk
 from pykob import config
+from pykob import preferencesWindow
 
 NONE_CFG_VALUE = "NONE"
 
@@ -49,6 +51,12 @@ def stringOrNone(s:str) -> str:
     """
     r = None if s.upper() == "NONE" else s
     return r
+
+def _doFilePreferences():
+    prefs = preferencesWindow.PreferencesWindow()
+
+def _doFileExit():
+    sys.exit(0)
 
 def main(argv):
     # Check for command line parameters...
@@ -73,6 +81,7 @@ def main(argv):
     wire = None
     min_char_speed = None
     text_speed = None
+    gui_config = False
 
     try:
         arg_parser = argparse.ArgumentParser(description="Display the PyKOB configuration as well as key system values. "
@@ -93,6 +102,7 @@ def main(argv):
             config.station_override, \
             config.text_speed_override, \
             config.wire_override])
+        arg_parser.add_argument('-G', '--gui', dest="gui_config", action='store_true', help="Use preferences panel GUI for interactive configuration.")
 
         args = arg_parser.parse_args()
 
@@ -151,6 +161,26 @@ def main(argv):
     except Exception as ex:
         print("Error processing arguments: {}".format(ex))
         sys.exit(1)
+
+    if args.gui_config:
+        try:
+            root = tk.Tk()
+            root.overrideredirect(1)
+            root.withdraw()
+
+            menu = tk.Menu()
+            root.config(menu=menu)
+            fileMenu = tk.Menu(menu)
+            menu.add_cascade(label='File', menu=fileMenu)
+            fileMenu.add_command(label='Preferences...', command=_doFilePreferences)
+            fileMenu.add_separator()
+            fileMenu.add_command(label='Quit', command=_doFileExit)
+
+            prefs = preferencesWindow.PreferencesWindow()
+            prefs.display()
+        except KeyboardInterrupt:
+            print()
+            sys.exit(0)
 
     # If no arguments were given print the system info in addition to the configuration.
     if len(argv) == 0:
