@@ -176,8 +176,11 @@ def main(argv):
             fileMenu.add_separator()
             fileMenu.add_command(label='Quit', command=_doFileExit)
 
-            prefs = preferencesWindow.PreferencesWindow()
+            prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=True)
             prefs.display()
+
+            # root.quit()
+
         except KeyboardInterrupt:
             print()
             sys.exit(0)

@@ -13,7 +13,8 @@ import serial
 import serial.tools.list_ports
 
 class PreferencesWindow:
-    def __init__(self):     
+    def __init__(self, quitWhenDismissed=False):
+        self.quitOnExit = quitWhenDismissed
         config.read_config()
         print("Configured serial port  =", config.serial_port)
         print("Configured code speed  =", config.text_speed)
@@ -297,6 +298,6 @@ class PreferencesWindow:
         self.root.mainloop()
 
     def dismiss(self):
-        # self.root.quit()
+        if self.quitOnExit:
+            self.root.quit()
         self.root.destroy()
-

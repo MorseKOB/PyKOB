@@ -77,7 +77,8 @@ def doFilePlay():
     kw.make_keyboard_focus()
 
 def doFilePreferences():
-    prefs = preferencesWindow.PreferencesWindow()
+    prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=False)
+    prefs.display()
 
 def doFileExit():
     kw.root.destroy()
