@@ -68,7 +68,7 @@ def from_key(code):
         update_sender(config.station)
         Reader.decode(code)
         Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to start/stop recording
-    if connected and emote:
+    if connected and remote:
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
