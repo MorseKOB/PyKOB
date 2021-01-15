@@ -51,6 +51,6 @@ try:
     print('pySerial ' + serial.VERSION)
     import serial.tools.list_ports
     for p in serial.tools.list_ports.comports():
-        print(p[1])
+        print(p)
 except:
     print('pySerial not installed')

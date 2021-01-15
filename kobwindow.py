@@ -71,6 +71,8 @@ class KOBWindow:
         fileMenu.add_separator()
         fileMenu.add_command(label='Play...', command=ka.doFilePlay)
         fileMenu.add_separator()
+        fileMenu.add_command(label='Preferences...', command=ka.doFilePreferences)
+        fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=ka.doFileExit)
 
         # Help menu
