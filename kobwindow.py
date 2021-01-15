@@ -198,16 +198,6 @@ class KOBWindow:
         self.root.update()                      # Make sure window size reflects changes so far
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-<<<<<<< HEAD
-        w, h = kc.WindowSize
-        x, y = kc.Position
-        if x < 0:
-            x = (sw - w) // 2
-            y = (sh - h) // 2
-        self.root.geometry('{}x{}+{}+{}'.format(w, h, x, y))
-        self.varOfficeID.set(config.station)
-        self.varCircuitCloser.set(kc.CircuitCloser)
-=======
         w = self.root.winfo_width()
         h = self.root.winfo_height()
         x = (sw - w) / 2
@@ -215,18 +205,13 @@ class KOBWindow:
         root.geometry('%dx%d+%d+%d' % (w, h, x, y))
         self.varOfficeID.set(config.station)
         self.varCircuitCloser.set(True)         # Previously kc.CircuitCloser (=True)
->>>>>>> master
         self.spnWPM.delete(0)
         self.spnWPM.insert(tk.END, config.text_speed)
         ka.doWPM()
         self.varCodeSenderOn.set(True)          # Previously kc.CodeSenderOn (=True)
         self.varCodeSenderRepeat.set(False)     # Previously kc.CodeSenderRepeat (=False)
         self.spnWireNo.delete(0)
-<<<<<<< HEAD
         self.spnWireNo.insert(tk.END, config.wire)
-=======
-        self.spnWireNo.insert(tk.END, int(config.wire))
->>>>>>> master
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()
