@@ -34,9 +34,10 @@ import kobevents
 import tkinter as tk
 import tkinter.scrolledtext as tkst 
 import kobactions as ka
-import kobconfig as kc
 import kobstationlist as ksl
 import kobreader as krdr
+from pykob import config
+
 from pykob import config
 
 class KOBWindow:
@@ -193,10 +194,11 @@ class KOBWindow:
         cmd = root.register(ka.handle_reader_append_text)
         root.tk.call("bind", root, kobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
 
-
         # get configuration settings
+        self.root.update()                      # Make sure window size reflects changes so far
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
+<<<<<<< HEAD
         w, h = kc.WindowSize
         x, y = kc.Position
         if x < 0:
@@ -205,16 +207,46 @@ class KOBWindow:
         self.root.geometry('{}x{}+{}+{}'.format(w, h, x, y))
         self.varOfficeID.set(config.station)
         self.varCircuitCloser.set(kc.CircuitCloser)
+=======
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        x = (sw - w) / 2
+        y = (sh - h) * 0.4                      # about 40% from top
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        self.varOfficeID.set(config.station)
+        self.varCircuitCloser.set(True)         # Previously kc.CircuitCloser (=True)
+>>>>>>> master
         self.spnWPM.delete(0)
         self.spnWPM.insert(tk.END, config.text_speed)
         ka.doWPM()
-        self.varCodeSenderOn.set(kc.CodeSenderOn)
-        self.varCodeSenderRepeat.set(kc.CodeSenderRepeat)
+        self.varCodeSenderOn.set(True)          # Previously kc.CodeSenderOn (=True)
+        self.varCodeSenderRepeat.set(False)     # Previously kc.CodeSenderRepeat (=False)
         self.spnWireNo.delete(0)
+<<<<<<< HEAD
         self.spnWireNo.insert(tk.END, config.wire)
+=======
+        self.spnWireNo.insert(tk.END, int(config.wire))
+>>>>>>> master
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()
+
+    def get_WPM(self):
+        # Guard against the possibility the text field will not have
+        # a valid number (e.g. an empty string, or non-numeric text)
+        try:
+            return int(self.spnWPM.get())
+        except ValueError as ex:
+            return 1
+
+    def get_wireNo(self):
+        # Guard against the possibility the text field will not have
+        # a valid number (e.g. an empty string, or non-numeric text)
+        try:
+            new_wire = int(self.spnWireNo.get())
+            return self.spnWireNo.get()
+        except ValueError as ex:
+            return "1"
 
     def make_keyboard_focus(self):
         """

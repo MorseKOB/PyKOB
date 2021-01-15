@@ -72,7 +72,7 @@ def doFilePlay():
         km.sender_ID = None
         dirpath, filename = os.path.split(pf)
         krdr.handle_append_text('[{}]\n'.format(filename))
-        km.Recorder.playback_start(list_data=True, max_silence=5)
+        km.Recorder.playback_start(list_data=False, max_silence=5)
     kw.make_keyboard_focus()
     
 def doFileExit():
@@ -89,30 +89,28 @@ def doHelpAbout():
 ####
 
 def doOfficeID(event):
-    officeID = kw.varOfficeID.get()
-    config.set_station(officeID)
+    new_officeID = kw.varOfficeID.get()
+    config.set_station(new_officeID)
     config.save_config()
-    km.Internet.set_officeID(officeID)
+    km.Internet.set_officeID(new_officeID)
 
 def doCircuitCloser():
     km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
 
 def doWPM(event=None):
-    wpm = int(kw.spnWPM.get())
-    config.set_text_speed(kw.spnWPM.get())
+    new_wpm = kw.get_WPM()
+    config.set_text_speed(new_wpm)
     config.save_config()
-    km.Sender = morse.Sender(wpm=wpm, cwpm=wpm,
-            codeType=config.code_type, spacing=config.spacing)
-    km.Reader = morse.Reader(wpm=wpm, codeType=config.code_type,
-            callback=km.readerCallback)
+    km.Sender = morse.Sender(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, spacing=config.spacing)
+    km.Reader = morse.Reader(wpm=int(new_wpm), codeType=config.code_type, callback=km.readerCallback)
 
 def doWireNo(event=None):
-    wireNo = int(kw.spnWireNo.get())
-    config.set_wire(kw.spnWireNo.get())
+    wire = kw.get_wireNo()
+    config.set_wire(wire)
     config.save_config()
     if km.connected:
         km.change_wire()
-        km.Recorder.wire = wireNo
+        km.Recorder.wire = wire
 
 def doConnect():
     if km.Recorder and not km.Recorder.playback_state == recorder.PlaybackState.idle:

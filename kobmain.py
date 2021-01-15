@@ -68,7 +68,11 @@ def from_key(code):
         update_sender(config.station)
         Reader.decode(code)
         Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to start/stop recording
+<<<<<<< HEAD
     if connected and remote:
+=======
+    if connected and config.remote:
+>>>>>>> master
         Internet.write(code)
     if len(code) > 0 and code[-1] == +1:
         set_local_loop_active(False)
@@ -148,7 +152,11 @@ def toggle_connect():
         ka.trigger_station_list_clear()
         Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
         Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
+<<<<<<< HEAD
         Internet.connect(config.wire)
+=======
+        Internet.connect(int(config.wire))
+>>>>>>> master
         connected = True
     else:
         connected = False
@@ -172,7 +180,11 @@ def change_wire():
     # Disconnect, change wire, reconnect.
     was_connected = connected
     disconnect()
+<<<<<<< HEAD
     Recorder.wire = config.wireNo
+=======
+    Recorder.wire = int(config.wire)
+>>>>>>> master
     if was_connected:
         time.sleep(0.350) # Needed to allow UTP packets to clear
         toggle_connect()
@@ -187,9 +199,16 @@ def update_sender(id):
         sender_ID = id
         Reader.flush()
         ka.trigger_reader_append_text("\n\n<{}>".format(sender_ID))
+<<<<<<< HEAD
         Reader = morse.Reader(
                 wpm=config.text_speed, codeType=config.code_type,
                 callback=readerCallback)  # reset to nominal code speed
+=======
+### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
+##        Reader = morse.Reader(
+##                wpm=config.text_speed, codeType=config.code_type,
+##                callback=readerCallback)  # reset to nominal code speed
+>>>>>>> master
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
@@ -199,7 +218,7 @@ def readerCallback(char, spacing):
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "_" else " * "
+        txt = "" if char == "__" else " * "
 ## ZZZ Temporarily disable 'intelligent' spacing
 ##    elif sp > 10:
 ##        txt = "     "
@@ -249,7 +268,11 @@ def init():
     dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
     targetFileName = "Session-" + dateTimeStr + ".json"
     log.info("Record to '{}'".format(targetFileName))
+<<<<<<< HEAD
     Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=config.wire, \
+=======
+    Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=int(config.wire), \
+>>>>>>> master
         play_code_callback=from_recorder, \
         play_sender_id_callback=ka.trigger_update_current_sender, \
         play_station_list_callback=ka.trigger_update_station_active, \
