@@ -148,7 +148,7 @@ def toggle_connect():
         ka.trigger_station_list_clear()
         Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
         Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
-        Internet.connect(config.wireNo)
+        Internet.connect(config.wire)
         connected = True
     else:
         connected = False

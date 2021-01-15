@@ -130,7 +130,7 @@ sound = True
 sounder = False
 spacing = Spacing.none
 station = None
-wire = None
+wire = 0
 min_char_speed = 18
 text_speed = 18
 
@@ -443,7 +443,7 @@ def set_station(s):
     station = noneOrValueFromStr(s)
     user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
-def set_wire(w):
+def set_wire(w: str):
     """Sets the wire to connect to
 
     Parameters
@@ -453,8 +453,13 @@ def set_wire(w):
     """
 
     global wire
-    wire = noneOrValueFromStr(w)
-    user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
+    try:
+        _wire = int(w)
+        wire = _wire
+        user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(wire))
+    except ValueError as ex:
+        log.err("Wire number value '{}' is not a valid integer value.".format(ex.args[0]))
+        raise
 
 def set_text_speed(s):
     """Sets the Text (code) speed in words per minute
@@ -516,8 +521,8 @@ def print_config():
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
     print("Spacing:", spacing.name.upper())
-    print("Station:", noneOrValueFromStr(station))
-    print("Wire:", noneOrValueFromStr(wire))
+    print("Station: '{}'".format(noneOrValueFromStr(station)))
+    print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
 
@@ -706,8 +711,8 @@ def read_config():
         __option = "Wire"
         __key = __WIRE_KEY
         _wire = user_config.get(__CONFIG_SECTION, __key)
-        if (not _wire) or (_wire.upper() != "NONE"):
-            wire = _wire
+        if (_wire) or (_wire.upper() != "NONE"):
+            wire = int(_wire)
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
         raise
