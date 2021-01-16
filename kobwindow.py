@@ -32,7 +32,7 @@ Create the main KOB window for MKOB and lay out its widgets
 import kobmain
 import kobevents
 import tkinter as tk
-import tkinter.scrolledtext as tkst 
+import tkinter.scrolledtext as tkst
 import kobactions as ka
 import kobstationlist as ksl
 import kobreader as krdr
@@ -40,7 +40,7 @@ import kobreader as krdr
 from pykob import config
 
 class KOBWindow:
-    def __init__(self, root, MKOB_VERSION_TEXT):       
+    def __init__(self, root, MKOB_VERSION_TEXT):
 
         # KOBWindow pointers for other modules
         ka.kw = self
@@ -60,10 +60,14 @@ class KOBWindow:
         root.bind_all('<Control-KeyPress-l>', ka.handle_playback_move_forward15)
         root.bind_all('<Control-KeyPress-j>', ka.handle_playback_move_sender_start)
         root.bind_all('<Control-KeyPress-k>', ka.handle_playback_move_sender_end)
-        
+
         # File menu
         menu = tk.Menu()
         root.config(menu=menu)
+
+        # Hide the window from view until its content can be fully initialized
+        root.withdraw()
+
         fileMenu = tk.Menu(menu)
         menu.add_cascade(label='File', menu=fileMenu)
         fileMenu.add_command(label='New', command=ka.doFileNew)
@@ -84,7 +88,7 @@ class KOBWindow:
         pwd1 = tk.PanedWindow(
                 root, orient=tk.HORIZONTAL, sashwidth=4,
                 borderwidth=0)  # left/right side
-        pwd1.grid(sticky='NESW', padx=6, pady=6)    
+        pwd1.grid(sticky='NESW', padx=6, pady=6)
         pwd2 = tk.PanedWindow(pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
         pwd1.add(pwd2, stretch='first')
 
@@ -110,7 +114,7 @@ class KOBWindow:
 
         # reader
         self.txtReader = tkst.ScrolledText(
-                frm1, width=40, height=15, bd=2,
+                frm1, width=54, height=21, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
@@ -118,17 +122,17 @@ class KOBWindow:
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(
-                frm2, width=40, height=5, bd=2,
+                frm2, width=40, height=7, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.txtKeyboard.focus_set()
-        
+
         # station list
         self.txtStnList = tkst.ScrolledText(
-                frm3, width=10, height=8, bd=2,
+                frm3, width=36, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
-        
+
         # office ID
         self.varOfficeID = tk.StringVar()
         self.entOfficeID = tk.Entry(
@@ -183,27 +187,31 @@ class KOBWindow:
         # Register messages and bind handlers
         ## For messages that need the 'data' element of an event
         ## need to use tk commands because tkinter doesn't provide wrapper methods.
-        self.root.bind(kobevents.EVENT_STATIONS_CLEAR, ka.handle_clear_stations)
-        ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)
+        root.bind(kobevents.EVENT_STATIONS_CLEAR, ka.handle_clear_stations)
+        ### root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)
         cmd = root.register(ka.handle_sender_update)
         root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
-        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
+        ### root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
         cmd = root.register(ksl.handle_update_station_active)
         root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
-        self.root.bind(kobevents.EVENT_READER_CLEAR, ka.handle_reader_clear)
-        ### self.root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
+        root.bind(kobevents.EVENT_READER_CLEAR, ka.handle_reader_clear)
+        ### root.bind(kobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
         cmd = root.register(ka.handle_reader_append_text)
         root.tk.call("bind", root, kobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
 
-        # get configuration settings
-        self.root.update()                      # Make sure window size reflects changes so far
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
-        w = self.root.winfo_width()
-        h = self.root.winfo_height()
+        # Finally, show the window in its full glory
+        root.update()                      # Make sure window size reflects changes so far
+        root.deiconify()
+
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+        w = root.winfo_width()
+        h = root.winfo_height()
         x = (sw - w) / 2
         y = (sh - h) * 0.4                      # about 40% from top
         root.geometry('%dx%d+%d+%d' % (w, h, x, y))
+
+        # get configuration settings
         self.varOfficeID.set(config.station)
         self.varCircuitCloser.set(True)         # Previously kc.CircuitCloser (=True)
         self.spnWPM.delete(0)
@@ -239,4 +247,3 @@ class KOBWindow:
         Make the keyboard window the active (focused) window.
         """
         self.txtKeyboard.focus_set()
-        
