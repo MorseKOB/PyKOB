@@ -220,7 +220,7 @@ class KOBWindow:
         self.varCodeSenderOn.set(True)          # Previously kc.CodeSenderOn (=True)
         self.varCodeSenderRepeat.set(False)     # Previously kc.CodeSenderRepeat (=False)
         self.spnWireNo.delete(0)
-        self.spnWireNo.insert(tk.END, int(config.wire))
+        self.spnWireNo.insert(tk.END, config.wire)
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()

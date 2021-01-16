@@ -60,6 +60,7 @@ Change history:
 
 from urllib.request import Request, urlopen
 import re
+import sys
 import time
 from pykob import internet, morse, kob, log
 import pykob  # to access PyKOB version number

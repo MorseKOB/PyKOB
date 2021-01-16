@@ -68,8 +68,8 @@ def main(argv):
     # System configuration
     port = None
     # User preferences
+    auto_connect = None
     invert_key_input = None
-    local = None
     remote = None
     interface_type = None
     server_url = None
@@ -88,10 +88,10 @@ def main(argv):
             + "Allow configuration values to be set and saved.", \
             parents=\
             [\
+            config.auto_connect_override, \
             config.code_type_override, \
             config.interface_type_override, \
             config.invert_key_input_override, \
-            config.local_override, \
             config.min_char_speed_override, \
             config.remote_override, \
             config.serial_port_override, \
@@ -108,6 +108,9 @@ def main(argv):
 
         # Set config values if they were specified
         save_config = False
+        if not args.auto_connect == config.auto_connect:
+            config.set_auto_connect(args.auto_connect)
+            save_config = True
         if not args.code_type == config.code_type:
             config.set_code_type(args.code_type)
             save_config = True
@@ -116,9 +119,6 @@ def main(argv):
             save_config = True
         if not args.invert_key_input == config.invert_key_input:
             config.set_invert_key_input(args.invert_key_input)
-            save_config = True
-        if not args.local == config.local:
-            config.set_local(args.local)
             save_config = True
         if not args.min_char_speed == config.min_char_speed:
             config.set_min_char_speed(args.min_char_speed)

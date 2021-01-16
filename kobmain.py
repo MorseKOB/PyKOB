@@ -148,7 +148,7 @@ def toggle_connect():
         ka.trigger_station_list_clear()
         Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
         Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
-        Internet.connect(int(config.wire))
+        Internet.connect(config.wire)
         connected = True
     else:
         connected = False
@@ -172,7 +172,7 @@ def change_wire():
     # Disconnect, change wire, reconnect.
     was_connected = connected
     disconnect()
-    Recorder.wire = int(config.wire)
+    Recorder.wire = config.wire
     if was_connected:
         time.sleep(0.350) # Needed to allow UTP packets to clear
         toggle_connect()
@@ -243,17 +243,21 @@ def init():
     Internet = internet.Internet(config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
-        log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+        log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
             "To enable/disable this setting use `Configure --iki`.")
-    # ZZZ temp always enable recorder - goal is to provide menu option to start/stop recording
     ts = recorder.get_timestamp()
     dt = datetime.fromtimestamp(ts / 1000.0)
     dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
     targetFileName = "Session-" + dateTimeStr + ".json"
     log.info("Record to '{}'".format(targetFileName))
-    Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=int(config.wire), \
+    Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=config.wire, \
         play_code_callback=from_recorder, \
         play_sender_id_callback=ka.trigger_update_current_sender, \
         play_station_list_callback=ka.trigger_update_station_active, \
         play_wire_callback=ka.trigger_player_wire_change)
     kobkeyboard.init()
+    # If the configuration indicates that an application should automatically connect - 
+    # connect to the currently configured wire.
+    if config.auto_connect:
+        ka.doConnect() # Suggest a connect.
+

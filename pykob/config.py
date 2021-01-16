@@ -108,10 +108,10 @@ __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
 # User INI file Parameters/Keys
+__AUTO_CONNECT_KEY = "AUTO_CONNECT"
 __CODE_TYPE_KEY = "CODE_TYPE"
 __INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 __INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
-__LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
 __SERVER_URL_KEY = "SERVER_URL"
@@ -148,17 +148,17 @@ user_name = None
 serial_port = None
 
 # User Settings
+auto_connect = False
 code_type = CodeType.american
 interface_type = InterfaceType.loop
 invert_key_input = False
-local = True
 remote = True
 server_url = None
 sound = True
 sounder = False
 spacing = Spacing.none
 station = None
-wire = None
+wire = 0
 min_char_speed = 18
 text_speed = 18
 
@@ -212,6 +212,31 @@ def create_config_files_if_needed():
             os.makedirs(app_config_dir)
         f = open(app_config_file_path, 'w')
         f.close()
+
+def set_auto_connect(s):
+    """Sets the Auto Connect to wire enable state
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    automatically connect to the configured wire.
+
+    Note that this is a 'suggestion'. It isn't used by the base pykob 
+    modules. It should be used by applications (like MKOB) to initiate a connection 
+    to the configured wire.
+    
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable auto-connect. Values of `NO`|`OFF`|`FALSE` will disable auto-connect.
+    """
+
+    global auto_connect
+    try:
+        auto_connect = strtobool(str(s))
+        user_config.set(__CONFIG_SECTION, __AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+    except ValueError as ex:
+        log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
 
 def set_code_type(s):
     """Sets the Code Type (for American or International)
@@ -467,7 +492,7 @@ def set_station(s):
     station = noneOrValueFromStr(s)
     user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
-def set_wire(w):
+def set_wire(w: str):
     """Sets the wire to connect to
 
     Parameters
@@ -477,8 +502,13 @@ def set_wire(w):
     """
 
     global wire
-    wire = noneOrValueFromStr(w)
-    user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
+    try:
+        _wire = int(w)
+        wire = _wire
+        user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(wire))
+    except ValueError as ex:
+        log.err("Wire number value '{}' is not a valid integer value.".format(ex.args[0]))
+        raise
 
 def set_text_speed(s):
     """Sets the Text (code) speed in words per minute
@@ -531,17 +561,17 @@ def print_config():
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
     print("--------------------------------------")
+    print("Auto Connect to Wire:", onOffFromBool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", onOffFromBool(invert_key_input))
-    print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
     print("KOB Server URL:", url)
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
     print("Spacing:", spacing.name.upper())
-    print("Station:", noneOrValueFromStr(station))
-    print("Wire:", noneOrValueFromStr(wire))
+    print("Station: '{}'".format(noneOrValueFromStr(station)))
+    print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
 
@@ -578,10 +608,10 @@ def read_config():
     #
     global serial_port
     #
+    global auto_connect
     global code_type
     global interface_type
     global invert_key_input
-    global local
     global min_char_speed
     global remote
     global server_url
@@ -636,10 +666,10 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
+        __AUTO_CONNECT_KEY:"OFF", \
         __CODE_TYPE_KEY:"AMERICAN", \
         __INTERFACE_TYPE_KEY:"LOOP", \
         __INVERT_KEY_INPUT_KEY:"OFF", \
-        __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
         __SERVER_URL_KEY:"NONE", \
@@ -665,6 +695,9 @@ def read_config():
             serial_port = None
 
         # Get the User config values
+        __option = "Auto Connect to Wire"
+        __key = __AUTO_CONNECT_KEY
+        auto_connect = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Code type"
         __key = __CODE_TYPE_KEY
         _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
@@ -688,9 +721,6 @@ def read_config():
         __option = "Invert key input"
         __key = __INVERT_KEY_INPUT_KEY
         invert_key_input = user_config.getboolean(__CONFIG_SECTION, __key)
-        __option = "Local copy"
-        __key = __LOCAL_KEY
-        local = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Minimum character speed"
         __key = __MIN_CHAR_SPEED_KEY
         min_char_speed = user_config.getint(__CONFIG_SECTION, __key)
@@ -730,8 +760,8 @@ def read_config():
         __option = "Wire"
         __key = __WIRE_KEY
         _wire = user_config.get(__CONFIG_SECTION, __key)
-        if (not _wire) or (_wire.upper() != "NONE"):
-            wire = _wire
+        if (_wire) or (_wire.upper() != "NONE"):
+            wire = int(_wire)
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
         raise
@@ -741,6 +771,12 @@ def read_config():
 
 # ### Mainline
 read_config()
+
+auto_connect_override = argparse.ArgumentParser(add_help=False)
+auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF", 
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
+metavar="auto-connect", dest="auto_connect")
 
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
@@ -753,10 +789,6 @@ help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-t
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
 invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, \
 help="Enable/disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
-
-local_override = argparse.ArgumentParser(add_help=False)
-local_override.add_argument("-L", "--local", default=local, \
-help="Enable/disable local copy of transmitted code.", metavar="local-copy", dest="local")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
