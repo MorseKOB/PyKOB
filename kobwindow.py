@@ -36,7 +36,6 @@ import tkinter.scrolledtext as tkst
 import kobactions as ka
 import kobstationlist as ksl
 import kobreader as krdr
-from pykob import config
 
 from pykob import config
 
@@ -71,6 +70,8 @@ class KOBWindow:
         fileMenu.add_command(label='Open...', command=ka.doFileOpen)
         fileMenu.add_separator()
         fileMenu.add_command(label='Play...', command=ka.doFilePlay)
+        fileMenu.add_separator()
+        fileMenu.add_command(label='Preferences...', command=ka.doFilePreferences)
         fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=ka.doFileExit)
 

@@ -22,11 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""config module  
+"""config module
 
-Reads configuration information for `per-machine` and `per-user` values.  
+Reads configuration information for `per-machine` and `per-user` values.
 
-An example of a `per-machine` value is the KOB serial/com port (PORT).  
+An example of a `per-machine` value is the KOB serial/com port (PORT).
 An example of a `per-user` value is the code speed (WPM).
 
 Configuration/preference values are read/written to:
@@ -62,16 +62,44 @@ class Spacing(IntEnum):
     char = 1
     word = 2
 
+    def to_string(self):
+        if self.value == Spacing.none:
+            return "NONE"
+        elif self.value == Spacing.char:
+            return "CHAR"
+        elif self.value == Spacing.word:
+            return "WORD"
+        else:
+            return "UNKNOWN"
+
 @unique
 class CodeType(IntEnum):
     american = 1
     international = 2
+
+    def to_string(self):
+        if self.value == CodeType.american:
+            return "AMERICAN"
+        elif self == CodeType.international:
+            return "INTERNATIONAL"
+        else:
+            return "UNKNOWN"
 
 @unique
 class InterfaceType(IntEnum):
     key_sounder = 1
     loop = 2
     keyer = 3
+
+    def to_string(self):
+        if self == InterfaceType.key_sounder:
+            return "KEY_SOUNDER"
+        elif self == InterfaceType.loop:
+            return "LOOP"
+        elif self == InterfaceType.keyer:
+            return "KEYER"
+        else:
+            return "UNKNOWN"
 
 # Application name
 __APP_NAME = "pykob"
@@ -216,8 +244,8 @@ def set_code_type(s):
     Parameters
     ----------
     s : str
-        The value `A|AMERICAN` will set the code type to 'American'.  
-        The value `I|INTERNATIONAL` will set the code type to 'International'.  
+        The value `A|AMERICAN` will set the code type to 'American'.
+        The value `I|INTERNATIONAL` will set the code type to 'International'.
     """
 
     global code_type
@@ -239,9 +267,9 @@ def set_interface_type(s):
     Parameters
     ----------
     s : str
-        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.  
+        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.
         The value `L|LOOP` will set the interface type to 'InterfaceType.loop'.
-        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.  
+        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.
     """
 
     global interface_type
@@ -263,14 +291,14 @@ def set_invert_key_input(b):
     """
     Enable/disable key input signal (DSR) invert.
 
-    When key-invert is enabled, the key input (DSR on the serial interface) 
-    is inverted (because the RS-232 logic is inverted). This is primarily used 
+    When key-invert is enabled, the key input (DSR on the serial interface)
+    is inverted (because the RS-232 logic is inverted). This is primarily used
     when the input is from a modem (in dial-up connection).
-    
+
     Parameters
     ----------
     b : string 'true/false'
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable key invert. Values of `NO`|`OFF`|`FALSE` will disable key invert.
     """
     global invert_key_input
@@ -281,16 +309,37 @@ def set_invert_key_input(b):
         log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
+def set_local(l):
+    """Enable/disable local copy
+
+    When local copy is enabled, the local sound/sounder configuration is
+    used to locally sound the content being sent to the wire.
+
+    Parameters
+    ----------
+    l : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
+    """
+
+    global local
+    try:
+        local = strtobool(str(l))
+        user_config.set(__CONFIG_SECTION, __LOCAL_KEY, onOffFromBool(local))
+    except ValueError as ex:
+        log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+
 def set_remote(r):
     """Enable/disable remote send
 
-    When remote send is enabled, the content will be sent to the  
-    wire configured.  
-    
+    When remote send is enabled, the content will be sent to the
+    wire configured.
+
     Parameters
     ----------
     r : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable remote send. Values of `NO`|`OFF`|`FALSE` will disable remote send.
     """
 
@@ -305,11 +354,11 @@ def set_remote(r):
 def set_min_char_speed(s):
     """Sets the minimum character speed in words per minute
 
-    A difference between character speed (in WPM) and text speed  
-    (in WPM) is used to calulate a Farnsworth timing value.  
+    A difference between character speed (in WPM) and text speed
+    (in WPM) is used to calulate a Farnsworth timing value.
 
-    This is the minimum character speed. If the text speed is 
-    higher, then the character speed will be bumped up to  
+    This is the minimum character speed. If the text speed is
+    higher, then the character speed will be bumped up to
     the text speed.
 
     Parameters
@@ -328,7 +377,7 @@ def set_min_char_speed(s):
         raise
 
 def set_serial_port(p):
-    """Sets the name/path of the serial/tty port to use for a 
+    """Sets the name/path of the serial/tty port to use for a
     key+sounder/loop interface
 
     Parameters
@@ -359,13 +408,13 @@ def set_server_url(s):
 def set_sound(s):
     """Sets the Sound/Audio enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the computer audio 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the computer audio
     will be used to produce sounder output.
 
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable sound. Values of `NO`|`OFF`|`FALSE` will disable sound.
     """
 
@@ -380,14 +429,14 @@ def set_sound(s):
 def set_sounder(s):
     """Sets the Sounder enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the sounder will 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the sounder will
     be driven if the `port` value is configured.
 
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
-        will enable sounder output. Values of `NO`|`OFF`|`FALSE` will disable 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable sounder output. Values of `NO`|`OFF`|`FALSE` will disable
         sounder output.
     """
 
@@ -400,18 +449,18 @@ def set_sounder(s):
         raise
 
 def set_spacing(s):
-    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,  
+    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,
     Character `Spacing.char` or Word `Spacing.word`
 
-    When set to `Spacing.none` Farnsworth spacing will not be added.  
-    When set to `Spacing.char` Farnsworth spacing will be added between characters.  
-    When set to `Spacing.word` Farnsworth spacing will be added between words.  
-    
+    When set to `Spacing.none` Farnsworth spacing will not be added.
+    When set to `Spacing.char` Farnsworth spacing will be added between characters.
+    When set to `Spacing.word` Farnsworth spacing will be added between words.
+
     Parameters
     ----------
     s : str
-        The value `N|NONE` will set the spacing to `Spacing.none` (disabled).  
-        The value `C|CHAR` will set the spacing to `Spacing.char`.  
+        The value `N|NONE` will set the spacing to `Spacing.none` (disabled).
+        The value `C|CHAR` will set the spacing to `Spacing.char`.
         The value `W|WORD` will set the spacing to `Spacing.word`.
     """
 
@@ -527,7 +576,7 @@ def print_config():
     print("Words per min speed:", text_speed)
 
 def save_config():
-    """Save (write) the configuration values out to the user and 
+    """Save (write) the configuration values out to the user and
     system/machine config files.
     """
 
@@ -760,13 +809,13 @@ serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
 sound_override = argparse.ArgumentParser(add_help=False)
-sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
+sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
 metavar="sound", dest="sound")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
-sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF", 
+sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
 metavar="sounder", dest="sounder")
