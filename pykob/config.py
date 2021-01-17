@@ -761,7 +761,11 @@ def read_config():
         __key = __WIRE_KEY
         _wire = user_config.get(__CONFIG_SECTION, __key)
         if (_wire) or (_wire.upper() != "NONE"):
-            wire = int(_wire)
+            try:
+                wire = int(_wire)
+            except ValueError as ex:
+                log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
+                wire = 1
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
         raise
