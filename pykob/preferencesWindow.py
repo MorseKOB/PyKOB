@@ -16,8 +16,8 @@ class PreferencesWindow:
     def __init__(self, quitWhenDismissed=False):
         self.quitOnExit = quitWhenDismissed
         config.read_config()
-      # print("Configured serial port  =", config.serial_port)
-      # print("Configured code speed  =", config.text_speed)
+        print("Configured serial port  =", config.serial_port)
+        print("Configured code speed  =", config.text_speed)
        
         interface = 'SERIAL'      # Placeholder until HW interface type is configured
         
@@ -161,7 +161,7 @@ class PreferencesWindow:
         ttk.Entry(internetConnection, width=5, textvariable=self.initialWireNumber).grid(row=3, column=1, sticky=tk.W)
 
         # Add a checkbox for the 'Automatically connect at startup' option
-        self.autoConnectAtStartup = tk.IntVar(value=config.auto_connect)
+        self.autoConnectAtStartup = tk.IntVar(value=0)
         ttk.Checkbutton(internetConnection,
                         text="Automatically connect at startup",
                         variable=self.autoConnectAtStartup).grid(row=4, column=0, columnspan=2, padx=20, sticky=tk.W)
@@ -181,7 +181,7 @@ class PreferencesWindow:
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
         ttk.Label(codeOptions, text="Intial Code Speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
-      # print("Setting code speed to", config.text_speed)
+        print("Setting code speed to", config.text_speed)
         self.codeSpeed = tk.DoubleVar(value=config.text_speed)
         ttk.Spinbox(codeOptions, from_=1, to=99,
                     width=4, format="%2.f", justify=tk.RIGHT,
@@ -281,7 +281,6 @@ class PreferencesWindow:
       # print("Initial wire number:", self.initialWireNumber.get())
         config.set_wire(self.initialWireNumber.get())
       # print("Auto-connect at startup:", self.autoConnectAtStartup.get())
-        config.set_auto_connect(self.autoConnectAtStartup.get())
       # print("Initial code speed:", self.codeSpeed.get())
         config.set_text_speed(self.codeSpeed.get())
       # print("Initial character rate:", self.characterRate.get())
