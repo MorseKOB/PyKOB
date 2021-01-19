@@ -306,7 +306,7 @@ class PreferencesWindow:
         self.root.mainloop()
 
     def dismiss(self):
-        if self._quitWhenDismissed:
+        if self._quitOnExit:
             self.root.quit()
         self.root.destroy()
         if self._callback:
