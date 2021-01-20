@@ -88,6 +88,7 @@ def doFilePreferences():
         preferencesDialog = \
             preferencesWindow.PreferencesWindow(callback=_markPreferencesDestroyed,
                                                 quitWhenDismissed=False)
+    preferencesDialog.root.deiconify()
     preferencesDialog.root.lift()
 
 def doFileExit():
