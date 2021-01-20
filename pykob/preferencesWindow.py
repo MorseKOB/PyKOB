@@ -12,9 +12,17 @@ from tkinter import Menu
 import serial
 import serial.tools.list_ports
 
+global preferencesDialog
+preferencesDialog = None                # Force creation of a new dialog when first invoked
+
+#
+# 'callback' is invoked when the window is dismissed
+# 'quitWhenDismissed' forces an exit from the running Tkinter mainloop on exit
+#
 class PreferencesWindow:
-    def __init__(self, quitWhenDismissed=False):
-        self.quitOnExit = quitWhenDismissed
+    def __init__(self, callback=None, quitWhenDismissed=False):
+        self._callback = callback
+        self._quitOnExit = quitWhenDismissed
         config.read_config()
       # print("Configured serial port  =", config.serial_port)
       # print("Configured code speed  =", config.text_speed)
@@ -299,6 +307,8 @@ class PreferencesWindow:
         self.root.mainloop()
 
     def dismiss(self):
-        if self.quitOnExit:
+        if self._quitOnExit:
             self.root.quit()
         self.root.destroy()
+        if self._callback:
+            self._callback(self)  
