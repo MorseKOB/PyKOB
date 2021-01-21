@@ -55,6 +55,19 @@ class PreferencesWindow:
 
         self.root.title("Preferences")
 
+        
+        #######################################################################
+        #
+        #   Create two-tabbed interface: Basic/Advanced
+        #
+        #######################################################################
+        
+        prefs_nb = ttk.NoteBook(self.root)
+        basic_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(basic_prefs, text="Basic")
+        advanced_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(advanced_prefs, text="Advanced")
+
         #######################################################################
         #
         #   Local Interface section
@@ -62,7 +75,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all local interface-related widgets
-        localInterface = ttk.LabelFrame(self.root, text=" Local Interface")
+        localInterface = ttk.LabelFrame(basic_prefs, text=" Local Interface")
         ttk.Label(localInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
 
         # Add a pop-up menu with the list of available serial connections:
@@ -130,7 +143,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all internet connection-related widgets
-        internetConnection = ttk.LabelFrame(self.root, text=" Internet Connection")
+        internetConnection = ttk.LabelFrame(basic_prefs, text=" Internet Connection")
         # ttk.Label(internetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
 
         server_url = config.server_url if config.server_url else HOST_DEFAULT
@@ -184,7 +197,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all code-related widgets
-        codeOptions = ttk.LabelFrame(self.root, text=" Code Options")
+        codeOptions = ttk.LabelFrame(basic_prefs, text=" Code Options")
         
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
@@ -250,6 +263,8 @@ class PreferencesWindow:
         dialogButtons.columnconfigure(2, weight=6)
       
         dialogButtons.pack(fill=tk.X)
+
+        prefs_nb.pack(expand=1, fill='both')
 
         # The call to update() is necessary to make the window update its dimensions to the
         # eventual displayed size.
