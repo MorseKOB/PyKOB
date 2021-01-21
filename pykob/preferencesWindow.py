@@ -4,13 +4,22 @@
 
 from pykob import config
 
-import tkinter as tk
-from tkinter import ttk
-from tkinter import scrolledtext
-from tkinter import Menu
+GUI = True                              # Hope for the best...
+try:
+    # import tkinter as tk
+    import X as tk
+    from tkinter import ttk
+    from tkinter import scrolledtext
+    from tkinter import Menu
+except ModuleNotFoundError:
+    GUI = False
 
-import serial
-import serial.tools.list_ports
+SERIAL = True                           # Hope for the best...
+try:
+    import serial
+    import serial.tools.list_ports
+except ModuleNotFoundError:
+    SERIAL = False
 
 global preferencesDialog
 preferencesDialog = None                # Force creation of a new dialog when first invoked
@@ -24,6 +33,9 @@ class PreferencesWindow:
         self._callback = callback
         self._quitOnExit = quitWhenDismissed
         config.read_config()
+        if not GUI:
+            return
+        
       # print("Configured serial port  =", config.serial_port)
       # print("Configured code speed  =", config.text_speed)
        
@@ -304,11 +316,13 @@ class PreferencesWindow:
         self.dismiss()
     
     def display(self):
-        self.root.mainloop()
+        if GUI:
+            self.root.mainloop()
 
     def dismiss(self):
-        if self._quitOnExit:
-            self.root.quit()
-        self.root.destroy()
+        if GUI:
+            if self._quitOnExit:
+                self.root.quit()
+            self.root.destroy()
         if self._callback:
             self._callback(self)  
