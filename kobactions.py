@@ -41,6 +41,8 @@ import kobstationlist as ksl
 import pykob  # for version number
 print("PyKOB " + pykob.VERSION)
 
+global preferencesDialog
+preferencesDialog = None
 kw = None  # initialized by KOBWindow
 
 ####
@@ -75,9 +77,19 @@ def doFilePlay():
         km.Recorder.playback_start(list_data=False, max_silence=5)
     kw.make_keyboard_focus()
 
+def _markPreferencesDestroyed(prefsDialog):
+    global preferencesDialog
+    preferencesDialog = None
+
 def doFilePreferences():
-    prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=False)
-    prefs.display()
+    global preferencesDialog
+
+    if not preferencesDialog:
+        preferencesDialog = \
+            preferencesWindow.PreferencesWindow(callback=_markPreferencesDestroyed,
+                                                quitWhenDismissed=False)
+    preferencesDialog.root.deiconify()
+    preferencesDialog.root.lift()
 
 def doFileExit():
     kw.root.destroy()

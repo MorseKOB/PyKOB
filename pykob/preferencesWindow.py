@@ -4,20 +4,39 @@
 
 from pykob import config
 
-import tkinter as tk
-from tkinter import ttk
-from tkinter import scrolledtext
-from tkinter import Menu
+GUI = True                              # Hope for the best...
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import scrolledtext
+    from tkinter import Menu
+except ModuleNotFoundError:
+    GUI = False
 
-import serial
-import serial.tools.list_ports
+SERIAL = True                           # Hope for the best...
+try:
+    import serial
+    import serial.tools.list_ports
+except ModuleNotFoundError:
+    SERIAL = False
 
+global preferencesDialog
+preferencesDialog = None                # Force creation of a new dialog when first invoked
+
+#
+# 'callback' is invoked when the window is dismissed
+# 'quitWhenDismissed' forces an exit from the running Tkinter mainloop on exit
+#
 class PreferencesWindow:
-    def __init__(self, quitWhenDismissed=False):
-        self.quitOnExit = quitWhenDismissed
+    def __init__(self, callback=None, quitWhenDismissed=False):
+        self._callback = callback
+        self._quitOnExit = quitWhenDismissed
         config.read_config()
-        print("Configured serial port  =", config.serial_port)
-        print("Configured code speed  =", config.text_speed)
+        if not GUI:
+            return
+        
+      # print("Configured serial port  =", config.serial_port)
+      # print("Configured code speed  =", config.text_speed)
        
         interface = 'SERIAL'      # Placeholder until HW interface type is configured
         
@@ -59,12 +78,15 @@ class PreferencesWindow:
 
         # Add a pop-up menu with the list of available serial connections:
         self.serialPort = tk.StringVar()
-        systemSerialPorts = serial.tools.list_ports.comports()
-        serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
+        if SERIAL:
+            systemSerialPorts = serial.tools.list_ports.comports()
+            serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
+        else:
+            serialPortValues = []
         serialPortMenu = ttk.Combobox(localInterface,
                                       width=30,
                                       textvariable=self.serialPort,
-                                      state='readonly',
+                                      state='readonly' if SERIAL else 'disabled',
                                       values=serialPortValues).grid(row=1,
                                                                     column=0, columnspan=4,
                                                                     sticky=tk.W)
@@ -85,6 +107,7 @@ class PreferencesWindow:
         for serialadioButton in range(len(self.SERIAL_CONNECTION_TYPES)):
             ttk.Radiobutton(localInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
                             variable=self.serialConnectionType,
+                            state='enabled' if SERIAL else 'disabled',
                             value=serialadioButton + 1).grid(row=serialadioButton + 2,
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
@@ -161,7 +184,7 @@ class PreferencesWindow:
         ttk.Entry(internetConnection, width=5, textvariable=self.initialWireNumber).grid(row=3, column=1, sticky=tk.W)
 
         # Add a checkbox for the 'Automatically connect at startup' option
-        self.autoConnectAtStartup = tk.IntVar(value=0)
+        self.autoConnectAtStartup = tk.IntVar(value=config.auto_connect)
         ttk.Checkbutton(internetConnection,
                         text="Automatically connect at startup",
                         variable=self.autoConnectAtStartup).grid(row=4, column=0, columnspan=2, padx=20, sticky=tk.W)
@@ -181,7 +204,7 @@ class PreferencesWindow:
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
         ttk.Label(codeOptions, text="Intial Code Speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
-        print("Setting code speed to", config.text_speed)
+      # print("Setting code speed to", config.text_speed)
         self.codeSpeed = tk.DoubleVar(value=config.text_speed)
         ttk.Spinbox(codeOptions, from_=1, to=99,
                     width=4, format="%2.f", justify=tk.RIGHT,
@@ -281,6 +304,7 @@ class PreferencesWindow:
       # print("Initial wire number:", self.initialWireNumber.get())
         config.set_wire(self.initialWireNumber.get())
       # print("Auto-connect at startup:", self.autoConnectAtStartup.get())
+        config.set_auto_connect(self.autoConnectAtStartup.get())
       # print("Initial code speed:", self.codeSpeed.get())
         config.set_text_speed(self.codeSpeed.get())
       # print("Initial character rate:", self.characterRate.get())
@@ -295,9 +319,13 @@ class PreferencesWindow:
         self.dismiss()
     
     def display(self):
-        self.root.mainloop()
+        if GUI:
+            self.root.mainloop()
 
     def dismiss(self):
-        if self.quitOnExit:
-            self.root.quit()
-        self.root.destroy()
+        if GUI:
+            if self._quitOnExit:
+                self.root.quit()
+            self.root.destroy()
+        if self._callback:
+            self._callback(self)  
