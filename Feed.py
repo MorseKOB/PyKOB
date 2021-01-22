@@ -276,7 +276,14 @@ try:
     cwpm = args.min_char_speed
 
     # Code type: American or International
-    code_type = args.code_type
+    if args.code_type =="A" or args.code_type=="AMERICAN":
+        code_type = config.CodeType.american
+    elif args.code_type=="I" or args.code_type=="INTERNATIONAL":
+        code_type = config.CodeType.international
+    else:
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
     
     # Pause between articles (in seconds):
     artPause = args.artPause
@@ -295,7 +302,7 @@ try:
 
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
     myInternet = internet.Internet(idText)
-    myKOB = kob.KOB(port=None, audio=False)
+    myKOB = kob.KOB(port=config.serial_port, interfaceType=config.interface_type, audio=config.sound)
 
     myInternet.connect(wire)
 
