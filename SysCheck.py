@@ -54,3 +54,13 @@ try:
         print(p)
 except:
     print('pySerial not installed')
+
+
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import scrolledtext
+    from tkinter import Menu
+    print('Tkinter ' + str(tk.TkVersion))
+except ModuleNotFound:
+    print('Tkinter not installed')
