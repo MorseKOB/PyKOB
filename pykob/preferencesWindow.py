@@ -149,8 +149,9 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all internet connection-related widgets
-        internetConnection = ttk.LabelFrame(basic_prefs, text=" Internet Connection")
-        # ttk.Label(internetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
+        basicInternetConnection = ttk.LabelFrame(basic_prefs, text=" Internet Connection")
+        # ttk.Label(basicInternetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
+        advancedInternetConnection = ttk.LabelFrame(advanced_prefs, text=" Internet Connection")
 
         server_url = config.server_url if config.server_url else HOST_DEFAULT
         server_port = PORT_DEFAULT
@@ -163,38 +164,39 @@ class PreferencesWindow:
         
         # Create and label an entry for the server URL:
         self.serverUrl = tk.StringVar(value=server_url)
-        ttk.Label(internetConnection, text="Server:").grid(row=0, column=0, sticky=tk.W)
-        ttk.Entry(internetConnection, width=30, textvariable=self.serverUrl).grid(row=0, column=1, sticky=tk.W)
+        ttk.Label(advancedInternetConnection, text="Server:").grid(row=0, column=0, sticky=tk.W)
+        ttk.Entry(advancedInternetConnection, width=30, textvariable=self.serverUrl).grid(row=0, column=1, sticky=tk.W)
         
         # Create and label an entry for the server port number:
         self.portNumber = tk.StringVar(value=server_port)
-        ttk.Label(internetConnection, text="Port number:").grid(row=0, column=2, sticky=tk.E)
-        ttk.Entry(internetConnection, width=10, textvariable=self.portNumber).grid(row=0, column=3, sticky=tk.W)
+        ttk.Label(advancedInternetConnection, text="Port number:").grid(row=0, column=2, sticky=tk.E)
+        ttk.Entry(advancedInternetConnection, width=10, textvariable=self.portNumber).grid(row=0, column=3, sticky=tk.W)
         
         # Add a checkbox for the 'Transmit to remote stations' option
         self.transmitToRemoteStations = tk.IntVar(value=config.remote)
-        ttk.Checkbutton(internetConnection,
+        ttk.Checkbutton(basicInternetConnection,
                         text="Transmit to remote stations",
                         variable=self.transmitToRemoteStations).grid(row=1, column=0, columnspan=4, sticky=tk.W)
 
         # Create and label an entry for the initial station ID:
         self.initialStationID = tk.StringVar(value=config.station)
-        ttk.Label(internetConnection, text="Initial station ID:").grid(row=2, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=20, textvariable=self.initialStationID).grid(row=2, column=1, sticky=tk.W)
+        ttk.Label(basicInternetConnection, text="Initial station ID:").grid(row=2, column=0, sticky=tk.E)
+        ttk.Entry(basicInternetConnection, width=20, textvariable=self.initialStationID).grid(row=2, column=1, sticky=tk.W)
 
         # Create and label an entry for the initial wire number:
         self.initialWireNumber = tk.StringVar(value=config.wire)
-        ttk.Label(internetConnection, text="Initial wire number:").grid(row=3, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=5, textvariable=self.initialWireNumber).grid(row=3, column=1, sticky=tk.W)
+        ttk.Label(basicInternetConnection, text="Initial wire number:").grid(row=3, column=0, sticky=tk.E)
+        ttk.Entry(basicInternetConnection, width=5, textvariable=self.initialWireNumber).grid(row=3, column=1, sticky=tk.W)
 
         # Add a checkbox for the 'Automatically connect at startup' option
         self.autoConnectAtStartup = tk.IntVar(value=config.auto_connect)
-        ttk.Checkbutton(internetConnection,
+        ttk.Checkbutton(basicInternetConnection,
                         text="Automatically connect at startup",
                         variable=self.autoConnectAtStartup).grid(row=4, column=0, columnspan=2, padx=20, sticky=tk.W)
 
-      # internetConnection.grid(row=1, column=0, columnspan=5, pady=6, sticky=tk.W)
-        internetConnection.pack(fill=tk.BOTH)
+      # basicInternetConnection.grid(row=1, column=0, columnspan=5, pady=6, sticky=tk.W)
+        basicInternetConnection.pack(fill=tk.BOTH)
+        advancedInternetConnection.pack(fill=tk.BOTH)
         
         #######################################################################
         #
