@@ -112,7 +112,7 @@ class PreferencesWindow:
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.interface_type.to_string() == self.SERIAL_CONNECTION_SETTINGS[serialadioButton]:
+            if config.interface_type.name.upper() == self.SERIAL_CONNECTION_SETTINGS[serialadioButton]:
                 self.serialConnectionType.set(serialadioButton + 1)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
@@ -225,7 +225,7 @@ class PreferencesWindow:
                             variable=self.characterSpacing,
                             value=spacingRadioButton + 1).grid(column=1, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.spacing.to_string() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
+            if config.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
                 self.characterSpacing.set(spacingRadioButton + 1)
     
         # Create a pair of Radiobuttons using one IntVar for the code type options
@@ -238,7 +238,7 @@ class PreferencesWindow:
                             variable=self.codeType,
                             value=codeTypeRadioButton + 1).grid(row=6, column=1 + codeTypeRadioButton, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.code_type.to_string().upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
+            if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self.codeType.set(codeTypeRadioButton + 1)
     
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
