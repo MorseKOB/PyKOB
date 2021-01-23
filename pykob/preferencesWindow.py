@@ -238,7 +238,7 @@ class PreferencesWindow:
                             variable=self.codeType,
                             value=codeTypeRadioButton + 1).grid(row=6, column=1 + codeTypeRadioButton, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.code_type.to_string() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton]:
+            if config.code_type.to_string().upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self.codeType.set(codeTypeRadioButton + 1)
     
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)

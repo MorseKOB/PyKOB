@@ -706,9 +706,9 @@ def read_config():
         __option = "Code type"
         __key = __CODE_TYPE_KEY
         _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
-        if _code_type == "AMERICAN":
+        if _code_type == "A" or _code_type == "AMERICAN":
             code_type = CodeType.american
-        elif _code_type == "INTERNATIONAL":
+        elif _code_type == "I" or _code_type == "INTERNATIONAL":
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
@@ -772,7 +772,7 @@ def read_config():
             try:
                 wire = int(_wire)
             except ValueError as ex:
-                log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
+                # log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
                 wire = 1
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))

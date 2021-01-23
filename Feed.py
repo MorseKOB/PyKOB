@@ -57,6 +57,9 @@ Examples:
 
 Change history:
 
+Feed 2.0  2021-01-22
+- Change to use standard command line argument processing
+
 Feed 1.9  2021-01-04
 - support using a PyKOB recording (json) file as a source
 
@@ -85,6 +88,8 @@ import pykob
 import traceback
 from pathlib import Path
 from pykob import config, newsreader, morse, internet, kob, log, recorder
+from distutils.util import strtobool
+
 
 VERSION     = '2.0'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
@@ -276,9 +281,10 @@ try:
     cwpm = args.min_char_speed
 
     # Code type: American or International
-    if args.code_type =="A" or args.code_type=="AMERICAN":
+    args_code_type = args.code_type.upper()
+    if args_code_type == "A" or args_code_type == "AMERICAN":
         code_type = config.CodeType.american
-    elif args.code_type=="I" or args.code_type=="INTERNATIONAL":
+    elif args_code_type == "I" or args_code_type =="INTERNATIONAL":
         code_type = config.CodeType.international
     else:
         msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
@@ -302,7 +308,8 @@ try:
 
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
     myInternet = internet.Internet(idText)
-    myKOB = kob.KOB(port=config.serial_port, interfaceType=config.interface_type, audio=config.sound)
+    audio_setting = strtobool(str(args.sound))
+    myKOB = kob.KOB(port=config.serial_port, interfaceType=config.interface_type, audio=audio_setting)
 
     myInternet.connect(wire)
 
