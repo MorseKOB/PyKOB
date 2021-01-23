@@ -62,9 +62,12 @@ class PreferencesWindow:
         #
         #######################################################################
         
-        prefs_nb = ttk.NoteBook(self.root)
+        prefs_nb = ttk.Notebook(self.root)
+        prefs_nb.pack(fill=tk.BOTH)
         basic_prefs = ttk.Frame(prefs_nb)
         prefs_nb.add(basic_prefs, text="Basic")
+        code_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(code_prefs, text="Morse Code")
         advanced_prefs = ttk.Frame(prefs_nb)
         prefs_nb.add(advanced_prefs, text="Advanced")
 
@@ -75,14 +78,16 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all local interface-related widgets
-        localInterface = ttk.LabelFrame(basic_prefs, text=" Local Interface")
-        ttk.Label(localInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
+        basiclocalInterface = ttk.LabelFrame(basic_prefs, text=" Local Interface")
+        ttk.Label(basiclocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
+        advancedlocalInterface = ttk.LabelFrame(advanced_prefs, text=" Local Interface")
+        ttk.Label(advancedlocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
 
         # Add a pop-up menu with the list of available serial connections:
         self.serialPort = tk.StringVar()
         systemSerialPorts = serial.tools.list_ports.comports()
         serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
-        serialPortMenu = ttk.Combobox(localInterface,
+        serialPortMenu = ttk.Combobox(basiclocalInterface,
                                       width=30,
                                       textvariable=self.serialPort,
                                       state='readonly',
@@ -95,7 +100,7 @@ class PreferencesWindow:
                 self.serialPort.set(serial_device)
         
         # Label the serial connection type:
-        ttk.Label(localInterface, text="Serial connection:").grid(row=2, rowspan=3, column=0, sticky=tk.NE)
+        ttk.Label(basiclocalInterface, text="Serial connection:").grid(row=2, rowspan=3, column=0, sticky=tk.NE)
 
         # Create three Radiobuttons using one IntVar for the serial connection type
         self.serialConnectionType = tk.IntVar()
@@ -104,7 +109,7 @@ class PreferencesWindow:
         self.serialConnectionType.set(self.DEFAULT_SERIAL_CONNECTION_TYPE)
         
         for serialadioButton in range(len(self.SERIAL_CONNECTION_TYPES)):
-            ttk.Radiobutton(localInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
+            ttk.Radiobutton(basiclocalInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
                             variable=self.serialConnectionType,
                             value=serialadioButton + 1).grid(row=serialadioButton + 2,
                                                              column=1, columnspan=2,
@@ -115,26 +120,27 @@ class PreferencesWindow:
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
         self.invertKeyInput = tk.IntVar(value=config.invert_key_input)
-        ttk.Checkbutton(localInterface, text="Invert key input",
+        ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
                         variable=self.invertKeyInput).grid(row=4,
                                                            column=5,
                                                            padx=12, sticky=tk.W)
         
         # Add a checkbox for the 'Use system sound' option
         self.useSystemSound = tk.IntVar(value=config.sound)
-        ttk.Checkbutton(localInterface,
+        ttk.Checkbutton(basiclocalInterface,
                         text="Use system sound",
                         variable=self.useSystemSound).grid(column=0, columnspan=6,
                                                            sticky=tk.W)
 
         # Add a checkbox for the 'Use local sounder' option
         self.useLocalSounder = tk.IntVar(value=config.sounder)
-        ttk.Checkbutton(localInterface,
+        ttk.Checkbutton(basiclocalInterface,
                         text="Use local sounder",
                         variable=self.useLocalSounder).grid(column=0, columnspan=6,
                                                             sticky=tk.W)
 
-        localInterface.pack(fill=tk.BOTH)
+        basiclocalInterface.pack(fill=tk.BOTH)
+        advancedlocalInterface.pack(fill=tk.BOTH)
 
         #######################################################################
         #
@@ -197,7 +203,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all code-related widgets
-        codeOptions = ttk.LabelFrame(basic_prefs, text=" Code Options")
+        codeOptions = ttk.LabelFrame(code_prefs, text=" Code Options")
         
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
