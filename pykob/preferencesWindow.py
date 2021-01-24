@@ -4,13 +4,21 @@
 
 from pykob import config
 
-import tkinter as tk
-from tkinter import ttk
-from tkinter import scrolledtext
-from tkinter import Menu
+GUI = True                              # Hope for the best...
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter import scrolledtext
+    from tkinter import Menu
+except ModuleNotFoundError:
+    GUI = False
 
-import serial
-import serial.tools.list_ports
+SERIAL = True                           # Hope for the best...
+try:
+    import serial
+    import serial.tools.list_ports
+except ModuleNotFoundError:
+    SERIAL = False
 
 global preferencesDialog
 preferencesDialog = None                # Force creation of a new dialog when first invoked
@@ -24,6 +32,9 @@ class PreferencesWindow:
         self._callback = callback
         self._quitOnExit = quitWhenDismissed
         config.read_config()
+        if not GUI:
+            return
+        
       # print("Configured serial port  =", config.serial_port)
       # print("Configured code speed  =", config.text_speed)
        
@@ -85,12 +96,15 @@ class PreferencesWindow:
 
         # Add a pop-up menu with the list of available serial connections:
         self.serialPort = tk.StringVar()
-        systemSerialPorts = serial.tools.list_ports.comports()
-        serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
-        serialPortMenu = ttk.Combobox(basiclocalInterface,
+        if SERIAL:
+            systemSerialPorts = serial.tools.list_ports.comports()
+            serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
+        else:
+            serialPortValues = []
+        serialPortMenu = ttk.Combobox(localInterface,
                                       width=30,
                                       textvariable=self.serialPort,
-                                      state='readonly',
+                                      state='readonly' if SERIAL else 'disabled',
                                       values=serialPortValues).grid(row=1,
                                                                     column=0, columnspan=4,
                                                                     sticky=tk.W)
@@ -111,6 +125,7 @@ class PreferencesWindow:
         for serialadioButton in range(len(self.SERIAL_CONNECTION_TYPES)):
             ttk.Radiobutton(basiclocalInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
                             variable=self.serialConnectionType,
+                            state='enabled' if SERIAL else 'disabled',
                             value=serialadioButton + 1).grid(row=serialadioButton + 2,
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
@@ -325,11 +340,13 @@ class PreferencesWindow:
         self.dismiss()
     
     def display(self):
-        self.root.mainloop()
+        if GUI:
+            self.root.mainloop()
 
     def dismiss(self):
-        if self._quitOnExit:
-            self.root.quit()
-        self.root.destroy()
+        if GUI:
+            if self._quitOnExit:
+                self.root.quit()
+            self.root.destroy()
         if self._callback:
             self._callback(self)  

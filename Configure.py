@@ -31,7 +31,12 @@ Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
 import sys
-import tkinter as tk
+GUI = True                              # Hope for the best
+try:
+    import tkinter as tk
+except ModuleNotFoundError:
+    GUI = False
+    
 from pykob import config
 from pykob import preferencesWindow
 
@@ -102,7 +107,9 @@ def main(argv):
             config.station_override, \
             config.text_speed_override, \
             config.wire_override])
-        arg_parser.add_argument('-G', '--gui', dest="gui_config", action='store_true', help="Use preferences panel GUI for interactive configuration.")
+        if GUI:
+            arg_parser.add_argument('-G', '--gui', dest="gui_config", action='store_true',
+                            help="Use preferences panel GUI for interactive configuration.")
 
         args = arg_parser.parse_args()
 
@@ -162,7 +169,7 @@ def main(argv):
         print("Error processing arguments: {}".format(ex))
         sys.exit(1)
 
-    if args.gui_config:
+    if GUI and args.gui_config:
         try:
             root = tk.Tk()
             root.overrideredirect(1)
