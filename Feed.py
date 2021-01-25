@@ -38,7 +38,7 @@ Command line parameters (required):
     idText - office call, etc.
     URI - RSS formatted text source (URI) or a PyKOB recording file.
     wpm - overall code speed (WPM).
-    
+
 Additional command line parameters (optional):
     cwpm - individual character speed (default: same as overall code speed)
     artPause - delay between articles (default: 2 sec)
@@ -157,9 +157,9 @@ def processRecording():
 
     playback_finished.clear()
     while True:
-        myRecorder = recorder.Recorder(None, uri, station_id=idText, 
-          play_code_callback=callbackPlay, 
-          play_finished_callback=callbackPlayFinished, 
+        myRecorder = recorder.Recorder(None, uri, station_id=idText,
+          play_code_callback=callbackPlay,
+          play_finished_callback=callbackPlayFinished,
           play_sender_id_callback = callbackSenderId)
         # Wait until there is an active listener on the wire and there isn't an active sender
         while activeSender() or not activeListener():
@@ -261,10 +261,10 @@ try:
                             help="Number of days from today of articles to read before repeating (default: all)", dest="days")
     arg_parser.add_argument("--wait", "-w", metavar="<sec>", type=float, default=0.0,
                             help="Number of seconds to wait for the wire to be idle before sending (default: none)", dest="wait")
-    
+
     args = arg_parser.parse_args()
   # print("arg_parser returned", args)
-    
+
     # Wire number for feed:
     wire = args.wire
 
@@ -273,7 +273,7 @@ try:
 
     # Feed URI:
     uri = args.uri
-    
+
     # The code speed for the feed:
     wpm = args.speed
 
@@ -290,7 +290,7 @@ try:
         msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
         log.err(msg)
         raise ValueError(msg)
-    
+
     # Pause between articles (in seconds):
     artPause = args.artPause
 
@@ -322,11 +322,11 @@ try:
     # See if the URI is a PyKOB recorder file or a RSS file/feed
     isRecording = False
     # See if the URI is a recording file
-    #  There are more effecient ways to do this with Mac/Linux, 
+    #  There are more effecient ways to do this with Mac/Linux,
     #  but this seems to be needed with Windows.
     #
-    # `Path` has problems handling paths that aren't local/absolute. The recorder class 
-    # only handles a local file path. If the URI isn't a local file path assume it is 
+    # `Path` has problems handling paths that aren't local/absolute. The recorder class
+    # only handles a local file path. If the URI isn't a local file path assume it is
     # a URL to a RSS feed.
     #
     fileExists = os.path.isfile(uri)
@@ -336,7 +336,7 @@ try:
         isJson = filepath.suffix == ".json"
         if fileExists and isJson:
             # URI is a file that has a '.json' extention
-            # this isn't a foolproof test, but is what we will use  
+            # this isn't a foolproof test, but is what we will use
             # for now to see if this is a PyKOB recording file.
             isRecording = True
     if isRecording:
