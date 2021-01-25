@@ -32,6 +32,9 @@ with the current weather conditions and short term forecast for that area.
 
 Change history:
 
+1.0.8  2021-01-24
+- changed to read config and accept standard command line overrides (issue #227)
+
 1.0.7  2020-05-28
 - changed header to `#!/usr/bin/env python3`
 
@@ -61,16 +64,19 @@ Change history:
 from urllib.request import Request, urlopen
 import re
 import sys
+import argparse
 import time
-from pykob import internet, morse, kob, log
+from pykob import config, internet, morse, kob, log
 import pykob  # to access PyKOB version number
+from distutils.util import strtobool
 
-VERSION = '1.0.7'
-WIRE    = 106
-IDTEXT  = 'KOB Weather Service, AC'
-WPM     = 20  # initial guess at received Morse speed
+VERSION = '1.0.8'
+# WIRE    = 106
+# IDTEXT  = 'KOB Weather Service, AC'
+# WPM     = 20  # initial guess at received Morse speed
 #DEBUG   = '~IACWXKSEA+'  # run locally, don't connect to wire
 DEBUG   = ''  # run normally
+FLAGS = re.IGNORECASE + re.DOTALL
 
 log.log('Starting Weather ' + VERSION)
 log.log('PyKOB version ' + pykob.VERSION)
@@ -103,8 +109,6 @@ def readerCallback(char, spacing):
         myReader.setWPM(WPM)
         msg = ''
     
-FLAGS = re.IGNORECASE + re.DOTALL
-
 def sendForecast(msg):
     m = re.search(r'WX(.{4,5})\+', msg)
     if not m:
@@ -213,12 +217,61 @@ try:
         sendForecast(DEBUG)
         exit()
 
-    myInternet = internet.Internet(IDTEXT)
-    myInternet.connect(WIRE)
+    arg_parser = argparse.ArgumentParser(description="Morse weather wire feed",
+                    parents=[ \
+                    # config.auto_connect_override, \       # Not applicable
+                      config.code_type_override, \
+                      config.interface_type_override, \
+                    # config.config.invert_key_input_override, \   # Not applicable
+                    # config.local_override, \                     # Not applicable
+                      config.min_char_speed_override, \
+                    # config.remote_override, \                    # Not applicable
+                      config.serial_port_override, \
+                      config.server_url_override, \
+                      config.sound_override, \
+                      config.sounder_override, \
+                      config.station_override, \
+                      config.spacing_override, \
+                      config.text_speed_override, \
+                      config.wire_override, \
+                     ])
+
+    args = arg_parser.parse_args()
+  # print("arg_parser returned", args)
+
+    # Wire number for feed:
+    wire = int(args.wire)
+
+    # Station ID for feed:
+    stationID = args.station
+
+    # The code speed for the feed:
+    wpm = args.text_speed
+
+    # The cwpm:
+    cwpm = args.min_char_speed
+
+    # Code type: American or International
+    args_code_type = args.code_type.upper()
+    if args_code_type == "A" or args_code_type == "AMERICAN":
+        code_type = config.CodeType.american
+    elif args_code_type == "I" or args_code_type =="INTERNATIONAL":
+        code_type = config.CodeType.international
+    else:
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+
+    audio_setting = strtobool(str(args.sound))
+    if not strtobool(str(args.sounder)):
+        args.serial_port = None         # Override configured HW serial port
+
+    myInternet = internet.Internet(stationID)
+    myInternet.connect(wire)
     myReader = morse.Reader(callback=readerCallback)
-    mySender = morse.Sender(WPM)
-    myKOB = kob.KOB(port=None, audio=False)
-    myReader.setWPM(WPM)
+    mySender = morse.Sender(wpm, cwpm, codeType=code_type)
+    myKOB = kob.KOB(port=args.serial_port, interfaceType=args.interface_type, audio=audio_setting)
+    myReader.setWPM(wpm)
     code = []
     bracket = False
     msg = ''

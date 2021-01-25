@@ -291,6 +291,9 @@ try:
         log.err(msg)
         raise ValueError(msg)
 
+    if not strtobool(str(args.sounder)):
+        args.serial_port = None         # Override configured HW serial port
+
     # Pause between articles (in seconds):
     artPause = args.artPause
 
