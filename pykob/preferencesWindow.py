@@ -101,7 +101,7 @@ class PreferencesWindow:
             serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
         else:
             serialPortValues = []
-        serialPortMenu = ttk.Combobox(localInterface,
+        serialPortMenu = ttk.Combobox(basiclocalInterface,
                                       width=30,
                                       textvariable=self.serialPort,
                                       state='readonly' if SERIAL else 'disabled',
