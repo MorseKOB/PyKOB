@@ -130,7 +130,7 @@ class PreferencesWindow:
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.interface_type.to_string() == self.SERIAL_CONNECTION_SETTINGS[serialadioButton]:
+            if config.interface_type.name.upper() == self.SERIAL_CONNECTION_SETTINGS[serialadioButton]:
                 self.serialConnectionType.set(serialadioButton + 1)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
@@ -231,7 +231,7 @@ class PreferencesWindow:
                                                       column=2,
                                                       padx=10, sticky=tk.W)
         
-        ttk.Label(codeOptions, text="Initial character rate:").grid(row=1, column=3, sticky=tk.E)
+        ttk.Label(codeOptions, text="Character rate:").grid(row=1, column=3, sticky=tk.E)
         self.characterRate = tk.DoubleVar(value=config.min_char_speed)
         ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT, textvariable=self.characterRate).grid(row=1, column=4, padx=10, sticky=tk.W)
         
@@ -244,7 +244,7 @@ class PreferencesWindow:
                             variable=self.characterSpacing,
                             value=spacingRadioButton + 1).grid(column=1, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.spacing.to_string() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
+            if config.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
                 self.characterSpacing.set(spacingRadioButton + 1)
     
         # Create a pair of Radiobuttons using one IntVar for the code type options
@@ -257,7 +257,7 @@ class PreferencesWindow:
                             variable=self.codeType,
                             value=codeTypeRadioButton + 1).grid(row=6, column=1 + codeTypeRadioButton, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.code_type.to_string() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton]:
+            if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self.codeType.set(codeTypeRadioButton + 1)
     
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
@@ -320,15 +320,15 @@ class PreferencesWindow:
         config.set_server_url(self.serverUrl.get() + ":" + self.portNumber.get())
       # print("Transmit to remote stations: ", self.transmitToRemoteStations.get())
         config.set_remote(self.transmitToRemoteStations.get())
-      # print("Initial station ID:", self.initialStationID.get())
-        config.set_station(self.initialStationID.get())
-      # print("Initial wire number:", self.initialWireNumber.get())
-        config.set_wire(self.initialWireNumber.get())
+      # print("Station ID:", self.stationID.get())
+        config.set_station(self.stationID.get())
+      # print("Wire number:", self.wireNumber.get())
+        config.set_wire(self.wireNumber.get())
       # print("Auto-connect at startup:", self.autoConnectAtStartup.get())
         config.set_auto_connect(self.autoConnectAtStartup.get())
-      # print("Initial code speed:", self.codeSpeed.get())
+      # print("Code speed:", self.codeSpeed.get())
         config.set_text_speed(self.codeSpeed.get())
-      # print("Initial character rate:", self.characterRate.get())
+      # print("Character rate:", self.characterRate.get())
         config.set_min_char_speed(self.characterRate.get())
       # print("Character spacing:", self.CHARACTER_SPACING_OPTIONS[self.characterSpacing.get() - 1])
         config.set_spacing(self.CHARACTER_SPACING_SETTINGS[self.characterSpacing.get() - 1])
