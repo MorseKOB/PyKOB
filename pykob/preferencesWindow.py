@@ -66,6 +66,22 @@ class PreferencesWindow:
 
         self.root.title("Preferences")
 
+        
+        #######################################################################
+        #
+        #   Create two-tabbed interface: Basic/Advanced
+        #
+        #######################################################################
+        
+        prefs_nb = ttk.Notebook(self.root)
+        prefs_nb.pack(fill=tk.BOTH)
+        basic_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(basic_prefs, text="Basic")
+        code_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(code_prefs, text="Morse Code")
+        advanced_prefs = ttk.Frame(prefs_nb)
+        prefs_nb.add(advanced_prefs, text="Advanced")
+
         #######################################################################
         #
         #   Local Interface section
@@ -73,8 +89,10 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all local interface-related widgets
-        localInterface = ttk.LabelFrame(self.root, text=" Local Interface")
-        ttk.Label(localInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
+        basiclocalInterface = ttk.LabelFrame(basic_prefs, text=" Local Interface")
+        ttk.Label(basiclocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
+        advancedlocalInterface = ttk.LabelFrame(advanced_prefs, text=" Local Interface")
+        ttk.Label(advancedlocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
 
         # Add a pop-up menu with the list of available serial connections:
         self.serialPort = tk.StringVar()
@@ -96,7 +114,7 @@ class PreferencesWindow:
                 self.serialPort.set(serial_device)
         
         # Label the serial connection type:
-        ttk.Label(localInterface, text="Serial connection:").grid(row=2, rowspan=3, column=0, sticky=tk.NE)
+        ttk.Label(basiclocalInterface, text="Serial connection:").grid(row=2, rowspan=3, column=0, sticky=tk.NE)
 
         # Create three Radiobuttons using one IntVar for the serial connection type
         self.serialConnectionType = tk.IntVar()
@@ -105,7 +123,7 @@ class PreferencesWindow:
         self.serialConnectionType.set(self.DEFAULT_SERIAL_CONNECTION_TYPE)
         
         for serialadioButton in range(len(self.SERIAL_CONNECTION_TYPES)):
-            ttk.Radiobutton(localInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
+            ttk.Radiobutton(basiclocalInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
                             variable=self.serialConnectionType,
                             state='enabled' if SERIAL else 'disabled',
                             value=serialadioButton + 1).grid(row=serialadioButton + 2,
@@ -117,26 +135,27 @@ class PreferencesWindow:
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
         self.invertKeyInput = tk.IntVar(value=config.invert_key_input)
-        ttk.Checkbutton(localInterface, text="Invert key input",
+        ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
                         variable=self.invertKeyInput).grid(row=4,
                                                            column=5,
                                                            padx=12, sticky=tk.W)
         
         # Add a checkbox for the 'Use system sound' option
         self.useSystemSound = tk.IntVar(value=config.sound)
-        ttk.Checkbutton(localInterface,
+        ttk.Checkbutton(basiclocalInterface,
                         text="Use system sound",
                         variable=self.useSystemSound).grid(column=0, columnspan=6,
                                                            sticky=tk.W)
 
         # Add a checkbox for the 'Use local sounder' option
         self.useLocalSounder = tk.IntVar(value=config.sounder)
-        ttk.Checkbutton(localInterface,
+        ttk.Checkbutton(basiclocalInterface,
                         text="Use local sounder",
                         variable=self.useLocalSounder).grid(column=0, columnspan=6,
                                                             sticky=tk.W)
 
-        localInterface.pack(fill=tk.BOTH)
+        basiclocalInterface.pack(fill=tk.BOTH)
+        advancedlocalInterface.pack(fill=tk.BOTH)
 
         #######################################################################
         #
@@ -145,7 +164,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all internet connection-related widgets
-        internetConnection = ttk.LabelFrame(self.root, text=" Internet Connection")
+        internetConnection = ttk.LabelFrame(advanced_prefs, text=" Internet Connection")
         # ttk.Label(internetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
 
         server_url = config.server_url if config.server_url else HOST_DEFAULT
@@ -160,12 +179,12 @@ class PreferencesWindow:
         # Create and label an entry for the server URL:
         self.serverUrl = tk.StringVar(value=server_url)
         ttk.Label(internetConnection, text="Server:").grid(row=0, column=0, sticky=tk.W)
-        ttk.Entry(internetConnection, width=30, textvariable=self.serverUrl).grid(row=0, column=1, sticky=tk.W)
+        ttk.Entry(internetConnection, width=30, textvariable=self.serverUrl).grid(row=0, column=1, sticky=tk.E)
         
         # Create and label an entry for the server port number:
         self.portNumber = tk.StringVar(value=server_port)
         ttk.Label(internetConnection, text="Port number:").grid(row=0, column=2, sticky=tk.E)
-        ttk.Entry(internetConnection, width=10, textvariable=self.portNumber).grid(row=0, column=3, sticky=tk.W)
+        ttk.Entry(internetConnection, width=12, textvariable=self.portNumber).grid(row=0, column=3, sticky=tk.E)
         
         # Add a checkbox for the 'Transmit to remote stations' option
         self.transmitToRemoteStations = tk.IntVar(value=config.remote)
@@ -173,15 +192,15 @@ class PreferencesWindow:
                         text="Transmit to remote stations",
                         variable=self.transmitToRemoteStations).grid(row=1, column=0, columnspan=4, sticky=tk.W)
 
-        # Create and label an entry for the initial station ID:
-        self.initialStationID = tk.StringVar(value=config.station)
-        ttk.Label(internetConnection, text="Initial station ID:").grid(row=2, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=20, textvariable=self.initialStationID).grid(row=2, column=1, sticky=tk.W)
+        # Create and label an entry for the station ID:
+        self.stationID = tk.StringVar(value=config.station)
+        ttk.Label(internetConnection, text="Station ID:").grid(row=2, column=0, sticky=tk.E)
+        ttk.Entry(internetConnection, width=55, textvariable=self.stationID).grid(row=2, column=1, columnspan=3, sticky=tk.W)
 
-        # Create and label an entry for the initial wire number:
-        self.initialWireNumber = tk.StringVar(value=config.wire)
-        ttk.Label(internetConnection, text="Initial wire number:").grid(row=3, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=5, textvariable=self.initialWireNumber).grid(row=3, column=1, sticky=tk.W)
+        # Create and label an entry for the wire number:
+        self.wireNumber = tk.StringVar(value=config.wire)
+        ttk.Label(internetConnection, text="Wire number:").grid(row=3, column=0, sticky=tk.E)
+        ttk.Entry(internetConnection, width=5, textvariable=self.wireNumber).grid(row=3, column=1, sticky=tk.W)
 
         # Add a checkbox for the 'Automatically connect at startup' option
         self.autoConnectAtStartup = tk.IntVar(value=config.auto_connect)
@@ -199,7 +218,7 @@ class PreferencesWindow:
         #######################################################################
 
         # Create a container frame to hold all code-related widgets
-        codeOptions = ttk.LabelFrame(self.root, text=" Code Options")
+        codeOptions = ttk.LabelFrame(code_prefs, text=" Code Options")
         
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
@@ -265,6 +284,8 @@ class PreferencesWindow:
         dialogButtons.columnconfigure(2, weight=6)
       
         dialogButtons.pack(fill=tk.X)
+
+        prefs_nb.pack(expand=1, fill='both')
 
         # The call to update() is necessary to make the window update its dimensions to the
         # eventual displayed size.
