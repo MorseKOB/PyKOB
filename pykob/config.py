@@ -62,44 +62,16 @@ class Spacing(IntEnum):
     char = 1
     word = 2
 
-    def to_string(self):
-        if self.value == Spacing.none:
-            return "NONE"
-        elif self.value == Spacing.char:
-            return "CHAR"
-        elif self.value == Spacing.word:
-            return "WORD"
-        else:
-            return "UNKNOWN"
-
 @unique
 class CodeType(IntEnum):
     american = 1
     international = 2
-
-    def to_string(self):
-        if self.value == CodeType.american:
-            return "AMERICAN"
-        elif self == CodeType.international:
-            return "INTERNATIONAL"
-        else:
-            return "UNKNOWN"
 
 @unique
 class InterfaceType(IntEnum):
     key_sounder = 1
     loop = 2
     keyer = 3
-
-    def to_string(self):
-        if self == InterfaceType.key_sounder:
-            return "KEY_SOUNDER"
-        elif self == InterfaceType.loop:
-            return "LOOP"
-        elif self == InterfaceType.keyer:
-            return "KEYER"
-        else:
-            return "UNKNOWN"
 
 # Application name
 __APP_NAME = "pykob"
@@ -706,7 +678,7 @@ def read_config():
         __option = "Code type"
         __key = __CODE_TYPE_KEY
         _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
-        if _code_type == "AMERICAN":
+        if  _code_type == "AMERICAN":
             code_type = CodeType.american
         elif _code_type == "INTERNATIONAL":
             code_type = CodeType.international
@@ -772,7 +744,7 @@ def read_config():
             try:
                 wire = int(_wire)
             except ValueError as ex:
-                log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
+                # log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
                 wire = 1
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))

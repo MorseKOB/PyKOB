@@ -38,7 +38,7 @@ Command line parameters (required):
     idText - office call, etc.
     URI - RSS formatted text source (URI) or a PyKOB recording file.
     wpm - overall code speed (WPM).
-    
+
 Additional command line parameters (optional):
     cwpm - individual character speed (default: same as overall code speed)
     artPause - delay between articles (default: 2 sec)
@@ -56,6 +56,9 @@ Examples:
     python Feed.py 111 "Civil War News, 15 wpm, AC" "file://civilwar.xml" 15 18 5 20 3
 
 Change history:
+
+Feed 2.0  2021-01-22
+- Change to use standard command line argument processing
 
 Feed 1.9  2021-01-04
 - support using a PyKOB recording (json) file as a source
@@ -78,54 +81,31 @@ Feed 1.4  2018-07-10
 
 import os
 import sys
+import argparse
 import time, datetime
 import threading
 import pykob
 import traceback
 from pathlib import Path
-from pykob import newsreader, morse, internet, kob, log, recorder
+from pykob import config, newsreader, morse, internet, kob, log, recorder
+from distutils.util import strtobool
 
-VERSION     = '1.9'
+
+VERSION     = '2.0'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
-log.log('Starting Feed {0}'.format(VERSION))
-
-wire = int(sys.argv[1])
-idText = sys.argv[2]
-uri = sys.argv[3]
-wpm = int(sys.argv[4])
-n = len(sys.argv)
-cwpm = int(sys.argv[5]) if n > 5 else 0
-artPause = float(sys.argv[6]) if n > 6 else 2.0
-grpPause = max(float(sys.argv[7]) if n > 7 else 5.0, artPause)
-days = int(sys.argv[8]) if n > 8 else 0
-wait = int(sys.argv[9]) if n > 9 else 0
-
-playback_finished = threading.Event()
-playback_last_sender = None
-
-mySender = morse.Sender(wpm, cwpm)
-myInternet = internet.Internet(idText)
-myKOB = kob.KOB(port=None, audio=False)
-
-myInternet.connect(wire)
-
-# create thread to listen for activity on the wire
-tLastSender = time.time()  # time of last activity
 def checkForActivity():
     global tLastSender
     while True:
         myInternet.read()
         tLastSender = time.time()
-listenerThread = threading.Thread(target=checkForActivity)
-listenerThread.daemon = True
-listenerThread.start()
 
 def activeListener():
     return time.time() < myInternet.tLastListener + TIMEOUT
 
 def activeSender():
+    global wait
     return time.time() < tLastSender + wait
 
 def send(code):
@@ -177,9 +157,9 @@ def processRecording():
 
     playback_finished.clear()
     while True:
-        myRecorder = recorder.Recorder(None, uri, station_id=idText, 
-          play_code_callback=callbackPlay, 
-          play_finished_callback=callbackPlayFinished, 
+        myRecorder = recorder.Recorder(None, uri, station_id=idText,
+          play_code_callback=callbackPlay,
+          play_finished_callback=callbackPlayFinished,
           play_sender_id_callback = callbackSenderId)
         # Wait until there is an active listener on the wire and there isn't an active sender
         while activeSender() or not activeListener():
@@ -243,15 +223,110 @@ def processRSS():
             time.sleep(artPause)
         time.sleep(grpPause - artPause)
 
+global artPause
+global days
+global grpPause
+global idText
+global uri
+global wait
+
+log.log('Starting Feed {0}'.format(VERSION))
+
 try:
+    arg_parser = argparse.ArgumentParser(description="Morse wire feed", parents=\
+     [\
+      config.serial_port_override, \
+      config.code_type_override, \
+      config.interface_type_override, \
+      config.sound_override, \
+      config.sounder_override, \
+      config.spacing_override, \
+      config.server_url_override, \
+      config.min_char_speed_override, \
+    # config.text_speed_override, \         # Specified as positional arg. #4
+    # config.wire_override, \               # Specified as positional arg. #1
+     ])
+    arg_parser.add_argument("wire", type=int, help="The wire no. for feed")
+    arg_parser.add_argument("station", metavar="station-id", type=str,
+                            help="The station identifier for the feed")
+    arg_parser.add_argument("uri",
+            help="The URI for the feed (e.g. http://rss.cnn.com/rss/cnn_topstories.rss or file://civilwar.xml)")
+    arg_parser.add_argument("speed", type=int, help="The code speed for the feed (in WPM)")
+
+    arg_parser.add_argument("--article-pause", "-P", metavar="<sec>", type=float, default=2.0,
+                            help="Pause between articles", dest= "artPause")
+    arg_parser.add_argument("--group-pause", "-G", metavar="<sec>", type=float, default=5.0,
+                            help="Pause between article groups", dest="grpPause")
+    arg_parser.add_argument("--days", "-d", metavar="<days>", type=int, default=0,
+                            help="Number of days from today of articles to read before repeating (default: all)", dest="days")
+    arg_parser.add_argument("--wait", "-w", metavar="<sec>", type=float, default=0.0,
+                            help="Number of seconds to wait for the wire to be idle before sending (default: none)", dest="wait")
+
+    args = arg_parser.parse_args()
+  # print("arg_parser returned", args)
+
+    # Wire number for feed:
+    wire = args.wire
+
+    # Station ID for feed:
+    idText = args.station
+
+    # Feed URI:
+    uri = args.uri
+
+    # The code speed for the feed:
+    wpm = args.speed
+
+    # The cwpm:
+    cwpm = args.min_char_speed
+
+    # Code type: American or International
+    args_code_type = args.code_type.upper()
+    if args_code_type == "A" or args_code_type == "AMERICAN":
+        code_type = config.CodeType.american
+    elif args_code_type == "I" or args_code_type =="INTERNATIONAL":
+        code_type = config.CodeType.international
+    else:
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+
+    # Pause between articles (in seconds):
+    artPause = args.artPause
+
+    # Default group pause to article pause value if no group pause value is supplied
+    grpPause = args.grpPause if args.grpPause > 0.0 else args.artPause
+
+    # Number of days (from today) of articles to read before repeating:
+    days = args.days
+
+    # The wait time (in seconds) after someone else transmits before resuming feed:
+    wait = args.wait
+
+    playback_finished = threading.Event()
+    playback_last_sender = None
+
+    mySender = morse.Sender(wpm, cwpm, codeType=code_type)
+    myInternet = internet.Internet(idText)
+    audio_setting = strtobool(str(args.sound))
+    myKOB = kob.KOB(port=args.serial_port, interfaceType=args.interface_type, audio=audio_setting)
+
+    myInternet.connect(wire)
+
+    # create thread to listen for activity on the wire
+    tLastSender = time.time()  # time of last activity
+    listenerThread = threading.Thread(target=checkForActivity)
+    listenerThread.daemon = True
+    listenerThread.start()
+
     # See if the URI is a PyKOB recorder file or a RSS file/feed
     isRecording = False
     # See if the URI is a recording file
-    #  There are more effecient ways to do this with Mac/Linux, 
+    #  There are more effecient ways to do this with Mac/Linux,
     #  but this seems to be needed with Windows.
     #
-    # `Path` has problems handling paths that aren't local/absolute. The recorder class 
-    # only handles a local file path. If the URI isn't a local file path assume it is 
+    # `Path` has problems handling paths that aren't local/absolute. The recorder class
+    # only handles a local file path. If the URI isn't a local file path assume it is
     # a URL to a RSS feed.
     #
     fileExists = os.path.isfile(uri)
@@ -261,7 +336,7 @@ try:
         isJson = filepath.suffix == ".json"
         if fileExists and isJson:
             # URI is a file that has a '.json' extention
-            # this isn't a foolproof test, but is what we will use  
+            # this isn't a foolproof test, but is what we will use
             # for now to see if this is a PyKOB recording file.
             isRecording = True
     if isRecording:
