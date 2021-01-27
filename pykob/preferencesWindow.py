@@ -28,7 +28,13 @@ preferencesDialog = None                # Force creation of a new dialog when fi
 # 'quitWhenDismissed' forces an exit from the running Tkinter mainloop on exit
 #
 class PreferencesWindow:
+    def _on_closing(self):
+        print("Closing window.")
+        self._displayed = False;
+        self.dismiss()
+
     def __init__(self, callback=None, quitWhenDismissed=False):
+        self._displayed = False;
         self._callback = callback
         self._quitOnExit = quitWhenDismissed
         config.read_config()
@@ -61,8 +67,10 @@ class PreferencesWindow:
         self.CODE_TYPE_SETTINGS = ['AMERICAN', 'INTERNATIONAL']
         self.DEFAULT_CODE_TYPE = 1
     
+        self._displayed = True;
         self.root = tk.Toplevel()
         self.root.resizable(False, False)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         self.root.title("Preferences")
 
@@ -344,9 +352,9 @@ class PreferencesWindow:
             self.root.mainloop()
 
     def dismiss(self):
-        if GUI:
-            if self._quitOnExit:
-                self.root.quit()
-            self.root.destroy()
+        if GUI and self._quitOnExit:
+            self.root.quit()
         if self._callback:
-            self._callback(self)  
+            self._callback(self) 
+        if GUI: 
+            self.root.destroy()
