@@ -63,7 +63,7 @@ class Internet:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET,
                 socket.SOCK_DGRAM)[0][4]
-        self.version = ("PyKOB " + VERSION).encode(encoding='ascii')
+        self.version = ("PyKOB " + VERSION).encode(encoding='latin-1')
         self.officeID = officeID if officeID != None else ""
         self.wireNo = 0
         self.sentSeqNo = 0
@@ -110,7 +110,7 @@ class Internet:
                 self.tLastListener = time.time()
                 cp = codePacketFormat.unpack(buf)
                 cmd, byts, stnID, seqNo, code = cp[0], cp[1], cp[2], cp[3], cp[4:]
-                stnID, sep, fill = stnID.decode(encoding='ascii').partition(NUL)
+                stnID, sep, fill = stnID.decode(encoding='latin-1').partition(NUL)
                 n = code[51]
                 if n == 0:  # ID packet
                     if self.ID_callback:
@@ -136,10 +136,10 @@ class Internet:
         if n > 50:
             log.warn("PyKOB.internet: code sequence too long: {0}".format(n))
             return
-        codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='ascii'))
+        codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='latin-1'))
         self.sentSeqNo += 1
         codePacket = codePacketFormat.pack(
-                DAT, 492, self.officeID.encode('ascii'),
+                DAT, 492, self.officeID.encode('latin-1'),
                 self.sentSeqNo, *codeBuf)
         for i in range(2):
             self.socket.sendto(codePacket, self.address)
@@ -159,7 +159,7 @@ class Internet:
             shortPacket = shortPacketFormat.pack(CON, self.wireNo)
             self.socket.sendto(shortPacket, self.address)
             self.sentSeqNo += 2
-            idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('ascii'),
+            idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
                     self.sentSeqNo, 1, self.version)
             self.socket.sendto(idPacket, self.address)
             if self.ID_callback:
