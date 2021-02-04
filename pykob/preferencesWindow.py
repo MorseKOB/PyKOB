@@ -54,7 +54,10 @@ class PreferencesWindow:
         PORT_DEFAULT = 7890
         
         self.CHARACTER_SPACING_OPTIONS = ["None", "Between characters", "Between words"]
-        self.CHARACTER_SPACING_SETTINGS = ['NONE', 'CHARACTER', 'WORD']
+        self.CHARACTER_SPACING_SETTINGS = ['NONE', 'CHAR', 'WORD']
+        self.CHARACTER_SPACING_NONE = 0
+        self.CHARACTER_SPACING_CHARACTER = 1
+        self.CHARACTER_SPACING_WORD = 2
         self.DEFAULT_CHARACTER_SPACING = 2
         
         self.CODE_TYPES = ["American", "International"]
@@ -222,29 +225,40 @@ class PreferencesWindow:
         
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
-        ttk.Label(codeOptions, text="Intial Code Speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
+        ttk.Label(codeOptions, text="Code Speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
       # print("Setting code speed to", config.text_speed)
         self.codeSpeed = tk.DoubleVar(value=config.text_speed)
         ttk.Spinbox(codeOptions, from_=1, to=99,
                     width=4, format="%2.f", justify=tk.RIGHT,
+                    command=self._updateSpacingOptions,
                     textvariable=self.codeSpeed).grid(row=1,
                                                       column=2,
                                                       padx=10, sticky=tk.W)
         
-        ttk.Label(codeOptions, text="Character rate:").grid(row=1, column=3, sticky=tk.E)
+        ttk.Label(codeOptions, text="Dot speed:").grid(row=1, column=3, sticky=tk.E)
         self.characterRate = tk.DoubleVar(value=config.min_char_speed)
-        ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT, textvariable=self.characterRate).grid(row=1, column=4, padx=10, sticky=tk.W)
+        ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
+                    command=self._updateSpacingOptions,
+                    textvariable=self.characterRate).grid(row=1, column=4, padx=10, sticky=tk.W)
         
         # Create three Radiobuttons using one IntVar for the character spacing options
         ttk.Label(codeOptions, text="Character spacing:").grid(row=2, column=0, columnspan=4, sticky=tk.W)
         # Initialize the code spacing option to its default value of 'None':
         self.characterSpacing = tk.IntVar(value=self.DEFAULT_CHARACTER_SPACING)
+        # Preserve the currently configured Farnsworth spacing option to restore
+        # it if the dot speed is toggled to be the same as code speed or not
+        self._original_configured_spacing = self.CHARACTER_SPACING_CHARACTER + 1
+
+        self._spacingRadioButtonWidgets = []
         for spacingRadioButton in range(len(self.CHARACTER_SPACING_OPTIONS)):
-            ttk.Radiobutton(codeOptions, text=self.CHARACTER_SPACING_OPTIONS[spacingRadioButton],
-                            variable=self.characterSpacing,
-                            value=spacingRadioButton + 1).grid(column=1, sticky=tk.W)
+            self._spacingRadioButtonWidgets.append(
+                ttk.Radiobutton(codeOptions, text=self.CHARACTER_SPACING_OPTIONS[spacingRadioButton],
+                                variable=self.characterSpacing,
+                                value=spacingRadioButton + 1))
+            self._spacingRadioButtonWidgets[spacingRadioButton].grid(column=1, sticky=tk.W)
             # If current config matches this radio button, update the selected value
             if config.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
+                self._original_configured_spacing = spacingRadioButton + 1
                 self.characterSpacing.set(spacingRadioButton + 1)
     
         # Create a pair of Radiobuttons using one IntVar for the code type options
@@ -259,7 +273,9 @@ class PreferencesWindow:
             # If current config matches this radio button, update the selected value
             if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self.codeType.set(codeTypeRadioButton + 1)
-    
+
+        self._updateSpacingOptions()
+
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
         codeOptions.pack(fill=tk.BOTH)
         
@@ -299,6 +315,24 @@ class PreferencesWindow:
         left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
         top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
         self.root.geometry('+%d+%d' % (left_offset, top_offset))
+
+    def _updateSpacingOptions(self):
+        if self.characterSpacing.get() == self.CHARACTER_SPACING_NONE + 1:
+            # The "None" option is enabled - appropriate for no Farnsworth spacing
+            if self.codeSpeed.get() != self.characterRate.get():
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_NONE].config(state = tk.DISABLED)
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_CHARACTER].config(state = tk.ACTIVE)
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_WORD].config(state = tk.NORMAL)
+                self.characterSpacing.set(
+                    self._original_configured_spacing if self._original_configured_spacing > 1 \
+                    else (self.CHARACTER_SPACING_CHARACTER + 1))
+        else:
+            if self.codeSpeed.get() == self.characterRate.get():
+                # There's no Farnsworth spacing: disable the choices
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_NONE].config(state = tk.ACTIVE)
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_CHARACTER].config(state = tk.DISABLED)
+                self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_WORD].config(state = tk.DISABLED)
+                self.characterSpacing.set(self.CHARACTER_SPACING_NONE + 1) # NONE
 
     def _ClickCancel(self):
         self.dismiss()
