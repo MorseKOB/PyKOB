@@ -444,6 +444,9 @@ class Recorder:
         self.__p_lines = 0
         self.__recorder_station_id = None
         self.__recorder_wire = None
+        self.__list_data = list_data
+        self.__max_silence = max_silence
+        self.__speed_factor = speed_factor
         #
         # Get information from the current playback recording file.
         with open(self.__source_file_path, "r") as fp:
@@ -479,9 +482,6 @@ class Recorder:
                     log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self.__source_file_path, self.__p_line_no, ex))
                     return
         # Calculate recording file values to aid playback functions
-        self.__list_data = list_data
-        self.__max_silence = max_silence
-        self.__speed_factor = speed_factor
         self.__playback_thread = threading.Thread(name='Recorder-Playback-Play', daemon=True, target=self.callbackPlay)
         self.__playback_thread.start()
         if self.__play_station_list_callback:
@@ -577,7 +577,7 @@ class Recorder:
                         if not self.__speed_factor == 100:
                             sf = 1.0 / (self.__speed_factor / 100.0)
                             for c in code:
-                                if c < 0 or c > 2:
+                                if (c < 0 or c > 2) and c != -32767:
                                     c = round(sf * c)
                         self.wire = wire
                         if self.__play_wire_callback:
