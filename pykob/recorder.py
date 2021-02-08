@@ -576,9 +576,7 @@ class Recorder:
                                 time.sleep(pause)
                         if not self.__speed_factor == 100:
                             sf = 1.0 / (self.__speed_factor / 100.0)
-                            for c in code:
-                                if (c < 0 or c > 2) and c != -32767:
-                                    c = round(sf * c)
+                            code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]
                         self.wire = wire
                         if self.__play_wire_callback:
                             self.__play_wire_callback(wire)
