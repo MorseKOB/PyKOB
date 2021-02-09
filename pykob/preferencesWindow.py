@@ -277,7 +277,6 @@ class PreferencesWindow:
             if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self._codeType.set(codeTypeRadioButton + 1)
 
-        self._updateSpacingOptions()
 
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
         codeOptions.pack(fill=tk.BOTH)
@@ -328,7 +327,6 @@ class PreferencesWindow:
         if str(self._dotSpeedControl.cget('state')) == tk.NORMAL:
           if self._codeSpeed.get() > self._dotSpeed.get():
               self._dotSpeed.set(int(self._codeSpeed.get()))
-          # self._updateSpacingOptions()
 
     def _dotSpeedChange(self):
         #
@@ -338,26 +336,6 @@ class PreferencesWindow:
         #
         if self._dotSpeed.get() < self._codeSpeed.get():
             self._codeSpeed.set(int(self._dotSpeed.get()))
-        self._updateSpacingOptions()
-
-    def _updateSpacingOptions(self):
-        return
-#         if self._characterSpacing.get() == self.CHARACTER_SPACING_NONE + 1:
-#             # The "None" option is enabled - appropriate for no Farnsworth spacing
-#             if self._codeSpeed.get() != self._dotSpeed.get():
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_NONE].config(state = tk.DISABLED)
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_CHARACTER].config(state = tk.ACTIVE)
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_WORD].config(state = tk.NORMAL)
-#                 self._characterSpacing.set(
-#                     self._original_configured_spacing if self._original_configured_spacing > 1 \
-#                     else (self.CHARACTER_SPACING_CHARACTER + 1))
-#         else:
-#             if self._codeSpeed.get() == self._dotSpeed.get():
-#                 # There's no Farnsworth spacing: disable the choices
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_NONE].config(state = tk.ACTIVE)
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_CHARACTER].config(state = tk.DISABLED)
-#                 self._spacingRadioButtonWidgets[self.CHARACTER_SPACING_WORD].config(state = tk.DISABLED)
-#                 self._characterSpacing.set(self.CHARACTER_SPACING_NONE + 1) # NONE
 
     def _spacingChange(self):
         if self._characterSpacing.get() == self.CHARACTER_SPACING_NONE + 1:
