@@ -72,6 +72,7 @@ try:
 
     VERSION = '1.5'
     PORT    = config.serial_port # serial port for KOB interface
+    USEGPIO = config.gpio # use the GPIO on Raspberry Pi
     SOUND   = config.sound # whether to enable computer sound for sounder
     TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
     TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
@@ -88,7 +89,7 @@ try:
     else:
         wire = None
 
-    myKOB = kob.KOB(PORT, SOUND)
+    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=SOUND)
 
     if wire:
         myInternet = internet.Internet(idText)

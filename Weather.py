@@ -217,7 +217,7 @@ try:
     myInternet.connect(WIRE)
     myReader = morse.Reader(callback=readerCallback)
     mySender = morse.Sender(WPM)
-    myKOB = kob.KOB(port=None, audio=False)
+    myKOB = kob.KOB(portToUse=None, audio=False)
     myReader.setWPM(WPM)
     code = []
     bracket = False

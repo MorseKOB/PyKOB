@@ -309,7 +309,8 @@ try:
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
     myInternet = internet.Internet(idText)
     audio_setting = strtobool(str(args.sound))
-    myKOB = kob.KOB(port=args.serial_port, interfaceType=args.interface_type, audio=audio_setting)
+    # ZZZ - add option to support GPIO
+    myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, audio=audio_setting)
 
     myInternet.connect(wire)
 

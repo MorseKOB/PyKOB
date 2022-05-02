@@ -72,6 +72,7 @@ def main(argv):
 
     # System configuration
     port = None
+    gpio = None
     # User preferences
     auto_connect = None
     invert_key_input = None
@@ -100,6 +101,7 @@ def main(argv):
             config.min_char_speed_override, \
             config.remote_override, \
             config.serial_port_override, \
+            config.gpio_override, \
             config.server_url_override, \
             config.sound_override, \
             config.sounder_override, \
@@ -135,6 +137,9 @@ def main(argv):
             save_config = True
         if not args.serial_port == config.serial_port:
             config.set_serial_port(args.serial_port)
+            save_config = True
+        if not args.gpio == config.gpio:
+            config.set_gpio(args.gpio)
             save_config = True
         if not args.server_url == config.server_url:
             s = config.server_url
