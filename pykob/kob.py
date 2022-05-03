@@ -34,20 +34,6 @@ import time
 from enum import Enum, IntEnum, unique
 from pykob import audio, config, log
 
-# Conditionally load Serial and GPIO support
-serialModuleAvailable = False
-gpioModuleAvailable = False
-try:
-    import serial
-    serialModuleAvailable = True
-except:
-    log.info("Module pySerial is not available. Serial interface cannot be used.")
-try:
-    from gpiozero import LED, Button
-    gpioModuleAvailable = True
-except:
-    log.info("Module 'gpiozero' is not available. GPIO interface cannot be used.")
-
 DEBOUNCE  = 0.015  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.75  # length of mark to signal circuit closure (sec)
@@ -66,6 +52,23 @@ class KOB:
     def __init__(
             self, interfaceType=config.interface_type.loop, portToUse=None,
             useGpio=False, audio=False, callback=None):
+        # Conditionally load GPIO or Serial library if requested.
+        #  GPIO takes priority if both are requested.
+        gpioModuleAvailable = False
+        serialModuleAvailable = False
+        if useGpio:
+            try:
+                from gpiozero import LED, Button
+                gpioModuleAvailable = True
+            except:
+                log.err("Module 'gpiozero' is not available. GPIO interface cannot be used.")
+        if portToUse and not gpioModuleAvailable:
+            try:
+                import serial
+                serialModuleAvailable = True
+            except:
+                log.err("Module pySerial is not available. Serial interface cannot be used.")
+
         self.t0 = -1.0  ### ZZZ Keep track of when the playback started
         self.useGpioIn = False # Set to True if we establish GPIO input (Key state read)
         self.useGpioOut = False # Set to True if we establish GPIO output (Sounder drive)
