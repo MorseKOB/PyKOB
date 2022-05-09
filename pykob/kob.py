@@ -161,7 +161,7 @@ class KOB:
         ks = False
         if self.useGpioIn:
             try:
-                ks = self.gpi.is_pressed
+                ks = not self.gpi.is_pressed
             except(OSError):
                 log.err("GPIO key interface not available.")
                 raise
