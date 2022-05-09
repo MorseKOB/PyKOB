@@ -2,6 +2,10 @@
 # For Raspberry Pi Desktop Case with OLED Stats Display
 # Base on Adafruit CircuitPython & SSD1306 Libraries
 # Installation & Setup Instructions - https://www.the-diy-life.com/add-an-oled-stats-display-to-raspberry-pi-os-bullseye/
+#
+# ES - Added 'try' around loading the I2C and SSD1306 to avoid it erroring out if I2C isn't 
+# enabled or a display isn't installed.
+#
 import sys
 import time
 import board
@@ -17,11 +21,16 @@ import subprocess
 OLED_DISPLAY_ADDR = 0x3C
 # Define the Reset Pin
 oled_reset = digitalio.DigitalInOut(board.D4)
+# Line height for 4 lines on the 128x64 OLED display
+LINE_HEIGHT = 16
 
 # Display Parameters
 WIDTH = 128
 HEIGHT = 64
-BORDER = 5
+BORDER = 2
+# Colors
+WHITE = 255
+BLACK = 0
 
 # Use for I2C.
 try:
@@ -32,7 +41,7 @@ except:
     exit(1)
 
 # Clear display.
-oled.fill(0)
+oled.fill(BLACK)
 oled.show()
 
 # Create blank image for drawing.
@@ -43,15 +52,15 @@ image = Image.new("1", (oled.width, oled.height))
 draw = ImageDraw.Draw(image)
 
 # Draw a white background
-draw.rectangle((0, 0, oled.width, oled.height), outline=255, fill=255)
+draw.rectangle((0, 0, oled.width, oled.height), outline=WHITE, fill=WHITE)
 
-font = ImageFont.truetype('PixelOperator.ttf', 16)
+font = ImageFont.truetype('PixelOperator.ttf', LINE_HEIGHT)
 #font = ImageFont.load_default()
 
 while True:
 
     # Draw a black filled box to clear the image.
-    draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
+    draw.rectangle((0, 0, oled.width, oled.height), outline=BLACK, fill=BLACK)
 
     # Shell scripts for system monitoring from here : https://unix.stackexchange.com/questions/119126/command-to-display-memory-usage-disk-usage-and-cpu-load
     cmd = "hostname -I | cut -d\' \' -f1"
@@ -66,13 +75,13 @@ while True:
     temp = subprocess.check_output(cmd, shell = True )
 
     # Pi Stats Display
-    draw.text((0, 0), "IP: " + str(IP,'utf-8'), font=font, fill=255)
-    draw.text((0, 16), str(CPU,'utf-8') + "%", font=font, fill=255)
-    draw.text((80, 16), str(temp,'utf-8') , font=font, fill=255)
-    draw.text((0, 32), str(MemUsage,'utf-8'), font=font, fill=255)
-    draw.text((0, 48), str(Disk,'utf-8'), font=font, fill=255)
+    draw.text((0, 0 * LINE_HEIGHT), "IP: " + str(IP,'utf-8'), font=font, fill=WHITE)
+    draw.text((0, 1 * LINE_HEIGHT), str(CPU,'utf-8') + "%", font=font, fill=WHITE)
+    draw.text((80, 1 * LINE_HEIGHT), str(temp,'utf-8') , font=font, fill=WHITE)
+    draw.text((0, 2 * LINE_HEIGHT), str(MemUsage,'utf-8'), font=font, fill=WHITE)
+    draw.text((0, 3 * LINE_HEIGHT), str(Disk,'utf-8'), font=font, fill=WHITE)
         
     # Display image
     oled.image(image)
     oled.show()
-    time.sleep(.1)
+    time.sleep(.3)
