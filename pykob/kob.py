@@ -90,7 +90,7 @@ class KOB:
         # have been performed.
         if useGpio and gpioModuleAvailable:
             try:
-                self.gpi = Button(21, pull_up = True)  # GPIO21 is key input.
+                self.gpi = Button(21, pull_up=True)  # GPIO21 is key input.
                 self.gpo = LED(26)  # GPIO26 used to drive sounder.
                 self.callback = callback
                 self.useGpioOut = True
@@ -161,7 +161,7 @@ class KOB:
         ks = False
         if self.useGpioIn:
             try:
-                ks = not self.gpi.is_pressed
+                ks = not (self.gpi.is_pressed)
             except(OSError):
                 log.err("GPIO key interface not available.")
                 raise
