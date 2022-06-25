@@ -106,7 +106,7 @@ try:
     time.sleep(0.350)
     myKOB.sounder(mySender.encode('+')) # Close the circuit
     print()
-    sys.exit(0)
+    # sys.exit(0)
 except KeyboardInterrupt:
     print()
     sys.exit(1)     # Indicate this was an abnormal exit

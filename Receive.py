@@ -27,9 +27,10 @@ SOFTWARE.
 
 Monitors a KOB wire, and displays decoded text on the system console.
 
-Command line parameters:
-    KOB wire no. (defaults to 101)
-    approximate code speed of incoming Morse (defaults to 20)
+This reads the current configuration and supports the common option flags.
+To maintain backward compatibility it also allows a positional command
+line parameter:
+    1. KOB wire no.
 
 Code speed (WPM) should be specified by running the
 'configure.sh' script or executing 'python3 Configure.py'.
@@ -38,10 +39,15 @@ Example:
     python Receive.py 110
 """
 
+from pykob import VERSION, config, log, kob, internet, morse
+
+import argparse
+import codecs
+from distutils.util import strtobool
 import sys
 from time import sleep
-from pykob import VERSION, config, internet, morse
-import codecs
+
+THINSPACE = '\u202F'  # narrow (half width) non-breaking space
 
 def readerCallback(char, spacing):
     halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
@@ -51,34 +57,67 @@ def readerCallback(char, spacing):
         halfSpaces -= 2
     for i in range(halfSpaces):
         outFile.write(THINSPACE)
+        print(THINSPACE, end='')
     if fullSpace:
         outFile.write(' ')
+        print(' ', end='')
     outFile.write(char)
     outFile.flush()
+    print(char, end='', flush=True)
+    if char == '.':
+        print()
+    elif char == '=':
+        print()
 
 try:
-    WIRE     = 109  # default KOB wire to connect to
-    WPM      = config.text_speed  # code speed (words per minute)
-    OFFICEID = 'MorseKOB 4.0 test, AC (listening)'
-    THINSPACE = '\u202F'  # narrow (half width) non-breaking space
+    arg_parser = argparse.ArgumentParser(description="Monitors a KOB wire, and displays decoded text.", \
+        parents=\
+        [\
+        config.serial_port_override, \
+        config.gpio_override, \
+        config.code_type_override, \
+        config.interface_type_override, \
+        config.sound_override, \
+        config.sounder_override, \
+        config.spacing_override, \
+        config.station_override, \
+        config.min_char_speed_override, \
+        config.text_speed_override])
+    arg_parser.add_argument('wire', nargs='?', default=config.wire, type=int,\
+        help='Wire to monitor. If specified, this is used rather than the one configured.')
+    args = arg_parser.parse_args()
+
+    port = args.serial_port # serial port for KOB interface
+    useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
+
+    office_id = args.station # the Station/Office ID string to attach with
+    text_speed = args.text_speed  # text speed (words per minute)
+    if (text_speed < 1) or(text_speed > 50):
+        print("text_speed specified must be between 1 and 50")
+        sys.exit(1)
+    sound = strtobool(args.sound)
+    sounder = strtobool(args.sounder)
+    wire = args.wire # wire to connect to
+    wpm = args.text_speed  # code speed (words per minute)
 
     print('Python ' + sys.version + ' on ' + sys.platform)
     print('MorseKOB ' + VERSION)
 
-    # get command line parameters, if any
-    if len(sys.argv) > 1:
-        WIRE = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        WPM = int(sys.argv[2])
+    print('Receiving from wire: ' + str(wire))
+    print('Connecting as Station/Office: ' + office_id)
 
-    myInternet = internet.Internet(OFFICEID)
+    myInternet = internet.Internet(office_id)
     myReader = morse.Reader(callback=readerCallback)
-    myInternet.connect(WIRE)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
+
+    myInternet.connect(wire)
     outFile = codecs.open( "log.txt", "w", "utf-8" )
     sleep(0.5)
     while True:
         code = myInternet.read()
         myReader.decode(code)
+        myKOB.sounder(code)
 except KeyboardInterrupt:
+    print()
     print()
     sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
