@@ -98,13 +98,13 @@ try:
         __text = __disneyland_dedication
         print("From Disneyland Fronteer Land...")
     print(__text)
-    myKOB.sounder(mySender.encode('~')) # Open the circuit
+    myKOB.soundCode(mySender.encode('~')) # Open the circuit
     time.sleep(0.200)
     for c in __text:
         code = mySender.encode(c, True)
-        myKOB.sounder(code)
+        myKOB.soundCode(code)
     time.sleep(0.350)
-    myKOB.sounder(mySender.encode('+')) # Close the circuit
+    myKOB.soundCode(mySender.encode('+')) # Close the circuit
     print()
     # sys.exit(0)
 except KeyboardInterrupt:

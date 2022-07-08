@@ -62,7 +62,7 @@ Time 1.3  2019-02-13
 def send(code):
     if wire and time.time() < myInternet.tLastListener + TIMEOUT:
         myInternet.write(code)
-    myKOB.sounder(code)
+    myKOB.soundCode(code)
 
 try:
     import sys

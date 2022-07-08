@@ -43,7 +43,7 @@ def callbackPlay(code):
     """
     global myKOB, playback_finished
     try:
-        myKOB.sounder(code, code_source=kob.CodeSource.player)
+        myKOB.soundCode(code, code_source=kob.CodeSource.player)
     except:
         playback_finished.set()
 

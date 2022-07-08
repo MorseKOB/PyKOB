@@ -110,12 +110,12 @@ def activeSender():
 
 def send(code):
     myInternet.write(code)
-    myKOB.sounder(code, code_source=kob.CodeSource.player)  # to pace the code sent to the wire
+    myKOB.soundCode(code, code_source=kob.CodeSource.player)  # to pace the code sent to the wire
 
 def sendParagraph():
     paragraphMark = (-211, 162, -54, 162, -54, 162, -54, 162)
     myInternet.write(paragraphMark)
-    myKOB.sounder(paragraphMark, code_source=kob.CodeSource.player) # to pace the code sent to the wire
+    myKOB.soundCode(paragraphMark, code_source=kob.CodeSource.player) # to pace the code sent to the wire
 
 def callbackPlay(code):
     """

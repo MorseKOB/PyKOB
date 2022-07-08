@@ -88,7 +88,7 @@ try:
                 time.sleep(dt)
                 for c in s:
                     code = mySender.encode(c)
-                    myKOB.sounder(code)  # to pace the code sent to the wire
+                    myKOB.soundCode(code)  # to pace the code sent to the wire
                     if WIRE:
                         myInternet.write(code)
                     print(c, end='', flush=True)  # display each character

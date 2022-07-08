@@ -122,7 +122,7 @@ def announce(s, kob, sender, recorder, source=kob.CodeSource.local):
     if local_text: print('> ', end='', flush=True)
     for c in s:
         code = sender.encode(c)
-        kob.sounder(code)
+        kob.soundCode(code)
         if local_text: print(c, end='', flush=True)
         if recorder:
             recorder.record(code, source)

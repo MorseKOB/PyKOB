@@ -204,7 +204,7 @@ def send(text):
         return
     for char in s:
         code = mySender.encode(char)
-        myKOB.sounder(code)  # to pace the code sent to the wire
+        myKOB.soundCode(code)  # to pace the code sent to the wire
         myInternet.write(code)
 
 try:

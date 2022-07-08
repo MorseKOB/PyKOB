@@ -116,7 +116,7 @@ try:
     while True:
         code = myInternet.read()
         myReader.decode(code)
-        myKOB.sounder(code)
+        myKOB.soundCode(code)
 except KeyboardInterrupt:
     print()
     print()

@@ -141,13 +141,13 @@ def doConnect():
 
 def trigger_circuit_close():
     """
-    Generate an event to indicate that the circuit should be closed.
+    Generate an event to indicate that the circuit has closed.
     """
     kw.root.event_generate(kobevents.EVENT_CIRCUIT_CLOSE, when='tail')
 
 def trigger_circuit_open():
     """
-    Generate an event to indicate that the circuit should be opened.
+    Generate an event to indicate that the circuit has opened.
     """
     kw.root.event_generate(kobevents.EVENT_CIRCUIT_OPEN, when='tail')
 

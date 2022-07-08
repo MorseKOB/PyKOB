@@ -60,7 +60,7 @@ try:
             text = title + ' = ' + description + ' ='
             for char in text:
                 code = mySender.encode(char)
-                myKOB.sounder(code)
+                myKOB.soundCode(code)
                 if code:
                     sys.stdout.write(char)
                 else:
