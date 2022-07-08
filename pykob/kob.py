@@ -25,7 +25,13 @@ SOFTWARE.
 """
 kob module
 
-Handles external key and/or sounder.
+Handles external key and/or sounder and the virtual sounder (computer audio).
+
+The interface type controls certain aspects of how the physical sounder is driven.
+If the interface type is LOOP then the sounder is energized when the key-closer is 
+open. This allows the sounder to follow the key as it closes and opens. In that case 
+calls to drive (energize/de-energize) the (general) sounder do not change the state of the 
+physical sounder, only the virtual sounder.
 """
 
 import sys
@@ -55,9 +61,7 @@ class CodeSource(IntEnum):
     player = 3
 
 class KOB:
-    def __init__(
-            self, port=None, interfaceType=config.interface_type.loop,
-            audio=False, callback=None):
+    def __init__(self, port=None, interfaceType=config.interface_type.loop, audio=False, callback=None):
         self.t0 = -1.0  ### ZZZ Keep track of when the playback started
         self.callback = callback
         if port and serialAvailable:
@@ -71,19 +75,21 @@ class KOB:
         else:
             self.port = None
             self.callback = None
-        self.audio = audio
-        self.interfaceType = interfaceType
-        self.sdrState = False  # True: mark, False: space
-        self.tLastSdr = time.time()  # time of last sounder transition
-        self.setSounder(True)
+        self.__audio = audio
+        self.__interfaceType = interfaceType
+        self.__keyCloserIsOpen = not self.keyIsCurrentlyClosed() # The state of the key at start-up deturmines the key-closer state
+        self.__physicalSdrEnergized = False  # True: energized/mark, False: de-energized/space
+        self.__synthSdrEnergized = False  # True: energized/mark, False: de-energized/space
+        self.__tLastSdr = time.time()  # time of last sounder transition
+        self.energizeSounder(True)
         time.sleep(0.5)  # ZZZ Why is this here?
         if self.port:
             try:
-                self.keyState = self.port.dsr if not config.invert_key_input else not self.port.dsr  # True: closed, False: open
+                self.keyState = self.getKeyState()
                 self.tLastKey = time.time()  # time of last key transition
                 self.cktClose = self.keyState  # True: circuit latched closed
                 if self.interfaceType == config.interface_type.key_sounder:
-                    self.setSounder(self.keyState)
+                    self.energizeSounder(self.keyState)
             except(OSError):
                 log.err("Port not available.")
                 self.port = None
@@ -102,6 +108,10 @@ class KOB:
         """ Recorder instance or None """
         self.__recorder = recorder
 
+    @property
+    def keyCloserIsOpen(self):
+        return self.__keyCloserIsOpen
+
     def callbackRead(self):
         """
         Called by the KeyRead thread `run` to read code from the key.
@@ -114,7 +124,7 @@ class KOB:
         code = ()
         while self.port:
             try:
-                s = self.port.dsr if not config.invert_key_input else not self.port.dsr # invert for RS-323 modem signal
+                s = self.keyIsCurrentlyClosed()
             except(OSError):
                 log.err("Port not available.")
                 self.port = None
@@ -125,7 +135,7 @@ class KOB:
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
                 if self.interfaceType == config.interface_type.key_sounder:
-                    self.setSounder(s)
+                    self.energizeSounder(s)
                 time.sleep(DEBOUNCE)
                 if s:
                     code += (-dt,)
@@ -148,6 +158,19 @@ class KOB:
             time.sleep(0.001)
         return ""
 
+    def keyIsCurrentlyClosed(self):
+        '''
+        Get the current key state.
+
+        Return: True=closed, False=open
+        '''
+        if not self.port:
+            return False
+        ks = self.port.dsr
+        if config.invert_key_input:
+            ks = not ks # invert for RS-323 modem signal
+        return ks
+
     def sounder(self, code, code_source=CodeSource.local):
         if self.t0 < 0:  ### ZZZ capture start time
             self.t0 = time.time()  ### ZZZ
@@ -159,7 +182,7 @@ class KOB:
                 c = -1
 ##                self.tLastSdr = t + 1.0
             if c > 0:  # start of mark
-                self.setSounder(True)
+                self.energizeSounder(True)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
@@ -168,24 +191,66 @@ class KOB:
                 self.tLastSdr = tNext
                 time.sleep(dt)
             if c > 1:  # end of (nonlatching) mark
-                self.setSounder(False)
+                self.energizeSounder(False)
 
-    def setSounder(self, state):
+    def keyCloserOpen(self, open):
+        '''
+        Track the physical key closer. This controlles the Loop/KOB sounder state.
+
+        If Closer is open and the type is Loop, energize (power) the sounder loop so it can follow the key.
+        If the Closer is closed and the type is Loop, de-energize the sounder so it can be driven to 'click'/'clack'.
+        '''
+        if self.noKeyCloserExists:
+            return
+        self.keyCloserIsOpen = open
+        if self.interfaceType == config.interface_type.loop:
+            if self.keyCloserIsOpen:
+                self.energizePhysicalSounder(True)
+            else:
+                self.energizePhysicalSounder(False)
+
+    def energizePhysicalSounder(self, energize):
+        '''
+        Energize the physical sounder (click) or De-energize (clack) if enabled.
+        '''
         try:
-            if state != self.sdrState:
-                self.sdrState = state
-                if state:
-                    if self.port:
+            if energize != self.physicalSdrEnergized:
+                self.physicalSdrEnergized = energize
+                if self.port:
+                    if energize:
+                        log.debug("click-p")
                         self.port.rts = True
-                    if self.audio:
-                        audio.play(1)  # click
-                else:
-                    if self.port:
+                    else:
+                        log.debug(" clack-p")
                         self.port.rts = False
-                    if self.audio:
-                        audio.play(0)  # clack
         except(OSError):
             log.err("Port not available.")
             self.port = None
+
+    def energizeSynthSounder(self, energize):
+        '''
+        Energize the synthetic (computer audio) sounder (click) or De-energize (clack) if enabled.
+        '''
+        if energize != self.synthSdrEnergized:
+            self.synthSdrEnergized = energize
+            if energize:
+                if self.audio:
+                    log.debug("click-s")
+                    audio.play(1)  # click
+            else:
+                if self.audio:
+                    log.debug(" clack-s")
+                    audio.play(0)  # clack
+
+    def energizeSounder(self, energize):
+        '''
+        Energize the sounder (click) or De-energize (clack)
+        '''
+        if self.interfaceType != config.InterfaceType.loop or not self.keyCloserIsOpen:
+            # Drive the physical sounder if the interface type isn't loop 
+            # or it is loop and the key-closer is closed or doesn't exist
+            self.energizePhysicalSounder(energize)
+        self.energizeSynthSounder(energize)
+
 ##if sys.platform == 'win32':  ### ZZZ This should be executed when the program is closed.
 ##    windll.winmm.timeEndPeriod(1)  # Restore default clock resolution. (Windows only)

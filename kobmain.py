@@ -48,19 +48,26 @@ connected = False
 
 local_loop_active = False  # True if sending on key or keyboard
 internet_active = False  # True if a remote station is sending
+physical_closer_closed = True  # True if we detect that the pysical key closer is closed
 
-latch_code = (-0x7fff, +1)  # code sequence to force latching
-unlatch_code = (-0x7fff, +2)  # code sequence to unlatch
+latch_code = (-0x7fff, +1)  # code sequence to force latching (close)
+unlatch_code = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 sender_ID = ""
 
 def __set_local_loop_active(state):
-    """set local_loop_active state"""
+    """
+    Set local_loop_active state
+    
+    True: Key or Keyboard active (Ciruit Closer OPEN)
+    False: Circuit Closer (physical and virtual) CLOSED
+    """
     global local_loop_active
     local_loop_active = state
+    log.debug("local_loop_active:{}".format(state))
     if local_loop_active:
         if kc.config.interface_type == config.interface_type.loop:
-            KOB.setSounder(True)
+            KOB.energizePhysicalSounder(True)
 
 
 def __emit_code(code):
@@ -76,6 +83,8 @@ def __emit_code(code):
     update_sender(kc.config.station)
     Reader.decode(code)
     Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to enable/disable recording
+    if kc.Local:
+        KOB.sounder(code)
     if connected and kc.Remote:
         Internet.write(code)
 
@@ -92,10 +101,15 @@ def from_key(code):
     global internet_active, local_loop_active
     if len(code) > 0:
         if code[-1] == 1:
+            # If loop interface, need to de-energize the sounder.
+            KOB.energizeSounder(False)
             ka.trigger_circuit_close()
             return
         elif code[-1] == 2:
+            # If loop interface, need to energize the sounder so it will follow the key.
+            KOB.energizeSounder(True)
             ka.trigger_circuit_open()
+
             return
     if not internet_active and local_loop_active:
         __emit_code(code)
@@ -109,8 +123,6 @@ def from_keyboard(code):
     """
     global internet_active, local_loop_active
     if not internet_active and local_loop_active:
-        if kc.Local:
-            KOB.sounder(code)
         __emit_code(code)
 
 def from_internet(code):
@@ -155,13 +167,14 @@ def from_circuit_closer(state):
         Recorder.record(code, kob.CodeSource.local)
     if connected and kc.Remote:
         Internet.write(code)
-    if len(code) > 0 and code[-1] == 1:
-        # Unlatch
-        __set_local_loop_active(False)
-        Reader.flush()
-    else:
-        # Latch
-        __set_local_loop_active(True)
+    if len(code) > 0:
+        if code[-1] == 1:
+            # Unlatch
+            __set_local_loop_active(False)
+            Reader.flush()
+        elif code[-1] == 2:
+            # Latch
+            __set_local_loop_active(True)
     ka.kw.varCircuitCloser.set(1 if not local_loop_active else 0)
 
 def disconnect():

@@ -6,7 +6,7 @@ try:
     interface = config.serial_port
 
     myKOB = kob.KOB(port=interface)
-    myKOB.setSounder(False)
+    myKOB.energizeSounder(False)
     while True:
         print(myKOB.key())
 except KeyboardInterrupt:
