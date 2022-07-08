@@ -31,7 +31,14 @@ Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
 import sys
+GUI = True                              # Hope for the best
+try:
+    import tkinter as tk
+except ModuleNotFoundError:
+    GUI = False
+    
 from pykob import config
+from pykob import preferencesWindow
 
 NONE_CFG_VALUE = "NONE"
 
@@ -50,6 +57,12 @@ def stringOrNone(s:str) -> str:
     r = None if s.upper() == "NONE" else s
     return r
 
+def _doFilePreferences():
+    prefs = preferencesWindow.PreferencesWindow()
+
+def _doFileExit():
+    sys.exit(0)
+
 def main(argv):
     # Check for command line parameters...
     #  If none are supplied, print the current configuration
@@ -59,11 +72,13 @@ def main(argv):
 
     # System configuration
     port = None
+    gpio = None
     # User preferences
+    auto_connect = None
     invert_key_input = None
-    local = None
     remote = None
     interface_type = None
+    server_url = None
     sound = None
     sounder = None
     spacing = None
@@ -72,30 +87,39 @@ def main(argv):
     wire = None
     min_char_speed = None
     text_speed = None
+    gui_config = False
 
     try:
         arg_parser = argparse.ArgumentParser(description="Display the PyKOB configuration as well as key system values. "
             + "Allow configuration values to be set and saved.", \
             parents=\
             [\
+            config.auto_connect_override, \
             config.code_type_override, \
             config.interface_type_override, \
             config.invert_key_input_override, \
-            config.local_override, \
             config.min_char_speed_override, \
             config.remote_override, \
             config.serial_port_override, \
+            config.gpio_override, \
+            config.server_url_override, \
             config.sound_override, \
             config.sounder_override, \
             config.spacing_override, \
             config.station_override, \
             config.text_speed_override, \
             config.wire_override])
+        if GUI:
+            arg_parser.add_argument('-G', '--gui', dest="gui_config", action='store_true',
+                            help="Use preferences panel GUI for interactive configuration.")
 
         args = arg_parser.parse_args()
 
         # Set config values if they were specified
         save_config = False
+        if not args.auto_connect == config.auto_connect:
+            config.set_auto_connect(args.auto_connect)
+            save_config = True
         if not args.code_type == config.code_type:
             config.set_code_type(args.code_type)
             save_config = True
@@ -105,9 +129,6 @@ def main(argv):
         if not args.invert_key_input == config.invert_key_input:
             config.set_invert_key_input(args.invert_key_input)
             save_config = True
-        if not args.local == config.local:
-            config.set_local(args.local)
-            save_config = True
         if not args.min_char_speed == config.min_char_speed:
             config.set_min_char_speed(args.min_char_speed)
             save_config = True
@@ -116,6 +137,16 @@ def main(argv):
             save_config = True
         if not args.serial_port == config.serial_port:
             config.set_serial_port(args.serial_port)
+            save_config = True
+        if not args.gpio == config.gpio:
+            config.set_gpio(args.gpio)
+            save_config = True
+        if not args.server_url == config.server_url:
+            s = config.server_url
+            if s and s.upper() == 'DEFAULT':
+                config.set_server_url(None)
+            else:
+                config.set_server_url(args.server_url)
             save_config = True
         if not args.sound == config.sound:
             config.set_sound(args.sound)
@@ -142,6 +173,29 @@ def main(argv):
     except Exception as ex:
         print("Error processing arguments: {}".format(ex))
         sys.exit(1)
+
+    if GUI and args.gui_config:
+        try:
+            root = tk.Tk()
+            root.overrideredirect(1)
+            root.withdraw()
+
+            menu = tk.Menu()
+            root.config(menu=menu)
+            fileMenu = tk.Menu(menu)
+            menu.add_cascade(label='File', menu=fileMenu)
+            fileMenu.add_command(label='Preferences...', command=_doFilePreferences)
+            fileMenu.add_separator()
+            fileMenu.add_command(label='Quit', command=_doFileExit)
+
+            prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=True)
+            prefs.display()
+
+            # root.quit()
+
+        except KeyboardInterrupt:
+            print()
+            sys.exit(0)
 
     # If no arguments were given print the system info in addition to the configuration.
     if len(argv) == 0:

@@ -32,14 +32,15 @@ Create the main KOB window for MKOB and lay out its widgets
 import kobmain
 import kobevents
 import tkinter as tk
-import tkinter.scrolledtext as tkst 
+import tkinter.scrolledtext as tkst
 import kobactions as ka
-import kobconfig as kc
 import kobstationlist as ksl
 import kobreader as krdr
 
+from pykob import config
+
 class KOBWindow:
-    def __init__(self, root, MKOB_VERSION_TEXT):       
+    def __init__(self, root, MKOB_VERSION_TEXT):
 
         # KOBWindow pointers for other modules
         ka.kw = self
@@ -59,16 +60,22 @@ class KOBWindow:
         root.bind_all('<Control-KeyPress-l>', ka.handle_playback_move_forward15)
         root.bind_all('<Control-KeyPress-j>', ka.handle_playback_move_sender_start)
         root.bind_all('<Control-KeyPress-k>', ka.handle_playback_move_sender_end)
-        
+
         # File menu
         menu = tk.Menu()
         root.config(menu=menu)
+
+        # Hide the window from view until its content can be fully initialized
+        root.withdraw()
+
         fileMenu = tk.Menu(menu)
         menu.add_cascade(label='File', menu=fileMenu)
         fileMenu.add_command(label='New', command=ka.doFileNew)
         fileMenu.add_command(label='Open...', command=ka.doFileOpen)
         fileMenu.add_separator()
         fileMenu.add_command(label='Play...', command=ka.doFilePlay)
+        fileMenu.add_separator()
+        fileMenu.add_command(label='Preferences...', command=ka.doFilePreferences)
         fileMenu.add_separator()
         fileMenu.add_command(label='Exit', command=ka.doFileExit)
 
@@ -81,7 +88,7 @@ class KOBWindow:
         pwd1 = tk.PanedWindow(
                 root, orient=tk.HORIZONTAL, sashwidth=4,
                 borderwidth=0)  # left/right side
-        pwd1.grid(sticky='NESW', padx=6, pady=6)    
+        pwd1.grid(sticky='NESW', padx=6, pady=6)
         pwd2 = tk.PanedWindow(pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
         pwd1.add(pwd2, stretch='first')
 
@@ -107,7 +114,7 @@ class KOBWindow:
 
         # reader
         self.txtReader = tkst.ScrolledText(
-                frm1, width=40, height=15, bd=2,
+                frm1, width=54, height=21, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtReader.grid(row=0, column=0, sticky='NESW')
         self.txtReader.rowconfigure(0, weight=1)
@@ -115,17 +122,17 @@ class KOBWindow:
 
         # keyboard
         self.txtKeyboard = tkst.ScrolledText(
-                frm2, width=40, height=5, bd=2,
+                frm2, width=40, height=7, bd=2,
                 wrap='word', font=('Arial', -14))
         self.txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.txtKeyboard.focus_set()
-        
+
         # station list
         self.txtStnList = tkst.ScrolledText(
-                frm3, width=10, height=8, bd=2,
+                frm3, width=36, height=8, bd=2,
                 wrap='none', font=('Arial', -14))
         self.txtStnList.grid(row=0, column=0, sticky='NESW', padx=3, pady=0)
-        
+
         # office ID
         self.varOfficeID = tk.StringVar()
         self.entOfficeID = tk.Entry(
@@ -192,7 +199,7 @@ class KOBWindow:
         ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)
         cmd = root.register(ka.handle_sender_update)
         root.tk.call("bind", root, kobevents.EVENT_CURRENT_SENDER, cmd + " %d")
-        ### self.root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
+        ### root.bind(kobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
         cmd = root.register(ksl.handle_update_station_active)
         root.tk.call("bind", root, kobevents.EVENT_STATION_ACTIVE, cmd + " %d")
 
@@ -202,32 +209,51 @@ class KOBWindow:
         cmd = root.register(ka.handle_reader_append_text)
         root.tk.call("bind", root, kobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
 
+        # Finally, show the window in its full glory
+        root.update()                      # Make sure window size reflects changes so far
+        root.deiconify()
+
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+        w = root.winfo_width()
+        h = root.winfo_height()
+        x = (sw - w) / 2
+        y = (sh - h) * 0.4                      # about 40% from top
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
         # get configuration settings
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
-        w, h = kc.WindowSize
-        x, y = kc.Position
-        if x < 0:
-            x = (sw - w) // 2
-            y = (sh - h) // 2
-        self.root.geometry('{}x{}+{}+{}'.format(w, h, x, y))
-        self.varOfficeID.set(kc.OfficeID)
-        self.varCircuitCloser.set(kc.CircuitCloser)
+        self.varOfficeID.set(config.station)
+        self.varCircuitCloser.set(True)         # Previously kc.CircuitCloser (=True)
         self.spnWPM.delete(0)
-        self.spnWPM.insert(tk.END, kc.WPM)
+        self.spnWPM.insert(tk.END, config.text_speed)
         ka.doWPM()
-        self.varCodeSenderOn.set(kc.CodeSenderOn)
-        self.varCodeSenderRepeat.set(kc.CodeSenderRepeat)
+        self.varCodeSenderOn.set(True)          # Previously kc.CodeSenderOn (=True)
+        self.varCodeSenderRepeat.set(False)     # Previously kc.CodeSenderRepeat (=False)
         self.spnWireNo.delete(0)
-        self.spnWireNo.insert(tk.END, kc.WireNo)
+        self.spnWireNo.insert(tk.END, config.wire)
 
         # Now that the windows and controls are initialized, initialize the kobmain module.
         kobmain.init()
+
+    def get_WPM(self):
+        # Guard against the possibility the text field will not have
+        # a valid number (e.g. an empty string, or non-numeric text)
+        try:
+            return int(self.spnWPM.get())
+        except ValueError as ex:
+            return 1
+
+    def get_wireNo(self):
+        # Guard against the possibility the text field will not have
+        # a valid number (e.g. an empty string, or non-numeric text)
+        try:
+            new_wire = int(self.spnWireNo.get())
+            return self.spnWireNo.get()
+        except ValueError as ex:
+            return "1"
 
     def make_keyboard_focus(self):
         """
         Make the keyboard window the active (focused) window.
         """
         self.txtKeyboard.focus_set()
-        

@@ -32,7 +32,6 @@ import time
 from datetime import datetime
 
 from pykob import kob, morse, internet, config, recorder, log
-import kobconfig as kc
 import kobactions as ka
 import kobstationlist
 import kobkeyboard
@@ -160,12 +159,12 @@ def from_circuit_closer(state):
     global local_loop_active, internet_active
     code = latch_code if state == 1 else unlatch_code
     if not internet_active:
-        if kc.Local:
-            ka.handle_sender_update(kc.config.station) # Okay to call 'handle_' as this is run on the main thread
+        if config.local:
+            ka.handle_sender_update(config.station) # Okay to call 'handle_' as this is run on the main thread
             KOB.sounder(code)
             Reader.decode(code)
         Recorder.record(code, kob.CodeSource.local)
-    if connected and kc.Remote:
+    if connected and config.remote:
         Internet.write(code)
     if len(code) > 0:
         if code[-1] == 1:
@@ -194,7 +193,7 @@ def toggle_connect():
         ka.trigger_station_list_clear()
         Internet.monitor_IDs(ka.trigger_update_station_active) # Set callback for monitoring stations
         Internet.monitor_sender(ka.trigger_update_current_sender) # Set callback for monitoring current sender
-        Internet.connect(kc.WireNo)
+        Internet.connect(config.wire)
         connected = True
     else:
         connected = False
@@ -218,7 +217,7 @@ def change_wire():
     # Disconnect, change wire, reconnect.
     was_connected = connected
     disconnect()
-    Recorder.wire = kc.WireNo
+    Recorder.wire = config.wire
     if was_connected:
         time.sleep(0.350) # Needed to allow UTP packets to clear
         toggle_connect()
@@ -233,18 +232,20 @@ def update_sender(id):
         sender_ID = id
         Reader.flush()
         ka.trigger_reader_append_text("\n\n<{}>".format(sender_ID))
-        Reader = morse.Reader(
-                wpm=kc.WPM, codeType=kc.CodeType,
-                callback=readerCallback)  # reset to nominal code speed
+### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
+##        Reader = morse.Reader(
+##                wpm=config.text_speed, codeType=config.code_type,
+##                callback=readerCallback)  # reset to nominal code speed
 
 def readerCallback(char, spacing):
     """display characters returned from the decoder"""
-    if kc.CodeType == config.CodeType.american:
+    Recorder.record([], '', text=char)
+    if config.code_type == config.CodeType.american:
         sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
     else:
         sp = spacing
     if sp > 100:
-        txt = "" if char == "_" else " * "
+        txt = "" if char == "__" else " * "
 ## ZZZ Temporarily disable 'intelligent' spacing
 ##    elif sp > 10:
 ##        txt = "     "
@@ -283,21 +284,26 @@ def init():
     """
     global KOB, Internet, Recorder
     KOB = kob.KOB(
-            port=kc.config.serial_port, interfaceType=kc.config.interface_type, audio=kc.config.sound, callback=from_key)
-    Internet = internet.Internet(kc.config.station, callback=from_internet)
+            portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
+            audio=config.sound, callback=from_key)
+    Internet = internet.Internet(config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
-        log.info("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+        log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
             "To enable/disable this setting use `Configure --iki`.")
-    # ZZZ temp always enable recorder - goal is to provide menu option to start/stop recording
     ts = recorder.get_timestamp()
     dt = datetime.fromtimestamp(ts / 1000.0)
     dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
     targetFileName = "Session-" + dateTimeStr + ".json"
     log.info("Record to '{}'".format(targetFileName))
-    Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=kc.WireNo, \
+    Recorder = recorder.Recorder(targetFileName, None, station_id=sender_ID, wire=config.wire, \
         play_code_callback=from_recorder, \
         play_sender_id_callback=ka.trigger_update_current_sender, \
         play_station_list_callback=ka.trigger_update_station_active, \
         play_wire_callback=ka.trigger_player_wire_change)
     kobkeyboard.init()
+    # If the configuration indicates that an application should automatically connect - 
+    # connect to the currently configured wire.
+    if config.auto_connect:
+        ka.doConnect() # Suggest a connect.
+

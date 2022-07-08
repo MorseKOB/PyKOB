@@ -62,6 +62,7 @@ try:
      [\
       config.interface_type_override, \
       config.serial_port_override, \
+      config.gpio_override, \
       config.sound_override, \
       config.sounder_override])
     arg_parser.add_argument('playback_file', metavar='file',
@@ -73,6 +74,7 @@ try:
     
     interface_type = args.interface_type
     port = args.serial_port # serial port for KOB/sounder interface
+    useGpio = strtobool(args.gpio) # use GPIO (Raspberry Pi)
     sound = strtobool(args.sound)
     sounder = strtobool(args.sounder)
     playback_file = args.playback_file
@@ -84,7 +86,7 @@ try:
     except FileNotFoundError:
         log.err("Recording file not found: {}".format(playback_file))
 
-    myKOB = kob.KOB(port=port, audio=sound, interfaceType=interface_type)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound, interfaceType=interface_type)
 
     myRecorder = recorder.Recorder(None, playback_file, play_code_callback=callbackPlay, play_finished_callback=callbackPlayFinished, station_id="Player")
     myRecorder.playback_start(list_data=args.listData, max_silence=args.maxSilence, speed_factor=args.speedFactor)

@@ -28,7 +28,7 @@ SOFTWARE.
 
 Cuckoo clock substitute.
 
-Serial port, text speed, and audio preferences should be specified by running the
+Serial port, use GPIO, text speed, and audio preferences should be specified by running the
 "configure.sh" script or executing "python3 Configure.py".
 """
 import argparse
@@ -119,12 +119,14 @@ def announcement(hours, minutes):
 #
 def announce(s, kob, sender, recorder, source=kob.CodeSource.local):
     global local_text
-    if local_text: print('>', s)
+    if local_text: print('> ', end='', flush=True)
     for c in s:
         code = sender.encode(c)
         kob.sounder(code)
+        if local_text: print(c, end='', flush=True)
         if recorder:
             recorder.record(code, source)
+    if local_text: print('')
 
 try:
     #log.log("Starting Clock")
@@ -132,6 +134,7 @@ try:
     arg_parser = argparse.ArgumentParser(description="Morse Cuckoo Clock", parents=\
      [\
       config.serial_port_override, \
+      config.gpio_override, \
       config.code_type_override, \
       config.sound_override, \
       config.sounder_override, \
@@ -146,6 +149,7 @@ try:
     args = arg_parser.parse_args()
     
     port = args.serial_port # serial port for KOB interface
+    useGpio = strtobool(args.gpio) # True to use GPIO interface
     if (args.text_speed < 1) or (args.text_speed > 50):
         print("text_speed specified must be between 1 and 50")
         sys.exit(1)
@@ -181,7 +185,7 @@ try:
         targetFileName = "Clock." + str(ts) + ".json"
         myRecorder = recorder.Recorder(targetFileName, None, station_id="Clock")
     
-    myKOB = kob.KOB(port=port, audio=sound)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
     mySender = morse.Sender(text_speed)
     
     # Announce the current time right now

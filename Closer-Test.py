@@ -5,8 +5,8 @@ from pykob import config
 try:
     interface = config.serial_port
 
-    myKOB = kob.KOB(port=interface)
-    myKOB.energizeSounder(False)
+    myKOB = kob.KOB(portToUse=interface, useGpio=config.gpio)
+    myKOB.setSounder(False)
     while True:
         print(myKOB.key())
 except KeyboardInterrupt:

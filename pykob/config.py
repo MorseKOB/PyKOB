@@ -22,11 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""config module  
+"""config module
 
-Reads configuration information for `per-machine` and `per-user` values.  
+Reads configuration information for `per-machine` and `per-user` values.
 
-An example of a `per-machine` value is the KOB serial/com port (PORT).  
+An example of a `per-machine` value is the KOB serial/com port (PORT).
 An example of a `per-user` value is the code speed (WPM).
 
 Configuration/preference values are read/written to:
@@ -79,13 +79,16 @@ __APP_NAME = "pykob"
 __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
+__GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
+__AUTO_CONNECT_KEY = "AUTO_CONNECT"
 __CODE_TYPE_KEY = "CODE_TYPE"
 __INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 __INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 __LOCAL_KEY = "LOCAL"
 __MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 __REMOTE_KEY = "REMOTE"
+__SERVER_URL_KEY = "SERVER_URL"
 __SOUND_KEY = "SOUND"
 __SOUNDER_KEY = "SOUNDER"
 __SPACING_KEY = "SPACING"
@@ -117,18 +120,21 @@ user_name = None
 
 # Machine/System Settings
 serial_port = None
+gpio = False
 
 # User Settings
+auto_connect = False
 code_type = CodeType.american
 interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
 remote = True
+server_url = None
 sound = True
 sounder = False
 spacing = Spacing.none
 station = None
-wire = None
+wire = 0
 min_char_speed = 18
 text_speed = 18
 
@@ -158,7 +164,7 @@ def noneOrValueFromStr(s):
     ------
         `None` or the string value
 """
-    r = None if not s or not s.strip() else s
+    r = None if not s or not s.strip() or s.upper() == 'NONE' else s
     return r
 
 def create_config_files_if_needed():
@@ -183,14 +189,39 @@ def create_config_files_if_needed():
         f = open(app_config_file_path, 'w')
         f.close()
 
+def set_auto_connect(s):
+    """Sets the Auto Connect to wire enable state
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    automatically connect to the configured wire.
+
+    Note that this is a 'suggestion'. It isn't used by the base pykob 
+    modules. It should be used by applications (like MKOB) to initiate a connection 
+    to the configured wire.
+    
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable auto-connect. Values of `NO`|`OFF`|`FALSE` will disable auto-connect.
+    """
+
+    global auto_connect
+    try:
+        auto_connect = strtobool(str(s))
+        user_config.set(__CONFIG_SECTION, __AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+    except ValueError as ex:
+        log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+
 def set_code_type(s):
     """Sets the Code Type (for American or International)
 
     Parameters
     ----------
     s : str
-        The value `A|AMERICAN` will set the code type to 'American'.  
-        The value `I|INTERNATIONAL` will set the code type to 'International'.  
+        The value `A|AMERICAN` will set the code type to 'American'.
+        The value `I|INTERNATIONAL` will set the code type to 'International'.
     """
 
     global code_type
@@ -212,9 +243,9 @@ def set_interface_type(s):
     Parameters
     ----------
     s : str
-        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.  
+        The value `KS|KEY_SOUNDER` will set the interface type to 'InterfaceType.key_sounder'.
         The value `L|LOOP` will set the interface type to 'InterfaceType.loop'.
-        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.  
+        The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.
     """
 
     global interface_type
@@ -236,14 +267,14 @@ def set_invert_key_input(b):
     """
     Enable/disable key input signal (DSR) invert.
 
-    When key-invert is enabled, the key input (DSR on the serial interface) 
-    is inverted (because the RS-232 logic is inverted). This is primarily used 
+    When key-invert is enabled, the key input (DSR on the serial interface)
+    is inverted (because the RS-232 logic is inverted). This is primarily used
     when the input is from a modem (in dial-up connection).
-    
+
     Parameters
     ----------
     b : string 'true/false'
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable key invert. Values of `NO`|`OFF`|`FALSE` will disable key invert.
     """
     global invert_key_input
@@ -257,13 +288,13 @@ def set_invert_key_input(b):
 def set_local(l):
     """Enable/disable local copy
 
-    When local copy is enabled, the local sound/sounder configuration is  
+    When local copy is enabled, the local sound/sounder configuration is
     used to locally sound the content being sent to the wire.
-    
+
     Parameters
     ----------
     l : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable local copy. Values of `NO`|`OFF`|`FALSE` will disable local copy.
     """
 
@@ -278,13 +309,13 @@ def set_local(l):
 def set_remote(r):
     """Enable/disable remote send
 
-    When remote send is enabled, the content will be sent to the  
-    wire configured.  
-    
+    When remote send is enabled, the content will be sent to the
+    wire configured.
+
     Parameters
     ----------
     r : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable remote send. Values of `NO`|`OFF`|`FALSE` will disable remote send.
     """
 
@@ -299,11 +330,11 @@ def set_remote(r):
 def set_min_char_speed(s):
     """Sets the minimum character speed in words per minute
 
-    A difference between character speed (in WPM) and text speed  
-    (in WPM) is used to calulate a Farnsworth timing value.  
+    A difference between character speed (in WPM) and text speed
+    (in WPM) is used to calulate a Farnsworth timing value.
 
-    This is the minimum character speed. If the text speed is 
-    higher, then the character speed will be bumped up to  
+    This is the minimum character speed. If the text speed is
+    higher, then the character speed will be bumped up to
     the text speed.
 
     Parameters
@@ -322,7 +353,7 @@ def set_min_char_speed(s):
         raise
 
 def set_serial_port(p):
-    """Sets the name/path of the serial/tty port to use for a 
+    """Sets the name/path of the serial/tty port to use for a
     key+sounder/loop interface
 
     Parameters
@@ -335,16 +366,53 @@ def set_serial_port(p):
     serial_port = noneOrValueFromStr(p)
     app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
 
+def set_gpio(s):
+    """Sets the key/sounder interface to Raspberry Pi GPIO
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    enable the GPIO interface to the key/sounder.
+    
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable GPIO interface. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
+        Serial port will become active (if configured for sounder = ON)
+    """
+
+    global gpio
+    try:
+        gpio = strtobool(str(s))
+        app_config.set(__CONFIG_SECTION, __GPIO_KEY, onOffFromBool(gpio))
+    except ValueError as ex:
+        log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+
+def set_server_url(s):
+    """Sets the KOB Server URL to connect to for wires
+
+    Parameters
+    ----------
+    s : str
+        The KOB Server URL or None. Also set to None if the value is 'DEFAULT'.
+    """
+
+    global server_url
+    server_url = noneOrValueFromStr(s)
+    if server_url and server_url.upper() == 'DEFAULT':
+        server_url = None
+    user_config.set(__CONFIG_SECTION, __SERVER_URL_KEY, server_url)
+
 def set_sound(s):
     """Sets the Sound/Audio enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the computer audio 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the computer audio
     will be used to produce sounder output.
 
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable sound. Values of `NO`|`OFF`|`FALSE` will disable sound.
     """
 
@@ -359,14 +427,14 @@ def set_sound(s):
 def set_sounder(s):
     """Sets the Sounder enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the sounder will 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the sounder will
     be driven if the `port` value is configured.
 
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
-        will enable sounder output. Values of `NO`|`OFF`|`FALSE` will disable 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable sounder output. Values of `NO`|`OFF`|`FALSE` will disable
         sounder output.
     """
 
@@ -379,18 +447,18 @@ def set_sounder(s):
         raise
 
 def set_spacing(s):
-    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,  
+    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,
     Character `Spacing.char` or Word `Spacing.word`
 
-    When set to `Spacing.none` Farnsworth spacing will not be added.  
-    When set to `Spacing.char` Farnsworth spacing will be added between characters.  
-    When set to `Spacing.word` Farnsworth spacing will be added between words.  
-    
+    When set to `Spacing.none` Farnsworth spacing will not be added.
+    When set to `Spacing.char` Farnsworth spacing will be added between characters.
+    When set to `Spacing.word` Farnsworth spacing will be added between words.
+
     Parameters
     ----------
     s : str
-        The value `N|NONE` will set the spacing to `Spacing.none` (disabled).  
-        The value `C|CHAR` will set the spacing to `Spacing.char`.  
+        The value `N|NONE` will set the spacing to `Spacing.none` (disabled).
+        The value `C|CHAR` will set the spacing to `Spacing.char`.
         The value `W|WORD` will set the spacing to `Spacing.word`.
     """
 
@@ -422,7 +490,7 @@ def set_station(s):
     station = noneOrValueFromStr(s)
     user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
 
-def set_wire(w):
+def set_wire(w: str):
     """Sets the wire to connect to
 
     Parameters
@@ -432,8 +500,13 @@ def set_wire(w):
     """
 
     global wire
-    wire = noneOrValueFromStr(w)
-    user_config.set(__CONFIG_SECTION, __WIRE_KEY, wire)
+    try:
+        _wire = int(w)
+        wire = _wire
+        user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(wire))
+    except ValueError as ex:
+        log.err("Wire number value '{}' is not a valid integer value.".format(ex.args[0]))
+        raise
 
 def set_text_speed(s):
     """Sets the Text (code) speed in words per minute
@@ -481,25 +554,29 @@ def print_system_info():
 def print_config():
     """Print the PyKOB configuration
     """
-
+    url = noneOrValueFromStr(server_url)
+    url = url if url else ''
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
+    print("GPIO interface (Raspberry Pi):", onOffFromBool(gpio))
     print("--------------------------------------")
+    print("Auto Connect to Wire:", onOffFromBool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", onOffFromBool(invert_key_input))
     print("Local copy:", onOffFromBool(local))
     print("Remote send:", onOffFromBool(remote))
+    print("KOB Server URL:", url)
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
     print("Spacing:", spacing.name.upper())
-    print("Station:", noneOrValueFromStr(station))
-    print("Wire:", noneOrValueFromStr(wire))
+    print("Station: '{}'".format(noneOrValueFromStr(station)))
+    print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
 
 def save_config():
-    """Save (write) the configuration values out to the user and 
+    """Save (write) the configuration values out to the user and
     system/machine config files.
     """
 
@@ -530,13 +607,16 @@ def read_config():
     global user_name
     #
     global serial_port
+    global gpio
     #
+    global auto_connect
     global code_type
     global interface_type
     global invert_key_input
     global local
     global min_char_speed
     global remote
+    global server_url
     global sound
     global sounder
     global spacing
@@ -588,19 +668,21 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
+        __AUTO_CONNECT_KEY:"OFF", \
         __CODE_TYPE_KEY:"AMERICAN", \
         __INTERFACE_TYPE_KEY:"LOOP", \
         __INVERT_KEY_INPUT_KEY:"OFF", \
         __LOCAL_KEY:"ON", \
         __MIN_CHAR_SPEED_KEY:"18", \
         __REMOTE_KEY:"ON", \
+        __SERVER_URL_KEY:"NONE", \
         __SOUND_KEY:"ON", \
         __SOUNDER_KEY:"OFF", \
         __SPACING_KEY:"NONE", \
         __STATION_KEY:"", \
         __WIRE_KEY:"", \
         __TEXT_SPEED_KEY:"18"}
-    app_config_defaults = {"PORT":""}
+    app_config_defaults = {"PORT":"", "GPIO":"OFF"}
 
     user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
     app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
@@ -609,17 +691,29 @@ def read_config():
     app_config.read(app_config_file_path)
 
     try:
+        ###
         # Get the System (App) config values
+        ###
         serial_port = app_config.get(__CONFIG_SECTION, __SERIAL_PORT_KEY)
         # If there isn't a PORT value set PORT to None
         if not serial_port:
             serial_port = None
 
+        # GPIO (Raspberry Pi)
+        __option = "GPIO interface"
+        __key = __GPIO_KEY
+        gpio = app_config.getboolean(__CONFIG_SECTION, __key)
+  
+        ###
         # Get the User config values
+        ###
+        __option = "Auto Connect to Wire"
+        __key = __AUTO_CONNECT_KEY
+        auto_connect = user_config.getboolean(__CONFIG_SECTION, __key)
         __option = "Code type"
         __key = __CODE_TYPE_KEY
         _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
-        if _code_type == "AMERICAN":
+        if  _code_type == "AMERICAN":
             code_type = CodeType.american
         elif _code_type == "INTERNATIONAL":
             code_type = CodeType.international
@@ -651,6 +745,11 @@ def read_config():
         __option = "Text speed"
         __key = __TEXT_SPEED_KEY
         text_speed = user_config.getint(__CONFIG_SECTION, __key)
+        __option = "Server URL"
+        __key = __SERVER_URL_KEY
+        _server_url = user_config.get(__CONFIG_SECTION, __key)
+        if (not _server_url) or (_server_url.upper() != "NONE"):
+            server_url = _server_url
         __option = "Sound"
         __key = __SOUND_KEY
         sound = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -676,8 +775,12 @@ def read_config():
         __option = "Wire"
         __key = __WIRE_KEY
         _wire = user_config.get(__CONFIG_SECTION, __key)
-        if (not _wire) or (_wire.upper() != "NONE"):
-            wire = _wire
+        if (_wire) or (_wire.upper() != "NONE"):
+            try:
+                wire = int(_wire)
+            except ValueError as ex:
+                # log.err("Wire number value '{}' is not a valid integer value.".format(_wire))
+                wire = 1
     except KeyError as ex:
         log.err("Key '{}' not found in configuration file.".format(ex.args[0]))
         raise
@@ -687,6 +790,12 @@ def read_config():
 
 # ### Mainline
 read_config()
+
+auto_connect_override = argparse.ArgumentParser(add_help=False)
+auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF", 
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
+metavar="auto-connect", dest="auto_connect")
 
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
@@ -714,18 +823,29 @@ remote_override.add_argument("-R", "--remote", default=remote, \
 help="Enable/disable transmission over the internet on the specified wire.", \
 metavar="remote-send", dest="remote")
 
+server_url_override = argparse.ArgumentParser(add_help=False)
+server_url_override.add_argument("-U", "--url", default=server_url, \
+help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
+
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
+gpio_override = argparse.ArgumentParser(add_help=False)
+gpio_override.add_argument("-g", "--gpio", default="ON" if gpio else "OFF",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
+ GPIO takes priority over the serial interface.", \
+metavar="gpio", dest="gpio")
+
 sound_override = argparse.ArgumentParser(add_help=False)
-sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF", 
+sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
 metavar="sound", dest="sound")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
-sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF", 
+sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
 metavar="sounder", dest="sounder")

@@ -34,7 +34,8 @@ The information is recorded in packets in a JSON structure that includes:
 3. Station ID
 4. Wire Number
 5. Code type
-6. Code Sequence (key timing information)
+6. The decoded character
+7. Code Sequence (key timing information)
 
 Though the name of the class is `recorder` it is typical that a 'recorder' can also
 play back. For example, a 'tape recorder', a 'video casset recorder (VCR)',
@@ -225,7 +226,7 @@ class Recorder:
         """
         self.__recorder_wire = wire
 
-    def record(self, code, source):
+    def record(self, code, source, text=''):
         """
         Record a code sequence in JSON format with additional context information.
         """
@@ -236,6 +237,7 @@ class Recorder:
                 "w":self.wire,
                 "s":self.station_id,
                 "o":source,
+                "t":text,
                 "c":code
             }
             with open(self.__target_file_path, "a+") as fp:
@@ -442,6 +444,9 @@ class Recorder:
         self.__p_lines = 0
         self.__recorder_station_id = None
         self.__recorder_wire = None
+        self.__list_data = list_data
+        self.__max_silence = max_silence
+        self.__speed_factor = speed_factor
         #
         # Get information from the current playback recording file.
         with open(self.__source_file_path, "r") as fp:
@@ -477,16 +482,14 @@ class Recorder:
                     log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self.__source_file_path, self.__p_line_no, ex))
                     return
         # Calculate recording file values to aid playback functions
-        # Print some values about the recording
-        print(" Lines: {}  Start: {}  End: {}  Duration: {}".format(self.__p_lines, date_time_from_ts(self.__p_fts), date_time_from_ts(self.__p_lts), hms_from_ts(self.__p_lts, self.__p_fts)))
-        self.__list_data = list_data
-        self.__max_silence = max_silence
-        self.__speed_factor = speed_factor
         self.__playback_thread = threading.Thread(name='Recorder-Playback-Play', daemon=True, target=self.callbackPlay)
         self.__playback_thread.start()
         if self.__play_station_list_callback:
             self.__p_stations_thread = threading.Thread(name='Recorder-Playback-StationList', daemon=True, target=self.callbackPlayStationList)
             self.__p_stations_thread.start()
+        if self.__list_data:
+            # Print some values about the recording
+            print(" Lines: {}  Start: {}  End: {}  Duration: {}".format(self.__p_lines, date_time_from_ts(self.__p_fts), date_time_from_ts(self.__p_lts), hms_from_ts(self.__p_lts, self.__p_fts)))
 
     def callbackPlay(self):
         """
@@ -502,9 +505,11 @@ class Recorder:
             self.__playback_state = PlaybackState.playing
             #
             # With the information from the recording, call the station callback (if set)
-            print('Stations in recording:')
+            if self.__list_data:
+                print('Stations in recording:')
             for s in self.__p_stations:
-                print(' Station: ', s)
+                if self.__list_data:
+                    print(' Station: ', s)
                 if self.__play_station_list_callback:
                     self.__play_station_list_callback(s)
             with open(self.__source_file_path, "r") as self.__p_fp:
@@ -571,9 +576,7 @@ class Recorder:
                                 time.sleep(pause)
                         if not self.__speed_factor == 100:
                             sf = 1.0 / (self.__speed_factor / 100.0)
-                            for c in code:
-                                if c < 0 or c > 2:
-                                    c = round(sf * c)
+                            code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]
                         self.wire = wire
                         if self.__play_wire_callback:
                             self.__play_wire_callback(wire)
@@ -594,7 +597,8 @@ class Recorder:
                 self.__play_finished_callback()
             with self.__p_fileop_lock:
                 self.__p_fp = None
-            print("Playback done.")
+            if self.__list_data:
+                print("Playback done.")
 
 
     def callbackPlayStationList(self):
@@ -630,9 +634,9 @@ if __name__ == "__main__":
     # Append more text to the same file
     for c in "This is a test":
         codesequence = mySender.encode(c, True)
-        myRecorder.record(codesequence, kob.CodeSource.local)
+        myRecorder.record(codesequence, kob.CodeSource.local, c)
     print()
     # Play the file
-    myKOB = kob.KOB(port=None, audio=True)
+    myKOB = kob.KOB(portToUse=None, audio=True)
     myRecorder.playback(myKOB)
 

@@ -32,7 +32,7 @@ import sys
 import codecs
 from pathlib import Path
 from threading import Timer
-from pykob import config
+from pykob import config, log
 
 DOTSPERWORD = 45     # dot units per word, including all spaces
                      #   (MORSE is 43, PARIS is 47)
@@ -134,6 +134,7 @@ Callback function is called whenever a character is decoded:
 """
 
 MINDASHLEN      = 1.5  # dot vs dash threshold (in dots)
+MAXDASHLEN      = 9.0  # long dash vs circuit closure threshold (in dots)
 MINMORSESPACE   = 2.0  # intrasymbol space vs Morse (in dots)
 MAXMORSESPACE   = 6.0  # maximum length of Morse space (in dots)
 MINCHARSPACE    = 2.7  # intrasymbol space vs character space (in dots)
@@ -155,6 +156,14 @@ readDecodeTable(0, 'codetable-american.txt') # American code table is at 0 index
 readDecodeTable(1, 'codetable-international.txt') # International code table is at 1 index
 
 class Reader:
+    """
+    The Morse decoding algorithm has to wait until two characters have been received before
+    decoding either of them. This is because what appears to be two characters may be two
+    halves of a single spaced character. The two characters are kept in a buffer which (clumsily)
+    is represented as three lists: codeBuf, spaceBuf, and markBuf (see details in the
+    `__init__` definition below).
+    """
+    
     def __init__(self, wpm=20, codeType=config.CodeType.american, callback=None):
         self.codeType  = codeType    # American or International
         self.wpm       = wpm         # current code speed estimate
@@ -166,6 +175,9 @@ class Reader:
         self.nChars    = 0           # number of complete characters in buffer
         self.callback  = callback    # function to call when character decoded
         self.flusher   = None        # holds Timer (thread) to call flush if no code received
+        self.latched   = False       # True if cicuit has been latched closed by a +1 code element
+        self.mark      = 0           # accumulates the length of a mark as positive code elements are received
+        self.space     = 1           # accumulates the length of a space as negative code elements are received
 
     def decode(self, codeSeq):
         # Code received - cancel an existing 'flusher'
@@ -173,20 +185,44 @@ class Reader:
             self.flusher.cancel()
             self.flusher = None
 ##        self.updateWPM(codeSeq)  ### ZZZ temporarily disable code speed recognition
+        nextSpace = 0  # space before next dot or dash
         i = 0
-        for i in range(0, len(codeSeq), 2):
-            sp = -codeSeq[i]
-            mk = codeSeq[i+1]
-            if self.codeBuf[self.nChars] == '':
-                self.spaceBuf[self.nChars] = sp  # start of new char
-            else:
-                if sp > MINMORSESPACE * self.dotLen:
-                    self.decodeChar(sp)  # possible Morse or word space
-            if mk > MINDASHLEN * self.truDot:
-                self.codeBuf[self.nChars] += '-'  # dash
-            else:
-                self.codeBuf[self.nChars] += '.'  # dot
-            self.markBuf[self.nChars] = mk
+        for i in range(0, len(codeSeq)):
+            c = codeSeq[i]
+            if c < 0:  # start or continuation of space, or continuation of mark (if latched)
+                c = -c
+                if self.latched:  # circuit has been latched closed
+                    self.mark += c
+                elif self.space > 0:  # continuation of space
+                    self.space += c
+                else:  # end of mark
+                    if self.mark > MINDASHLEN * self.truDot:
+                        self.codeBuf[self.nChars] += '-'  # dash
+                    else:
+                        self.codeBuf[self.nChars] += '.'  # dot
+                    self.markBuf[self.nChars] = self.mark
+                    self.mark = 0
+                    self.space = c
+            elif c == 1:  # start (or continuation) of extended mark
+                self.latched = True
+                if self.space > 0:  # start of mark
+                    if self.space > MINMORSESPACE * self.dotLen:  # possible Morse or word space
+                        self.decodeChar(self.space)
+                    self.mark = 0
+                    self.space = 0
+                else: # continuation of mark
+                    pass
+            elif c == 2:  # end of mark (or continuation of space)
+                self.latched = False
+            elif c > 2:  # mark
+                self.latched = False
+                if self.space > 0:  # start of new mark
+                    if self.space > MINMORSESPACE * self.dotLen:  # possible Morse or word space
+                        self.decodeChar(self.space)
+                    self.mark = c
+                    self.space = 0
+                elif self.mark > 0:  # continuation of mark
+                    self.mark += c
         self.flusher = Timer(((20.0 * self.truDot) / 1000.0), self.flush)  # if idle call `flush`
         self.flusher.setName("Reader-Flusher")
         self.flusher.start()
@@ -212,41 +248,58 @@ class Reader:
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
-        self.decodeChar(MAXINT)
-        self.decodeChar(MAXINT)  # this is intentional, although maybe not needed
+        if self.mark > 0 or self.latched:
+            spacing = self.spaceBuf[self.nChars]
+            if self.mark > MINDASHLEN * self.truDot:
+                self.codeBuf[self.nChars] += '-'  # dash
+            elif self.mark > 2:
+                self.codeBuf[self.nChars] += '.'  # dot
+            self.markBuf[self.nChars] = self.mark
+            self.mark = 0
+            self.space = 1  # to prevent circuit opening mistakenly decoding as 'E'
+            self.decodeChar(MAXINT)
+            self.decodeChar(MAXINT)  # a second time, to flush both characters
+            self.codeBuf = ['', '']
+            self.spaceBuf = [0, 0]
+            self.markBuf = [0, 0]
+            self.nChars = 0
+            if self.latched:
+                self.callback('_', float(spacing) / (3 * self.truDot) - 1)
 
     def decodeChar(self, nextSpace):
-        self.nChars += 1
-        sp1 = self.spaceBuf[0]
-        sp2 = self.spaceBuf[1]
-        sp3 = nextSpace
-        code = ''
-        s = ''
+        self.nChars += 1  # number of complete characters in buffer (1 or 2)
+        sp1 = self.spaceBuf[0]  # space before 1st character
+        sp2 = self.spaceBuf[1]  # space before 2nd character
+        sp3 = nextSpace  # space before next character
+        code = ''  # the dots and dashes
+        s = ''  # the decoded character or pair of characters
         if self.nChars == 2 and sp2 < MAXMORSESPACE * self.dotLen and \
-                MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:
-            code = self.codeBuf[0] + ' ' + self.codeBuf[1]
+                MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:  # could be two halves of a spaced character
+            code = self.codeBuf[0] + ' ' + self.codeBuf[1]  # try combining the two halves
             s = self.lookupChar(code)
-            if s != '' and s != '&':
+            if s != '' and s != '&':  # yes, it's a spaced character, clear the whole buffer
                 self.codeBuf[0] = ''
                 self.markBuf[0] = 0
                 self.codeBuf[1] = ''
                 self.spaceBuf[1] = 0
                 self.markBuf[1] = 0
                 self.nChars = 0
-            else:
+            else:  # it's not recognized as a spaced character,
                 code = ''
                 s = ''
-        if self.nChars == 2 and sp2 < MINCHARSPACE * self.dotLen:
+        if self.nChars == 2 and sp2 < MINCHARSPACE * self.dotLen:  # it's a single character, merge the two halves
             self.codeBuf[0] += self.codeBuf[1]
             self.markBuf[0] = self.markBuf[1]
             self.codeBuf[1] = ''
             self.spaceBuf[1] = 0
             self.markBuf[1] = 0
             self.nChars = 1
-        if self.nChars == 2:
+        if self.nChars == 2:  # decode the first character, otherwise wait for the next one to arrive
             code = self.codeBuf[0]
             s = self.lookupChar(code)
-            if s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
+            if s == 'T' and self.markBuf[0] > MAXDASHLEN * self.dotLen:
+                s = '_'
+            elif s == 'T' and self.markBuf[0] > MINLLEN * self.dotLen and \
                     self.codeType == config.CodeType.american:
                 s = 'L'
             elif s == 'E':
@@ -261,7 +314,7 @@ class Reader:
             self.codeBuf[1] = ''
             self.spaceBuf[1] = 0
             self.markBuf[1] = 0
-            self.nChars -= 1
+            self.nChars = 1
         self.spaceBuf[self.nChars] = nextSpace
         if code != '' and s == '':
             s = '[' + code + ']'
@@ -274,3 +327,9 @@ class Reader:
             return(decodeTable[codeTableIndex][code])
         else:
             return('')
+
+    def displayBuffers(self, text):
+        """Display the code buffer and other information for troubleshooting"""
+        log.debug("{}: nChars = {}".format(text, self.nChars))
+        for i in range(2):
+            print("{} '{}' {}".format(self.spaceBuf[i], self.codeBuf[i], self.markBuf[i]))
