@@ -27,7 +27,7 @@ WIDTH = 128
 HEIGHT = 64
 BORDER = 2
 # Line height for 4 lines on the 128x64 OLED display
-LINE_HEIGHT = HEIGHT / 4
+LINE_HEIGHT = HEIGHT // 4
 # Colors
 WHITE = 255
 BLACK = 0
