@@ -310,7 +310,7 @@ try:
     myInternet = internet.Internet(idText)
     audio_setting = strtobool(str(args.sound))
     # ZZZ - add option to support GPIO
-    myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, audio=audio_setting)
+    myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, useAudio=audio_setting)
 
     myInternet.connect(wire)
 

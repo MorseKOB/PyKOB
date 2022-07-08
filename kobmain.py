@@ -65,7 +65,7 @@ def __set_local_loop_active(state):
     local_loop_active = state
     log.debug("local_loop_active:{}".format(state))
     if local_loop_active:
-        if kc.config.interface_type == config.interface_type.loop:
+        if config.interface_type == config.interface_type.loop:
             KOB.energizePhysicalSounder(True)
 
 
@@ -79,12 +79,12 @@ def __emit_code(code):
     determine it should be emitted.
     """
     global connected
-    update_sender(kc.config.station)
+    update_sender(config.station)
     Reader.decode(code)
     Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to enable/disable recording
-    if kc.Local:
+    if config.local:
         KOB.sounder(code)
-    if connected and kc.Remote:
+    if connected and config.remote:
         Internet.write(code)
 
 def from_key(code):
@@ -285,7 +285,7 @@ def init():
     global KOB, Internet, Recorder
     KOB = kob.KOB(
             portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
-            audio=config.sound, callback=from_key)
+            useAudio=config.sound, callback=from_key)
     Internet = internet.Internet(config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:

@@ -82,7 +82,7 @@ try:
         sys.exit(1)
     sound = strtobool(args.sound)
 
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
     mySender = morse.Sender(text_speed)
 
     # send HI at 20 wpm as an example

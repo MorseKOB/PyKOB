@@ -89,7 +89,7 @@ try:
     else:
         wire = None
 
-    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=SOUND)
+    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
 
     if wire:
         myInternet = internet.Internet(idText)

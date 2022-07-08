@@ -86,7 +86,7 @@ try:
     except FileNotFoundError:
         log.err("Recording file not found: {}".format(playback_file))
 
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound, interfaceType=interface_type)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound, interfaceType=interface_type)
 
     myRecorder = recorder.Recorder(None, playback_file, play_code_callback=callbackPlay, play_finished_callback=callbackPlayFinished, station_id="Player")
     myRecorder.playback_start(list_data=args.listData, max_silence=args.maxSilence, speed_factor=args.speedFactor)

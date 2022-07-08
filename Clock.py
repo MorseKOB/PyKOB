@@ -185,7 +185,7 @@ try:
         targetFileName = "Clock." + str(ts) + ".json"
         myRecorder = recorder.Recorder(targetFileName, None, station_id="Clock")
     
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
     mySender = morse.Sender(text_speed)
     
     # Announce the current time right now

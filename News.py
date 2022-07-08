@@ -50,7 +50,7 @@ CODETYPE = config.code_type
 CODESPACING = config.spacing
 
 mySender = morse.Sender(WPM, CWPM, CODETYPE, CODESPACING)
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=USESOUND)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND)
 
 try:
     while True:
