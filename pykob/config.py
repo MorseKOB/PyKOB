@@ -79,6 +79,7 @@ __APP_NAME = "pykob"
 __CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
 __SERIAL_PORT_KEY = "PORT"
+__GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
 __AUTO_CONNECT_KEY = "AUTO_CONNECT"
 __CODE_TYPE_KEY = "CODE_TYPE"
@@ -119,6 +120,7 @@ user_name = None
 
 # Machine/System Settings
 serial_port = None
+gpio = False
 
 # User Settings
 auto_connect = False
@@ -364,6 +366,28 @@ def set_serial_port(p):
     serial_port = noneOrValueFromStr(p)
     app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
 
+def set_gpio(s):
+    """Sets the key/sounder interface to Raspberry Pi GPIO
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    enable the GPIO interface to the key/sounder.
+    
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        will enable GPIO interface. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
+        Serial port will become active (if configured for sounder = ON)
+    """
+
+    global gpio
+    try:
+        gpio = strtobool(str(s))
+        app_config.set(__CONFIG_SECTION, __GPIO_KEY, onOffFromBool(gpio))
+    except ValueError as ex:
+        log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+
 def set_server_url(s):
     """Sets the KOB Server URL to connect to for wires
 
@@ -534,6 +558,7 @@ def print_config():
     url = url if url else ''
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
+    print("GPIO interface (Raspberry Pi):", onOffFromBool(gpio))
     print("--------------------------------------")
     print("Auto Connect to Wire:", onOffFromBool(auto_connect))
     print("Code type:", code_type.name.upper())
@@ -582,6 +607,7 @@ def read_config():
     global user_name
     #
     global serial_port
+    global gpio
     #
     global auto_connect
     global code_type
@@ -656,7 +682,7 @@ def read_config():
         __STATION_KEY:"", \
         __WIRE_KEY:"", \
         __TEXT_SPEED_KEY:"18"}
-    app_config_defaults = {"PORT":""}
+    app_config_defaults = {"PORT":"", "GPIO":"OFF"}
 
     user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
     app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
@@ -665,13 +691,22 @@ def read_config():
     app_config.read(app_config_file_path)
 
     try:
+        ###
         # Get the System (App) config values
+        ###
         serial_port = app_config.get(__CONFIG_SECTION, __SERIAL_PORT_KEY)
         # If there isn't a PORT value set PORT to None
         if not serial_port:
             serial_port = None
 
+        # GPIO (Raspberry Pi)
+        __option = "GPIO interface"
+        __key = __GPIO_KEY
+        gpio = app_config.getboolean(__CONFIG_SECTION, __key)
+  
+        ###
         # Get the User config values
+        ###
         __option = "Auto Connect to Wire"
         __key = __AUTO_CONNECT_KEY
         auto_connect = user_config.getboolean(__CONFIG_SECTION, __key)
@@ -795,6 +830,13 @@ help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url",
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+
+gpio_override = argparse.ArgumentParser(add_help=False)
+gpio_override.add_argument("-g", "--gpio", default="ON" if gpio else "OFF",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
+ GPIO takes priority over the serial interface.", \
+metavar="gpio", dest="gpio")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF",

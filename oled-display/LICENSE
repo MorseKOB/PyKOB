@@ -1,9 +1,6 @@
-#!/usr/bin/env python3
-
-"""
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2021 Michael Klements
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,29 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-"""
-
-"""
-MKOB.pyw
-
-Python version of MorseKOB 2.5
-"""
-
-import tkinter as tk
-import sys
-import kobwindow
-
-VERSION = "4.0.17"
-MKOB_VERSION_TEXT = "MorseKOB " + VERSION
-print(MKOB_VERSION_TEXT)
-print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
-
-try:
-    root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # TODO: fails with Linux
-    kobwindow.KOBWindow(root, MKOB_VERSION_TEXT)
-    
-    root.mainloop()
-except KeyboardInterrupt:
-    print()
-sys.exit(0)

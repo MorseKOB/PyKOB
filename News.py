@@ -26,10 +26,10 @@ SOFTWARE.
 
 """News.py
 
-Fetches articles from an RSS news feed and sends them in American Morse
+Fetches articles from an RSS news feed and sends them in Morse
 to a sounder.
 
-Serial port, code speed, and audio preferences should be specified by running the
+Serial port or to use GPIO, code speed, and audio preferences should be specified by running the
 'configure.sh' script or executing 'python3 Configure.py'.
 """
 
@@ -40,13 +40,17 @@ from pykob import config,newsreader, morse, kob
 
 SOURCE   = 'https://www.ansa.it/sito/ansait_rss.xml'  # news feed
 PORT = config.serial_port # serial port for KOB interface
+USEGPIO = config.gpio
+USESOUND = config.sound # whether to enable computer sound for sounder
+
 WPM = config.words_per_min_speed  # code speed (words per minute)
-SOUND = config.sound # whether to enable computer sound for sounder
 CWPM     = 18  # minimum character speed
 PAUSE    = 5  # gap to leave between articles (seconds)
+CODETYPE = config.code_type
+CODESPACING = config.spacing
 
-mySender = morse.Sender(WPM, CWPM, morse.INTERNATIONAL, morse.CHARSPACING)
-myKOB = kob.KOB(PORT, SOUND)
+mySender = morse.Sender(WPM, CWPM, CODETYPE, CODESPACING)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=USESOUND)
 
 try:
     while True:

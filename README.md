@@ -1,10 +1,13 @@
 # MorseKOB Version 4 - Python
 
 Written by Les Kerr, this is a Python library and programs that implement 
-the MorseKOB functionality. A user interface hasn't been completed yet, 
-but the library functions in pykob provide modules and functions that 
-can be used within a Python program to perform MorseKOB operations.
+the MorseKOB functionality. The library functions in pykob provide modules 
+and functions that can be used within a Python program to perform MorseKOB 
+operations.
 
+The MKOB application provides a full graphical interface that allows the 
+station to connect to a MorseKOB wire on the Morse KOB server. Instructions 
+for running the MKOB application are in the MKOB-README.
 # License
 The following license information apply to the contents of this application, 
 modules, libraries and to libraries and modules used by this application.

@@ -637,6 +637,6 @@ if __name__ == "__main__":
         myRecorder.record(codesequence, kob.CodeSource.local, c)
     print()
     # Play the file
-    myKOB = kob.KOB(port=None, audio=True)
+    myKOB = kob.KOB(portToUse=None, audio=True)
     myRecorder.playback(myKOB)
 

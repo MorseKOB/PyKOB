@@ -52,6 +52,7 @@ from pykob import config, kob, internet, morse, log
 log.log('SchedFeed 1.3')
 
 PORT = config.serial_port # serial port for KOB interface
+USEGPIO = config.gpio # use the GPIO on a Raspberry Pi
 WPM = config.words_per_min_speed  # code speed (words per minute)
 SOUND = config.sound # whether to enable computer sound for sounder
 WIRE    = 199  # 0 for no feed to internet
@@ -69,7 +70,7 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
     
-myKOB = kob.KOB(port=PORT, audio=SOUND)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=SOUND)
 if WIRE:
     myInternet = internet.Internet(IDTEXT)
     myInternet.connect(WIRE)

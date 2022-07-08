@@ -239,7 +239,8 @@ def init():
     """
     global KOB, Internet, Recorder
     KOB = kob.KOB(
-            port=config.serial_port, interfaceType=config.interface_type, audio=config.sound, callback=from_key)
+            portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
+            audio=config.sound, callback=from_key)
     Internet = internet.Internet(config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:

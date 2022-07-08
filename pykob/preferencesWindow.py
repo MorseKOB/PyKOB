@@ -40,15 +40,15 @@ class PreferencesWindow:
        
         interface = 'SERIAL'      # Placeholder until HW interface type is configured
         
-        self.HW_INTERFACE_TYPES = ["None", "GPIO interface (Raspberry Pi)", "Serial Port"]
-        self.SERIAL_HW_INTERFACE = 2        # index of 'Serial Port' in list above
-        self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'GPIO', 'SERIAL']
+        self.HW_INTERFACE_TYPES = ["None", "Serial Port", "GPIO (Raspberry Pi)"]
+        self.NONE_HW_INTERFACE = 0        # index of 'None' in list above
+        self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
         
-        self.SERIAL_CONNECTION_TYPES = ['Local loop (key and sounder in series)',
+        self.EQUIPMENT_TYPES = ['Local loop (key and sounder in series)',
                                        'Separate key and sounder',
                                        'Separate dot/dash paddle and sounder']
-        self.SERIAL_CONNECTION_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
-        self.DEFAULT_SERIAL_CONNECTION_TYPE = 2
+        self.EQUIPMENT_TYPE_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
+        self.DEFAULT_EQUIPMENT_TYPE = 1
         
         HOST_DEFAULT = "mtc-kob.dyndns.org"
         PORT_DEFAULT = 7890
@@ -62,7 +62,7 @@ class PreferencesWindow:
         
         self.CODE_TYPES = ["American", "International"]
         self.CODE_TYPE_SETTINGS = ['AMERICAN', 'INTERNATIONAL']
-        self.DEFAULT_CODE_TYPE = 1
+        self.DEFAULT_CODE_TYPE = 0
     
         self.root = tk.Toplevel()
         self.root.resizable(False, False)
@@ -72,7 +72,7 @@ class PreferencesWindow:
         
         #######################################################################
         #
-        #   Create two-tabbed interface: Basic/Advanced
+        #   Create three-tabbed interface: Basic/Morse/Advanced
         #
         #######################################################################
         
@@ -97,6 +97,26 @@ class PreferencesWindow:
         advancedlocalInterface = ttk.LabelFrame(advanced_prefs, text=" Local Interface")
         ttk.Label(advancedlocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
 
+        # Create three Radiobuttons using one IntVar for the interface type
+        self._interfaceType = tk.IntVar()
+
+        # Initialize the interface type to its default value of 'None':
+        self._interfaceType.set(self.NONE_HW_INTERFACE)
+        
+        for interfaceRadioButton in range(len(self.HW_INTERFACE_TYPES)):
+            ttk.Radiobutton(basiclocalInterface, text=self.HW_INTERFACE_TYPES[interfaceRadioButton],
+                            variable=self._interfaceType,
+                            state='enabled',
+                            value=interfaceRadioButton + 1).grid(row=2 + interfaceRadioButton,
+                                                             column=1, columnspan=1,
+                                                             sticky=tk.W)
+            # GPIO takes precidence
+            if config.gpio:
+              if "GPIO" == self.HW_INTERFACE_CONFIG_SETTINGS[interfaceRadioButton]:
+                self._interfaceType.set(interfaceRadioButton + 1)
+            elif config.serial_port and ("SERIAL" == self.HW_INTERFACE_CONFIG_SETTINGS[interfaceRadioButton]):
+              self._interfaceType.set(interfaceRadioButton + 1)
+
         # Add a pop-up menu with the list of available serial connections:
         self._serialPort = tk.StringVar()
         if SERIAL:
@@ -108,33 +128,33 @@ class PreferencesWindow:
                                       width=30,
                                       textvariable=self._serialPort,
                                       state='readonly' if SERIAL else 'disabled',
-                                      values=serialPortValues).grid(row=1,
-                                                                    column=0, columnspan=4,
+                                      values=serialPortValues).grid(row=3,
+                                                                    column=2, columnspan=4,
                                                                     sticky=tk.W)
         for serial_device in serialPortValues:
             # If port device  matches this radio button, update the selected value
             if config.serial_port == serial_device:
                 self._serialPort.set(serial_device)
         
-        # Label the serial connection type:
-        ttk.Label(basiclocalInterface, text="Serial connection:").grid(row=2, rowspan=3, column=0, sticky=tk.NE)
+        # Label the equipment type:
+        ttk.Label(basiclocalInterface, text="Equipment type:").grid(row=7, rowspan=3, column=0, sticky=tk.NE)
 
-        # Create three Radiobuttons using one IntVar for the serial connection type
-        self._serialConnectionType = tk.IntVar()
+        # Create three Radiobuttons using one IntVar for the equipment type
+        self._equipmentType = tk.IntVar()
 
-        # Initialize the serial connection type to its default value of 'Separate key and sounder':
-        self._serialConnectionType.set(self.DEFAULT_SERIAL_CONNECTION_TYPE)
+        # Initialize the equipment type to its default value of 'Separate key and sounder':
+        self._equipmentType.set(self.DEFAULT_EQUIPMENT_TYPE)
         
-        for serialadioButton in range(len(self.SERIAL_CONNECTION_TYPES)):
-            ttk.Radiobutton(basiclocalInterface, text=self.SERIAL_CONNECTION_TYPES[serialadioButton],
-                            variable=self._serialConnectionType,
-                            state='enabled' if SERIAL else 'disabled',
-                            value=serialadioButton + 1).grid(row=serialadioButton + 2,
+        for equipmentRadioButton in range(len(self.EQUIPMENT_TYPES)):
+            ttk.Radiobutton(basiclocalInterface, text=self.EQUIPMENT_TYPES[equipmentRadioButton],
+                            variable=self._equipmentType,
+                            state='enabled' if SERIAL or GPIO else 'disabled',
+                            value=equipmentRadioButton + 1).grid(row=8 + equipmentRadioButton,
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.interface_type.name.upper() == self.SERIAL_CONNECTION_SETTINGS[serialadioButton]:
-                self._serialConnectionType.set(serialadioButton + 1)
+            if config.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
+                self._equipmentType.set(equipmentRadioButton + 1)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
         self._invertKeyInput = tk.IntVar(value=config.invert_key_input)
@@ -362,9 +382,9 @@ class PreferencesWindow:
         if self._serialPort.get() != "":
             # print("Serial port: ", self._serialPort.get())
             config.set_serial_port(self._serialPort.get())
-      # print("Serial connection type: {} ({})".format(self.SERIAL_CONNECTION_TYPES[self._serialConnectionType.get() - 1], \
-      #                                                self.SERIAL_CONNECTION_SETTINGS[self._serialConnectionType.get() - 1]))
-        config.set_interface_type(self.SERIAL_CONNECTION_SETTINGS[self._serialConnectionType.get() - 1])
+      # print("Serial connection type: {} ({})".format(self.EQUIPMENT_TYPES[self._equipmentType.get() - 1], \
+      #                                                self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
+        config.set_interface_type(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
       # print("Invert key input: ", self._invertKeyInput.get())
         config.set_invert_key_input(self._invertKeyInput.get())
       # print("Use system sound: ", self._useSystemSound.get())
