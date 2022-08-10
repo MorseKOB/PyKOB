@@ -34,6 +34,7 @@ Serial port, code speed, and audio preferences should be specified by running th
 'configure.sh' script or executing 'python3 Configure.py'.
 """
 
+from operator import truediv
 from pykob import config, kob, morse
 
 import argparse
@@ -44,11 +45,11 @@ from distutils.util import strtobool
 
 __short_QBF = "The quick brown fox"
 __full_QBF = "The quick brown fox jumps over the lazy dog"
-__disneyland_dedication = "To all who come to this happy place; welcome. \
-Disneyland is your land. Here age relives fond memories of the past... \
-and here youth may savor the challenge and promise of the future. Disneyland \
+__disneyland_dedication = "To all who come to this happy place;  welcome. \
+Disneyland is your land.   Here age relives fond memories of the past...  \
+and here youth may savor the challenge and promise of the future.  Disneyland \
 is dedicated to the ideals, the dreams and the hard facts that have \
-created America... \
+created America...  \
 with the hope that it will be a source of joy and inspiration to all the world."
 
 __full = False
@@ -68,45 +69,57 @@ try:
         config.min_char_speed_override, \
         config.text_speed_override])
     arg_parser.add_argument("-f", "--full", action='store_true', default=False, \
-    help="Play full 'Quick Brown Fox...'", dest="full")
+    help="Play the full 'Quick Brown Fox...'", dest="full")
     arg_parser.add_argument("-d", "--di", action='store_true', default=False, \
     help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
+    arg_parser.add_argument("-R", "--repeat", action='store_true', default=False, \
+    help="Repeat playing the text/code", dest="repeat")
 
     args = arg_parser.parse_args()
 
     port = args.serial_port # serial port for KOB interface
-    useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
+    sound = strtobool(args.sound)
+    repeat = args.repeat
     text_speed = args.text_speed  # text speed (words per minute)
-    if (text_speed < 1) or(text_speed > 50):
+    if (text_speed < 1) or (text_speed > 50):
         print("text_speed specified must be between 1 and 50")
         sys.exit(1)
-    sound = strtobool(args.sound)
+    useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
 
     myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
     mySender = morse.Sender(text_speed)
 
     # send HI at 20 wpm as an example
     print("HI")
+
     code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
             -180, +60, -60, +60, -1000, +1)
 
-    time.sleep(1)
+    first_time = True
+    while first_time or repeat:
+        first_time = False
+        time.sleep(1)
 
-    # then send the text
-    __text = __full_QBF if args.full else __short_QBF
-    if args.dd:
-        __text = __disneyland_dedication
-        print("From Disneyland Fronteer Land...")
-    print(__text)
-    myKOB.sounder(mySender.encode('~')) # Open the circuit
-    time.sleep(0.200)
-    for c in __text:
-        code = mySender.encode(c, True)
-        myKOB.sounder(code)
-    time.sleep(0.350)
-    myKOB.sounder(mySender.encode('+')) # Close the circuit
-    print()
-    # sys.exit(0)
+        # then send the text
+        __text = __full_QBF if args.full else __short_QBF
+        if args.dd:
+            __text = __disneyland_dedication
+            print("From Disneyland Frontierland...")
+        print(__text)
+        myKOB.sounder(mySender.encode('~')) # Open the circuit
+        time.sleep(0.350)
+        for c in __text:
+            code = mySender.encode(c, True)
+            myKOB.sounder(code)
+        time.sleep(0.350)
+        myKOB.sounder(mySender.encode('+')) # Close the circuit
+        print()
+        if repeat:
+            print("Repeating in 3 seconds. Press ^C to exit...")
+            time.sleep(3)
+    sys.exit(0)
 except KeyboardInterrupt:
     print()
-    sys.exit(1)     # Indicate this was an abnormal exit
+    if not repeat:
+        sys.exit(1) # Indicate this was an abnormal exit
+    sys.exit(0)     # Normal exit for ^C when repeating
