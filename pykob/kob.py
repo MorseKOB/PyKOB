@@ -57,7 +57,7 @@ class CodeSource(IntEnum):
 class KOB:
     def __init__(
             self, interfaceType=config.interface_type.loop, portToUse=None,
-            useGpio=False, useAudio=False, callback=None):
+            useGpio=False, useAudio=False, keyCallback=None):
         # Conditionally load GPIO or Serial library if requested.
         #  GPIO takes priority if both are requested.
         gpioModuleAvailable = False
@@ -80,7 +80,7 @@ class KOB:
         self.useGpioOut = False # Set to True if we establish GPIO output (Sounder drive)
         self.useSerialIn = False # Set to True if we establish Serial input (Key state read)
         self.useSerialOut = False # Set to True if we establish Serial output (Sounder drive)
-        self.callback = None # Set to the passed in value once we establish an interface
+        self.keyCallback = None # Set to the passed in value once we establish an interface
         self.audio = useAudio
         self.interfaceType = interfaceType
         self.lastKeyState = False # False is key open
@@ -101,7 +101,7 @@ class KOB:
             try:
                 self.gpi = Button(21, pull_up=True)  # GPIO21 is key input.
                 self.gpo = LED(26)  # GPIO26 used to drive sounder.
-                self.callback = callback
+                self.keyCallback = keyCallback
                 self.useGpioOut = True
                 self.energizeLoop(True) # Energize the loop to test for closer
                 self.useGpioIn = True
@@ -115,7 +115,7 @@ class KOB:
             try:
                 self.port = serial.Serial(portToUse)
                 self.port.dtr = True
-                self.callback = callback
+                self.keyCallback = keyCallback
                 self.useSerialOut = True
                 self.energizeLoop(True) # Energize the loop to test for closer
                 self.useSerialIn = True
@@ -131,8 +131,8 @@ class KOB:
         self.tLastKey = time.time()  # time of last key transition
         self.cktClose = self.keyIsClosed  # True: circuit latched closed
         self.__recorder = None
-        if self.callback:
-            keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackRead)
+        if self.keyCallback:
+            keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
             keyreadThread.start()
 
     @property
@@ -149,7 +149,7 @@ class KOB:
     def keyCloserIsOpen(self):
         return self.__keyCloserIsOpen
 
-    def callbackRead(self):
+    def callbackKeyRead(self):
         """
         Called by the KeyRead thread `run` to read code from the key.
         """
@@ -160,7 +160,7 @@ class KOB:
                     self.keyCloserOpen(False)
                 elif code[-1] == 2: # special code for closer/circuit open
                     self.keyCloserOpen(True)
-            self.callback(code)
+            self.keyCallback(code)
 
     @property
     def keyIsClosed(self) -> bool:
@@ -219,8 +219,10 @@ class KOB:
             '''
             try:
                 if energize:
+                    self.synthSounderEnergized = True
                     audio.play(1) # click
                 else:
+                    self.synthSounderEnergized = False
                     audio.play(0) # clack
             except:
                 log.err("System audio error playing loop state")
@@ -277,7 +279,6 @@ class KOB:
                 self.lastKeyState = kc
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
-                self.energizeSounder(kc)
                 time.sleep(DEBOUNCE)
                 if kc:
                     code += (-dt,)

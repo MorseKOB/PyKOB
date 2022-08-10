@@ -194,6 +194,10 @@ class KOBWindow:
         self.root.bind(kobevents.EVENT_CIRCUIT_CLOSE, ka.handle_circuit_close)
         self.root.bind(kobevents.EVENT_CIRCUIT_OPEN, ka.handle_circuit_open)
         
+        #### Emit code sequence
+        ### self.root.bind(kobevents.EVENT_EMIT_CODE, ka.handle_emit_code)
+        cmd = root.register(ka.handle_emit_code)
+        root.tk.call("bind", root, kobevents.EVENT_EMIT_CODE, cmd + " %d")
         #### Current Sender and Station List
         self.root.bind(kobevents.EVENT_STATIONS_CLEAR, ka.handle_clear_stations)
         ### self.root.bind(kobevents.EVENT_CURRENT_SENDER, ka.handle_sender_update)

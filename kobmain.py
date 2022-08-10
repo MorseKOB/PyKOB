@@ -47,7 +47,6 @@ connected = False
 
 local_loop_active = False  # True if sending on key or keyboard
 internet_station_active = False  # True if a remote station is sending
-physical_closer_closed = True  # True if we detect that the pysical key closer is closed
 
 latch_code = (-0x7fff, +1)  # code sequence to force latching (close)
 unlatch_code = (-0x7fff, +2)  # code sequence to unlatch (open)
@@ -71,8 +70,10 @@ def __emit_code(code):
     1. Record code if recording is enabled
     2. Send code to the wire if connected
 
-    This is used from the key or the keyboard threads to emit code once they 
+    This is used indirectly from the key or the keyboard threads to emit code once they 
     determine it should be emitted.
+
+    It should be called by an event handler in response to a 'EVENT_EMIT_CODE'.
     """
     global connected
     update_sender(config.station)
@@ -102,7 +103,7 @@ def from_key(code):
             ka.trigger_circuit_open()
             return
     if not internet_station_active and local_loop_active:
-        __emit_code(code)
+        ka.trigger_emit_code(code)
 
 def from_keyboard(code):
     """
@@ -113,7 +114,7 @@ def from_keyboard(code):
     """
     global internet_station_active, local_loop_active
     if not internet_station_active and local_loop_active:
-        __emit_code(code)
+        ka.trigger_emit_code(code)
 
 def from_internet(code):
     """handle inputs received from the internet"""
@@ -276,7 +277,7 @@ def init():
     global KOB, Internet, Recorder
     KOB = kob.KOB(
             portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
-            useAudio=config.sound, callback=from_key)
+            useAudio=config.sound, keyCallback=from_key)
     Internet = internet.Internet(config.station, callback=from_internet)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:

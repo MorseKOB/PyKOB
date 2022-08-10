@@ -25,7 +25,9 @@ SOFTWARE.
 """
 kobevents.py
 
-Event strings used to perform actions on window widgits.
+Event strings used to perform actions on window widgits or other features needing 
+to be executed on the MAIN thread.
+
 If standard events exist they should be used rather than creating/using custom 
 events.
 
@@ -35,6 +37,7 @@ events.
 EVENT_CIRCUIT_CLOSE = "<<Circuit_Close>>" # Close the local circuit
 EVENT_CIRCUIT_OPEN = "<<Circuit_Open>>" # Open the local circuit
 EVENT_CURRENT_SENDER = "<<Current_Sender>>" # Record the current sender (station)
+EVENT_EMIT_CODE = "<<Emit_Code>>" # Emit a code sequence
 EVENT_PLAYER_WIRE_CHANGE = "<<Player_Wire_Change>>" # The player detected a wire change
 EVENT_READER_APPEND_TEXT = "<<Reader_Append_Text>>" # Append text to the reader window
 EVENT_READER_CLEAR = "<<Clear_Reader>>" # Clear the reader window
