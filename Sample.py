@@ -69,7 +69,7 @@ try:
         config.min_char_speed_override, \
         config.text_speed_override])
     arg_parser.add_argument("-f", "--full", action='store_true', default=False, \
-    help="Play full 'Quick Brown Fox...'", dest="full")
+    help="Play the full 'Quick Brown Fox...'", dest="full")
     arg_parser.add_argument("-d", "--di", action='store_true', default=False, \
     help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
     arg_parser.add_argument("-R", "--repeat", action='store_true', default=False, \
@@ -78,8 +78,8 @@ try:
     args = arg_parser.parse_args()
 
     port = args.serial_port # serial port for KOB interface
-    sound = strtobool(args.sound)
     repeat = args.repeat
+    sound = strtobool(args.sound)
     text_speed = args.text_speed  # text speed (words per minute)
     if (text_speed < 1) or (text_speed > 50):
         print("text_speed specified must be between 1 and 50")
@@ -91,8 +91,6 @@ try:
 
     # send HI at 20 wpm as an example
     print("HI")
-    if (repeat):
-        print("Repeating... Press ^C to exit")
 
     code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
             -180, +60, -60, +60, -1000, +1)
@@ -106,20 +104,22 @@ try:
         __text = __full_QBF if args.full else __short_QBF
         if args.dd:
             __text = __disneyland_dedication
-            print("From Disneyland Fronteer Land...")
+            print("From Disneyland Frontierland...")
         print(__text)
-        myKOB.soundCode(mySender.encode('~')) # Open the circuit
-        time.sleep(0.200)
+        myKOB.sounder(mySender.encode('~')) # Open the circuit
+        time.sleep(0.350)
         for c in __text:
             code = mySender.encode(c, True)
-            myKOB.soundCode(code)
+            myKOB.sounder(code)
         time.sleep(0.350)
-        myKOB.soundCode(mySender.encode('+')) # Close the circuit
+        myKOB.sounder(mySender.encode('+')) # Close the circuit
         print()
         if repeat:
             print("Repeating in 3 seconds. Press ^C to exit...")
             time.sleep(3)
-    # sys.exit(0)
+    sys.exit(0)
 except KeyboardInterrupt:
     print()
-    sys.exit(1)     # Indicate this was an abnormal exit
+    if not repeat:
+        sys.exit(1) # Indicate this was an abnormal exit
+    sys.exit(0)     # Normal exit for ^C when repeating
