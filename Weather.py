@@ -204,7 +204,7 @@ def send(text):
         return
     for char in s:
         code = mySender.encode(char)
-        myKOB.sounder(code)  # to pace the code sent to the wire
+        myKOB.soundCode(code)  # to pace the code sent to the wire
         myInternet.write(code)
 
 try:
@@ -217,7 +217,7 @@ try:
     myInternet.connect(WIRE)
     myReader = morse.Reader(callback=readerCallback)
     mySender = morse.Sender(WPM)
-    myKOB = kob.KOB(portToUse=None, audio=False)
+    myKOB = kob.KOB(portToUse=None, useAudio=False)
     myReader.setWPM(WPM)
     code = []
     bracket = False

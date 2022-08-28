@@ -62,7 +62,7 @@ Time 1.3  2019-02-13
 def send(code):
     if wire and time.time() < myInternet.tLastListener + TIMEOUT:
         myInternet.write(code)
-    myKOB.sounder(code)
+    myKOB.soundCode(code)
 
 try:
     import sys
@@ -89,7 +89,7 @@ try:
     else:
         wire = None
 
-    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=SOUND)
+    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
 
     if wire:
         myInternet = internet.Internet(idText)

@@ -55,11 +55,12 @@ def keyboard_send():
             kw.txtKeyboard.tag_add('highlight', 'mark')
             c = kw.txtKeyboard.get('mark')
             if c == '~':
-                kw.varCircuitCloser.set(0)
-            code = km.Sender.encode(c)
-            km.from_keyboard(code)
-            if c == '+':
-                kw.varCircuitCloser.set(1)
+                ka.trigger_circuit_open()
+            elif c == '+':
+                ka.trigger_circuit_close()
+            else:
+                code = km.Sender.encode(c)
+                km.from_keyboard(code)
             kw.txtKeyboard.tag_remove('highlight', 'mark')
             kw.txtKeyboard.mark_set('mark', 'mark+1c')
         else:

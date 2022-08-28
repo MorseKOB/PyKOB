@@ -70,7 +70,7 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
     
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, audio=SOUND)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
 if WIRE:
     myInternet = internet.Internet(IDTEXT)
     myInternet.connect(WIRE)
@@ -88,7 +88,7 @@ try:
                 time.sleep(dt)
                 for c in s:
                     code = mySender.encode(c)
-                    myKOB.sounder(code)  # to pace the code sent to the wire
+                    myKOB.soundCode(code)  # to pace the code sent to the wire
                     if WIRE:
                         myInternet.write(code)
                     print(c, end='', flush=True)  # display each character

@@ -108,7 +108,7 @@ try:
 
     myInternet = internet.Internet(office_id)
     myReader = morse.Reader(callback=readerCallback)
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, audio=sound)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
 
     myInternet.connect(wire)
     outFile = codecs.open( "log.txt", "w", "utf-8" )
@@ -116,7 +116,7 @@ try:
     while True:
         code = myInternet.read()
         myReader.decode(code)
-        myKOB.sounder(code)
+        myKOB.soundCode(code)
 except KeyboardInterrupt:
     print()
     print()

@@ -139,6 +139,24 @@ def doConnect():
 #### Trigger event messages ###
 ####
 
+def trigger_circuit_close():
+    """
+    Generate an event to indicate that the circuit has closed.
+    """
+    kw.root.event_generate(kobevents.EVENT_CIRCUIT_CLOSE, when='tail')
+
+def trigger_circuit_open():
+    """
+    Generate an event to indicate that the circuit has opened.
+    """
+    kw.root.event_generate(kobevents.EVENT_CIRCUIT_OPEN, when='tail')
+
+def trigger_emit_code(code: list):
+    """
+    Generate an event to emit the code sequence.
+    """
+    kw.root.event_generate(kobevents.EVENT_EMIT_CODE, when='tail', data=code)
+
 def trigger_player_wire_change(id: int):
     """
     Generate an event to indicate that the wire number 
@@ -180,6 +198,28 @@ def trigger_update_station_active(id: str):
 ####
 #### Event (message) handlers
 ####
+
+def handle_circuit_close(event):
+    """
+    Close the circuit and trigger associated local functions (checkbox, etc.)
+    """
+    km.from_circuit_closer(True)
+
+def handle_circuit_open(event):
+    """
+    Open the circuit and trigger associated local functions (checkbox, sender, etc.)
+    """
+    km.from_circuit_closer(False)
+
+def handle_emit_code(event_data):
+    """
+    Emit a code sequence.
+    
+    event_data is the code sequence list as a string (ex: '(-17290 89)')
+    It is converted to a list of integer values to emit.
+    """
+    code = tuple(map(int, event_data.strip(')(').split(', ')))
+    km.__emit_code(code)
 
 def handle_escape(event):
     """

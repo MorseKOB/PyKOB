@@ -36,7 +36,7 @@ try:
     import pyaudio
     ok = True
 except:
-    log.log('PyAudio not installed.')
+    log.log("PyAudio can't be loaded.")
     ok = False
 
 BUFFERSIZE = 16
