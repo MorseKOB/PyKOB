@@ -43,6 +43,7 @@ import time
 from pykob import config, kob, morse, log
 from distutils.util import strtobool
 
+__description = "Sample to test/demonstrate some of the Morse PyKOB functionality and your external sounder, if connected."
 __short_QBF = "The quick brown fox"
 __full_QBF = "The quick brown fox jumps over the lazy dog"
 __disneyland_dedication = "To all who come to this happy place;  welcome. \
@@ -56,7 +57,7 @@ __full = False
 __DLW = False
 
 try:
-    arg_parser = argparse.ArgumentParser(description="Sample of the PyKOB functionality with a short Morse code text and options for longer texts.", \
+    arg_parser = argparse.ArgumentParser(description=__description, \
         parents=\
         [\
         config.serial_port_override, \
@@ -68,12 +69,12 @@ try:
         config.spacing_override, \
         config.min_char_speed_override, \
         config.text_speed_override])
-    arg_parser.add_argument("-f", "--full", action='store_true', default=False, \
+    arg_parser.add_argument("-F", "--full", action='store_true', default=False, \
     help="Play the full 'Quick Brown Fox...'", dest="full")
-    arg_parser.add_argument("-d", "--di", action='store_true', default=False, \
-    help="Play the Disneyland inauguration speech (as heard at the Frontierland Station)", dest="dd")
+    arg_parser.add_argument("-D", "--disneyland", action='store_true', default=False, \
+    help="Play the Disneyland inauguration speech (as heard at the Frontierland Train Station)", dest="disneyland")
     arg_parser.add_argument("-R", "--repeat", action='store_true', default=False, \
-    help="Repeat playing the text/code", dest="repeat")
+    help="Repeat playing the text/code until ^C is pressed", dest="repeat")
 
     args = arg_parser.parse_args()
 
@@ -89,11 +90,15 @@ try:
     myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
     mySender = morse.Sender(text_speed)
 
-    # send HI at 20 wpm as an example
-    print("HI")
+    # Print some info in case people don't use the help
+    print(__description)
+    print("use '-h' or '--help' to see all of the available options.")
+    if not (args.full or args.disneyland):
+         print("Try '-F'|'--full' or '-D'|'--disneyland' for more content.")
+    print("")
 
     code = (-1000, +2, -1000, +60, -60, +60, -60, +60, -60, +60,
-            -180, +60, -60, +60, -1000, +1)
+            -180, +60, -60, +60, -1000, +1) # HI at 20 wpm
 
     first_time = True
     while first_time or repeat:
@@ -102,17 +107,17 @@ try:
 
         # then send the text
         __text = __full_QBF if args.full else __short_QBF
-        if args.dd:
+        if args.disneyland:
             __text = __disneyland_dedication
             print("From Disneyland Frontierland...")
         print(__text)
-        myKOB.sounder(mySender.encode('~')) # Open the circuit
+        myKOB.soundCode(mySender.encode('~')) # Open the circuit
         time.sleep(0.350)
         for c in __text:
             code = mySender.encode(c, True)
-            myKOB.sounder(code)
+            myKOB.soundCode(code)
         time.sleep(0.350)
-        myKOB.sounder(mySender.encode('+')) # Close the circuit
+        myKOB.soundCode(mySender.encode('+')) # Close the circuit
         print()
         if repeat:
             print("Repeating in 3 seconds. Press ^C to exit...")

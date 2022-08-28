@@ -218,8 +218,7 @@ def handle_emit_code(event_data):
     event_data is the code sequence list as a string (ex: '(-17290 89)')
     It is converted to a list of integer values to emit.
     """
-    code_sl = event_data.strip(')(').split(', ')
-    code = list(map(int, code_sl))
+    code = tuple(map(int, event_data.strip(')(').split(', ')))
     km.__emit_code(code)
 
 def handle_escape(event):
