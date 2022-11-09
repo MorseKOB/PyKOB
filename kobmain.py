@@ -64,23 +64,24 @@ def __set_local_loop_active(state):
     local_loop_active = state
     log.debug("local_loop_active:{}".format(state))
 
-def __emit_code(code):
+def __emit_code(code, code_source):
     """
     Emit local code. That involves:
     1. Record code if recording is enabled
     2. Send code to the wire if connected
 
-    This is used indirectly from the key or the keyboard threads to emit code once they 
+    This is used indirectly from the key or the keyboard threads to emit code once they
     determine it should be emitted.
 
-    It should be called by an event handler in response to a 'EVENT_EMIT_CODE'.
+    It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' or
+    'EVENT_EMIT_KB_CODE' message.
     """
     global connected
     update_sender(config.station)
     Reader.decode(code)
-    Recorder.record(code, kob.CodeSource.local) # ZZZ ToDo: option to enable/disable recording
+    Recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
     if config.local:
-        KOB.soundCode(code)
+        KOB.soundCode(code, code_source)
     if connected and config.remote:
         Internet.write(code)
 
@@ -103,7 +104,7 @@ def from_key(code):
             ka.trigger_circuit_open()
             return
     if not internet_station_active and local_loop_active:
-        ka.trigger_emit_code(code)
+        ka.trigger_emit_key_code(code)
 
 def from_keyboard(code):
     """
@@ -114,13 +115,13 @@ def from_keyboard(code):
     """
     global internet_station_active, local_loop_active
     if not internet_station_active and local_loop_active:
-        ka.trigger_emit_code(code)
+        ka.trigger_emit_kb_code(code)
 
 def from_internet(code):
     """handle inputs received from the internet"""
     global local_loop_active, internet_station_active
     if connected:
-        KOB.soundCode(code)
+        KOB.soundCode(code, kob.CodeSource.wire)
         Reader.decode(code)
         Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
@@ -134,14 +135,14 @@ def from_recorder(code, source=None):
     """
     if connected:
         disconnect()
-    KOB.soundCode(code)
+    KOB.soundCode(code, kob.CodeSource.player)
     Reader.decode(code)
 
-def from_circuit_closer(state):
+def circuit_closer_closed(state):
     """
     Handle change of Circuit Closer state.
     This must be called from the GUI thread handling the Circuit-Closer checkbox, 
-    the ESC keyboard shortcut, or by posting a message.
+    the ESC keyboard shortcut, or by posting a message (from the Key handler).
 
     A state of:
      True: 'latch'
@@ -152,8 +153,8 @@ def from_circuit_closer(state):
     code = latch_code if state == 1 else unlatch_code
     if not internet_station_active:
         if config.local:
-            ka.handle_sender_update(config.station) # Okay to call 'handle_' as this is run on the main thread
-            KOB.soundCode(code)
+            ka.handle_sender_update(config.station) # Okay to call 'handle_...' as this is run on the main thread
+            KOB.soundCode(code, kob.CodeSource.key)
             Reader.decode(code)
         Recorder.record(code, kob.CodeSource.local)
     if connected and config.remote:

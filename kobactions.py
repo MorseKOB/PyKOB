@@ -111,7 +111,7 @@ def doOfficeID(event):
     km.Internet.set_officeID(new_officeID)
 
 def doCircuitCloser():
-    km.from_circuit_closer(kw.varCircuitCloser.get() == 1)
+    km.circuit_closer_closed(kw.varCircuitCloser.get() == 1)
 
 def doWPM(event=None):
     new_wpm = kw.get_WPM()
@@ -151,11 +151,17 @@ def trigger_circuit_open():
     """
     kw.root.event_generate(kobevents.EVENT_CIRCUIT_OPEN, when='tail')
 
-def trigger_emit_code(code: list):
+def trigger_emit_key_code(code: list):
     """
-    Generate an event to emit the code sequence.
+    Generate an event to emit the code sequence originating from the key.
     """
-    kw.root.event_generate(kobevents.EVENT_EMIT_CODE, when='tail', data=code)
+    kw.root.event_generate(kobevents.EVENT_EMIT_KEY_CODE, when='tail', data=code)
+
+def trigger_emit_kb_code(code: list):
+    """
+    Generate an event to emit the code sequence originating from the keyboard.
+    """
+    kw.root.event_generate(kobevents.EVENT_EMIT_KB_CODE, when='tail', data=code)
 
 def trigger_player_wire_change(id: int):
     """
@@ -203,15 +209,27 @@ def handle_circuit_close(event):
     """
     Close the circuit and trigger associated local functions (checkbox, etc.)
     """
-    km.from_circuit_closer(True)
+    km.circuit_closer_closed(True)
 
 def handle_circuit_open(event):
     """
     Open the circuit and trigger associated local functions (checkbox, sender, etc.)
     """
-    km.from_circuit_closer(False)
+    km.circuit_closer_closed(False)
 
-def handle_emit_code(event_data):
+def handle_emit_key_code(event_data):
+    """
+    Emit code originating from the key
+    """
+    handle_emit_code(event_data, kob.CodeSource.key)
+
+def handle_emit_kb_code(event_data):
+    """
+    Emit code originating from the keyboard
+    """
+    handle_emit_code(event_data, kob.CodeSource.keyboard)
+
+def handle_emit_code(event_data, code_source):
     """
     Emit a code sequence.
     
@@ -219,7 +237,7 @@ def handle_emit_code(event_data):
     It is converted to a list of integer values to emit.
     """
     code = tuple(map(int, event_data.strip(')(').split(', ')))
-    km.__emit_code(code)
+    km.__emit_code(code, code_source)
 
 def handle_escape(event):
     """
