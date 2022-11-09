@@ -53,6 +53,8 @@ class CodeSource(IntEnum):
     local = 1
     wire = 2
     player = 3
+    key = 4
+    keyboard = 5
 
 class KOB:
     def __init__(
@@ -103,7 +105,6 @@ class KOB:
                 self.gpo = LED(26)  # GPIO26 used to drive sounder.
                 self.keyCallback = keyCallback
                 self.useGpioOut = True
-                self.energizeLoop(True) # Energize the loop to test for closer
                 self.useGpioIn = True
                 self.keyHasCloser = self.keyIsClosed # If True (circuit closed) when we start, assume key has a closer
                 print("The GPIO interface is available/active and will be used.")
@@ -117,7 +118,6 @@ class KOB:
                 self.port.dtr = True
                 self.keyCallback = keyCallback
                 self.useSerialOut = True
-                self.energizeLoop(True) # Energize the loop to test for closer
                 self.useSerialIn = True
                 self.keyHasCloser = self.keyIsClosed # If True (circuit closed) when we start, assume key has a closer
                 self.useSerial = True
@@ -127,9 +127,14 @@ class KOB:
                 self.useSerialOut = False
                 log.info("Interface for key and/or sounder on serial port '{}' not available. Key and sounder will not function.".format(portToUse))
         self.tLastSdr = time.time()  # time of last sounder transition
-        time.sleep(0.5)  # ZZZ Why is this here?
+        time.sleep(0.5)
         self.tLastKey = time.time()  # time of last key transition
-        self.cktClose = self.keyIsClosed  # True: circuit latched closed
+        self.circuitClosed = self.keyIsClosed  # True: circuit latched closed
+        self.energizeSounder(self.circuitClosed, False)
+        #
+        # If configured for a loop interface and no sounder output, de-energize the loop
+        if config.interface_type == config.InterfaceType.loop and not config.sounder:
+            self.energizeLoop(False)
         self.__recorder = None
         if self.keyCallback:
             keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
@@ -195,7 +200,7 @@ class KOB:
     def energizeLoop(self, energize: bool):
         '''
         Energize the loop if this is a loop interface. This is done to allow the 
-        key and key-closer to be read.
+        sounder to follow the key for local feedback.
         '''
         if self.useGpioOut:
             try:
@@ -228,14 +233,15 @@ class KOB:
                 log.err("System audio error playing loop state")
         self.loopIsEnergized = energize
 
-    def energizeSounder(self, energize: bool):
+    def energizeSounder(self, energize: bool, fromKey: bool):
         '''
         Set the state of the sounder.
         True: Energized/Click
         False: De-Energized/Clack
         '''
-        if config.sounder and not self.loopIsEnergized:
-            # If the loop is energized, it shouldn't be affected by a call to this.
+        if config.sounder and not (config.interface_type == config.InterfaceType.loop and fromKey):
+            # If using a loop interface and the source is the key, 
+            # don't do anything, as the closing of the key will sound the energize the sounder.
             if self.useGpioOut:
                 try:
                     if energize:
@@ -282,19 +288,19 @@ class KOB:
                 time.sleep(DEBOUNCE)
                 if kc:
                     code += (-dt,)
-                elif self.cktClose:
+                elif self.circuitClosed:
                     code += (-dt, +2)  # unlatch closed circuit
-                    self.cktClose = False
+                    self.circuitClosed = False
                     return code
                 else:
                     code += (dt,)
             if not kc and code and \
                     t > self.tLastKey + CODESPACE:
                 return code
-            if kc and not self.cktClose and \
+            if kc and not self.circuitClosed and \
                     t > self.tLastKey + CKTCLOSE:
                 code += (+1,)  # latch circuit closed
-                self.cktClose = True
+                self.circuitClosed = True
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
@@ -313,9 +319,8 @@ class KOB:
             t = time.time()
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
-##                self.tLastSdr = t + 1.0
             if c == 1 or c > 2:  # start of mark
-                self.energizeSounder(True)
+                self.energizeSounder(True, code_source == CodeSource.key)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
@@ -324,13 +329,21 @@ class KOB:
                 self.tLastSdr = tNext
                 time.sleep(dt)
             if c > 1:  # end of (nonlatching) mark
-                self.energizeSounder(False)
+                self.energizeSounder(False, code_source == CodeSource.key)
 
     def keyCloserOpen(self, open):
         '''
         Track the physical key closer. This controlles the Loop/KOB sounder state.
         '''
         self.__keyCloserIsOpen = open
+        #
+        # If this is a loop interface and the closer is now open (meaning that they are 
+        # intending to send code), end if the sounder is enabled (in the configuration), 
+        # energize the loop so the sounder will follow the key. Likewise, if it's closed, 
+        # de-energize the loop.
+        #
+        if config.interface_type == config.InterfaceType.loop and config.sounder:
+            self.energizeLoop(open)
 
 ##if sys.platform == 'win32':  ### ZZZ This should be executed when the program is closed.
 ##    windll.winmm.timeEndPeriod(1)  # Restore default clock resolution. (Windows only)
