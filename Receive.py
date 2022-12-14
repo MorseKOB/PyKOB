@@ -32,9 +32,6 @@ To maintain backward compatibility it also allows a positional command
 line parameter:
     1. KOB wire no.
 
-Code speed (WPM) should be specified by running the
-'configure.sh' script or executing 'python3 Configure.py'.
-
 Example:
     python Receive.py 110
 """
@@ -91,6 +88,9 @@ try:
     useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
 
     office_id = args.station # the Station/Office ID string to attach with
+    code_type = args.code_type
+    spacing = args.spacing
+    min_char_speed = args.min_char_speed
     text_speed = args.text_speed  # text speed (words per minute)
     if (text_speed < 1) or(text_speed > 50):
         print("text_speed specified must be between 1 and 50")
@@ -98,7 +98,6 @@ try:
     sound = strtobool(args.sound)
     sounder = strtobool(args.sounder)
     wire = args.wire # wire to connect to
-    wpm = args.text_speed  # code speed (words per minute)
 
     print('Python ' + sys.version + ' on ' + sys.platform)
     print('MorseKOB ' + VERSION)
@@ -107,7 +106,7 @@ try:
     print('Connecting as Station/Office: ' + office_id)
 
     myInternet = internet.Internet(office_id)
-    myReader = morse.Reader(callback=readerCallback)
+    myReader = morse.Reader(wpm=text_speed, code_type=code_type, callback=readerCallback)
     myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
 
     myInternet.connect(wire)
