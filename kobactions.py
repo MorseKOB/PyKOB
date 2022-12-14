@@ -118,7 +118,7 @@ def doWPM(event=None):
     config.set_text_speed(new_wpm)
     config.save_config()
     km.Sender = morse.Sender(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, spacing=config.spacing)
-    km.Reader = morse.Reader(wpm=int(new_wpm), codeType=config.code_type, callback=km.readerCallback)
+    km.Reader = morse.Reader(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, callback=km.readerCallback)
 
 def doWireNo(event=None):
     wire = kw.get_wireNo()
@@ -236,8 +236,10 @@ def handle_emit_code(event_data, code_source):
     event_data is the code sequence list as a string (ex: '(-17290 89)')
     It is converted to a list of integer values to emit.
     """
-    code = tuple(map(int, event_data.strip(')(').split(', ')))
-    km.__emit_code(code, code_source)
+    data = event_data.strip(')(')
+    if (data and (not data.isspace())):
+        code = tuple(map(int, data.split(', ')))
+        km.__emit_code(code, code_source)
 
 def handle_escape(event):
     """

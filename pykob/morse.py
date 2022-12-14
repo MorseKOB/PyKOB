@@ -164,27 +164,31 @@ class Reader:
     `__init__` definition below).
     """
     
-    def __init__(self, wpm=20, codeType=config.CodeType.american, callback=None):
-        self.codeType  = codeType    # American or International
-        self.wpm       = wpm         # current code speed estimate
-        self.dotLen    = int(1200. / wpm)  # nominal dot length (ms)
-        self.truDot    = self.dotLen # actual length of typical dot (ms)
-        self.codeBuf   = ['', '']    # code elements for two characters
-        self.spaceBuf  = [0, 0]      # space before each character
-        self.markBuf   = [0, 0]      # length of last dot or dash in character
-        self.nChars    = 0           # number of complete characters in buffer
-        self.callback  = callback    # function to call when character decoded
-        self.flusher   = None        # holds Timer (thread) to call flush if no code received
-        self.latched   = False       # True if cicuit has been latched closed by a +1 code element
-        self.mark      = 0           # accumulates the length of a mark as positive code elements are received
-        self.space     = 1           # accumulates the length of a space as negative code elements are received
+    def __init__(self, wpm=20, cwpm=0, codeType=config.CodeType.american, callback=None):
+        self.codeType  = codeType     # American or International
+        self.wpm       = max(wpm, cwpm)  # configured code speed
+        self.dotLen    = int(1200.0 / self.wpm)  # nominal dot length (ms)
+        self.truDot    = self.dotLen  # actual length of typical dot (ms)
+        self.codeBuf   = ['', '']     # code elements for two characters
+        self.spaceBuf  = [0, 0]       # space before each character
+        self.markBuf   = [0, 0]       # length of last dot or dash in character
+        self.nChars    = 0            # number of complete characters in buffer
+        self.callback  = callback     # function to call when character decoded
+        self.flusher   = None         # holds Timer (thread) to call flush if no code received
+        self.latched   = False        # True if cicuit has been latched closed by a +1 code element
+        self.mark      = 0            # accumulates the length of a mark as positive code elements are received
+        self.space     = 1            # accumulates the length of a space as negative code elements are received
+        # Detected code speed values. Start with the configured speed and calculated values
+        self.d_wpm = self.wpm
+        self.d_dotLen = self.dotLen
+        self.d_truDot = self.truDot
 
     def decode(self, codeSeq):
         # Code received - cancel an existing 'flusher'
         if self.flusher:
             self.flusher.cancel()
             self.flusher = None
-##        self.updateWPM(codeSeq)  ### ZZZ temporarily disable code speed recognition
+        self.updateDWPM(codeSeq)  # Update the 'detected' WPM
         nextSpace = 0  # space before next dot or dash
         i = 0
         for i in range(0, len(codeSeq)):
@@ -232,17 +236,17 @@ class Reader:
         self.dotLen = int(1200. / wpm)
         self.truDot = self.dotLen
 
-    def updateWPM(self, codeSeq):
+    def updateDWPM(self, codeSeq):
         for i in range(1, len(codeSeq) - 2, 2):
-            minDotLen = int(0.5 * self.dotLen)
-            maxDotLen = int(1.5 * self.dotLen)
+            minDotLen = int(0.5 * self.d_dotLen)
+            maxDotLen = int(1.5 * self.d_dotLen)
             if codeSeq[i] > minDotLen and codeSeq[i] < maxDotLen and \
                     codeSeq[i] - codeSeq[i+1] < 2 * maxDotLen and \
                     codeSeq[i+2] < maxDotLen:
                 dotLen = (codeSeq[i] - codeSeq[i+1]) / 2
-                self.truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self.truDot)
-                self.dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self.dotLen)
-                self.wpm = 1200. / self.dotLen
+                self.d_truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self.d_truDot)
+                self.d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self.d_dotLen)
+                self.d_wpm = 1200. / self.d_dotLen
 
     def flush(self):
         if self.flusher:
