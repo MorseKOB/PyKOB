@@ -81,14 +81,13 @@ I hope to hear (from many of you) that you were successful.
 
 BTW: You can see other things that might be of interest if you go up one level on GitHub: https://github.com/MorseKOB
 
--ES
 
 # License
 The following license information apply to the contents of this application,
 modules, libraries and to libraries and modules used by this application.
 
 ## MIT License
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-2023 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
