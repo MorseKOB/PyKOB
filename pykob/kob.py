@@ -28,9 +28,9 @@ kob module
 Handles external key and/or sounder and the virtual sounder (computer audio).
 
 The interface type controls certain aspects of how the physical sounder is driven.
-If the interface type is LOOP then the sounder (loop) is energized when the key-closer is 
-open. This is required to allow the key and closer to be read. In that case 
-calls to drive (energize/de-energize) the (general) sounder do not change the state of the 
+If the interface type is LOOP then the sounder (loop) is energized when the key-closer is
+open. This is required to allow the key and closer to be read. In that case
+calls to drive (energize/de-energize) the (general) sounder do not change the state of the
 physical sounder (loop), only the virtual/synthesized sounder.
 """
 
@@ -77,7 +77,8 @@ class KOB:
             except:
                 log.err("Module pySerial is not available. Serial interface cannot be used.")
 
-        self.t0 = -1.0  ### ZZZ Keep track of when the playback started
+        self.tCodeSounded = -1.0  # Keep track of when the code was first sounded
+        self.tSndrEnergized = time.time() # Time the sounder was last energized
         self.useGpioIn = False # Set to True if we establish GPIO input (Key state read)
         self.useGpioOut = False # Set to True if we establish GPIO output (Sounder drive)
         self.useSerialIn = False # Set to True if we establish Serial input (Key state read)
@@ -95,9 +96,9 @@ class KOB:
         #  GPIO takes priority if it is requested and available.
         #  Then, serial is used if Port is set and PySerial is available.
         #
-        # The reason for some repeated code in these two sections is to perform the Key read 
-        # and Sounder set within the section so the error can be reported with an appropriate 
-        # message and the interface availability can be set knowing that both operations 
+        # The reason for some repeated code in these two sections is to perform the Key read
+        # and Sounder set within the section so the error can be reported with an appropriate
+        # message and the interface availability can be set knowing that both operations
         # have been performed.
         if useGpio and gpioModuleAvailable:
             try:
@@ -130,21 +131,23 @@ class KOB:
         time.sleep(0.5)
         self.tLastKey = time.time()  # time of last key transition
         self.circuitClosed = self.keyIsClosed  # True: circuit latched closed
-        self.energizeSounder(self.circuitClosed, False)
+        self.energizeLoop(self.circuitClosed, False)
         #
         # If configured for a loop interface and no sounder output, de-energize the loop
         if config.interface_type == config.InterfaceType.loop and not config.sounder:
-            self.energizeLoop(False)
+            self.energizeLoop(False, False)
         self.__recorder = None
         if self.keyCallback:
             keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
             keyreadThread.start()
+        powersaveThread = threading.Thread(name='KOB-PowerSave', daemon=True, target=self.callbackPowerSave)
+        powersaveThread.start()
 
     @property
     def recorder(self):
         """ Recorder instance or None """
         return self.__recorder
-    
+
     @recorder.setter
     def recorder(self, recorder):
         """ Recorder instance or None """
@@ -166,6 +169,18 @@ class KOB:
                 elif code[-1] == 2: # special code for closer/circuit open
                     self.keyCloserOpen(True)
             self.keyCallback(code)
+
+    def callbackPowerSave(self):
+        """
+        Called by the PowerSave thread 'run' to control the power save (sounder energize)
+        """
+        while True:
+            now = time.time()
+            power_save_seconds = config.sounder_power_save
+            if power_save_seconds > 0:
+                if (now - self.tSndrEnergized) > power_save_seconds:
+                    self.powerSave(True)
+            time.sleep(1.0)
 
     @property
     def keyIsClosed(self) -> bool:
@@ -197,55 +212,23 @@ class KOB:
             kc = not kc
         return kc
 
-    def energizeLoop(self, energize: bool):
-        '''
-        Energize the loop if this is a loop interface. This is done to allow the 
-        sounder to follow the key for local feedback.
-        '''
-        if self.useGpioOut:
-            try:
-                if energize:
-                    self.gpo.on() # Pin goes high and energizes sounder
-                else:
-                    self.gpo.off() # Pin goes low and deenergizes sounder
-            except(OSError):
-                log.err("GPIO output error setting loop state")
-        if self.useSerialOut:
-            try:
-                if energize:
-                    self.port.rts = True
-                else:
-                    self.port.rts = False
-            except(OSError):
-                log.err("Serial RTS error setting loop state")
-        if config.sound and self.audio:
-            '''
-            Simulate the loop being energized/de-energized if sound is enabled.
-            '''
-            try:
-                if energize:
-                    self.synthSounderEnergized = True
-                    audio.play(1) # click
-                else:
-                    self.synthSounderEnergized = False
-                    audio.play(0) # clack
-            except:
-                log.err("System audio error playing loop state")
-        self.loopIsEnergized = energize
 
-    def energizeSounder(self, energize: bool, fromKey: bool):
+    def energizeLoop(self, energize: bool, fromKey: bool):
         '''
         Set the state of the sounder.
         True: Energized/Click
         False: De-Energized/Clack
         '''
+        self.loopIsEnergized = energize
+        now = time.time()
         if config.sounder and not (config.interface_type == config.InterfaceType.loop and fromKey):
-            # If using a loop interface and the source is the key, 
-            # don't do anything, as the closing of the key will sound the energize the sounder.
+            # If using a loop interface and the source is the key,
+            # don't do anything, as the closing of the key will sound the energized the sounder.
             if self.useGpioOut:
                 try:
                     if energize:
                         self.gpo.on() # Pin goes high and energizes sounder
+                        self.tSndrEnergized = now
                     else:
                         self.gpo.off() # Pin goes low and deenergizes sounder
                 except(OSError):
@@ -254,6 +237,7 @@ class KOB:
                 try:
                     if energize:
                         self.port.rts = True
+                        self.tSndrEnergized = now
                     else:
                         self.port.rts = False
                 except(OSError):
@@ -269,7 +253,7 @@ class KOB:
                         audio.play(0) # clack
                 except:
                     log.err("System audio error playing sounder state")
-        
+
     def key(self):
         '''
         Process input from the key.
@@ -311,8 +295,9 @@ class KOB:
         '''
         Process the code and sound it.
         '''
-        if self.t0 < 0:  ### ZZZ capture start time
-            self.t0 = time.time()  ### ZZZ
+        self.powerSave(False)
+        if self.tCodeSounded < 0:  # capture start time
+            self.tCodeSounded = time.time()
         if self.__recorder and not code_source == CodeSource.player:
             self.__recorder.record(code_source, code)
         for c in code:
@@ -320,7 +305,7 @@ class KOB:
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
             if c == 1 or c > 2:  # start of mark
-                self.energizeSounder(True, code_source == CodeSource.key)
+                self.energizeLoop(True, code_source == CodeSource.key)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
@@ -329,7 +314,7 @@ class KOB:
                 self.tLastSdr = tNext
                 time.sleep(dt)
             if c > 1:  # end of (nonlatching) mark
-                self.energizeSounder(False, code_source == CodeSource.key)
+                self.energizeLoop(False, code_source == CodeSource.key)
 
     def keyCloserOpen(self, open):
         '''
@@ -337,13 +322,40 @@ class KOB:
         '''
         self.__keyCloserIsOpen = open
         #
-        # If this is a loop interface and the closer is now open (meaning that they are 
-        # intending to send code), end if the sounder is enabled (in the configuration), 
-        # energize the loop so the sounder will follow the key. Likewise, if it's closed, 
+        # If this is a loop interface and the closer is now open (meaning that they are
+        # intending to send code), and if the sounder is enabled (in the configuration),
+        # energize the loop so the sounder will follow the key. Likewise, if it's closed,
         # de-energize the loop.
         #
         if config.interface_type == config.InterfaceType.loop and config.sounder:
             self.energizeLoop(open)
+
+    def powerSave(self, enable: bool):
+        '''
+        Turn off the loop power to save power (reduce risk of fire, etc.)
+        '''
+        now = time.time()
+        if self.useGpioOut:
+            try:
+                if enable:
+                    self.gpo.off() # Pin goes low and deenergizes sounder
+                else:
+                    if self.loopIsEnergized:
+                        self.gpo.on() # Pin goes high and energizes sounder
+                        self.tSndrEnergized = now
+
+            except(OSError):
+                log.err("GPIO output error setting sounder state")
+        if self.useSerialOut:
+            try:
+                if enable:
+                    self.port.rts = False
+                else:
+                    if self.loopIsEnergized:
+                        self.port.rts = True
+                        self.tSndrEnergized = now
+            except(OSError):
+                log.err("Serial RTS error setting sounder state")
 
 ##if sys.platform == 'win32':  ### ZZZ This should be executed when the program is closed.
 ##    windll.winmm.timeEndPeriod(1)  # Restore default clock resolution. (Windows only)

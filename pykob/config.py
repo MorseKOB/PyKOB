@@ -453,10 +453,6 @@ def set_sounder_power_save(s):
     To save power, reduce fire risk, etc. the sounder drive circuit will be de-energized after
     this many seconds of idle time. Setting this to zero (0) will disable the power save functionality.
 
-    This is the minimum character speed. If the text speed is
-    higher, then the character speed will be bumped up to
-    the text speed.
-
     Parameters
     ----------
     s : str

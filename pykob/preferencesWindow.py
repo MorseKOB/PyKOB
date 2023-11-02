@@ -156,13 +156,6 @@ class PreferencesWindow:
             if config.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
                 self._equipmentType.set(equipmentRadioButton + 1)
 
-        # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
-        self._invertKeyInput = tk.IntVar(value=config.invert_key_input)
-        ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
-                        variable=self._invertKeyInput).grid(row=4,
-                                                           column=5,
-                                                           padx=12, sticky=tk.W)
-        
         # Add a checkbox for the 'Use system sound' option
         self._useSystemSound = tk.IntVar(value=config.sound)
         ttk.Checkbutton(basiclocalInterface,
@@ -176,6 +169,16 @@ class PreferencesWindow:
                         text="Use local sounder",
                         variable=self._useLocalSounder).grid(column=0, columnspan=6,
                                                             sticky=tk.W)
+
+        # Add a number field for the 'Sounder Power Save' time
+        self._sounderPowerSave = tk.IntVar(value=config.sounder_power_save)
+        ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=20, sticky=tk.W)
+        ttk.Entry(advancedlocalInterface, width=12, textvariable=self._sounderPowerSave).grid(row=6, column=2, sticky=tk.W)
+
+        # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
+        self._invertKeyInput = tk.IntVar(value=config.invert_key_input)
+        ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
+                        variable=self._invertKeyInput).grid(row=7, column=0, padx=20, sticky=tk.W)
 
         basiclocalInterface.pack(fill=tk.BOTH)
         advancedlocalInterface.pack(fill=tk.BOTH)
@@ -245,7 +248,7 @@ class PreferencesWindow:
         
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
-        ttk.Label(codeOptions, text="Code Speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
+        ttk.Label(codeOptions, text="Code speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
       # print("Setting code speed to", config.text_speed)
         self._codeSpeed = tk.DoubleVar(value=config.text_speed)
         self._codeSpeedControl = \
@@ -391,6 +394,8 @@ class PreferencesWindow:
         config.set_sound(self._useSystemSound.get())
       # print("Use local sounder: ", self._useLocalSounder.get())
         config.set_sounder(self._useLocalSounder.get())
+      # print("Sounder Power Save: ", self._sounderPowerSave.get())
+        config.set_sounder_power_save(self._sounderPowerSave.get())
       # print("Server URL: {}".format(self._serverUrl.get() + ":" + self._portNumber.get()))
         config.set_server_url(self._serverUrl.get() + ":" + self._portNumber.get())
       # print("Transmit to remote stations: ", self._transmitToRemoteStations.get())
