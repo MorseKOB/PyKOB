@@ -91,6 +91,7 @@ __REMOTE_KEY = "REMOTE"
 __SERVER_URL_KEY = "SERVER_URL"
 __SOUND_KEY = "SOUND"
 __SOUNDER_KEY = "SOUNDER"
+__SOUNDER_POWER_SAVE_KEY = "SOUNDER_POWER_SAVE"
 __SPACING_KEY = "SPACING"
 __STATION_KEY = "STATION"
 __TEXT_SPEED_KEY = "TEXT_SPEED"
@@ -446,6 +447,31 @@ def set_sounder(s):
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
+def set_sounder_power_save(s):
+    """Sets the time (in seconds) to delay before de-energizing the sounder to save power
+
+    To save power, reduce fire risk, etc. the sounder drive circuit will be de-energized after
+    this many seconds of idle time. Setting this to zero (0) will disable the power save functionality.
+
+    This is the minimum character speed. If the text speed is
+    higher, then the character speed will be bumped up to
+    the text speed.
+
+    Parameters
+    ----------
+    s : str
+        The number of idle seconds before power-save as an interger string value
+    """
+
+    global sounder_power_save
+    try:
+        _seconds = int(s)
+        sounder_power_save = _seconds if _seconds >= 0 else 0
+        user_config.set(__CONFIG_SECTION, __SOUNDER_POWER_SAVE_KEY, str(sounder_power_save))
+    except ValueError as ex:
+        log.err("Idle time '{}' is not a valid integer value. Not setting SounderPowerSave value.".format(ex.args[0]))
+        raise
+
 def set_spacing(s):
     """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,
     Character `Spacing.char` or Word `Spacing.word`
@@ -569,6 +595,7 @@ def print_config():
     print("KOB Server URL:", url)
     print("Sound:", onOffFromBool(sound))
     print("Sounder:", onOffFromBool(sounder))
+    print("Sounder Power Save (seconds):", sounder_power_save)
     print("Spacing:", spacing.name.upper())
     print("Station: '{}'".format(noneOrValueFromStr(station)))
     print("Wire:", wire)
@@ -619,6 +646,7 @@ def read_config():
     global server_url
     global sound
     global sounder
+    global sounder_power_save
     global spacing
     global station
     global wire
@@ -678,6 +706,7 @@ def read_config():
         __SERVER_URL_KEY:"NONE", \
         __SOUND_KEY:"ON", \
         __SOUNDER_KEY:"OFF", \
+        __SOUNDER_POWER_SAVE_KEY:"60", \
         __SPACING_KEY:"NONE", \
         __STATION_KEY:"", \
         __WIRE_KEY:"", \
@@ -756,6 +785,9 @@ def read_config():
         __option = "Sounder"
         __key = __SOUNDER_KEY
         sounder = user_config.getboolean(__CONFIG_SECTION, __key)
+        __option = "Sounder power save (seconds)"
+        __key = __SOUNDER_POWER_SAVE_KEY
+        sounder_power_save = user_config.getint(__CONFIG_SECTION, __key)
         __option = "Spacing"
         __key = __SPACING_KEY
         _spacing = (user_config.get(__CONFIG_SECTION, __key)).upper()
@@ -849,6 +881,11 @@ sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "O
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
 metavar="sounder", dest="sounder")
+
+sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
+sounder_pwrsv_override.add_argument("-P", "--pwrsv", default=sounder_power_save, type=int, \
+help="The sounder power-save delay in seconds, or '0' to disable.", \
+metavar="seconds", dest="sounder_power_save")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
 spacing_override.add_argument("-s", "--spacing", default=spacing.name.upper(), \

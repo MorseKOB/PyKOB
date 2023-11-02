@@ -36,7 +36,7 @@ try:
     import tkinter as tk
 except ModuleNotFoundError:
     GUI = False
-    
+
 from pykob import config
 from pykob import preferencesWindow
 
@@ -67,13 +67,13 @@ def main(argv):
     # Check for command line parameters...
     #  If none are supplied, print the current configuration
     #  If arguments are given, process them for 'help' or the setting values.
-    #  If values are specified, update the config and save it, then 
+    #  If values are specified, update the config and save it, then
     #  print the configuration.
 
     # System configuration
     port = None
     gpio = None
-    # User preferences
+    # User configuration
     auto_connect = None
     invert_key_input = None
     remote = None
@@ -81,6 +81,7 @@ def main(argv):
     server_url = None
     sound = None
     sounder = None
+    sounder_pwrsv = None
     spacing = None
     station = None
     code_type = None
@@ -105,6 +106,7 @@ def main(argv):
             config.server_url_override, \
             config.sound_override, \
             config.sounder_override, \
+            config.sounder_pwrsv_override, \
             config.spacing_override, \
             config.station_override, \
             config.text_speed_override, \
@@ -153,6 +155,9 @@ def main(argv):
             save_config = True
         if not args.sounder == config.sounder:
             config.set_sounder(args.sounder)
+            save_config = True
+        if not args.sounder_power_save == config.sounder_power_save:
+            config.set_sounder_power_save(args.sounder_power_save)
             save_config = True
         if not args.spacing == config.spacing:
             config.set_spacing(args.spacing)
@@ -218,4 +223,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print()
         sys.exit(0)     # Indicate this was a normal exit
-    
+
