@@ -220,7 +220,8 @@ class KOB:
         False: De-Energized/Clack
         '''
         self.loopIsEnergized = energize
-        now = time.time()
+        if energize:
+            self.tSndrEnergized = time.time()
         if config.sounder and not (config.interface_type == config.InterfaceType.loop and fromKey):
             # If using a loop interface and the source is the key,
             # don't do anything, as the closing of the key will sound the energized the sounder.
@@ -228,7 +229,6 @@ class KOB:
                 try:
                     if energize:
                         self.gpo.on() # Pin goes high and energizes sounder
-                        self.tSndrEnergized = now
                     else:
                         self.gpo.off() # Pin goes low and deenergizes sounder
                 except(OSError):
@@ -237,7 +237,6 @@ class KOB:
                 try:
                     if energize:
                         self.port.rts = True
-                        self.tSndrEnergized = now
                     else:
                         self.port.rts = False
                 except(OSError):
@@ -328,7 +327,7 @@ class KOB:
         # de-energize the loop.
         #
         if config.interface_type == config.InterfaceType.loop and config.sounder:
-            self.energizeLoop(open)
+            self.energizeLoop(open, True)
 
     def powerSave(self, enable: bool):
         '''
