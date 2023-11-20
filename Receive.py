@@ -81,14 +81,14 @@ try:
         config.min_char_speed_override, \
         config.text_speed_override])
     arg_parser.add_argument('wire', nargs='?', default=config.wire, type=int,\
-        help='Wire to monitor. If specified, this is used rather than the one configured.')
+        help='Wire to monitor. If specified, this is used rather than the configured wire.')
     args = arg_parser.parse_args()
 
     port = args.serial_port # serial port for KOB interface
     useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
 
     office_id = args.station # the Station/Office ID string to attach with
-    code_type = args.code_type
+    code_type = config.codeTypeFromString(args.code_type)
     spacing = args.spacing
     min_char_speed = args.min_char_speed
     text_speed = args.text_speed  # text speed (words per minute)
@@ -106,7 +106,7 @@ try:
     print('Connecting as Station/Office: ' + office_id)
 
     myInternet = internet.Internet(office_id)
-    myReader = morse.Reader(wpm=text_speed, code_type=code_type, callback=readerCallback)
+    myReader = morse.Reader(wpm=text_speed, codeType=code_type, callback=readerCallback)
     myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
 
     myInternet.connect(wire)

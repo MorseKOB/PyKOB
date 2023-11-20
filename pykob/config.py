@@ -168,6 +168,15 @@ def noneOrValueFromStr(s):
     r = None if not s or not s.strip() or s.upper() == 'NONE' else s
     return r
 
+def codeTypeFromString(s):
+    """Return the CodeType for a string (A:AMERICAN|I:INTERNATIONAL). Raises a ValueError if not valid"""
+    s = s.upper()
+    if s=="A" or s=="AMERICAN":
+        return CodeType.american
+    elif s=="I" or s=="INTERNATIONAL":
+        return CodeType.international
+    raise ValueError(s)
+
 def create_config_files_if_needed():
     global app_config_dir
     global app_config_file_path
