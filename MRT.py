@@ -48,7 +48,6 @@ from distutils.util import strtobool
 import sys
 from time import sleep
 
-THINSPACE = '\u202F'  # narrow (half width) non-breaking space
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
@@ -64,7 +63,7 @@ local_loop_active = False  # True if sending on key or keyboard
 internet_station_active = False  # True if a remote station is sending
 
 sender_current = ""
-last_printed_para = False
+last_received_para = False
 
 def handle_sender_update(sender):
     """
@@ -182,25 +181,27 @@ def from_internet(code):
 
 
 def reader_callback(char, spacing):
-    global last_printed_para
+    global last_received_para
+    if not char == '=':
+        if last_received_para:
+            print()
+        last_received_para = False
+    else:
+        last_received_para = True
     halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
     fullSpace = False
+    if halfSpaces > 0:
+        halfSpaces -=1
     if halfSpaces >= 2:
         fullSpace = True
-        halfSpaces -= 2
+        halfSpaces = (halfSpaces - 1) // 2
     for i in range(halfSpaces):
-        print(THINSPACE, end='')
+        print(' ', end='')
     if fullSpace:
         print(' ', end='')
     print(char, end='', flush=True)
     if char == '_':
         print()
-    elif char == '=':
-        if not last_printed_para:
-            print()
-            last_printed_para = True
-    else:
-        last_printed_para = False
 
 try:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe current configuration is used except as overridden by optional arguments.", \
