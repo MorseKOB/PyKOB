@@ -35,10 +35,10 @@ physical sounder (loop), only the virtual/synthesized sounder.
 """
 
 import sys
-import threading
 import time
 from enum import Enum, IntEnum, unique
 from pykob import audio, config, log
+from threading import Event, Thread
 
 DEBOUNCE  = 0.015  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
@@ -76,7 +76,7 @@ class KOB:
                 serialModuleAvailable = True
             except:
                 log.err("Module pySerial is not available. Serial interface cannot be used.")
-
+        self.threadsStop = Event()
         self.tCodeSounded = -1.0  # Keep track of when the code was first sounded
         self.tSndrEnergized = time.time() # Time the sounder was last energized
         self.useGpioIn = False # Set to True if we establish GPIO input (Key state read)
@@ -137,10 +137,12 @@ class KOB:
         if config.interface_type == config.InterfaceType.loop and not config.sounder:
             self.energizeLoop(False, False)
         self.__recorder = None
+        self.keyreadThread = None
+        self.powersaveThread = None
         if self.keyCallback:
-            keyreadThread = threading.Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
-            keyreadThread.start()
-        powersaveThread = threading.Thread(name='KOB-PowerSave', daemon=True, target=self.callbackPowerSave)
+            self.keyreadThread = Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
+            self.keyreadThread.start()
+        powersaveThread = Thread(name='KOB-PowerSave', daemon=True, target=self.callbackPowerSave)
         powersaveThread.start()
 
     @property
@@ -157,11 +159,17 @@ class KOB:
     def keyCloserIsOpen(self):
         return self.__keyCloserIsOpen
 
+    def exit(self):
+        """
+        Stop the threads and exit.
+        """
+        self.threadsStop.set()
+
     def callbackKeyRead(self):
         """
         Called by the KeyRead thread `run` to read code from the key.
         """
-        while True:
+        while not self.threadsStop.is_set():
             code = self.key()
             if len(code) > 0:
                 if code[-1] == 1: # special code for closer/circuit closed
@@ -174,7 +182,7 @@ class KOB:
         """
         Called by the PowerSave thread 'run' to control the power save (sounder energize)
         """
-        while True:
+        while not self.threadsStop.is_set():
             now = time.time()
             power_save_seconds = config.sounder_power_save
             if power_save_seconds > 0:
@@ -300,6 +308,9 @@ class KOB:
         if self.__recorder and not code_source == CodeSource.player:
             self.__recorder.record(code_source, code)
         for c in code:
+            if self.threadsStop.is_set():
+                self.energizeLoop(True, True)
+                return
             t = time.time()
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
