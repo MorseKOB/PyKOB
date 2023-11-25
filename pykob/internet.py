@@ -30,9 +30,9 @@ Reads/writes code sequences from/to a KOB wire.
 
 import socket
 import struct
-import threading
 import time
 from pykob import VERSION, config, log
+from threading import Event, Thread
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
 PORT_DEFAULT = 7890
@@ -69,14 +69,16 @@ class Internet:
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
         self.tLastListener = 0.0
+        self.threadStop = Event()
         self.disconnect()  # to establish a UDP connection with the server
-        keepAliveThread = threading.Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
-        keepAliveThread.start()
+        self.keepAliveThread = Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
+        self.keepAliveThread.start()
         self.callback = callback
         self.record_callback = record_callback
+        self.internetReadThread = None
         if callback or record_callback:
-            internetReadThread = threading.Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
-            internetReadThread.start()
+            self.internetReadThread = Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
+            self.internetReadThread.start()
         self.ID_callback = None
         self.sender_callback = None
 
@@ -89,11 +91,17 @@ class Internet:
         shortPacket = shortPacketFormat.pack(DIS, 0)
         self.socket.sendto(shortPacket, self.address)
 
+    def exit(self):
+        """
+        Stop the threads and exit.
+        """
+        self.threadStop.set()
+
     def callbackRead(self):
         """
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
-        while True:
+        while not self.threadStop.is_set():
             code = self.read()
             if self.callback:
                 self.callback(code)
@@ -145,7 +153,7 @@ class Internet:
             self.socket.sendto(codePacket, self.address)
 
     def keepAlive(self):
-        while True:
+        while not self.threadStop.is_set():
             self.sendID()
             time.sleep(10.0)  # send another keepalive sequence every ten seconds
 

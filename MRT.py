@@ -64,6 +64,7 @@ internet_station_active = False  # True if a remote station is sending
 
 sender_current = ""
 last_received_para = False
+exit_status = 1
 
 def handle_sender_update(sender):
     """
@@ -243,7 +244,15 @@ try:
     while True:
         sleep(0.1)  # Loop while background threads take care of 'stuff'
 except KeyboardInterrupt:
+    exit_status = 0 # Since the main program is an infinite loop, ^C is a normal way to exit.
+finally:
     print()
     print()
-    sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
-
+    if connected:
+        Internet.disconnect()
+        sleep(0.3)
+    Reader.exit()
+    Internet.exit()
+    KOB.exit()
+    sleep(0.5)
+    sys.exit(exit_status)

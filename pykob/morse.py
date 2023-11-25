@@ -231,6 +231,14 @@ class Reader:
         self.flusher.setName("Reader-Flusher")
         self.flusher.start()
 
+    def exit(self):
+        """
+        Cancel the flusher (if it exists) and exit.
+        """
+        if self.flusher:
+            self.flusher.cancel()
+            self.flusher = None
+            
     def setWPM(self, wpm):
         self.wpm = wpm
         self.dotLen = int(1200. / wpm)
