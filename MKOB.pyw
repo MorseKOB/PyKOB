@@ -32,18 +32,18 @@ Python version of MorseKOB 2.5
 
 import tkinter as tk
 import sys
-import kobwindow
+from mkobwindow import MKOBWindow
 
-VERSION = "4.0.17"
+VERSION = "4.0.18"
 MKOB_VERSION_TEXT = "MorseKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # TODO: fails with Linux
-    kobwindow.KOBWindow(root, MKOB_VERSION_TEXT)
-    
+##    root.iconbitmap("resources/mkob.ico")  # ZZZ: fails with Linux
+    mkobwindow = MKOBWindow(root, MKOB_VERSION_TEXT)
+
     root.mainloop()
 except KeyboardInterrupt:
     print()

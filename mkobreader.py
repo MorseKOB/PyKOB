@@ -27,25 +27,30 @@ kobreader.py
 
 Manage the reader window.
 
-Calls to the 'handle_' methods should be made on the main GUI thread as a result of the GUI handling 
+Calls to the 'handle_' methods should be made on the main GUI thread as a result of the GUI handling
 message events.
 """
 
-import kobevents as ke
-import kobwindow
+class MKOBReader():
+    """
+    The main text window for the MKOB app. This primarily displays the
+    decoded Morse that is received from a wire or keyed locally. It is
+    also used to display various other content.
+    """
 
-kw = None # Must be set from the root window
+    def __init__(self, mkwindow) -> None:
+        self.kw = mkwindow
 
-def handle_append_text(event_data):
-    """
-    Event handler to append text to the window.
-    """
-    text = event_data
-    kw.txtReader.insert('end', text)
-    kw.txtReader.see('end')
+    def handle_append_text(self, event_data):
+        """
+        Event handler to append text to the window.
+        """
+        text = event_data
+        self.kw.reader_win.insert('end', text)
+        self.kw.reader_win.see('end')
 
-def handle_clear(event_data):
-    """
-    Event handler to clear the contents.
-    """
-    kw.txtReader.delete('1.0', 'end')
+    def handle_clear(self, event_data):
+        """
+        Event handler to clear the contents.
+        """
+        self.kw.reader_win.delete('1.0', 'end')
