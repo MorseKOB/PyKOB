@@ -66,7 +66,6 @@ class MKOBKeyTimeWin(tk.Toplevel):
         super().__init__()
         self.config(width=INITIAL_WIDTH, height=INITIAL_HEIHGT)
         self.title("MKOB Key Timing")
-        self.iconbitmap("resources/mkob-icon.ico")
         self._wpm = wpm
         self._codetype = codeType
         #

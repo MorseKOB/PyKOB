@@ -40,8 +40,13 @@ print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
-    root = tk.Tk()
-    root.iconbitmap("MKOB.ico")  # ZZZ: fails with Linux
+    root = tk.Tk(className="MKOB")
+    if ( sys.platform.startswith('win')):
+        root.iconbitmap(default="resources/mkob-icon.ico")  # fails with Linux, must use PhotoImage (below)
+    else:
+        icon = tk.PhotoImage(file="resources/mkob-icon.png")
+        root.iconphoto(True, icon)
+
     mkobwindow = MKOBWindow(root, MKOB_VERSION_TEXT)
 
     root.mainloop()
