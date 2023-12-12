@@ -169,15 +169,18 @@ class MKOBKeyTimeWin(tk.Toplevel):
         if index >= GRAPH_UPPER_BOUND:
             self._txtGraph.delete("0.0", GRAPH_LINES_TO_DEL)
 
-    def _gen_line(self, indicator, val, exp, err, like, fc, fl, tc='', lc='|'):
-        sign = '-' if val < 0 else ' '
+    def _gen_line_graph(self, fc, fl, tc='', lc='|'):
+        # Generate a string of fill characters (fc) that is fill length (fl) long.
+        bar = fc * fl
+        return "{0}{1}{2}".format(lc, bar, tc)
+
+    def _gen_line_text(self, indicator, val, exp, err, like):
+        sign = '\u2191' if val < 0 else '\u2193'
         value = int(abs(val))
         err_sign = '-' if err < 0 else ' '
         error = abs(err)
-        # Generate a string of fill characters (fc) that is fill length (fl) long.
-        bar = fc * fl
-        return "{0}{1:2d} ({2:4d}) {3}{4:4d} {5}{6:6.1%} {7} {8}{9}{10}".format(
-            indicator, self._wpm, exp, sign, value, err_sign, error, like, lc, bar, tc)
+        return "{0}{1:2d} ({2:4d}) {3}{4:4d} {5}{6:6.1%} {7}".format(
+            indicator, self._wpm, exp, sign, value, err_sign, error, like)
 
     def key_closed(self):
         """
@@ -275,5 +278,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
             bar_char = '\u2501' if i < 0 else '\u2587' # line or 7/8 block
             if i_abs >= 10000:
                 i = 9999 * (-1 if i < 0 else 1)
-            s = self._gen_line(indicator, i, expected_len, error, like, bar_char, bar_value, bar_end)
-            self.append(s + '\n',tag)
+            s1 = self._gen_line_text(indicator, i, expected_len, error, like)
+            s2 = self._gen_line_graph(bar_char, bar_value, bar_end)
+            self.append(s1, TAG_NORMAL)
+            self.append(" {}\n".format(s2), tag)
