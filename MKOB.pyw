@@ -34,14 +34,14 @@ import tkinter as tk
 import sys
 from mkobwindow import MKOBWindow
 
-VERSION = "4.0.18"
-MKOB_VERSION_TEXT = "MorseKOB " + VERSION
+VERSION = "4.1.0"
+MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     root = tk.Tk()
-##    root.iconbitmap("resources/mkob.ico")  # ZZZ: fails with Linux
+    root.iconbitmap("MKOB.ico")  # ZZZ: fails with Linux
     mkobwindow = MKOBWindow(root, MKOB_VERSION_TEXT)
 
     root.mainloop()

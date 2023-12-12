@@ -66,6 +66,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
         super().__init__()
         self.config(width=INITIAL_WIDTH, height=INITIAL_HEIHGT)
         self.title("MKOB Key Timing")
+        self.iconbitmap("resources/mkob-icon.ico")
         self._wpm = wpm
         self._codetype = codeType
         #
@@ -86,8 +87,8 @@ class MKOBKeyTimeWin(tk.Toplevel):
         self._txtGraph.tag_config(TAG_NORMAL)
         self._txtGraph.tag_config(TAG_ERROR, foreground="#EE0000") # Medium red
         self._txtGraph.tag_config(TAG_MARK, foreground="#1C86EE")  # Dodger blue
-        self._txtGraph.tag_config(TAG_WARN_P, foreground="#FFA500")  # Dark orange
-        self._txtGraph.tag_config(TAG_WARN_N, foreground="#FFD700")  # Gold-2
+        self._txtGraph.tag_config(TAG_WARN_P, foreground="#CD6600")  # Dark orange 3
+        self._txtGraph.tag_config(TAG_WARN_N, foreground="#EE7600")  # Dark orange 2
         # options
         self._varLocalOn = tk.BooleanVar()
         self._varLocalOn.set(local_enable)
@@ -249,7 +250,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
                     expected_len = dash_len
                 elif i > self._morse_reader.dash_len_max and self._codetype == config.CodeType.american:
                     if i <= self._morse_reader.dashlong_len_max:
-                        like = '\u2517' # box drawing 'L'
+                        like = 'L'
                         expected_len = ldash_len
                     else:
                         like = '0'
