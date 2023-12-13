@@ -66,7 +66,7 @@ class MKOBMain:
                 portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
                 useAudio=config.sound, keyCallback=self.from_key)
         self.__internet = internet.Internet(config.station, code_callback=self.from_internet,
-                                            pckt_callback=self.__packet_callback)
+                                            pckt_callback=self.__packet_callback, mka=self.__ka)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if config.invert_key_input:
             log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \

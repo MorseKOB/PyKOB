@@ -49,9 +49,11 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 NUL = '\x00'
 
 class Internet:
-    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None):
+    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None, mka=None):
         self.host = HOST_DEFAULT
         self.port = PORT_DEFAULT
+        self.mka = mka # MKOBAction - to be able to display warning messages to the user
+        self.address = None
         s = config.server_url
         if s:
             # see if a port was included
@@ -61,8 +63,6 @@ class Internet:
                 self.port = hp[1]
             self.host = hp[0]
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET,
-                socket.SOCK_DGRAM)[0][4]
         self.version = ("PyKOB " + VERSION).encode(encoding='latin-1')
         self.officeID = officeID if officeID != None else ""
         self.wireNo = 0
@@ -91,6 +91,22 @@ class Internet:
     def packet_callback(self, cb):
         self.__packet_callback = cb
 
+    def _get_address(self, renew=False):
+        if not self.address or renew:
+            success = False
+            while not success:
+                try:
+                    self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
+                    success = True
+                except (OSError, socket.gaierror) as ex:
+                    # Network error
+                    s = "Network error ({}) - Retrying in 5 seconds".format(ex)
+                    log.warn(s)
+                    if self.mka:
+                        self.mka.trigger_reader_append_text("{}\n".format(s))
+                    time.sleep(5.0)
+        return self.address
+
     def connect(self, wireNo):
         self.wireNo = wireNo
         self.sendID()
@@ -98,7 +114,10 @@ class Internet:
     def disconnect(self):
         self.wireNo = 0
         shortPacket = shortPacketFormat.pack(DIS, 0)
-        self.socket.sendto(shortPacket, self.address)
+        try:
+            self.socket.sendto(shortPacket, self._get_address())
+        except:
+            self._get_address(renew=True)
 
     def exit(self):
         """
@@ -119,8 +138,21 @@ class Internet:
 
     def read(self):
         while True:
-            buf = self.socket.recv(500)
-            nBytes = len(buf)
+            success = False
+            buf = None
+            nBytes = 0
+            while not success:
+                try:
+                    buf = self.socket.recv(500)
+                    nBytes = len(buf)
+                    success = True
+                except (OSError, socket.gaierror) as ex:
+                    # Network error
+                    s = "Network error ({}) - Retrying in 5 seconds".format(ex)
+                    log.warn(s)
+                    if self.mka:
+                        self.mka.trigger_reader_append_text("{}\n".format(s))
+                    time.sleep(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
                 if self.__packet_callback:
@@ -163,7 +195,10 @@ class Internet:
                 DAT, 492, self.officeID.encode('latin-1'),
                 self.sentSeqNo, *codeBuf)
         for i in range(2):
-            self.socket.sendto(codePacket, self.address)
+            try:
+                self.socket.sendto(codePacket, self._get_address())
+            except:
+                self._get_address(renew=True)
         # Write packet info if requested
         if self.__packet_callback:
             self.__packet_callback("\n<sent: {}:{}>".format(DAT, code))
@@ -175,22 +210,20 @@ class Internet:
             time.sleep(10.0)  # send another keepalive sequence every ten seconds
 
     def sendID(self):
-        try:
-            self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET,
-                    socket.SOCK_DGRAM)[0][4]
-        except:
-            log.info("PyKOB.internet ignoring DNS lookup error")
         if self.wireNo:
-            shortPacket = shortPacketFormat.pack(CON, self.wireNo)
-            self.socket.sendto(shortPacket, self.address)
-            self.sentSeqNo += 2
-            idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
-                    self.sentSeqNo, 1, self.version)
-            self.socket.sendto(idPacket, self.address)
-            if self.__packet_callback:
-                self.__packet_callback("\n<sent: {}>".format(DAT))
-            if self.ID_callback:
-                self.ID_callback(self.officeID)
+            try:
+                shortPacket = shortPacketFormat.pack(CON, self.wireNo)
+                self.socket.sendto(shortPacket, self._get_address())
+                self.sentSeqNo += 2
+                idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
+                        self.sentSeqNo, 1, self.version)
+                self.socket.sendto(idPacket, self.address)
+                if self.__packet_callback:
+                    self.__packet_callback("\n<sent: {}>".format(DAT))
+                if self.ID_callback:
+                    self.ID_callback(self.officeID)
+            except (OSError, socket.gaierror) as ex:
+                self._get_address(renew=True)
 
     def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
