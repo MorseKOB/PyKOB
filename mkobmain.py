@@ -108,6 +108,10 @@ class MKOBMain:
         self.__show_packets = b
 
     @property
+    def Internet(self):
+        return self.__internet
+
+    @property
     def Reader(self):
         return self.__mreader
 
@@ -122,7 +126,7 @@ class MKOBMain:
     @property
     def Sender(self):
         return self.__msender
-    
+
     @Sender.setter
     def Sender(self, morse_sender):
         self.__msender = morse_sender
@@ -130,11 +134,11 @@ class MKOBMain:
     @property
     def StationList(self):
         return self.__station_list
-    
+
     @property
     def wpm(self):
         return self.__wpm
-    
+
     @wpm.setter
     def wpm(self, v):
         self.__wpm = v
