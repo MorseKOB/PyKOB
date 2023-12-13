@@ -234,7 +234,7 @@ try:
     KOB = kob.KOB(
             portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
             useAudio=config.sound, keyCallback=from_key)
-    Internet = internet.Internet(office_id, callback=from_internet)
+    Internet = internet.Internet(office_id, code_callback=from_internet)
     Internet.monitor_sender(handle_sender_update) # Set callback for monitoring current sender
     Reader = morse.Reader(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type, callback=reader_callback)
 
