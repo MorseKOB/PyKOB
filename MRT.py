@@ -248,11 +248,14 @@ except KeyboardInterrupt:
 finally:
     print()
     print()
-    if connected:
-        Internet.disconnect()
-        sleep(0.3)
-    Reader.exit()
-    Internet.exit()
-    KOB.exit()
+    if Internet:
+        if connected:
+            Internet.disconnect()
+            sleep(0.8)
+        Internet.exit()
+    if Reader:
+        Reader.exit()
+    if KOB:
+        KOB.exit()
     sleep(0.5)
     sys.exit(exit_status)
