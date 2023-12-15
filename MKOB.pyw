@@ -34,7 +34,7 @@ import tkinter as tk
 import sys
 from mkobwindow import MKOBWindow
 
-VERSION = "4.1.0"
+VERSION = "4.1.1"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
