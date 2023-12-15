@@ -79,7 +79,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
         self._fb.columnconfigure(0, weight=1)
         self._fb.rowconfigure(0, weight=1)
         # graph
-        self._txtGraph = tkst.ScrolledText(self._fb, wrap='none', font=("Courier", -14))
+        self._txtGraph = tkst.ScrolledText(self._fb, wrap='none', font='TkFixedFont')
         #self._txtGraph.rowconfigure(0, weight=1)
         #self._txtGraph.columnconfigure(0, weight=2)
         self._txtGraph.grid(row=0, column=0, padx=2, pady=2, sticky=tk.E+tk.W+tk.N+tk.S)
@@ -187,28 +187,28 @@ class MKOBKeyTimeWin(tk.Toplevel):
         Call when the key is closed to cause a marker to be put in the graph.
         """
         if self._varLocalOn.get():
-            self.append(">{}\n".format('\u21A7' * 100)) # 100 Down Arrows
+            self.append("\u25BA{}\n".format('\u21A7' * 100)) # 100 Down Arrows
 
     def key_opened(self):
         """
         Call when the key is opened to cause a marker to be put in the graph.
         """
         if self._varLocalOn.get():
-            self.append(">{}\n".format('\u21A5' * 100)) # 100 Up Arrows
+            self.append("\u25BA{}\n".format('\u21A5' * 100)) # 100 Up Arrows
 
     def key_code(self, code):
         """
         Call when the key has code.
         """
         if self._varLocalOn.get():
-            self.output_code_lines(code, '>')
+            self.output_code_lines(code, '\u25BA ') # '>'
 
     def wire_code(self, code):
         """
         Call when code comes in from the wire.
         """
         if self._varWireOn.get():
-            self.output_code_lines(code, '<')
+            self.output_code_lines(code, '\u25C4 ') # '<'
 
     def output_code_lines(self, code, indicator):
         wpm = self._wpm
@@ -275,7 +275,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
                 bar_value = 119
                 bar_end = '!'
                 tag = TAG_ERROR
-            bar_char = '\u2501' if i < 0 else '\u2587' # line or 7/8 block
+            bar_char = '\u25AC' if i < 0 else '\u2593' # line or dark block
             if i_abs >= 10000:
                 i = 9999 * (-1 if i < 0 else 1)
             s1 = self._gen_line_text(indicator, i, expected_len, error, like)
