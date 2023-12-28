@@ -81,6 +81,11 @@ class MKOBMain:
             play_sender_id_callback=self.__ka.trigger_update_current_sender, \
             play_station_list_callback=self.__ka.trigger_update_station_active, \
             play_wire_callback=self.__ka.trigger_player_wire_change)
+
+    def start(self):
+        """
+        Start the main processing.
+        """
         # If the configuration indicates that an application should automatically connect -
         # connect to the currently configured wire.
         if config.auto_connect:
@@ -177,7 +182,8 @@ class MKOBMain:
         self.update_sender(config.station)
         self.__mreader.decode(code)
         self.__recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
-        if config.local:
+        if config.local and not code_source == kob.CodeSource.key:
+            # Don't call if from key. Local sounder handled in key processing.
             self.__kob.soundCode(code, code_source)
         if self.__connected and config.remote:
             self.__internet.write(code)
@@ -254,7 +260,7 @@ class MKOBMain:
         if not self.__internet_station_active:
             if config.local:
                 self.__ka.handle_sender_update(config.station) # Okay to call 'handle_...' as this is run on the main thread
-                self.__kob.soundCode(code, kob.CodeSource.key)
+                self.__kob.soundCode(code, kob.CodeSource.key) # ZZZ needed if we sound in the key?
                 self.__mreader.decode(code)
             self.__recorder.record(code, kob.CodeSource.local)
         if self.__connected and config.remote:

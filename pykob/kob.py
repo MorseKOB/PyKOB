@@ -40,7 +40,7 @@ from enum import Enum, IntEnum, unique
 from pykob import audio, config, log
 from threading import Event, Thread
 
-DEBOUNCE  = 0.015  # time to ignore transitions due to contact bounce (sec)
+DEBOUNCE  = 0.018  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.800  # length of mark to signal circuit closure (sec)
 
@@ -232,7 +232,7 @@ class KOB:
             self.tSndrEnergized = time.time()
         if config.sounder and not (config.interface_type == config.InterfaceType.loop and fromKey):
             # If using a loop interface and the source is the key,
-            # don't do anything, as the closing of the key will sound the energized the sounder.
+            # don't do anything, as the closing of the key will sound the energized sounder.
             if self.useGpioOut:
                 try:
                     if energize:
@@ -276,6 +276,13 @@ class KOB:
                 self.lastKeyState = kc
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
+                #
+                # For 'Seperate Key & Sounder' and the Audio Sounder,
+                # drive it here to avoid as much delay from the key
+                # transitions as possible.
+                #
+                if config.local:
+                    self.energizeLoop(kc, True)
                 time.sleep(DEBOUNCE)
                 if kc:
                     code += (-dt,)

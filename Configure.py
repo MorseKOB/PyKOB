@@ -100,6 +100,7 @@ def main(argv):
             config.interface_type_override, \
             config.invert_key_input_override, \
             config.min_char_speed_override, \
+            config.local_override, \
             config.remote_override, \
             config.serial_port_override, \
             config.gpio_override, \
@@ -133,6 +134,9 @@ def main(argv):
             save_config = True
         if not args.min_char_speed == config.min_char_speed:
             config.set_min_char_speed(args.min_char_speed)
+            save_config = True
+        if not args.local == config.local:
+            config.set_local(args.local)
             save_config = True
         if not args.remote == config.remote:
             config.set_remote(args.remote)

@@ -844,11 +844,11 @@ help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-t
 
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
 invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, \
-help="Enable/disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
+help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", default=local, \
-help="Enable/disable local copy of transmitted code.", metavar="local-copy", dest="local")
+help="True/False to Enable/Disable local copy of transmitted code.", metavar="local-copy", dest="local")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
@@ -857,7 +857,7 @@ metavar="wpm", dest="min_char_speed")
 
 remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument("-R", "--remote", default=remote, \
-help="Enable/disable transmission over the internet on the specified wire.", \
+help="True/False to Enable/Disable transmission over the internet on the specified wire.", \
 metavar="remote-send", dest="remote")
 
 server_url_override = argparse.ArgumentParser(add_help=False)

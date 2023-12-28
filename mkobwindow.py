@@ -257,6 +257,7 @@ class MKOBWindow:
         self.ka.setMKobMain(self.km)
         self.kkb = MKOBKeyboard(self.ka, self, self.km)
         self.ka.doWPM()
+        self.km.start()
 
     @property
     def code_sender_enabled(self):
