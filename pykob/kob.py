@@ -392,6 +392,7 @@ class KOB:
         '''
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         '''
+        log.debug("powerSave:{}".format(enable))
         now = time.time()
         if self.useGpioOut:
             try:
