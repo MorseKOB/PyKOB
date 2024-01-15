@@ -49,7 +49,7 @@ class MKOBReader():
         self.kw.reader_win.insert('end', text)
         self.kw.reader_win.see('end')
 
-    def handle_clear(self, event_data):
+    def handle_clear(self, event_data=None):
         """
         Event handler to clear the contents.
         """

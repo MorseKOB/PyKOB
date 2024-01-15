@@ -79,6 +79,7 @@ class KOB:
         self.threadsStop = Event()
         self.tCodeSounded = -1.0  # Keep track of when the code was first sounded
         self.tSndrEnergized = time.time() # Time the sounder was last energized
+        self.powerSaving = False  # Indicates if Power-Save is active
         self.useGpioIn = False # Set to True if we establish GPIO input (Key state read)
         self.useGpioOut = False # Set to True if we establish GPIO output (Sounder drive)
         self.useSerialIn = False # Set to True if we establish Serial input (Key state read)
@@ -88,9 +89,11 @@ class KOB:
         self.interfaceType = interfaceType
         self.lastKeyState = False # False is key open
         self.keyHasCloser = False # We will determine once the interface is configured
-        self.__keyCloserIsOpen = False
         self.sounderIsEnergized = False
         self.synthSounderEnergized = False # True: last played 'click', False: played 'clack' (or hasn't played)
+        #
+        self.__keyCloserIsOpen = False
+        self.__virtualCloserIsOpen = False  # Manage a virtual closer that might be different from the physical
         #
         # Set up the external interface to the key and sounder.
         #  GPIO takes priority if it is requested and available.
@@ -146,8 +149,8 @@ class KOB:
         if self.keyCallback:
             self.keyreadThread = Thread(name='KOB-KeyRead', daemon=True, target=self.callbackKeyRead)
             self.keyreadThread.start()
-        powersaveThread = Thread(name='KOB-PowerSave', daemon=True, target=self.callbackPowerSave)
-        powersaveThread.start()
+        self.powersaveThread = Thread(name='KOB-PowerSave', daemon=True, target=self.callbackPowerSave)
+        self.powersaveThread.start()
 
     @property
     def recorder(self):
@@ -162,6 +165,17 @@ class KOB:
     @property
     def keyCloserIsOpen(self):
         return self.__keyCloserIsOpen
+
+    @property
+    def virtualCloserIsOpen(self):
+        return self.__virtualCloserIsOpen
+
+    @virtualCloserIsOpen.setter
+    def virtualCloserIsOpen(self, open):
+        log.debug("virtualCloserIsOpen:{}".format(open))
+        self.__virtualCloserIsOpen = open
+        if open and config.interface_type == config.InterfaceType.loop and config.sounder:
+            self.powerSave(False)
 
     def exit(self):
         """
@@ -189,7 +203,7 @@ class KOB:
         while not self.threadsStop.is_set():
             now = time.time()
             power_save_seconds = config.sounder_power_save
-            if power_save_seconds > 0 and not self.__keyCloserIsOpen:
+            if power_save_seconds > 0 and not self.powerSaving and not self.__virtualCloserIsOpen and not self.__keyCloserIsOpen:
                 if (now - self.tSndrEnergized) > power_save_seconds:
                     self.powerSave(True)
             time.sleep(1.0)
@@ -323,7 +337,7 @@ class KOB:
                 # drive it here to avoid as much delay from the key
                 # transitions as possible.
                 #
-                if config.local:
+                if config.local and self.__virtualCloserIsOpen:
                     self.energizeSounder(kc, True)
                 time.sleep(DEBOUNCE)
                 if kc:
@@ -347,11 +361,12 @@ class KOB:
             time.sleep(0.001)
         return ""
 
-    def soundCode(self, code, code_source=CodeSource.local):
+    def soundCode(self, code, code_source=CodeSource.local, sound=True):
         '''
         Process the code and sound it.
         '''
-        self.powerSave(False)
+        if sound:
+            self.powerSave(False)
         if self.tCodeSounded < 0:  # capture start time
             self.tCodeSounded = time.time()
         if self.__recorder and not code_source == CodeSource.player:
@@ -364,7 +379,8 @@ class KOB:
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
             if c == 1 or c > 2:  # start of mark
-                self.energizeSounder(True, code_source == CodeSource.key)
+                if sound:
+                    self.energizeSounder(True, code_source == CodeSource.key)
             tNext = self.tLastSdr + abs(c) / 1000.
             dt = tNext - t
             if dt <= 0:
@@ -373,7 +389,8 @@ class KOB:
                 self.tLastSdr = tNext
                 time.sleep(dt)
             if c > 1:  # end of (nonlatching) mark
-                self.energizeSounder(False, code_source == CodeSource.key)
+                if sound:
+                    self.energizeSounder(False, code_source == CodeSource.key)
 
     def keyCloserOpen(self, open):
         '''
@@ -385,37 +402,40 @@ class KOB:
         # intending to send code), make sure the loop is powered if the sounder is enabled
         # (in the configuration) so the sounder will follow the key.
         #
-        if config.interface_type == config.InterfaceType.loop and config.sounder:
+        if open and self.__virtualCloserIsOpen \
+            and config.interface_type == config.InterfaceType.loop and config.sounder:
             self.loopPowerOn()
 
     def powerSave(self, enable: bool):
         '''
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         '''
-        log.debug("powerSave:{}".format(enable))
-        now = time.time()
-        if self.useGpioOut:
-            try:
-                if enable:
-                    # De-energize the sounder without changing the 'sounderIsEnergized' state.
-                    self.gpo.off() # Pin goes low and deenergizes sounder
-                else:
-                    # Restore the sounder state
-                    if self.sounderIsEnergized:
-                        self.gpo.on() # Pin goes high and energizes sounder
-                        self.tSndrEnergized = now
+        if not self.powerSaving == enable:
+            log.debug("powerSave:{}".format(enable))
+            self.powerSaving = enable
+            now = time.time()
+            if self.useGpioOut:
+                try:
+                    if enable:
+                        # De-energize the sounder without changing the 'sounderIsEnergized' state.
+                        self.gpo.off() # Pin goes low and deenergizes sounder
+                    else:
+                        # Restore the sounder state
+                        if self.sounderIsEnergized:
+                            self.gpo.on() # Pin goes high and energizes sounder
+                            self.tSndrEnergized = now
 
-            except(OSError):
-                log.err("GPIO output error setting sounder state")
-        if self.useSerialOut:
-            try:
-                if enable:
-                    # De-energize the sounder without changing the 'sounderIsEnergized' state.
-                    self.port.rts = False # Causes interface to deenergize sounder
-                else:
-                    # Restore the sounder state
-                    if self.sounderIsEnergized: # The loop was energized...
-                        self.port.rts = True # Causes interface to energize sounder
-                        self.tSndrEnergized = now
-            except(OSError):
-                log.err("Serial RTS error setting sounder state")
+                except(OSError):
+                    log.err("GPIO output error setting sounder state")
+            if self.useSerialOut:
+                try:
+                    if enable:
+                        # De-energize the sounder without changing the 'sounderIsEnergized' state.
+                        self.port.rts = False # Causes interface to deenergize sounder
+                    else:
+                        # Restore the sounder state
+                        if self.sounderIsEnergized: # The loop was energized...
+                            self.port.rts = True # Causes interface to energize sounder
+                            self.tSndrEnergized = now
+                except(OSError):
+                    log.err("Serial RTS error setting sounder state")

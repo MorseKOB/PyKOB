@@ -45,7 +45,8 @@ try:
     root.iconphoto(True, icon)
 
     mkobwindow = MKOBWindow(root, MKOB_VERSION_TEXT)
-
+    mkobwindow.kkb.start()
+    
     root.mainloop()
 except KeyboardInterrupt:
     print()

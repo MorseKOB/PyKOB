@@ -30,6 +30,8 @@ Handle the flow of Morse code throughout the program.
 
 import time
 from datetime import datetime
+from queue import Queue
+from threading import Event, Thread
 
 from pykob import kob, morse, internet, config, recorder, log
 from mkobkeytimewin import MKOBKeyTimeWin
@@ -53,10 +55,14 @@ class MKOBMain:
         self.__show_packets = False
         self.__lastCharWasParagraph = False
 
-        self.__local_loop_active = False  # True if sending on key or keyboard
         self.__internet_station_active = False  # True if a remote station is sending
 
         self.__sender_ID = ""
+
+        # For emitting code
+        self.__emit_code_queue = Queue()
+        self.__emit_code_thread = Thread(name='MKMain-EmitCode', daemon=True, target=self.__thread_emit_code)
+        self.__emit_code_thread.start()
 
         """
         Initialize the main class. This must be called by the main window class once all windows,
@@ -65,6 +71,7 @@ class MKOBMain:
         self.__kob = kob.KOB(
                 portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
                 useAudio=config.sound, keyCallback=self.from_key)
+        self.__kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
         self.__internet = internet.Internet(config.station, code_callback=self.from_internet,
                                             pckt_callback=self.__packet_callback, mka=self.__ka)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
@@ -157,38 +164,49 @@ class MKOBMain:
         if self.show_packets:
             self.__ka.trigger_reader_append_text(pckt_text)
 
-    def set_local_loop_active(self, state):
-        """
-        Set local_loop_active state
+    def __thread_emit_code(self):
+        while True:
+            # Read from the emit code queue
+            emit_code_packet = self.__emit_code_queue.get() # Blocks until a packet is available
+            #
+            code = emit_code_packet[0]
+            code_source = emit_code_packet[1]
+            closer_open = emit_code_packet[2]
+            done_callback = emit_code_packet[3]
+            cb_arg = emit_code_packet[4]
 
-        True: Key or Keyboard active (Ciruit Closer OPEN)
-        False: Circuit Closer (physical and virtual) CLOSED
-        """
-        self.__local_loop_active = state
-        log.debug("local_loop_active:{}".format(state))
+            if closer_open:
+                self.update_sender(config.station)
+                self.__mreader.decode(code)
+                self.__recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
+                if self.__connected and config.remote:
+                    self.__internet.write(code)
+                if self.key_graph_is_active():
+                    self.__key_graph_win.key_code(code)
+            if config.local and not code_source == kob.CodeSource.key:
+                # Don't call if from key. Local sounder handled in key processing.
+                # Call even if closer closed in order to take the appropriate amount of time.
+                self.__kob.soundCode(code, code_source, closer_open)
+            if done_callback:
+                if cb_arg:
+                    done_callback(cb_arg)
+                else:
+                    done_callback()
 
-    def emit_code(self, code, code_source):
+    def emit_code(self, code, code_source, closer_open=True, done_callback=None, cb_arg=None):
         """
         Emit local code. That involves:
         1. Record code if recording is enabled
         2. Send code to the wire if connected
 
-        This is used indirectly from the key or the keyboard threads to emit code once they
+        This is used from the keyboard or indirectly from the key thread to emit code once they
         determine it should be emitted.
 
-        It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' or
-        'EVENT_EMIT_KB_CODE' message.
+        It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' message,
+        or from the keyboard sender.
         """
-        self.update_sender(config.station)
-        self.__mreader.decode(code)
-        self.__recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
-        if config.local and not code_source == kob.CodeSource.key:
-            # Don't call if from key. Local sounder handled in key processing.
-            self.__kob.soundCode(code, code_source)
-        if self.__connected and config.remote:
-            self.__internet.write(code)
-        if self.key_graph_is_active():
-            self.__key_graph_win.key_code(code)
+        emit_code_packet = [code, code_source, closer_open, done_callback, cb_arg]
+        self.__emit_code_queue.put(emit_code_packet)
 
     def from_key(self, code):
         """
@@ -207,18 +225,17 @@ class MKOBMain:
             elif code[-1] == 2: # special code for closer/circuit open
                 self.__ka.trigger_circuit_open()
                 return
-        if not self.__internet_station_active and self.__local_loop_active:
+        if not self.__internet_station_active and self.__kob.virtualCloserIsOpen:
             self.__ka.trigger_emit_key_code(code)
 
-    def from_keyboard(self, code):
+    def from_keyboard(self, code, finished_callback=None, cb_arg=None):
         """
         Handle inputs received from the keyboard sender.
-        Only send if the circuit is open.
 
         Called from the 'Keyboard-Send' thread.
         """
-        if not self.__internet_station_active and self.__local_loop_active:
-            self.__ka.trigger_emit_kb_code(code)
+        if not self.__internet_station_active:
+            self.emit_code(code, kob.CodeSource.keyboard, self.__kob.virtualCloserIsOpen, finished_callback, cb_arg)
 
     def from_internet(self, code):
         """handle inputs received from the internet"""
@@ -245,7 +262,7 @@ class MKOBMain:
         if self.key_graph_is_active():
             self.__key_graph_win.key_code(code)
 
-    def circuit_closer_closed(self, state):
+    def virtualCloserClosed(self, closed):
         """
         Handle change of Circuit Closer state.
         This must be called from the GUI thread handling the Circuit-Closer checkbox,
@@ -256,26 +273,27 @@ class MKOBMain:
         False: 'unlatch'
 
         """
-        code = LATCH_CODE if state == 1 else UNLATCH_CODE
+        code = LATCH_CODE if closed else UNLATCH_CODE
+        # Set the Circuit Closer checkbox appropriately
+        self.__kw.circuit_closer = (1 if closed else 0)
+        self.__kob.virtualCloserIsOpen = not closed
         if not self.__internet_station_active:
             if config.local:
-                self.__ka.handle_sender_update(config.station) # Okay to call 'handle_...' as this is run on the main thread
+                if not closed:
+                    self.__ka.handle_sender_update(config.station) # Can call 'handle_' as this is run on the UI thread
                 self.__kob.soundCode(code, kob.CodeSource.key) # ZZZ needed if we sound in the key?
                 self.__mreader.decode(code)
             self.__recorder.record(code, kob.CodeSource.local)
         if self.__connected and config.remote:
             self.__internet.write(code)
-        if len(code) > 0:
-            if code[-1] == 1:
-                # Unlatch
-                self.set_local_loop_active(False)
-                self.__mreader.flush()
-            elif code[-1] == 2:
-                # Latch
-                self.set_local_loop_active(True)
-        self.__kw.circuit_closer = (1 if not self.__local_loop_active else 0)
+        if closed:
+            # Latch
+            self.__mreader.flush()
+        else:
+            # Unlatch
+            pass
         if self.key_graph_is_active():
-            if state:
+            if closed:
                 self.__key_graph_win.key_closed()
             else:
                 self.__key_graph_win.key_opened()
@@ -288,8 +306,11 @@ class MKOBMain:
             self.toggle_connect()
 
     def toggle_connect(self):
-        """connect or disconnect when user clicks on the Connect button"""
+        """
+        Connect or disconnect when user clicks on the Connect button.
+        """
         if not self.__connected:
+            # Connect
             self.__sender_ID = ""
             self.__ka.trigger_station_list_clear()
             self.__internet.monitor_IDs(self.__ka.trigger_update_station_active) # Set callback for monitoring stations
@@ -297,12 +318,13 @@ class MKOBMain:
             self.__internet.connect(config.wire)
             self.__connected = True
         else:
+            # Disconnect
             self.__connected = False
             self.__internet.monitor_IDs(None) # don't monitor stations
             self.__internet.monitor_sender(None) # don't monitor current sender
             self.__internet.disconnect()
             self.__mreader.flush()
-            if not self.__local_loop_active:
+            if not self.__kob.virtualCloserIsOpen:
                 self.__kob.soundCode(LATCH_CODE)
                 self.__mreader.decode(LATCH_CODE)
             self.__sender_ID = ""

@@ -60,10 +60,11 @@ class MKOBActions():
 
     def doFileOpen(self):
         self.kw.keyboard_win.insert(tk.END, "~  Now is the time for all good men to come to the aid of their party.  +")
-        self.kw.keyboard_win.mark_set('mark', '0.0')
-        self.kw.keyboard_win.mark_gravity('mark', tk.LEFT)
-        self.kw.keyboard_win.tag_config('highlight', underline=1)
-        self.kw.keyboard_win.tag_add('highlight', 'mark')
+        self.kw.keyboard_win.mark_gravity('insert', tk.LEFT)
+        #self.kw.keyboard_win.tag_config('highlight', underline=1)
+        #self.kw.keyboard_win.tag_add('highlight', 'mark')
+        self.kw.give_keyboard_focus()
+        self.kw.keyboard_win.mark_set('insert', '0.0')
 
     def doFilePlay(self):
         print("Play a file...")
@@ -118,23 +119,24 @@ class MKOBActions():
         self.km.Internet.set_officeID(new_officeID)
 
     def doCircuitCloser(self):
-        self.km.circuit_closer_closed(self.kw.circuit_closer == 1)
+        self.km.virtualCloserClosed(self.kw.circuit_closer == 1)
 
-    def doWPM(self, event=None):
+    def doWPM(self, event=None, *args):
         new_wpm = self.kw.wpm
-        config.set_text_speed(new_wpm)
-        config.save_config()
-        self.km.wpm = new_wpm
-        self.km.Sender = morse.Sender(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, spacing=config.spacing)
-        self.km.Reader = morse.Reader(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, callback=self.km.readerCallback)
+        if new_wpm > -1:
+            config.set_text_speed_int(new_wpm)
+            config.save_config()
+            self.km.Sender = morse.Sender(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, spacing=config.spacing)
+            self.km.Reader = morse.Reader(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, callback=self.km.readerCallback)
 
-    def doWireNo(self, event=None):
+    def doWireNo(self, event=None, *args):
         wire = self.kw.wire_number
-        config.set_wire(wire)
-        config.save_config()
-        if self.km.connected:
-            self.km.change_wire()
-            self.km.Recorder.wire = wire
+        if wire > -1:
+            config.set_wire_int(wire)
+            config.save_config()
+            if self.km.connected:
+                self.km.change_wire()
+                self.km.Recorder.wire = wire
 
     def doConnect(self):
         if self.km.Recorder and not self.km.Recorder.playback_state == recorder.PlaybackState.idle:
@@ -158,17 +160,23 @@ class MKOBActions():
         """
         self.kw.event_generate(mkobevents.EVENT_CIRCUIT_OPEN, when='tail')
 
+    def trigger_emit_kb_code(self, code: list):
+        """
+        Generate an event to emit the code sequence originating from the keyboard.
+        """
+        self.kw.event_generate(mkobevents.EVENT_EMIT_KB_CODE, when='tail', data=code)
+
     def trigger_emit_key_code(self, code: list):
         """
         Generate an event to emit the code sequence originating from the key.
         """
         self.kw.event_generate(mkobevents.EVENT_EMIT_KEY_CODE, when='tail', data=code)
 
-    def trigger_emit_kb_code(self, code: list):
+    def trigger_keyboard_send(self):
         """
-        Generate an event to emit the code sequence originating from the keyboard.
+        Generate an event to indicate that text should be sent from the keyboard window.
         """
-        self.kw.event_generate(mkobevents.EVENT_EMIT_KB_CODE, when='tail', data=code)
+        self.kw.event_generate(mkobevents.EVENT_KB_PROCESS_SEND, when='tail')
 
     def trigger_player_wire_change(self, id: int):
         """
@@ -188,6 +196,12 @@ class MKOBActions():
         Generate an event to clear the Reader window
         """
         self.kw.event_generate(mkobevents.EVENT_READER_CLEAR, when='tail')
+
+    def trigger_set_code_sender_on(self, on: bool):
+        """
+        Generate an event to set the Code Sender state ON|OFF.
+        """
+        self.kw.event_generate(mkobevents.EVENT_SET_CODE_SENDER_ON, when='tail', data=on)
 
     def trigger_station_list_clear(self):
         """
@@ -216,13 +230,13 @@ class MKOBActions():
         """
         Close the circuit and trigger associated local functions (checkbox, etc.)
         """
-        self.km.circuit_closer_closed(True)
+        self.km.virtualCloserClosed(True)
 
     def handle_circuit_open(self, event):
         """
         Open the circuit and trigger associated local functions (checkbox, sender, etc.)
         """
-        self.km.circuit_closer_closed(False)
+        self.km.virtualCloserClosed(False)
 
     def handle_emit_key_code(self, event_data):
         """
@@ -248,13 +262,55 @@ class MKOBActions():
             code = tuple(map(int, data.split(', ')))
             self.km.emit_code(code, code_source)
 
-    def handle_escape(self, event):
+    def handle_toggle_closer(self, event):
         """
         toggle Circuit Closer and regain control of the wire
         """
         self.kw.circuit_closer = not self.kw.circuit_closer
         self.doCircuitCloser()
         self.km.reset_wire_state()  # regain control of the wire
+        return "break"
+
+    def handle_decrease_wpm(self, event):
+        """
+        Decrease code speed
+        """
+        wpm = self.kw.wpm
+        if wpm > -1:
+            wpm = (wpm - 1 if wpm > 5 else 5)
+            self.kw.wpm = wpm
+        return "break"
+
+    def handle_increase_wpm(self, event):
+        """
+        Increase code speed
+        """
+        wpm = self.kw.wpm
+        if wpm > -1:
+            wpm = (wpm + 1 if wpm < 40 else wpm)
+            self.kw.wpm = wpm
+        return "break"
+
+    def handle_clear_reader_window(self, event):
+        """
+        Clear Code Reader window
+        """
+        self.krdr.handle_clear()
+        return "break"
+
+    def handle_clear_sender_window(self, event):
+        """
+        Clear Code Sender window
+        """
+        self.kw.keyboard_sender.handle_clear()
+        return "break"
+
+    def handle_toggle_code_sender(self, event):
+        """
+        Toggle Code Sender ON|OFF
+        """
+        self.kw.code_sender_enabled = not self.kw.code_sender_enabled
+        return "break"
 
     def handle_playback_move_back15(self, event):
         """
@@ -319,6 +375,16 @@ class MKOBActions():
         self.km.update_sender(event_data)
         self.ksl.handle_update_current_sender(event_data)
         self.km.Recorder.station_id = event_data
+
+    def handle_set_code_sender_on(self, event_data):
+        """
+        Handle a <<Set_Code_Sender_On>> message by:
+        1. Setting the Code Sender On checkbox to Checked|Unchecked
+
+        event_data is a string representation of True|False
+        """
+        on = eval(event_data)
+        self.kw.code_sender_enabled = on
 
     def handle_clear_stations(self, event):
         """

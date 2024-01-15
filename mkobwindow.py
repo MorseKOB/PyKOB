@@ -25,8 +25,7 @@ SOFTWARE.
 """
 kobwindow.py
 
-Create the main KOB window for MKOB and lay out its widgets
-(controls).
+Create the main window for MKOB and lay out its widgets (controls).
 """
 
 from mkobactions import MKOBActions
@@ -39,9 +38,14 @@ from pykob.morse import Reader
 
 import mkobevents
 import tkinter as tk
+from tkinter import ttk
 import tkinter.scrolledtext as tkst
 
+def ignore_event(e):
+    return
 
+def ignore_event_no_propagate(e):
+    return "break"
 
 class MKOBWindow:
     def __init__(self, root, MKOB_VERSION_TEXT):
@@ -51,19 +55,31 @@ class MKOBWindow:
         self.ksl = MKOBStationList(self)
         self.ka = MKOBActions(self, self.ksl, self.krdr)
 
+        # validators
+        self._digits_only_validator = root.register(self._validate_number_entry)
+
         # window
         self.root = root
         self.__MKOB_VERSION_TEXT = MKOB_VERSION_TEXT
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
         self.root.title(MKOB_VERSION_TEXT)
-        self.root.bind_all('<KeyPress-Escape>', self.ka.handle_escape)
+        self.root.bind_all('<Key-Escape>', self.ka.handle_toggle_closer)
+        self.root.bind_all('<Key-Pause>', self.ka.handle_toggle_code_sender)
+        self.root.bind_all('<Key-F1>', self.ka.handle_toggle_code_sender)
+        self.root.bind_all('<Key-F4>', self.ka.handle_decrease_wpm)
+        self.root.bind_all('<Key-F5>', self.ka.handle_increase_wpm)
+        self.root.bind_all('<Key-F11>', self.ka.handle_clear_reader_window)
+        self.root.bind_all('<Key-F12>', self.ka.handle_clear_sender_window)
+        self.root.bind_all('<Key-Next>', self.ka.handle_decrease_wpm)
+        self.root.bind_all('<Key-Prior>', self.ka.handle_increase_wpm)
         self.root.bind_all('<Control-KeyPress-s>', self.ka.handle_playback_stop)
         self.root.bind_all('<Control-KeyPress-p>', self.ka.handle_playback_pauseresume)
         self.root.bind_all('<Control-KeyPress-h>', self.ka.handle_playback_move_back15)
         self.root.bind_all('<Control-KeyPress-l>', self.ka.handle_playback_move_forward15)
         self.root.bind_all('<Control-KeyPress-j>', self.ka.handle_playback_move_sender_start)
         self.root.bind_all('<Control-KeyPress-k>', self.ka.handle_playback_move_sender_end)
+        self.root.bind_class('<Key-F4>', ignore_event)
 
         # File menu
         self.menu = tk.Menu()
@@ -88,8 +104,9 @@ class MKOBWindow:
         self.toolsMenu = tk.Menu(self.menu)
         self.menu.add_cascade(label="Tools", menu=self.toolsMenu)
         self.showPacketsBV = tk.BooleanVar()
-        self.toolsMenu.add_checkbutton(label="Show Packets", variable=self.showPacketsBV,
-                                  command=self.ka.doShowPacketsChanged)
+        self.toolsMenu.add_checkbutton(
+                label="Show Packets", variable=self.showPacketsBV,
+                command=self.ka.doShowPacketsChanged)
         self.toolsMenu.add_command(label="Key Timing Graph...", command=self.ka.doKeyGraphShow)
 
         # Help menu
@@ -98,30 +115,28 @@ class MKOBWindow:
         self.helpMenu.add_command(label='About', command=self.ka.doHelpAbout)
 
         # paned windows
-        self.pwd1 = tk.PanedWindow(
-                root, orient=tk.HORIZONTAL, sashwidth=4,
-                borderwidth=0)  # left/right side
+        self.pwd1 = ttk.PanedWindow(root, orient=tk.HORIZONTAL)  # left/right side
         self.pwd1.grid(sticky='NESW', padx=6, pady=6)
-        self.pwd2 = tk.PanedWindow(self.pwd1, orient=tk.VERTICAL, sashwidth=4)  # reader/keyboard
-        self.pwd1.add(self.pwd2, stretch='first')
+        self.pwd2 = ttk.PanedWindow(self.pwd1, orient=tk.VERTICAL)  # reader/keyboard
+        self.pwd1.add(self.pwd2)
 
         # frames
-        self.frm1 = tk.Frame(self.pwd2, padx=3, pady=0)  # reader
+        self.frm1 = ttk.Frame(self.pwd2)  # reader
         self.frm1.rowconfigure(0, weight=1)
         self.frm1.columnconfigure(0, weight=2)
-        self.pwd2.add(self.frm1, stretch='always')
+        self.pwd2.add(self.frm1)
 
-        self.frm2 = tk.Frame(self.pwd2, padx=3, pady=6)  # keyboard
+        self.frm2 = ttk.Frame(self.pwd2)  # keyboard
         self.frm2.rowconfigure(0, weight=1)
         self.frm2.columnconfigure(0, weight=1)
-        self.pwd2.add(self.frm2, stretch='always')
+        self.pwd2.add(self.frm2)
 
-        self.frm3 = tk.Frame(self.pwd1)  # right side
+        self.frm3 = ttk.Frame(self.pwd1)  # right side
         self.frm3.rowconfigure(0, weight=1)
         self.frm3.columnconfigure(0, weight=1)
         self.pwd1.add(self.frm3)
 
-        self.frm4 = tk.Frame(self.frm3)  # right side rows
+        self.frm4 = ttk.Frame(self.frm3)  # right side rows
         self.frm4.columnconfigure(0, weight=1)
         self.frm4.grid(row=2)
 
@@ -137,6 +152,7 @@ class MKOBWindow:
         self.__txtKeyboard = tkst.ScrolledText(
                 self.frm2, width=40, height=7, bd=2,
                 wrap='word', font=('Arial', -14))
+        self.__txtKeyboard.bind('<Key-F4>', self.ka.handle_decrease_wpm)
         self.__txtKeyboard.grid(row=0, column=0, sticky='NESW')
         self.__txtKeyboard.focus_set()
 
@@ -148,54 +164,60 @@ class MKOBWindow:
 
         # office ID
         self.varOfficeID = tk.StringVar()
-        self.entOfficeID = tk.Entry(
-                self.frm3, bd=2, font=('Helvetica', -14),
-                textvariable=self.varOfficeID)
+        self.entOfficeID = ttk.Entry(self.frm3, font=('Helvetica', -14), textvariable=self.varOfficeID)
         self.entOfficeID.bind('<Any-KeyRelease>', self.ka.doOfficeID)
         self.entOfficeID.grid(row=1, column=0, sticky='EW', padx=3, pady=6)
 
         # circuit closer
-        self.lfm1 = tk.LabelFrame(self.frm4, padx=5, pady=5)
+        self.lfm1 = ttk.LabelFrame(self.frm4)
         self.lfm1.grid(row=0, column=0, columnspan=2, padx=3, pady=6)
         self.varCircuitCloser = tk.IntVar()
-        self.chkCktClsr = tk.Checkbutton(
+        self.chkCktClsr = ttk.Checkbutton(
                 self.lfm1, text='Circuit Closer', variable=self.varCircuitCloser,
                 command=self.ka.doCircuitCloser)
         self.chkCktClsr.grid(row=0, column=0)
+
         # WPM
-        tk.Label(self.lfm1, text='  WPM ').grid(row=0, column=1)
-        self.spnWPM = tk.Spinbox(
-                self.lfm1, from_=5, to=40, justify='center',
-                width=4, borderwidth=2, command=self.ka.doWPM)
-        self.spnWPM.bind('<Any-KeyRelease>', self.ka.doWPM)
+        ttk.Label(self.lfm1, text='  WPM ').grid(row=0, column=1)
+        self._wpmvar = tk.StringVar()
+        self._wpmvar.set(config.text_speed)
+        self._wpmvar.trace('w', self.ka.doWPM)
+        self.spnWPM = ttk.Spinbox(self.lfm1, from_=5, to=40,
+                        width=4, format="%1.0f", justify=tk.RIGHT,
+                        validate="key", validatecommand=(self._digits_only_validator,'%P'),
+                        textvariable=self._wpmvar)
         self.spnWPM.grid(row=0, column=2)
+        self.spnWPM.bind('KeyRelease', self.ka.doWPM)
 
         # code sender
-        self.lfm2 = tk.LabelFrame(self.frm4, text='Code Sender', padx=5, pady=5)
+        self.lfm2 = ttk.LabelFrame(self.frm4, text='Code Sender')
         self.lfm2.grid(row=1, column=0, padx=3, pady=6, sticky='NESW')
         self.varCodeSenderOn = tk.IntVar()
-        self.chkCodeSenderOn = tk.Checkbutton(
+        self.chkCodeSenderOn = ttk.Checkbutton(
                 self.lfm2, text='On', variable=self.varCodeSenderOn)
         self.chkCodeSenderOn.grid(row=0, column=0, sticky='W')
         self.varCodeSenderRepeat = tk.IntVar()
-        self.chkCodeSenderRepeat = tk.Checkbutton(
+        self.chkCodeSenderRepeat = ttk.Checkbutton(
                 self.lfm2, text='Repeat', variable=self.varCodeSenderRepeat)
         self.chkCodeSenderRepeat.grid(row=1, column=0, sticky='W')
 
         # wire no. / connect
-        self.lfm3 = tk.LabelFrame(self.frm4, text='Wire No.', padx=5, pady=5)
+        self.lfm3 = ttk.LabelFrame(self.frm4, text='Wire No.')
         self.lfm3.grid(row=1, column=1, padx=3, pady=6, sticky='NS')
-        self.spnWireNo = tk.Spinbox(
-                self.lfm3, from_=1, to=32000, justify='center',
-                width=7, borderwidth=2, command=self.ka.doWireNo)
-        self.spnWireNo.bind('<Any-KeyRelease>', self.ka.doWireNo)
+        self._wirevar = tk.StringVar()
+        self._wirevar.set(config.wire)
+        self._wirevar.trace('w', self.ka.doWireNo)
+        self.spnWireNo = ttk.Spinbox(
+                self.lfm3, from_=1, to=32000, width=7, format="%1.0f", justify=tk.RIGHT,
+                validate="key", validatecommand=(self._digits_only_validator,'%P'),
+                textvariable=self._wirevar)
         self.spnWireNo.grid()
         self.cvsConnect = tk.Canvas(
                 self.lfm3, width=6, height=10, bd=2,
                 relief=tk.SUNKEN, bg='white')
         self.cvsConnect.grid(row=0, column=2)
         tk.Canvas(self.lfm3, width=1, height=2).grid(row=1, column=1)
-        self.btnConnect = tk.Button(self.lfm3, text='Connect', command=self.ka.doConnect)
+        self.btnConnect = ttk.Button(self.lfm3, text='Connect', command=self.ka.doConnect)
         self.btnConnect.grid(row=2, columnspan=3, ipady=2, sticky='EW')
 
         ###########################################################################################
@@ -206,6 +228,11 @@ class MKOBWindow:
         #### Circuit Open/Close
         self.root.bind(mkobevents.EVENT_CIRCUIT_CLOSE, self.ka.handle_circuit_close)
         self.root.bind(mkobevents.EVENT_CIRCUIT_OPEN, self.ka.handle_circuit_open)
+
+        #### Set Code Sender On/Off
+        ### self.root.bind(kobevents.EVENT_SET_CODE_SENDER_ON, self.ka.handle_set_code_sender_on)
+        cmd = self.root.register(self.ka.handle_set_code_sender_on)
+        self.root.tk.call("bind", root, mkobevents.EVENT_SET_CODE_SENDER_ON, cmd + " %d")
 
         #### Emit code sequence (from KEY)
         ### self.root.bind(kobevents.EVENT_EMIT_KEY_CODE, self.ka.handle_emit_key_code)
@@ -244,20 +271,28 @@ class MKOBWindow:
 
         # get configuration settings
         self.varOfficeID.set(config.station)
-        self.varCircuitCloser.set(True)         # Previously kc.CircuitCloser (=True)
-        self.spnWPM.delete(0)
-        self.spnWPM.insert(tk.END, config.text_speed)
-        self.varCodeSenderOn.set(True)          # Previously kc.CodeSenderOn (=True)
-        self.varCodeSenderRepeat.set(False)     # Previously kc.CodeSenderRepeat (=False)
-        self.spnWireNo.delete(0)
-        self.spnWireNo.insert(tk.END, config.wire)
+        self.varCircuitCloser.set(True)
+        self.varCodeSenderOn.set(True)
+        self.varCodeSenderRepeat.set(False)
 
-        # Now that the windows and controls are initialized, initialize the kobmain module.
+        # Now that the windows and controls are initialized, create our MKOBMain and MKOBKeyboard.
         self.km = MKOBMain(self.ka, self.ksl, self)
         self.ka.setMKobMain(self.km)
         self.kkb = MKOBKeyboard(self.ka, self, self.km)
+        #### Keyboard events
+        self.root.bind(mkobevents.EVENT_KB_PROCESS_SEND, self.kkb.handle_keyboard_send)
+
+        # Finish up...
         self.ka.doWPM()
         self.km.start()
+
+
+    def _validate_number_entry(self, P):
+        """
+        Assure that 'P' is a number or blank.
+        """
+        p_is_ok = (P.isdigit() or P == '')
+        return p_is_ok
 
     @property
     def code_sender_enabled(self):
@@ -265,6 +300,13 @@ class MKOBWindow:
         The state of the code sender checkbox.
         """
         return self.varCodeSenderOn.get()
+
+    @code_sender_enabled.setter
+    def code_sender_enabled(self, on: bool):
+        """
+        Set the state of the code sender checkbox ON|OFF
+        """
+        self.varCodeSenderOn.set(on)
 
     @property
     def code_sender_repeat(self):
@@ -309,33 +351,54 @@ class MKOBWindow:
         return self.__txtReader
 
     @property
+    def root_win(self):
+        return self.root
+
+    @property
+    def keyboard_sender(self):
+        return self.kkb
+
+    @property
     def station_list_win(self):
         return self.__txtStnList
 
     @property
-    def wire_number(self):
+    def wire_number(self) -> int:
         """
-        Currently set wire number.
+        Current wire number.
         """
-        # Guard against the possibility the text field will not have
-        # a valid number (e.g. an empty string, or non-numeric text)
+        wire = self._wirevar.get()
         try:
-            new_wire = int(self.spnWireNo.get())
-            return self.spnWireNo.get()
-        except ValueError as ex:
-            return "1"
+            return int(wire)
+        except ValueError:
+            pass
+        return -1
+
+    @wire_number.setter
+    def wire_number(self, wire:int):
+        self._wirevar.set(wire)
 
     @property
-    def wpm(self):
+    def wpm(self) -> int:
         """
-        Currently set code/text speed in words per minute.
+        Current code/text speed in words per minute.
         """
-        # Guard against the possibility the text field will not have
-        # a valid number (e.g. an empty string, or non-numeric text)
+        wpm = self._wpmvar.get()
         try:
-            return int(self.spnWPM.get())
-        except ValueError as ex:
-            return 1
+            return int(wpm)
+        except ValueError:
+            pass
+        return -1
+
+    @wpm.setter
+    def wpm(self, speed:int):
+        new_wpm = speed
+        if speed < 5:
+            new_wpm = 5
+        elif speed > 40:
+            new_wpm = 40
+        self._wpmvar.set(new_wpm)
+        self.ka.doWPM()
 
     def connected(self, connected):
         """

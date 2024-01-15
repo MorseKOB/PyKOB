@@ -533,13 +533,15 @@ def set_wire(w: str):
     global wire
     try:
         _wire = int(w)
-        wire = _wire
-        user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(wire))
+        set_wire_int(_wire)
     except ValueError as ex:
         log.err("Wire number value '{}' is not a valid integer value.".format(ex.args[0]))
         raise
 
-def set_text_speed(s):
+def set_wire_int(w: int):
+    user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(w))
+
+def set_text_speed(s: str):
     """Sets the Text (code) speed in words per minute
 
     Parameters
@@ -551,11 +553,14 @@ def set_text_speed(s):
     global text_speed
     try:
         _speed = int(s)
-        text_speed = _speed
-        user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
+        set_text_speed_int(_speed)
     except ValueError as ex:
         log.err("Text speed value '{}' is not a valid integer value.".format(ex.args[0]))
         raise
+
+def set_text_speed_int(s: int):
+    text_speed = s
+    user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
 
 def print_info():
     """Print system and PyKOB configuration information

@@ -59,7 +59,7 @@ Recorder = None
 Internet = None
 connected = False
 
-local_loop_active = False  # True if sending on key or keyboard
+local_circuit_active = False  # True if sending on key or keyboard
 internet_station_active = False  # True if a remote station is sending
 
 sender_current = ""
@@ -79,16 +79,16 @@ def handle_sender_update(sender):
 
 def set_local_loop_active(state):
     """
-    Set local_loop_active state
+    Set local_circuit_active state
 
     True: Key or Keyboard active (Ciruit Closer OPEN)
     False: Circuit Closer (physical and virtual) CLOSED
     """
-    global local_loop_active
-    local_loop_active = state
-    # log.debug("local_loop_active:{}".format(state))
+    global local_circuit_active
+    local_circuit_active = state
+    # log.debug("local_circuit_active:{}".format(state))
 
-def circuit_closer_closed(state):
+def virtualCloserClosed(state):
     """
     Handle change of Circuit Closer state.
 
@@ -96,7 +96,7 @@ def circuit_closer_closed(state):
      True: 'latch'
      False: 'unlatch'
     """
-    global local_loop_active, internet_station_active
+    global local_circuit_active, internet_station_active
     code = LATCH_CODE if state == 1 else UNLATCH_CODE
     if not internet_station_active:
         if config.local:
@@ -145,15 +145,15 @@ def from_key(code):
 
     Called from the 'KOB-KeyRead' thread.
     """
-    global internet_station_active, local_loop_active
+    global internet_station_active, local_circuit_active
     if len(code) > 0:
         if code[-1] == 1: # special code for closer/circuit closed
-            circuit_closer_closed(True)
+            virtualCloserClosed(True)
             return
         elif code[-1] == 2: # special code for closer/circuit open
-            circuit_closer_closed(False)
+            virtualCloserClosed(False)
             return
-    if not internet_station_active and local_loop_active:
+    if not internet_station_active and local_circuit_active:
         emit_local_code(code, kob.CodeSource.key)
 
 def from_keyboard(code):
@@ -163,13 +163,13 @@ def from_keyboard(code):
 
     Called from the 'Keyboard-Send' thread.
     """
-    global internet_station_active, local_loop_active
-    if not internet_station_active and local_loop_active:
+    global internet_station_active, local_circuit_active
+    if not internet_station_active and local_circuit_active:
         emit_local_code(code, kob.CodeSource.keyboard)
 
 def from_internet(code):
     """handle inputs received from the internet"""
-    global local_loop_active, internet_station_active
+    global local_circuit_active, internet_station_active
     if connected:
         KOB.soundCode(code, kob.CodeSource.wire)
         Reader.decode(code)

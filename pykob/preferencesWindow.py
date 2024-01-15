@@ -249,10 +249,10 @@ class PreferencesWindow:
         ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
         
         ttk.Label(codeOptions, text="Code speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
-      # print("Setting code speed to", config.text_speed)
+        # print("Setting code speed to", config.text_speed)
         self._codeSpeed = tk.DoubleVar(value=config.text_speed)
         self._codeSpeedControl = \
-            ttk.Spinbox(codeOptions, from_=1, to=99,
+            ttk.Spinbox(codeOptions, from_=5, to=40,
                         width=4, format="%2.f", justify=tk.RIGHT,
                         command=self._codeSpeedChange,
                         textvariable=self._codeSpeed)
