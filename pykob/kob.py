@@ -58,7 +58,7 @@ class CodeSource(IntEnum):
 
 class KOB:
     def __init__(
-            self, interfaceType=config.interface_type.loop, portToUse=None,
+            self, interfaceType=config.InterfaceType.loop, portToUse=None,
             useGpio=False, useAudio=False, keyCallback=None):
         # Conditionally load GPIO or Serial library if requested.
         #  GPIO takes priority if both are requested.
@@ -92,8 +92,8 @@ class KOB:
         self.sounderIsEnergized = False
         self.synthSounderEnergized = False # True: last played 'click', False: played 'clack' (or hasn't played)
         #
-        self.__keyCloserIsOpen = False
-        self.__virtualCloserIsOpen = False  # Manage a virtual closer that might be different from the physical
+        self._keyCloserIsOpen = False
+        self._virtualCloserIsOpen = False  # Manage a virtual closer that might be different from the physical
         #
         # Set up the external interface to the key and sounder.
         #  GPIO takes priority if it is requested and available.
@@ -133,7 +133,7 @@ class KOB:
         self.tLastSdr = time.time()  # time of last sounder transition
         time.sleep(0.5)
         # If configured for a loop interface, enable the loop power
-        if config.interface_type == config.InterfaceType.loop:
+        if self.interfaceType == config.InterfaceType.loop:
             if config.sounder:
                 self.loopPowerOn()
             else:
@@ -143,7 +143,7 @@ class KOB:
         self.circuitClosed = self.keyIsClosed  # True: circuit latched closed
         self.energizeSounder(self.circuitClosed, False)
         #
-        self.__recorder = None
+        self._recorder = None
         self.keyreadThread = None
         self.powersaveThread = None
         if self.keyCallback:
@@ -155,26 +155,26 @@ class KOB:
     @property
     def recorder(self):
         """ Recorder instance or None """
-        return self.__recorder
+        return self._recorder
 
     @recorder.setter
     def recorder(self, recorder):
         """ Recorder instance or None """
-        self.__recorder = recorder
+        self._recorder = recorder
 
     @property
     def keyCloserIsOpen(self):
-        return self.__keyCloserIsOpen
+        return self._keyCloserIsOpen
 
     @property
     def virtualCloserIsOpen(self):
-        return self.__virtualCloserIsOpen
+        return self._virtualCloserIsOpen
 
     @virtualCloserIsOpen.setter
     def virtualCloserIsOpen(self, open):
         log.debug("virtualCloserIsOpen:{}".format(open))
-        self.__virtualCloserIsOpen = open
-        if open and config.interface_type == config.InterfaceType.loop and config.sounder:
+        self._virtualCloserIsOpen = open
+        if open and self.interfaceType == config.InterfaceType.loop and config.sounder:
             self.powerSave(False)
 
     def exit(self):
@@ -203,7 +203,7 @@ class KOB:
         while not self.threadsStop.is_set():
             now = time.time()
             power_save_seconds = config.sounder_power_save
-            if power_save_seconds > 0 and not self.powerSaving and not self.__virtualCloserIsOpen and not self.__keyCloserIsOpen:
+            if power_save_seconds > 0 and not self.powerSaving and not self._virtualCloserIsOpen and not self._keyCloserIsOpen:
                 if (now - self.tSndrEnergized) > power_save_seconds:
                     self.powerSave(True)
             time.sleep(1.0)
@@ -285,7 +285,7 @@ class KOB:
         self.sounderIsEnergized = energize
         if energize:
             self.tSndrEnergized = time.time()
-        if config.sounder and not (config.interface_type == config.InterfaceType.loop and fromKey):
+        if config.sounder and not (self.interfaceType == config.InterfaceType.loop and fromKey):
             # If using a loop interface and the source is the key,
             # don't do anything, as the closing of the key will energize the sounder,
             # since the loop is energized.
@@ -337,7 +337,7 @@ class KOB:
                 # drive it here to avoid as much delay from the key
                 # transitions as possible.
                 #
-                if config.local and self.__virtualCloserIsOpen:
+                if config.local and self._virtualCloserIsOpen:
                     self.energizeSounder(kc, True)
                 time.sleep(DEBOUNCE)
                 if kc:
@@ -369,8 +369,8 @@ class KOB:
             self.powerSave(False)
         if self.tCodeSounded < 0:  # capture start time
             self.tCodeSounded = time.time()
-        if self.__recorder and not code_source == CodeSource.player:
-            self.__recorder.record(code_source, code)
+        if self._recorder and not code_source == CodeSource.player:
+            self._recorder.record(code_source, code)
         for c in code:
             if self.threadsStop.is_set():
                 self.energizeSounder(True, True)
@@ -396,14 +396,14 @@ class KOB:
         '''
         Track the physical key closer. This controlles the Loop/KOB sounder state.
         '''
-        self.__keyCloserIsOpen = open
+        self._keyCloserIsOpen = open
         #
         # If this is a loop interface and the closer is now open (meaning that they are
         # intending to send code), make sure the loop is powered if the sounder is enabled
         # (in the configuration) so the sounder will follow the key.
         #
-        if open and self.__virtualCloserIsOpen \
-            and config.interface_type == config.InterfaceType.loop and config.sounder:
+        if open and self._virtualCloserIsOpen \
+            and self.interfaceType == config.InterfaceType.loop and config.sounder:
             self.loopPowerOn()
 
     def powerSave(self, enable: bool):

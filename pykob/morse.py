@@ -65,103 +65,103 @@ readEncodeTable(config.code_type.international, 'codetable-international.txt')
 
 class Sender:
     def __init__(self, wpm, cwpm=0, codeType=config.CodeType.american, spacing=config.Spacing.char):
-        self.__codeType = codeType
-        self.__spacing = spacing
+        self._codeType = codeType
+        self._spacing = spacing
         self.setWPM(wpm, cwpm)
-        self.__space = self.__wordSpace  # delay before next code element (ms)
-        
+        self._space = self._wordSpace  # delay before next code element (ms)
+
     @property
     def dot_len(self):
-        return self.__dotLen
-    
+        return self._dotLen
+
     @property
     def dash_len(self):
-        return (3.0 * self.__dotLen)
-    
+        return (3.0 * self._dotLen)
+
     @property
     def long_dash_len(self):
-        if self.__codeType == config.CodeType.american:
-            return (6.0 * self.__dotLen)
+        if self._codeType == config.CodeType.american:
+            return (6.0 * self._dotLen)
         else:
             return (-1.0)
-        
+
     @property
     def xl_dash_len(self):
-        if self.__codeType == config.CodeType.american:
-            return (8.0 * self.__dotLen)
+        if self._codeType == config.CodeType.american:
+            return (8.0 * self._dotLen)
         else:
             return (-1.0)
-        
+
     @property
     def intra_char_space_len(self):
-        if self.__codeType == config.CodeType.american:
-            return (3 * self.__dotLen)
+        if self._codeType == config.CodeType.american:
+            return (3 * self._dotLen)
         else:
             return (-1.0)
-        
+
     @property
     def char_space_len(self):
-        return (self.__charSpace)
-    
+        return (self._charSpace)
+
     @property
     def word_space_len(self):
-        return (self.__wordSpace)
+        return (self._wordSpace)
 
     def encode(self, char, printChar=False):
         c = char.upper()
         if (printChar):
             print(c, end="", flush=True)
         code = ()
-        cti = 0 if self.__codeType == config.CodeType.american else 1
+        cti = 0 if self._codeType == config.CodeType.american else 1
         if not c in encodeTable[cti]:
             if c == '-' or c == '\'' or c == 'curly apostrophe':  # Linux
                         # doesn't recognize the UTF-8 encoding of this file
-                self.__space += int((self.__wordSpace - self.__charSpace) / 2)
+                self._space += int((self._wordSpace - self._charSpace) / 2)
             elif c == '\r':
                 pass
             elif c == '+':
-                code = (-self.__space, +1)
-                self.__space = self.__charSpace
+                code = (-self._space, +1)
+                self._space = self._charSpace
             elif c == '~':
-                code = (-self.__space, +2)
-                self.__space = self.__charSpace
+                code = (-self._space, +2)
+                self._space = self._charSpace
             else:
-                self.__space += self.__wordSpace - self.__charSpace
+                self._space += self._wordSpace - self._charSpace
         else:
             for e in encodeTable[cti][c]:
                 if e == ' ':
-                    self.__space = 3 * self.__dotLen
+                    self._space = 3 * self._dotLen
                 else:
-                    code += (-self.__space,)
+                    code += (-self._space,)
                     if e == '.':
-                        code += (self.__dotLen,)
+                        code += (self._dotLen,)
                     elif e == '-':
-                        code += (3 * self.__dotLen,)
+                        code += (3 * self._dotLen,)
                     elif e == '=':
-                        code += (6 * self.__dotLen,)
+                        code += (6 * self._dotLen,)
                     elif e == '#':
-                        code += (9 * self.__dotLen,)
-                    self.__space = self.__dotLen
-            self.__space = self.__charSpace
+                        code += (9 * self._dotLen,)
+                    self._space = self._dotLen
+            self._space = self._charSpace
         return code
 
     def setWPM(self, wpm, cwpm=0):
-        if self.__spacing == config.Spacing.none:
+        if self._spacing == config.Spacing.none:
             cwpm = wpm  # send characters at overall code speed
         else:
             cwpm = max(wpm, cwpm)  # send at Farnsworth speed
-        self.__dotLen    = int(1200 / cwpm)  # dot length (ms)
-        self.__charSpace = 3 * self.__dotLen  # space between characters (ms)
-        self.__wordSpace = 7 * self.__dotLen  # space between words (ms)
-        if self.__codeType == config.CodeType.american:
-            self.__charSpace += int((60000 / cwpm - self.__dotLen * DOTSPERWORD) / 6)
-            self.__wordSpace = 2 * self.__charSpace
+        self._dotLen    = int(1200 / cwpm)  # dot length (ms)
+        self._charSpace = 3 * self._dotLen  # space between characters (ms)
+        self._wordSpace = 7 * self._dotLen  # space between words (ms)
+        if self._codeType == config.CodeType.american:
+            self._charSpace += int((60000 / cwpm - self._dotLen * DOTSPERWORD) / 6)
+            self._wordSpace = 2 * self._charSpace
         delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
-        if self.__spacing == config.Spacing.char:
-            self.__charSpace += int(delta / 6)
-            self.__wordSpace += int(delta / 3)
-        elif self.__spacing == config.Spacing.word:
-            self.__wordSpace += int(delta)
+        if self._spacing == config.Spacing.char:
+            self._charSpace += int(delta / 6)
+            self._wordSpace += int(delta / 3)
+        elif self._spacing == config.Spacing.word:
+            self._wordSpace += int(delta)
 
 
 """
@@ -205,69 +205,69 @@ class Reader:
     is represented as three lists: codeBuf, spaceBuf, and markBuf (see details in the
     `__init__` definition below).
     """
-    
+
     def __init__(self, wpm=20, cwpm=0, codeType=config.CodeType.american, callback=None):
-        self.__codeType  = codeType     # American or International
+        self._codeType  = codeType     # American or International
         self.setWPM(wpm, cwpm)
-        self.__codeBuf   = ['', '']     # code elements for two characters
-        self.__spaceBuf  = [0, 0]       # space before each character
-        self.__markBuf   = [0, 0]       # length of last dot or dash in character
-        self.__nChars    = 0            # number of complete characters in buffer
-        self.__callback  = callback     # function to call when character decoded
-        self.__flusher   = None         # holds Timer (thread) to call flush if no code received
-        self.__latched   = False        # True if cicuit has been latched closed by a +1 code element
-        self.__mark      = 0            # accumulates the length of a mark as positive code elements are received
-        self.__space     = 1            # accumulates the length of a space as negative code elements are received
+        self._codeBuf   = ['', '']     # code elements for two characters
+        self._spaceBuf  = [0, 0]       # space before each character
+        self._markBuf   = [0, 0]       # length of last dot or dash in character
+        self._nChars    = 0            # number of complete characters in buffer
+        self._callback  = callback     # function to call when character decoded
+        self._flusher   = None         # holds Timer (thread) to call flush if no code received
+        self._latched   = False        # True if cicuit has been latched closed by a +1 code element
+        self._mark      = 0            # accumulates the length of a mark as positive code elements are received
+        self._space     = 1            # accumulates the length of a space as negative code elements are received
         # Detected code speed values. Start with the configured speed and calculated values
-        self.__d_wpm = self.__wpm
-        self.__d_dotLen = self.__dotLen
-        self.__d_truDot = self.__truDot
+        self._d_wpm = self._wpm
+        self._d_dotLen = self._dotLen
+        self._d_truDot = self._truDot
 
     @property
     def wpm(self):
-        return self.__wpm
-    
+        return self._wpm
+
     @property
     def dot_len(self):
-        return self.__dotLen
-    
+        return self._dotLen
+
     @property
     def dot_len_max(self):
-        return ((self.__dotLen * MINDASHLEN) - 0.1)
-    
+        return ((self._dotLen * MINDASHLEN) - 0.1)
+
     @property
     def dash_len_min(self):
-        return (self.__dotLen * MINDASHLEN)
-    
+        return (self._dotLen * MINDASHLEN)
+
     @property
     def dash_len_max(self):
-        return ((self.__dotLen * MINLLEN) - 0.1)
-    
+        return ((self._dotLen * MINLLEN) - 0.1)
+
     @property
     def dashlong_len_max(self):
-        return ((self.__dotLen * MINXLLEN) - 0.1)
-    
+        return ((self._dotLen * MINXLLEN) - 0.1)
+
     @property
     def dashxl_len_max(self):
-        return (self.__dotLen * MAXDASHLEN)
+        return (self._dotLen * MAXDASHLEN)
 
     @property
     def intra_char_space_min(self):
-        return (self.__dotLen * 1.45)
-    
+        return (self._dotLen * 1.45)
+
     @property
     def intra_char_space_max(self):
-        return ((self.__dotLen + (self.__dotLen * MINCHARSPACE)) - 0.1)
-    
+        return ((self._dotLen + (self._dotLen * MINCHARSPACE)) - 0.1)
+
     @property
     def char_space_max(self):
-        return (self.__dotLen * MAXMORSESPACE)
+        return (self._dotLen * MAXMORSESPACE)
 
     def decode(self, codeSeq):
         # Code received - cancel an existing 'flusher'
-        if self.__flusher:
-            self.__flusher.cancel()
-            self.__flusher = None
+        if self._flusher:
+            self._flusher.cancel()
+            self._flusher = None
         self.updateDWPM(codeSeq)  # Update the 'detected' WPM
         nextSpace = 0  # space before next dot or dash
         i = 0
@@ -275,146 +275,146 @@ class Reader:
             c = codeSeq[i]
             if c < 0:  # start or continuation of space, or continuation of mark (if latched)
                 c = -c
-                if self.__latched:  # circuit has been latched closed
-                    self.__mark += c
-                elif self.__space > 0:  # continuation of space
-                    self.__space += c
+                if self._latched:  # circuit has been latched closed
+                    self._mark += c
+                elif self._space > 0:  # continuation of space
+                    self._space += c
                 else:  # end of mark
-                    if self.__mark > MINDASHLEN * self.__truDot:
-                        self.__codeBuf[self.__nChars] += '-'  # dash
+                    if self._mark > MINDASHLEN * self._truDot:
+                        self._codeBuf[self._nChars] += '-'  # dash
                     else:
-                        self.__codeBuf[self.__nChars] += '.'  # dot
-                    self.__markBuf[self.__nChars] = self.__mark
-                    self.__mark = 0
-                    self.__space = c
+                        self._codeBuf[self._nChars] += '.'  # dot
+                    self._markBuf[self._nChars] = self._mark
+                    self._mark = 0
+                    self._space = c
             elif c == 1:  # start (or continuation) of extended mark
-                self.__latched = True
-                if self.__space > 0:  # start of mark
-                    if self.__space > MINMORSESPACE * self.__dotLen:  # possible Morse or word space
-                        self.decodeChar(self.__space)
-                    self.__mark = 0
-                    self.__space = 0
+                self._latched = True
+                if self._space > 0:  # start of mark
+                    if self._space > MINMORSESPACE * self._dotLen:  # possible Morse or word space
+                        self.decodeChar(self._space)
+                    self._mark = 0
+                    self._space = 0
                 else: # continuation of mark
                     pass
             elif c == 2:  # end of mark (or continuation of space)
-                self.__latched = False
+                self._latched = False
             elif c > 2:  # mark
-                self.__latched = False
-                if self.__space > 0:  # start of new mark
-                    if self.__space > MINMORSESPACE * self.__dotLen:  # possible Morse or word space
-                        self.decodeChar(self.__space)
-                    self.__mark = c
-                    self.__space = 0
-                elif self.__mark > 0:  # continuation of mark
-                    self.__mark += c
-        self.__flusher = Timer(((20.0 * self.__truDot) / 1000.0), self.flush)  # if idle call `flush`
-        self.__flusher.setName("Reader-Flusher")
-        self.__flusher.start()
+                self._latched = False
+                if self._space > 0:  # start of new mark
+                    if self._space > MINMORSESPACE * self._dotLen:  # possible Morse or word space
+                        self.decodeChar(self._space)
+                    self._mark = c
+                    self._space = 0
+                elif self._mark > 0:  # continuation of mark
+                    self._mark += c
+        self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self.flush)  # if idle call `flush`
+        self._flusher.setName("Reader-Flusher")
+        self._flusher.start()
 
     def exit(self):
         """
         Cancel the flusher (if it exists) and exit.
         """
-        if self.__flusher:
-            self.__flusher.cancel()
-            self.__flusher = None
-            
+        if self._flusher:
+            self._flusher.cancel()
+            self._flusher = None
+
     def setWPM(self, wpm, cwpm=0):
-        self.__wpm       = max(wpm, cwpm)  # configured code speed
-        self.__dotLen    = int(1200.0 / self.__wpm)  # nominal dot length (ms)
-        self.__truDot    = self.__dotLen  # actual length of typical dot (ms)
+        self._wpm       = max(wpm, cwpm)  # configured code speed
+        self._dotLen    = int(1200.0 / self._wpm)  # nominal dot length (ms)
+        self._truDot    = self._dotLen  # actual length of typical dot (ms)
 
     def updateDWPM(self, codeSeq):
         for i in range(1, len(codeSeq) - 2, 2):
-            minDotLen = int(0.5 * self.__d_dotLen)
-            maxDotLen = int(1.5 * self.__d_dotLen)
+            minDotLen = int(0.5 * self._d_dotLen)
+            maxDotLen = int(1.5 * self._d_dotLen)
             if codeSeq[i] > minDotLen and codeSeq[i] < maxDotLen and \
                     codeSeq[i] - codeSeq[i+1] < 2 * maxDotLen and \
                     codeSeq[i+2] < maxDotLen:
                 dotLen = (codeSeq[i] - codeSeq[i+1]) / 2
-                self.__d_truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self.__d_truDot)
-                self.__d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self.__d_dotLen)
-                self.__d_wpm = 1200. / self.__d_dotLen
+                self._d_truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self._d_truDot)
+                self._d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self._d_dotLen)
+                self._d_wpm = 1200. / self._d_dotLen
 
     def flush(self):
-        if self.__flusher:
-            self.__flusher.cancel()
-            self.__flusher = None
-        if self.__mark > 0 or self.__latched:
-            spacing = self.__spaceBuf[self.__nChars]
-            if self.__mark > MINDASHLEN * self.__truDot:
-                self.__codeBuf[self.__nChars] += '-'  # dash
-            elif self.__mark > 2:
-                self.__codeBuf[self.__nChars] += '.'  # dot
-            self.__markBuf[self.__nChars] = self.__mark
-            self.__mark = 0
-            self.__space = 1  # to prevent circuit opening mistakenly decoding as 'E'
+        if self._flusher:
+            self._flusher.cancel()
+            self._flusher = None
+        if self._mark > 0 or self._latched:
+            spacing = self._spaceBuf[self._nChars]
+            if self._mark > MINDASHLEN * self._truDot:
+                self._codeBuf[self._nChars] += '-'  # dash
+            elif self._mark > 2:
+                self._codeBuf[self._nChars] += '.'  # dot
+            self._markBuf[self._nChars] = self._mark
+            self._mark = 0
+            self._space = 1  # to prevent circuit opening mistakenly decoding as 'E'
             self.decodeChar(MAXINT)
             self.decodeChar(MAXINT)  # a second time, to flush both characters
-            self.__codeBuf = ['', '']
-            self.__spaceBuf = [0, 0]
-            self.__markBuf = [0, 0]
-            self.__nChars = 0
-            if self.__latched:
-                self.__callback('_', float(spacing) / (3 * self.__truDot) - 1)
+            self._codeBuf = ['', '']
+            self._spaceBuf = [0, 0]
+            self._markBuf = [0, 0]
+            self._nChars = 0
+            if self._latched:
+                self._callback('_', float(spacing) / (3 * self._truDot) - 1)
 
     def decodeChar(self, nextSpace):
-        self.__nChars += 1  # number of complete characters in buffer (1 or 2)
-        sp1 = self.__spaceBuf[0]  # space before 1st character
-        sp2 = self.__spaceBuf[1]  # space before 2nd character
+        self._nChars += 1  # number of complete characters in buffer (1 or 2)
+        sp1 = self._spaceBuf[0]  # space before 1st character
+        sp2 = self._spaceBuf[1]  # space before 2nd character
         sp3 = nextSpace  # space before next character
         code = ''  # the dots and dashes
         s = ''  # the decoded character or pair of characters
-        if self.__nChars == 2 and sp2 < MAXMORSESPACE * self.__dotLen and \
+        if self._nChars == 2 and sp2 < MAXMORSESPACE * self._dotLen and \
                 MORSERATIO * sp1 > sp2 and sp2 < MORSERATIO * sp3:  # could be two halves of a spaced character
-            code = self.__codeBuf[0] + ' ' + self.__codeBuf[1]  # try combining the two halves
+            code = self._codeBuf[0] + ' ' + self._codeBuf[1]  # try combining the two halves
             s = self.lookupChar(code)
             if s != '' and s != '&':  # yes, it's a spaced character, clear the whole buffer
-                self.__codeBuf[0] = ''
-                self.__markBuf[0] = 0
-                self.__codeBuf[1] = ''
-                self.__spaceBuf[1] = 0
-                self.__markBuf[1] = 0
-                self.__nChars = 0
+                self._codeBuf[0] = ''
+                self._markBuf[0] = 0
+                self._codeBuf[1] = ''
+                self._spaceBuf[1] = 0
+                self._markBuf[1] = 0
+                self._nChars = 0
             else:  # it's not recognized as a spaced character,
                 code = ''
                 s = ''
-        if self.__nChars == 2 and sp2 < MINCHARSPACE * self.__dotLen:  # it's a single character, merge the two halves
-            self.__codeBuf[0] += self.__codeBuf[1]
-            self.__markBuf[0] = self.__markBuf[1]
-            self.__codeBuf[1] = ''
-            self.__spaceBuf[1] = 0
-            self.__markBuf[1] = 0
-            self.__nChars = 1
-        if self.__nChars == 2:  # decode the first character, otherwise wait for the next one to arrive
-            code = self.__codeBuf[0]
+        if self._nChars == 2 and sp2 < MINCHARSPACE * self._dotLen:  # it's a single character, merge the two halves
+            self._codeBuf[0] += self._codeBuf[1]
+            self._markBuf[0] = self._markBuf[1]
+            self._codeBuf[1] = ''
+            self._spaceBuf[1] = 0
+            self._markBuf[1] = 0
+            self._nChars = 1
+        if self._nChars == 2:  # decode the first character, otherwise wait for the next one to arrive
+            code = self._codeBuf[0]
             s = self.lookupChar(code)
-            if s == 'T' and self.__markBuf[0] > MAXDASHLEN * self.__dotLen:
+            if s == 'T' and self._markBuf[0] > MAXDASHLEN * self._dotLen:
                 s = '_'
-            elif s == 'T' and self.__markBuf[0] > MINLLEN * self.__dotLen and \
-                    self.__codeType == config.CodeType.american:
+            elif s == 'T' and self._markBuf[0] > MINLLEN * self._dotLen and \
+                    self._codeType == config.CodeType.american:
                 s = 'L'
             elif s == 'E':
-                if self.__markBuf[0] == 1:
+                if self._markBuf[0] == 1:
                     s = '_'
-                elif self.__markBuf[0] == 2:
+                elif self._markBuf[0] == 2:
                     s = '_'
                     sp1 = 0  ### ZZZ eliminate space between underscores
-            self.__codeBuf[0] = self.__codeBuf[1]
-            self.__spaceBuf[0] = self.__spaceBuf[1]
-            self.__markBuf[0] = self.__markBuf[1]
-            self.__codeBuf[1] = ''
-            self.__spaceBuf[1] = 0
-            self.__markBuf[1] = 0
-            self.__nChars = 1
-        self.__spaceBuf[self.__nChars] = nextSpace
+            self._codeBuf[0] = self._codeBuf[1]
+            self._spaceBuf[0] = self._spaceBuf[1]
+            self._markBuf[0] = self._markBuf[1]
+            self._codeBuf[1] = ''
+            self._spaceBuf[1] = 0
+            self._markBuf[1] = 0
+            self._nChars = 1
+        self._spaceBuf[self._nChars] = nextSpace
         if code != '' and s == '':
             s = '[' + code + ']'
         if s != '':
-            self.__callback(s, float(sp1) / (3 * self.__truDot) - 1)
+            self._callback(s, float(sp1) / (3 * self._truDot) - 1)
 
     def lookupChar(self, code):
-        codeTableIndex = 0 if self.__codeType == config.CodeType.american else 1
+        codeTableIndex = 0 if self._codeType == config.CodeType.american else 1
         if code in decodeTable[codeTableIndex]:
             return(decodeTable[codeTableIndex][code])
         else:
@@ -422,6 +422,6 @@ class Reader:
 
     def displayBuffers(self, text):
         """Display the code buffer and other information for troubleshooting"""
-        log.debug("{}: nChars = {}".format(text, self.__nChars))
+        log.debug("{}: nChars = {}".format(text, self._nChars))
         for i in range(2):
-            print("{} '{}' {}".format(self.__spaceBuf[i], self.__codeBuf[i], self.__markBuf[i]))
+            print("{} '{}' {}".format(self._spaceBuf[i], self._codeBuf[i], self._markBuf[i]))

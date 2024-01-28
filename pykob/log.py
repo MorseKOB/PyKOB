@@ -30,6 +30,8 @@ logs status, debug and error messages.
 import sys
 import datetime
 
+DEBUG_ENABLED = True
+
 def log(msg, type="", dt=None):
     dtl = dt if dt else str(datetime.datetime.now())[:19]
     typestr = " {0}".format(type) if type else ""
@@ -44,7 +46,8 @@ def logErr(msg):
     sys.stderr.flush()
     
 def debug(msg):
-    log(msg, type="DEBUG")
+    if DEBUG_ENABLED:
+        log(msg, type="DEBUG")
     
 def err(msg):
     typ, val, trc = sys.exc_info()

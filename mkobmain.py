@@ -33,7 +33,7 @@ from datetime import datetime
 from queue import Queue
 from threading import Event, Thread
 
-from pykob import kob, morse, internet, config, recorder, log
+from pykob import config, kob, morse, internet, recorder, log
 from mkobkeytimewin import MKOBKeyTimeWin
 
 NNBSP = "\u202f"  # narrow no-break space
@@ -42,132 +42,131 @@ UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 class MKOBMain:
     def __init__(self, mkactions, mkstationlist, mkwindow):
-        self.__ka = mkactions
-        self.__mreader = None  # Set by MKOBActions.doWPM
-        self.__msender = None  # Set by MKOBActions.doWPM
-        self.__station_list = mkstationlist
-        self.__kw = mkwindow
-        self.__wpm = mkwindow.wpm
+        self._ka = mkactions
+        self._mreader = None  # Set by MKOBActions.doWPM
+        self._msender = None  # Set by MKOBActions.doWPM
+        self._station_list = mkstationlist
+        self._kw = mkwindow
 
-        self.__key_graph_win = None
+        self._key_graph_win = None
 
-        self.__connected = False
-        self.__show_packets = False
-        self.__lastCharWasParagraph = False
+        self._connected = False
+        self._show_packets = False
+        self._lastCharWasParagraph = False
 
-        self.__internet_station_active = False  # True if a remote station is sending
+        self._internet_station_active = False  # True if a remote station is sending
 
-        self.__sender_ID = ""
+        self._sender_ID = ""
+        self._cwpm = self._kw.cwpm
+        self._twpm = self._kw.twpm
 
         # For emitting code
-        self.__emit_code_queue = Queue()
-        self.__emit_code_thread = Thread(name='MKMain-EmitCode', daemon=True, target=self.__thread_emit_code)
-        self.__emit_code_thread.start()
+        self._emit_code_queue = Queue()
+        self._emit_code_thread = Thread(name='MKMain-EmitCode', daemon=True, target=self._thread_emit_code)
 
-        """
-        Initialize the main class. This must be called by the main window class once all windows,
-        menus, etc. are created, configured and ready.
-        """
-        self.__kob = kob.KOB(
+        self._kob = kob.KOB(
                 portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
                 useAudio=config.sound, keyCallback=self.from_key)
-        self.__kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
-        self.__internet = internet.Internet(config.station, code_callback=self.from_internet,
-                                            pckt_callback=self.__packet_callback, mka=self.__ka)
+        self._kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
+        self._internet = internet.Internet(config.station, code_callback=self.from_internet,
+                                            pckt_callback=self._packet_callback, mka=self._ka)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if config.invert_key_input:
             log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
                 "To enable/disable this setting use `Configure --iki`.")
-        ts = recorder.get_timestamp()
-        dt = datetime.fromtimestamp(ts / 1000.0)
-        dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
-        targetFileName = "Session-" + dateTimeStr + ".json"
-        log.info("Record to '{}'".format(targetFileName))
-        self.__recorder = recorder.Recorder(targetFileName, None, station_id=self.__sender_ID, wire=config.wire, \
-            play_code_callback=self.from_recorder, \
-            play_sender_id_callback=self.__ka.trigger_update_current_sender, \
-            play_station_list_callback=self.__ka.trigger_update_station_active, \
-            play_wire_callback=self.__ka.trigger_player_wire_change)
 
     def start(self):
         """
         Start the main processing.
         """
+        ts = recorder.get_timestamp()
+        dt = datetime.fromtimestamp(ts / 1000.0)
+        dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(dt.year, dt.month, dt.day, dt.hour, dt.minute)
+        targetFileName = "Session-" + dateTimeStr + ".json"
+        log.info("Record to '{}'".format(targetFileName))
+        self._recorder = recorder.Recorder(targetFileName, None, station_id=self._sender_ID, wire=config.wire, \
+            play_code_callback=self.from_recorder, \
+            play_sender_id_callback=self._ka.trigger_update_current_sender, \
+            play_station_list_callback=self._ka.trigger_update_station_active, \
+            play_wire_callback=self._ka.trigger_player_wire_change)
+        self._emit_code_thread.start()
         # If the configuration indicates that an application should automatically connect -
         # connect to the currently configured wire.
         if config.auto_connect:
-            self.__ka.doConnect() # Suggest a connect.
+            self._ka.doConnect() # Suggest a connect.
 
     @property
     def connected(self):
         """
         True if connected to a wire.
         """
-        return self.__connected
+        return self._connected
 
     @property
     def show_packets(self):
         """
         True if the user requested the received and sent packets be displayed.
         """
-        return self.__show_packets
+        return self._show_packets
 
     @show_packets.setter
     def show_packets(self, b: bool):
         """
         Set whether to display the received and sent packets.
         """
-        self.__show_packets = b
+        self._show_packets = b
 
     @property
     def Internet(self):
-        return self.__internet
+        return self._internet
 
     @property
     def Reader(self):
-        return self.__mreader
+        return self._mreader
 
     @Reader.setter
     def Reader(self, morse_reader):
-        self.__mreader = morse_reader
+        self._mreader = morse_reader
 
     @property
     def Recorder(self):
-        return self.__recorder
+        return self._recorder
 
     @property
     def Sender(self):
-        return self.__msender
+        return self._msender
 
     @Sender.setter
     def Sender(self, morse_sender):
-        self.__msender = morse_sender
+        self._msender = morse_sender
 
     @property
     def StationList(self):
-        return self.__station_list
+        return self._station_list
 
     @property
     def wpm(self):
-        return self.__wpm
+        return self._cwpm
 
-    @wpm.setter
-    def wpm(self, v):
-        self.__wpm = v
+    def setwpm(self, cwpm, twpm):
+        self._cwpm = cwpm
+        self._twpm = twpm
+        self.Sender = morse.Sender(wpm=twpm, cwpm=cwpm, codeType=self._kw.code_type, spacing=self._kw.spacing)
+        self.Reader = morse.Reader(wpm=twpm, cwpm=cwpm, codeType=self._kw.code_type, callback=self.readerCallback)
         if self.key_graph_is_active():
-            self.__key_graph_win.wpm = v
+            self._key_graph_win.wpm = cwpm
 
-    def __packet_callback(self, pckt_text):
+    def _packet_callback(self, pckt_text):
         """
         Set as a callback for the Internet package to print packets
         """
         if self.show_packets:
-            self.__ka.trigger_reader_append_text(pckt_text)
+            self._ka.trigger_reader_append_text(pckt_text)
 
-    def __thread_emit_code(self):
+    def _thread_emit_code(self):
         while True:
             # Read from the emit code queue
-            emit_code_packet = self.__emit_code_queue.get() # Blocks until a packet is available
+            emit_code_packet = self._emit_code_queue.get() # Blocks until a packet is available
             #
             code = emit_code_packet[0]
             code_source = emit_code_packet[1]
@@ -177,16 +176,16 @@ class MKOBMain:
 
             if closer_open:
                 self.update_sender(config.station)
-                self.__mreader.decode(code)
-                self.__recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
-                if self.__connected and config.remote:
-                    self.__internet.write(code)
+                self._mreader.decode(code)
+                self._recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
+                if self._connected and config.remote:
+                    self._internet.write(code)
                 if self.key_graph_is_active():
-                    self.__key_graph_win.key_code(code)
+                    self._key_graph_win.key_code(code)
             if config.local and not code_source == kob.CodeSource.key:
                 # Don't call if from key. Local sounder handled in key processing.
                 # Call even if closer closed in order to take the appropriate amount of time.
-                self.__kob.soundCode(code, code_source, closer_open)
+                self._kob.soundCode(code, code_source, closer_open)
             if done_callback:
                 if cb_arg:
                     done_callback(cb_arg)
@@ -206,7 +205,7 @@ class MKOBMain:
         or from the keyboard sender.
         """
         emit_code_packet = [code, code_source, closer_open, done_callback, cb_arg]
-        self.__emit_code_queue.put(emit_code_packet)
+        self._emit_code_queue.put(emit_code_packet)
 
     def from_key(self, code):
         """
@@ -220,13 +219,13 @@ class MKOBMain:
         """
         if len(code) > 0:
             if code[-1] == 1: # special code for closer/circuit closed
-                self.__ka.trigger_circuit_close()
+                self._ka.trigger_circuit_close()
                 return
             elif code[-1] == 2: # special code for closer/circuit open
-                self.__ka.trigger_circuit_open()
+                self._ka.trigger_circuit_open()
                 return
-        if not self.__internet_station_active and self.__kob.virtualCloserIsOpen:
-            self.__ka.trigger_emit_key_code(code)
+        if not self._internet_station_active and self._kob.virtualCloserIsOpen:
+            self._ka.trigger_emit_key_code(code)
 
     def from_keyboard(self, code, finished_callback=None, cb_arg=None):
         """
@@ -234,33 +233,33 @@ class MKOBMain:
 
         Called from the 'Keyboard-Send' thread.
         """
-        if not self.__internet_station_active:
-            self.emit_code(code, kob.CodeSource.keyboard, self.__kob.virtualCloserIsOpen, finished_callback, cb_arg)
+        if not self._internet_station_active:
+            self.emit_code(code, kob.CodeSource.keyboard, self._kob.virtualCloserIsOpen, finished_callback, cb_arg)
 
     def from_internet(self, code):
         """handle inputs received from the internet"""
-        if self.__connected:
-            self.__kob.soundCode(code, kob.CodeSource.wire)
-            self.__mreader.decode(code)
-            self.__recorder.record(code, kob.CodeSource.wire)
+        if self._connected:
+            self._kob.soundCode(code, kob.CodeSource.wire)
+            self._mreader.decode(code)
+            self._recorder.record(code, kob.CodeSource.wire)
             if len(code) > 0 and code[-1] == +1:
-                self.__internet_station_active = False
+                self._internet_station_active = False
             else:
-                self.__internet_station_active = True
+                self._internet_station_active = True
             if self.key_graph_is_active():
-                self.__key_graph_win.wire_code(code)
+                self._key_graph_win.wire_code(code)
 
 
     def from_recorder(self, code, source=None):
         """
         Handle inputs received from the recorder during playback.
         """
-        if self.__connected:
+        if self._connected:
             self.disconnect()
-        self.__kob.soundCode(code, kob.CodeSource.player)
-        self.__mreader.decode(code)
+        self._kob.soundCode(code, kob.CodeSource.player)
+        self._mreader.decode(code)
         if self.key_graph_is_active():
-            self.__key_graph_win.key_code(code)
+            self._key_graph_win.key_code(code)
 
     def virtualCloserClosed(self, closed):
         """
@@ -275,71 +274,71 @@ class MKOBMain:
         """
         code = LATCH_CODE if closed else UNLATCH_CODE
         # Set the Circuit Closer checkbox appropriately
-        self.__kw.circuit_closer = (1 if closed else 0)
-        self.__kob.virtualCloserIsOpen = not closed
-        if not self.__internet_station_active:
+        self._kw.circuit_closer = (1 if closed else 0)
+        self._kob.virtualCloserIsOpen = not closed
+        if not self._internet_station_active:
             if config.local:
                 if not closed:
-                    self.__ka.handle_sender_update(config.station) # Can call 'handle_' as this is run on the UI thread
-                self.__kob.soundCode(code, kob.CodeSource.key) # ZZZ needed if we sound in the key?
-                self.__mreader.decode(code)
-            self.__recorder.record(code, kob.CodeSource.local)
-        if self.__connected and config.remote:
-            self.__internet.write(code)
+                    self._ka.handle_sender_update(config.station) # Can call 'handle_' as this is run on the UI thread
+                self._kob.soundCode(code, kob.CodeSource.key) # ZZZ needed if we sound in the key?
+                self._mreader.decode(code)
+            self._recorder.record(code, kob.CodeSource.local)
+        if self._connected and config.remote:
+            self._internet.write(code)
         if closed:
             # Latch
-            self.__mreader.flush()
+            self._mreader.flush()
         else:
             # Unlatch
             pass
         if self.key_graph_is_active():
             if closed:
-                self.__key_graph_win.key_closed()
+                self._key_graph_win.key_closed()
             else:
-                self.__key_graph_win.key_opened()
+                self._key_graph_win.key_opened()
 
     def disconnect(self):
         """
         Disconnect if connected.
         """
-        if self.__connected:
+        if self._connected:
             self.toggle_connect()
 
     def toggle_connect(self):
         """
         Connect or disconnect when user clicks on the Connect button.
         """
-        if not self.__connected:
+        if not self._connected:
             # Connect
-            self.__sender_ID = ""
-            self.__ka.trigger_station_list_clear()
-            self.__internet.monitor_IDs(self.__ka.trigger_update_station_active) # Set callback for monitoring stations
-            self.__internet.monitor_sender(self.__ka.trigger_update_current_sender) # Set callback for monitoring current sender
-            self.__internet.connect(config.wire)
-            self.__connected = True
+            self._sender_ID = ""
+            self._ka.trigger_station_list_clear()
+            self._internet.monitor_IDs(self._ka.trigger_update_station_active) # Set callback for monitoring stations
+            self._internet.monitor_sender(self._ka.trigger_update_current_sender) # Set callback for monitoring current sender
+            self._internet.connect(config.wire)
+            self._connected = True
         else:
             # Disconnect
-            self.__connected = False
-            self.__internet.monitor_IDs(None) # don't monitor stations
-            self.__internet.monitor_sender(None) # don't monitor current sender
-            self.__internet.disconnect()
-            self.__mreader.flush()
-            if not self.__kob.virtualCloserIsOpen:
-                self.__kob.soundCode(LATCH_CODE)
-                self.__mreader.decode(LATCH_CODE)
-            self.__sender_ID = ""
-            self.__ka.trigger_station_list_clear()
-        self.__internet_station_active = False
+            self._connected = False
+            self._internet.monitor_IDs(None) # don't monitor stations
+            self._internet.monitor_sender(None) # don't monitor current sender
+            self._internet.disconnect()
+            self._mreader.flush()
+            if not self._kob.virtualCloserIsOpen:
+                self._kob.soundCode(LATCH_CODE)
+                self._mreader.decode(LATCH_CODE)
+            self._sender_ID = ""
+            self._ka.trigger_station_list_clear()
+        self._internet_station_active = False
 
-    def change_wire(self):
+    def change_wire(self, wire:int):
         """
         Change the current wire. If connected, drop the current connection and
         connect to the new wire.
         """
         # Disconnect, change wire, reconnect.
-        was_connected = self.__connected
+        was_connected = self._connected
         self.disconnect()
-        self.__recorder.wire = config.wire
+        self._recorder.wire = wire
         if was_connected:
             time.sleep(0.350) # Needed to allow UTP packets to clear
             self.toggle_connect()
@@ -349,9 +348,9 @@ class MKOBMain:
 
     def update_sender(self, id):
         """display station ID in reader window when there's a new sender"""
-        if id != self.__sender_ID:  # new sender
-            self.__sender_ID = id
-            self.__ka.trigger_reader_append_text("\n\n<{}>".format(self.__sender_ID))
+        if id != self._sender_ID:  # new sender
+            self._sender_ID = id
+            self._ka.trigger_reader_append_text("\n\n<{}>".format(self._sender_ID))
         ### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
         ##        Reader = morse.Reader(
         ##                wpm=config.text_speed, codeType=config.code_type,
@@ -359,7 +358,7 @@ class MKOBMain:
 
     def readerCallback(self, char, spacing):
         """display characters returned from the decoder"""
-        self.__recorder.record([], '', text=char)
+        self._recorder.record([], '', text=char)
         if config.code_type == config.CodeType.american:
             sp = (spacing - 0.25) / 1.25  # adjust for American Morse spacing
         else:
@@ -386,29 +385,29 @@ class MKOBMain:
             n = int(sp + 0.5)
             txt = n * " "
         if char == "=":
-            self.__lastCharWasParagraph = True
+            self._lastCharWasParagraph = True
         else:
-            if self.__lastCharWasParagraph:
+            if self._lastCharWasParagraph:
                 txt += "\n"
-            self.__lastCharWasParagraph = False
+            self._lastCharWasParagraph = False
         txt += char
-        self.__ka.trigger_reader_append_text(txt)
+        self._ka.trigger_reader_append_text(txt)
 
     def reset_wire_state(self):
         """regain control of the wire"""
-        self.__internet_station_active = False
+        self._internet_station_active = False
 
     def show_key_graph(self):
         """
         Show the Key Timing graph.
         """
-        if not (self.__key_graph_win and MKOBKeyTimeWin.active):
-            self.__key_graph_win = MKOBKeyTimeWin(self.__wpm)
-        self.__key_graph_win.focus()
+        if not (self._key_graph_win and MKOBKeyTimeWin.active):
+            self._key_graph_win = MKOBKeyTimeWin(self._cwpm)
+        self._key_graph_win.focus()
 
     def key_graph_is_active(self):
         """
         True if the key graph is currently active.
         """
-        return (self.__key_graph_win and MKOBKeyTimeWin.active)
+        return (self._key_graph_win and MKOBKeyTimeWin.active)
 

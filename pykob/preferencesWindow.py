@@ -34,48 +34,48 @@ class PreferencesWindow:
         config.read_config()
         if not GUI:
             return
-        
+
       # print("Configured serial port  =", config.serial_port)
       # print("Configured code speed  =", config.text_speed)
-       
+
         interface = 'SERIAL'      # Placeholder until HW interface type is configured
-        
+
         self.HW_INTERFACE_TYPES = ["None", "Serial Port", "GPIO (Raspberry Pi)"]
         self.NONE_HW_INTERFACE = 0        # index of 'None' in list above
         self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
-        
+
         self.EQUIPMENT_TYPES = ['Local loop (key and sounder in series)',
                                        'Separate key and sounder',
                                        'Separate dot/dash paddle and sounder']
         self.EQUIPMENT_TYPE_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
         self.DEFAULT_EQUIPMENT_TYPE = 1
-        
+
         HOST_DEFAULT = "mtc-kob.dyndns.org"
         PORT_DEFAULT = 7890
-        
+
         self.CHARACTER_SPACING_OPTIONS = ["None", "Between characters", "Between words"]
         self.CHARACTER_SPACING_SETTINGS = ['NONE', 'CHAR', 'WORD']
         self.CHARACTER_SPACING_NONE = 0
         self.CHARACTER_SPACING_CHARACTER = 1
         self.CHARACTER_SPACING_WORD = 2
         self.DEFAULT_CHARACTER_SPACING = 2
-        
+
         self.CODE_TYPES = ["American", "International"]
         self.CODE_TYPE_SETTINGS = ['AMERICAN', 'INTERNATIONAL']
         self.DEFAULT_CODE_TYPE = 0
-    
+
         self.root = tk.Toplevel()
         self.root.resizable(False, False)
 
         self.root.title("Preferences")
 
-        
+
         #######################################################################
         #
         #   Create three-tabbed interface: Basic/Morse/Advanced
         #
         #######################################################################
-        
+
         prefs_nb = ttk.Notebook(self.root)
         prefs_nb.pack(fill=tk.BOTH)
         basic_prefs = ttk.Frame(prefs_nb)
@@ -102,7 +102,7 @@ class PreferencesWindow:
 
         # Initialize the interface type to its default value of 'None':
         self._interfaceType.set(self.NONE_HW_INTERFACE)
-        
+
         for interfaceRadioButton in range(len(self.HW_INTERFACE_TYPES)):
             ttk.Radiobutton(basiclocalInterface, text=self.HW_INTERFACE_TYPES[interfaceRadioButton],
                             variable=self._interfaceType,
@@ -135,7 +135,7 @@ class PreferencesWindow:
             # If port device  matches this radio button, update the selected value
             if config.serial_port == serial_device:
                 self._serialPort.set(serial_device)
-        
+
         # Label the equipment type:
         ttk.Label(basiclocalInterface, text="Equipment type:").grid(row=7, rowspan=3, column=0, sticky=tk.NE)
 
@@ -144,7 +144,7 @@ class PreferencesWindow:
 
         # Initialize the equipment type to its default value of 'Separate key and sounder':
         self._equipmentType.set(self.DEFAULT_EQUIPMENT_TYPE)
-        
+
         for equipmentRadioButton in range(len(self.EQUIPMENT_TYPES)):
             ttk.Radiobutton(basiclocalInterface, text=self.EQUIPMENT_TYPES[equipmentRadioButton],
                             variable=self._equipmentType,
@@ -172,7 +172,7 @@ class PreferencesWindow:
 
         # Add a number field for the 'Sounder Power Save' time
         self._sounderPowerSave = tk.IntVar(value=config.sounder_power_save)
-        ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=20, sticky=tk.W)
+        ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=(20,4), sticky=tk.W)
         ttk.Entry(advancedlocalInterface, width=12, textvariable=self._sounderPowerSave).grid(row=6, column=2, sticky=tk.W)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
@@ -201,17 +201,17 @@ class PreferencesWindow:
         if len(hp) == 2:
             server_port = hp[1]
         server_url = hp[0]
-        
+
         # Create and label an entry for the server URL:
         self._serverUrl = tk.StringVar(value=server_url)
         ttk.Label(internetConnection, text="Server:").grid(row=0, column=0, sticky=tk.W)
         ttk.Entry(internetConnection, width=30, textvariable=self._serverUrl).grid(row=0, column=1, sticky=tk.E)
-        
+
         # Create and label an entry for the server port number:
         self._portNumber = tk.StringVar(value=server_port)
         ttk.Label(internetConnection, text="Port number:").grid(row=0, column=2, sticky=tk.E)
         ttk.Entry(internetConnection, width=12, textvariable=self._portNumber).grid(row=0, column=3, sticky=tk.E)
-        
+
         # Add a checkbox for the 'Transmit to remote stations' option
         self._transmitToRemoteStations = tk.IntVar(value=config.remote)
         ttk.Checkbutton(internetConnection,
@@ -236,7 +236,7 @@ class PreferencesWindow:
 
       # internetConnection.grid(row=1, column=0, columnspan=5, pady=6, sticky=tk.W)
         internetConnection.pack(fill=tk.BOTH)
-        
+
         #######################################################################
         #
         #   Morse Code section
@@ -245,10 +245,18 @@ class PreferencesWindow:
 
         # Create a container frame to hold all code-related widgets
         codeOptions = ttk.LabelFrame(code_prefs, text=" Code Options")
-        
-        ttk.Label(codeOptions, text="Code speed and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
-        
-        ttk.Label(codeOptions, text="Code speed:").grid(row=1, column=1, padx=30, sticky=tk.E)
+
+        ttk.Label(codeOptions, text="Speed (WPM) and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
+
+        ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
+        self._dotSpeed = tk.DoubleVar(value=config.min_char_speed)
+        self._dotSpeedControl = \
+            ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
+                        command=self._dotSpeedChange,
+                        textvariable=self._dotSpeed)
+        self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
+
+        ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
         # print("Setting code speed to", config.text_speed)
         self._codeSpeed = tk.DoubleVar(value=config.text_speed)
         self._codeSpeedControl = \
@@ -256,18 +264,10 @@ class PreferencesWindow:
                         width=4, format="%2.f", justify=tk.RIGHT,
                         command=self._codeSpeedChange,
                         textvariable=self._codeSpeed)
-        self._codeSpeedControl.grid(row=1, column=2, padx=10, sticky=tk.W)
-        
-        ttk.Label(codeOptions, text="Dot speed:").grid(row=1, column=3, sticky=tk.E)
-        self._dotSpeed = tk.DoubleVar(value=config.min_char_speed)
-        self._dotSpeedControl = \
-            ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
-                        command=self._dotSpeedChange,
-                        textvariable=self._dotSpeed)
-        self._dotSpeedControl.grid(row=1, column=4, padx=10, sticky=tk.W)
-        
+        self._codeSpeedControl.grid(row=1, column=4, padx=(4,10), sticky=tk.W)
+
         # Create three Radiobuttons using one IntVar for the character spacing options
-        ttk.Label(codeOptions, text="Character spacing:").grid(row=2, column=0, columnspan=4, sticky=tk.W)
+        ttk.Label(codeOptions, text="Farnsworth spacing:").grid(row=2, column=0, columnspan=4, sticky=tk.W)
         # Initialize the code spacing option to its default value of 'None':
         self._characterSpacing = tk.IntVar(value=self.DEFAULT_CHARACTER_SPACING)
         # Preserve the currently configured Farnsworth spacing option to restore
@@ -286,16 +286,17 @@ class PreferencesWindow:
             if config.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
                 self._original_configured_spacing = spacingRadioButton + 1
                 self._characterSpacing.set(spacingRadioButton + 1)
-    
+
         # Create a pair of Radiobuttons using one IntVar for the code type options
-        ttk.Label(codeOptions, text="Morse code type:").grid(row=6, column=0, sticky=tk.W)
+        ttk.Label(codeOptions, text=" ").grid(row=6, column=0) # a row of padding
+        ttk.Label(codeOptions, text="Morse code type:").grid(row=7, column=0, sticky=tk.W)
         self._codeType = tk.IntVar()
         # Initialize the code spacing option to its default value of 'None':
         self._codeType.set(self.DEFAULT_CODE_TYPE)
         for codeTypeRadioButton in range(len(self.CODE_TYPES)):
             ttk.Radiobutton(codeOptions, text=self.CODE_TYPES[codeTypeRadioButton],
                             variable=self._codeType,
-                            value=codeTypeRadioButton + 1).grid(row=6, column=1 + codeTypeRadioButton, sticky=tk.W)
+                            value=codeTypeRadioButton + 1).grid(row=7, column=1 + codeTypeRadioButton, sticky=tk.W)
             # If current config matches this radio button, update the selected value
             if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self._codeType.set(codeTypeRadioButton + 1)
@@ -303,7 +304,7 @@ class PreferencesWindow:
 
       # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
         codeOptions.pack(fill=tk.BOTH)
-        
+
         #######################################################################
         #
         #   Overall "Save" / "Cancel" buttons
@@ -318,12 +319,12 @@ class PreferencesWindow:
       # self._cancel_button.configure(state='disabled')
         self._cancel_button.grid(row=0, column=1, padx=6, pady=12, sticky=tk.E)
         dialogButtons.columnconfigure(1, weight=6)
-        
+
         self._OK_button = ttk.Button(dialogButtons, text="Save", command=self._clickOK)
       # self._OK_button.configure(state='disabled')
         self._OK_button.grid(row=0, column=2, padx=6, pady=12, sticky=tk.E)
         dialogButtons.columnconfigure(2, weight=6)
-      
+
         dialogButtons.pack(fill=tk.X)
 
         prefs_nb.pack(expand=1, fill='both')
@@ -380,7 +381,7 @@ class PreferencesWindow:
 
     def _clickCancel(self):
         self.dismiss()
-    
+
     def _clickOK(self):
         if self._serialPort.get() != "":
             # print("Serial port: ", self._serialPort.get())
@@ -414,11 +415,11 @@ class PreferencesWindow:
         config.set_spacing(self.CHARACTER_SPACING_SETTINGS[self._characterSpacing.get() - 1])
       # print("Code type:", self.CODE_TYPES[self._codeType.get() - 1])
         config.set_code_type(self.CODE_TYPE_SETTINGS[self._codeType.get() - 1])
-        
+
         config.save_config()
-        
+
         self.dismiss()
-    
+
     def display(self):
         if GUI:
             self.root.mainloop()
@@ -429,4 +430,4 @@ class PreferencesWindow:
                 self.root.quit()
             self.root.destroy()
         if self._callback:
-            self._callback(self)  
+            self._callback(self)

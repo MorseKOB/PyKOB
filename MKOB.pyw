@@ -32,9 +32,11 @@ Python version of MorseKOB 2.5
 
 import tkinter as tk
 import sys
+from pykob import config, log
+import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
-VERSION = "4.1.2"
+VERSION = "4.1.3"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
@@ -43,11 +45,29 @@ try:
     root = tk.Tk(className="MKOB")
     icon = tk.PhotoImage(file="resources/mkob-icon.png")
     root.iconphoto(True, icon)
+    # Set the theme
+    #root.tk.call("source", "azure.tcl")
+    #root.tk.call("set_theme", "light")
+    root.rowconfigure(0, weight=1)
+    root.columnconfigure(0, weight=1)
+    root.title(MKOB_VERSION_TEXT)
+    # Our content
+    mkobwin = MKOBWindow(root, MKOB_VERSION_TEXT, config)
 
-    mkobwindow = MKOBWindow(root, MKOB_VERSION_TEXT)
-    mkobwindow.kkb.start()
-    
+    # Set a minsize for the window, and place it in the middle
+    root.update()
+    root.minsize(int(root.winfo_width() * 0.66), int(root.winfo_height() * 0.66))
+    x_cordinate = int((root.winfo_screenwidth() / 2) - (root.winfo_width() / 2))
+    y_cordinate = int((root.winfo_screenheight() / 2) - (root.winfo_height() / 2))
+    root.geometry("+{}+{}".format(x_cordinate, y_cordinate-20))
+    root.state('normal')
+
+    mkobwin.start()
+
+    mkw.print_hierarchy(root)
+
     root.mainloop()
+
 except KeyboardInterrupt:
     print()
 sys.exit(0)
