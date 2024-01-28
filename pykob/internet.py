@@ -73,9 +73,9 @@ class Internet:
         self.disconnect()  # to establish a UDP connection with the server
         self.keepAliveThread = Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
         self.keepAliveThread.start()
-        self.__code_callback = code_callback
-        self.__packet_callback = pckt_callback
-        self.__record_callback = record_callback
+        self._code_callback = code_callback
+        self._packet_callback = pckt_callback
+        self._record_callback = record_callback
         self.internetReadThread = None
         if code_callback or record_callback:
             self.internetReadThread = Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
@@ -85,11 +85,11 @@ class Internet:
 
     @property
     def packet_callback(self):
-        return self.__packet_callback
+        return self._packet_callback
     
     @packet_callback.setter
     def packet_callback(self, cb):
-        self.__packet_callback = cb
+        self._packet_callback = cb
 
     def _get_address(self, renew=False):
         if not self.address or renew:
@@ -131,10 +131,10 @@ class Internet:
         """
         while not self.threadStop.is_set():
             code = self.read()
-            if self.__code_callback:
-                self.__code_callback(code)
-            if self.__record_callback:
-                self.__record_callback(code)
+            if self._code_callback:
+                self._code_callback(code)
+            if self._record_callback:
+                self._record_callback(code)
 
     def read(self):
         while True:
@@ -155,8 +155,8 @@ class Internet:
                     time.sleep(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
-                if self.__packet_callback:
-                    self.__packet_callback("\n<rcvd: {}>".format(ACK))
+                if self._packet_callback:
+                    self._packet_callback("\n<rcvd: {}>".format(ACK))
             elif nBytes == 496:  # code or ID packet
                 self.tLastListener = time.time()
                 cp = codePacketFormat.unpack(buf)
@@ -176,8 +176,8 @@ class Internet:
                     else:
                         code = code[:n]
                     self.rcvdSeqNo = seqNo
-                    if self.__packet_callback:
-                        self.__packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
+                    if self._packet_callback:
+                        self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
             else:
                 log.warn("PyKOB.internet received invalid record length: {0}".format(nBytes))
@@ -200,8 +200,8 @@ class Internet:
             except:
                 self._get_address(renew=True)
         # Write packet info if requested
-        if self.__packet_callback:
-            self.__packet_callback("\n<sent: {}:{}>".format(DAT, code))
+        if self._packet_callback:
+            self._packet_callback("\n<sent: {}:{}>".format(DAT, code))
 
 
     def keepAlive(self):
@@ -218,8 +218,8 @@ class Internet:
                 idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
                         self.sentSeqNo, 1, self.version)
                 self.socket.sendto(idPacket, self.address)
-                if self.__packet_callback:
-                    self.__packet_callback("\n<sent: {}>".format(DAT))
+                if self._packet_callback:
+                    self._packet_callback("\n<sent: {}>".format(DAT))
                 if self.ID_callback:
                     self.ID_callback(self.officeID)
             except (OSError, socket.gaierror) as ex:
@@ -239,5 +239,5 @@ class Internet:
 
     def record_code(self, record_callback):
         """Start recording code received and sent"""
-        self.__record_callback = record_callback
+        self._record_callback = record_callback
 

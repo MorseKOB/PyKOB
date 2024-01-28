@@ -202,17 +202,17 @@ def create_config_files_if_needed():
 def set_auto_connect(s):
     """Sets the Auto Connect to wire enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should
     automatically connect to the configured wire.
 
-    Note that this is a 'suggestion'. It isn't used by the base pykob 
-    modules. It should be used by applications (like MKOB) to initiate a connection 
+    Note that this is a 'suggestion'. It isn't used by the base pykob
+    modules. It should be used by applications (like MKOB) to initiate a connection
     to the configured wire.
-    
+
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable auto-connect. Values of `NO`|`OFF`|`FALSE` will disable auto-connect.
     """
 
@@ -337,7 +337,7 @@ def set_remote(r):
         log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
-def set_min_char_speed(s):
+def set_min_char_speed(s: str):
     """Sets the minimum character speed in words per minute
 
     A difference between character speed (in WPM) and text speed
@@ -353,14 +353,17 @@ def set_min_char_speed(s):
         The speed in words-per-minute as an interger string value
     """
 
-    global min_char_speed
     try:
         _speed = int(s)
-        min_char_speed = _speed
-        user_config.set(__CONFIG_SECTION, __MIN_CHAR_SPEED_KEY, str(min_char_speed))
+        set_min_char_speed_int(_speed)
     except ValueError as ex:
         log.err("CHARS value '{}' is not a valid integer value. Not setting CWPM value.".format(ex.args[0]))
         raise
+
+def set_min_char_speed_int(si: int):
+    global min_char_speed
+    min_char_speed = si
+    user_config.set(__CONFIG_SECTION, __MIN_CHAR_SPEED_KEY, str(min_char_speed))
 
 def set_serial_port(p):
     """Sets the name/path of the serial/tty port to use for a
@@ -379,13 +382,13 @@ def set_serial_port(p):
 def set_gpio(s):
     """Sets the key/sounder interface to Raspberry Pi GPIO
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should
     enable the GPIO interface to the key/sounder.
-    
+
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable GPIO interface. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
         Serial port will become active (if configured for sounder = ON)
     """
@@ -742,7 +745,7 @@ def read_config():
         __option = "GPIO interface"
         __key = __GPIO_KEY
         gpio = app_config.getboolean(__CONFIG_SECTION, __key)
-  
+
         ###
         # Get the User config values
         ###
@@ -834,7 +837,7 @@ def read_config():
 read_config()
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
-auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF", 
+auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
 metavar="auto-connect", dest="auto_connect")

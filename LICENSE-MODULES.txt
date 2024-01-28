@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 =================================================================================
 
-Libraries and Modules used by this package (applications, libraries, modules, 
-etc. ) might be licensed under a different license. License information for 
+Libraries and Modules used by this package (applications, libraries, modules,
+etc. ) might be licensed under a different license. License information for
 those libraries/modules can be found in 'LICENSE-MODULES'.

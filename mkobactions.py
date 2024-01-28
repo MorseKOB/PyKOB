@@ -31,7 +31,6 @@ import os
 import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.filedialog as fd
-import time
 
 from pykob import config, kob, internet, morse, preferencesWindow, recorder, VERSION
 import mkobevents
@@ -40,31 +39,31 @@ print("PyKOB " + VERSION)
 
 class MKOBActions():
     def __init__(self, mkwindow, mksl, mkrdr) -> None:
-        self.__preferencesDialog = None
-        self.km = None
+        self._preferencesDialog = None
+        self.km = None # Set in start
         self.kw = mkwindow
         self.ksl = mksl
         self.krdr = mkrdr
+        self.kkb = None # Set in start
+
+    def start(self, mkmain, mkkb):
+        self.km = mkmain
+        self.kkb = mkkb
 
     ####
     #### Menu item handlers
     ####
 
     # File menu
-
-    def setMKobMain(self, mkmain):
-        self.km = mkmain
-
     def doFileNew(self):
         self.kw.keyboard_win.delete('1.0', tk.END)
 
     def doFileOpen(self):
-        self.kw.keyboard_win.insert(tk.END, "~  Now is the time for all good men to come to the aid of their party.  +")
-        self.kw.keyboard_win.mark_gravity('insert', tk.LEFT)
-        #self.kw.keyboard_win.tag_config('highlight', underline=1)
-        #self.kw.keyboard_win.tag_add('highlight', 'mark')
-        self.kw.give_keyboard_focus()
-        self.kw.keyboard_win.mark_set('insert', '0.0')
+        print("Open a file for sending...")
+        pf = fd.askopenfilename(title='Text File for Sending', filetypes=[('Text','*.txt'),('Markdown','*.md'),('Any','*.*')])
+        if pf:
+            print(" Open: ", pf)
+            self.kkb.load_file(pf)
 
     def doFilePlay(self):
         print("Play a file...")
@@ -82,15 +81,15 @@ class MKOBActions():
         self.kw.give_keyboard_focus()
 
     def _markPreferencesDestroyed(self, prefsDialog):
-        self.__preferencesDialog = None
+        self._preferencesDialog = None
 
     def doFilePreferences(self):
-        if not self.__preferencesDialog:
-            self.__preferencesDialog = \
+        if not self._preferencesDialog:
+            self._preferencesDialog = \
                 preferencesWindow.PreferencesWindow(callback=self._markPreferencesDestroyed,
                                                     quitWhenDismissed=False)
-        self.__preferencesDialog.root.deiconify()
-        self.__preferencesDialog.root.lift()
+        self._preferencesDialog.root.deiconify()
+        self._preferencesDialog.root.lift()
 
     def doFileExit(self):
         self.kw.exit()
@@ -112,22 +111,23 @@ class MKOBActions():
     #### Action handlers for control events
     ####
 
-    def doOfficeID(self, event):
+    def doOfficeID(self, event=None, *args):
         new_officeID = self.kw.office_id
         config.set_station(new_officeID)
         config.save_config()
         self.km.Internet.set_officeID(new_officeID)
 
-    def doCircuitCloser(self):
+    def doCircuitCloser(self, event=None, *args):
         self.km.virtualCloserClosed(self.kw.circuit_closer == 1)
 
     def doWPM(self, event=None, *args):
-        new_wpm = self.kw.wpm
-        if new_wpm > -1:
-            config.set_text_speed_int(new_wpm)
+        new_cwpm = self.kw.cwpm
+        new_twpm = self.kw.twpm
+        if new_cwpm > -1 and new_twpm > -1:
+            config.set_text_speed_int(new_twpm)
+            config.set_min_char_speed_int(new_cwpm)
             config.save_config()
-            self.km.Sender = morse.Sender(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, spacing=config.spacing)
-            self.km.Reader = morse.Reader(wpm=int(new_wpm), cwpm=int(config.min_char_speed), codeType=config.code_type, callback=self.km.readerCallback)
+            self.km.setwpm(new_cwpm, new_twpm)
 
     def doWireNo(self, event=None, *args):
         wire = self.kw.wire_number
@@ -135,10 +135,9 @@ class MKOBActions():
             config.set_wire_int(wire)
             config.save_config()
             if self.km.connected:
-                self.km.change_wire()
-                self.km.Recorder.wire = wire
+                self.km.change_wire(wire)
 
-    def doConnect(self):
+    def doConnect(self, event=None, *args):
         if self.km.Recorder and not self.km.Recorder.playback_state == recorder.PlaybackState.idle:
             return # If the recorder is playing a recording do not allow connection
         self.km.toggle_connect()
@@ -202,6 +201,12 @@ class MKOBActions():
         Generate an event to set the Code Sender state ON|OFF.
         """
         self.kw.event_generate(mkobevents.EVENT_SET_CODE_SENDER_ON, when='tail', data=on)
+
+    def trigger_speed_change(self):
+        """
+        Generate an event to indicate that the user changed the character or text speed.
+        """
+        self.kw.event_generate(mkobevents.EVENT_SPEED_CHANGE, when='tail')
 
     def trigger_station_list_clear(self):
         """
@@ -275,20 +280,20 @@ class MKOBActions():
         """
         Decrease code speed
         """
-        wpm = self.kw.wpm
-        if wpm > -1:
-            wpm = (wpm - 1 if wpm > 5 else 5)
-            self.kw.wpm = wpm
+        cwpm = self.kw.cwpm
+        if cwpm > -1:
+            cwpm = (cwpm - 1 if cwpm > 5 else 5)
+            self.kw.cwpm = cwpm
         return "break"
 
     def handle_increase_wpm(self, event):
         """
         Increase code speed
         """
-        wpm = self.kw.wpm
-        if wpm > -1:
-            wpm = (wpm + 1 if wpm < 40 else wpm)
-            self.kw.wpm = wpm
+        cwpm = self.kw.cwpm
+        if cwpm > -1:
+            cwpm = (cwpm + 1 if cwpm < 40 else cwpm)
+            self.kw.cwpm = cwpm
         return "break"
 
     def handle_clear_reader_window(self, event):

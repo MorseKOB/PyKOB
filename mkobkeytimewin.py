@@ -39,6 +39,8 @@ The graph looks like this:
 import tkinter as tk
 import tkinter.scrolledtext as tkst
 from tkinter import ttk
+from tkinter import N, S, W, E
+
 
 from pykob import config
 from pykob.morse import Reader
@@ -75,7 +77,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
         self._ft = tk.Frame(self, height=OPTIONS_HEIGHT)
         self._ft.grid(row=0, column=0, padx=0, pady=0, sticky=tk.E+tk.W)
         self._fb = tk.Frame(self, width=INITIAL_WIDTH, height=INITIAL_HEIHGT-OPTIONS_HEIGHT)
-        self._fb.grid(row=1, column=0, columnspan=3, padx=1, pady=1, sticky=tk.E+tk.W+tk.N+tk.S)
+        self._fb.grid(row=1, column=0, columnspan=3, padx=1, pady=1, sticky=(N,S,W,E))
         self._fb.columnconfigure(0, weight=1)
         self._fb.rowconfigure(0, weight=1)
         # graph
@@ -98,12 +100,12 @@ class MKOBKeyTimeWin(tk.Toplevel):
         self._chkWireOn = tk.Checkbutton(self._ft, text="Wire", variable=self._varWireOn)
         self._chkWireOn.grid(row=0, column=1, padx=8, pady=8)
         self._btnClear = tk.Button(self._ft, text='Clear', command=self.do_clear)
-        self._btnClear.grid(row=0, column=2, ipady=2, sticky='EW')
+        self._btnClear.grid(row=0, column=2, ipady=2, sticky=(W,E))
         tk.Label(self._ft, text="Mark").grid(row=0, column=3, padx=4, pady=8)
         self._varMarkTxt = tk.StringVar()
-        self._entMarkTxt = tk.Entry(self._ft, bd=2, font=("Helvetica", -15), textvariable=self._varMarkTxt)
+        self._entMarkTxt = tk.Entry(self._ft, bd=2, textvariable=self._varMarkTxt)
         self._entMarkTxt.bind("<Return>", self.do_mark_text_enter)
-        self._entMarkTxt.grid(row=0, column=4, columnspan=3, padx=2, pady=2, sticky=tk.E+tk.W)
+        self._entMarkTxt.grid(row=0, column=4, columnspan=3, padx=2, pady=2, sticky=(W,E))
         #
         self.__class__.active = True  # Indicate that the window is 'active'
         #
