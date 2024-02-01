@@ -2,7 +2,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-2024 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -111,7 +111,7 @@ class _GetchWindows:
 
     def __call__(self):
         import msvcrt
-        return msvcrt.getch()
+        return msvcrt.getch().decode("utf-8")
 
 
 def handle_sender_update(sender):
@@ -261,8 +261,7 @@ def kb_thread_run():
     kbrd_char = _Getch()
     while True:
         try:
-            bc = kbrd_char()
-            ch = bc.decode("utf-8")
+            ch = kbrd_char()
             if ch == '\x03': # They pressed ^C
                 Control_C_Pressed = True
                 return # We are done
