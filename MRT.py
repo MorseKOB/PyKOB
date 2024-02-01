@@ -2,7 +2,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-2024 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,15 +43,15 @@ Example:
 from pykob import VERSION, config, log, kob, internet, morse
 
 import argparse
-import codecs
-from distutils.util import strtobool
+import os
 import sys
+import threading as thr
 from time import sleep
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
-
+Control_C_Pressed = False
 KOB = None
 our_office_id = ""
 Sender = None
@@ -62,10 +62,59 @@ connected = False
 
 local_loop_active = False  # True if sending on key or keyboard
 internet_station_active = False  # True if a remote station is sending
-
 sender_current = ""
 last_received_para = False
 exit_status = 1
+
+class _Getch:
+    """
+    Gets a single character from standard input.  Does not echo to the screen.
+
+    This uses native calls on Windows and *nix (Linux and MacOS), and relies on
+    the Subclasses for each platform.
+    """
+    def __init__(self):
+        try:
+            self.impl = _GetchWindows()
+        except ImportError:
+            self.impl = _GetchUnix()
+
+    def __call__(self): return self.impl()
+
+class _GetchUnix:
+    """
+    Get a single character from the standard input on *nix
+
+    Used by `_Getch`
+    """
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+
+class _GetchWindows:
+    """
+    Get a single character from the standard input on Windows
+
+    Used by `_Getch`
+    """
+    def __init__(self):
+        import msvcrt
+
+    def __call__(self):
+        import msvcrt
+        return msvcrt.getch().decode("utf-8")
+
 
 def handle_sender_update(sender):
     """
@@ -132,6 +181,8 @@ def emit_local_code(code, code_source):
         Recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
     if connected and config.remote:
         Internet.write(code)
+    if code_source == kob.CodeSource.keyboard and config.local:
+        KOB.soundCode(code, code_source)
 
 def from_key(code):
     """
@@ -159,6 +210,13 @@ def from_keyboard(code):
     Called from the 'Keyboard-Send' thread.
     """
     global internet_station_active, local_loop_active
+    if len(code) > 0:
+        if code[-1] == 1: # special code for closer/circuit closed
+            circuit_closer_closed(True)
+            return
+        elif code[-1] == 2: # special code for closer/circuit open
+            circuit_closer_closed(False)
+            return
     if not internet_station_active and local_loop_active:
         emit_local_code(code, kob.CodeSource.keyboard)
 
@@ -167,8 +225,8 @@ def from_internet(code):
     global local_loop_active, internet_station_active, sender_current, our_office_id
     if connected:
         if not sender_current == our_office_id:
-            KOB.soundCode(code, kob.CodeSource.wire)
             Reader.decode(code)
+            KOB.soundCode(code, kob.CodeSource.wire)
         if Recorder:
             Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
@@ -199,6 +257,25 @@ def reader_callback(char, spacing):
     print(char, end='', flush=True)
     if char == '_':
         print()
+
+def kb_thread_run():
+    global Control_C_Pressed
+    kbrd_char = _Getch()
+    while True:
+        try:
+            ch = kbrd_char()
+            if ch == '\x03': # They pressed ^C
+                Control_C_Pressed = True
+                return # We are done
+            if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
+                # Since this is from the keyboard, print it so it can be seen.
+                nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
+                print(ch, end=nl)
+                code = Sender.encode(ch)
+                from_keyboard(code)
+            sleep(0.01)
+        except Exception as ex:
+            print("<<< Keyboard reader encountered an error and will stop reading. Exception: {} >>>").format(ex)
 
 try:
     # Main code
@@ -234,12 +311,19 @@ try:
     Internet = internet.Internet(our_office_id, code_callback=from_internet)
     Internet.monitor_sender(handle_sender_update) # Set callback for monitoring current sender
     Reader = morse.Reader(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type, callback=reader_callback)
+    Sender = morse.Sender(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type)
+
+    # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
+    kbthread = thr.Thread(name="Keyboard-thread", daemon=True, target=kb_thread_run)
+    kbthread.start()
 
     Internet.connect(wire)
     connected = True
     sleep(0.5)
     while True:
         sleep(0.1)  # Loop while background threads take care of 'stuff'
+        if Control_C_Pressed:
+            raise KeyboardInterrupt
 except KeyboardInterrupt:
     exit_status = 0 # Since the main program is an infinite loop, ^C is a normal way to exit.
 finally:
