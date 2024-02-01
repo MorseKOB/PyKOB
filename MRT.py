@@ -53,6 +53,7 @@ UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 
 KOB = None
+our_office_id = ""
 Sender = None
 Reader = None
 Recorder = None
@@ -101,7 +102,6 @@ def circuit_closer_closed(state):
     if not internet_station_active:
         if config.local:
             handle_sender_update(config.station)
-            KOB.soundCode(code, kob.CodeSource.key)
             Reader.decode(code)
         if Recorder:
             Recorder.record(code, kob.CodeSource.local)
@@ -127,11 +127,9 @@ def emit_local_code(code, code_source):
     """
     global connected
     handle_sender_update(config.station)
-    Reader.decode(code)
+    #Reader.decode(code)
     if Recorder:
         Recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
-    if config.local:
-        KOB.soundCode(code, code_source)
     if connected and config.remote:
         Internet.write(code)
 
@@ -139,9 +137,6 @@ def from_key(code):
     """
     Handle inputs received from the external key.
     Only send if the circuit is open.
-    Note: typically this will be the case, but it is possible to
-     close the circuit from the GUI while the key's physical closer
-     is still open.
 
     Called from the 'KOB-KeyRead' thread.
     """
@@ -169,10 +164,11 @@ def from_keyboard(code):
 
 def from_internet(code):
     """handle inputs received from the internet"""
-    global local_loop_active, internet_station_active
+    global local_loop_active, internet_station_active, sender_current, our_office_id
     if connected:
-        KOB.soundCode(code, kob.CodeSource.wire)
-        Reader.decode(code)
+        if not sender_current == our_office_id:
+            KOB.soundCode(code, kob.CodeSource.wire)
+            Reader.decode(code)
         if Recorder:
             Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
@@ -205,6 +201,7 @@ def reader_callback(char, spacing):
         print()
 
 try:
+    # Main code
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe current configuration is used except as overridden by optional arguments.", \
         parents=\
         [\
@@ -214,7 +211,7 @@ try:
         help='Wire to connect to. If specified, this is used rather than the configured wire.')
     args = arg_parser.parse_args()
 
-    office_id = args.station # the Station/Office ID string to attach with
+    our_office_id = args.station # the Station/Office ID string to attach with
     text_speed = args.text_speed  # text speed (words per minute)
     if (text_speed < 1) or (text_speed > 50):
         print("text speed specified must be between 1 and 50 [-t|--textspeed]")
@@ -225,7 +222,7 @@ try:
     print('PyKOB ' + VERSION)
 
     print('Connecting to wire: ' + str(wire))
-    print('Connecting as Station/Office: ' + office_id)
+    print('Connecting as Station/Office: ' + our_office_id)
     # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
     if config.invert_key_input:
         print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
@@ -234,7 +231,7 @@ try:
     KOB = kob.KOB(
             portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
             useAudio=config.sound, keyCallback=from_key)
-    Internet = internet.Internet(office_id, code_callback=from_internet)
+    Internet = internet.Internet(our_office_id, code_callback=from_internet)
     Internet.monitor_sender(handle_sender_update) # Set callback for monitoring current sender
     Reader = morse.Reader(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type, callback=reader_callback)
 
