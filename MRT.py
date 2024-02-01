@@ -69,6 +69,9 @@ exit_status = 1
 class _Getch:
     """
     Gets a single character from standard input.  Does not echo to the screen.
+
+    This uses native calls on Windows and *nix (Linux and MacOS), and relies on
+    the Subclasses for each platform.
     """
     def __init__(self):
         try:
@@ -78,18 +81,12 @@ class _Getch:
 
     def __call__(self): return self.impl()
 
-class _Getch:
-    """Gets a single character from standard input.  Does not echo to the screen."""
-    def __init__(self):
-        try:
-            self.impl = _GetchWindows()
-        except ImportError:
-            self.impl = _GetchUnix()
-
-    def __call__(self): return self.impl()
-
-
 class _GetchUnix:
+    """
+    Get a single character from the standard input on *nix
+
+    Used by `_Getch`
+    """
     def __init__(self):
         import tty, sys
 
@@ -106,6 +103,11 @@ class _GetchUnix:
 
 
 class _GetchWindows:
+    """
+    Get a single character from the standard input on Windows
+
+    Used by `_Getch`
+    """
     def __init__(self):
         import msvcrt
 
@@ -223,8 +225,8 @@ def from_internet(code):
     global local_loop_active, internet_station_active, sender_current, our_office_id
     if connected:
         if not sender_current == our_office_id:
-            KOB.soundCode(code, kob.CodeSource.wire)
             Reader.decode(code)
+            KOB.soundCode(code, kob.CodeSource.wire)
         if Recorder:
             Recorder.record(code, kob.CodeSource.wire)
         if len(code) > 0 and code[-1] == +1:
@@ -267,7 +269,7 @@ def kb_thread_run():
                 return # We are done
             if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
                 # Since this is from the keyboard, print it so it can be seen.
-                nl = '\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
+                nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
                 print(ch, end=nl)
                 code = Sender.encode(ch)
                 from_keyboard(code)
