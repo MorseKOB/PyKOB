@@ -1,0 +1,16 @@
+BEAUFORT SCALE.  
+
+Beaufort Number,  Name,  Miles Per Hour,  Description.  
+ 0  calm,  less than 1 mph,  calm,  smoke rises vertically.  
+ 1  light air,  1 to 3 mph,  direction of wind shown by smoke  but not by wind vanes.  
+ 2  light breeze,  4 to 7 mph,  wind felt on face,  leaves rustle,  ordinary vane moved by wind.  
+ 3  gentle breeze,  8 to 12 mph,  leaves and small twigs in constant motion,  wind extends light flag.  
+ 4  moderate breeze,  13 to 18 mph,  raises dust and loose paper,  small branches are moved.  
+ 5  fresh breeze,  19 to 24 mph,  small trees in leaf begin to sway,  crested wavelets form on inland waters.  
+ 6  strong breeze,  25 to 31 mph,  large branches in motion,  telegraph wires whistle,  umbrellas used with difficulty.  
+ 7  moderate gale,  32 to 38 mph,  whole trees in motion,  inconvenience in walking against wind.  
+ 8  fresh gale,  39 to 46 mph,  breaks twigs off trees,  generally impedes progress.  
+ 9  strong gale,  47 to 54 mph,  slight structural damage occurs,  chimney pots and slates removed.  
+ 10  whole gale,  55 to 63 mph,  trees uprooted,  considerable structural damage occurs.  
+ 11  storm,  64 to 72 mph,  very rarely experienced,  accompanied by widespread damage.  
+ 12  hurricane,  73 to 136 mph,  devastation occurs.  
