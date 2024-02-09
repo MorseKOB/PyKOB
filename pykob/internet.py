@@ -49,7 +49,7 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 NUL = '\x00'
 
 class Internet:
-    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None, mka=None):
+    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None, appver=None, mka=None):
         self.host = HOST_DEFAULT
         self.port = PORT_DEFAULT
         self.mka = mka # MKOBAction - to be able to display warning messages to the user
@@ -63,7 +63,12 @@ class Internet:
                 self.port = hp[1]
             self.host = hp[0]
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.version = ("PyKOB " + VERSION).encode(encoding='latin-1')
+        # Application name/version to register with on the server
+        self.appver = None if appver == None or appver.strip() == "" else appver.strip()
+        if appver:
+            self.app = "{} (PK-{})".format(appver, VERSION).encode(encoding='latin-1')
+        else:
+            self.app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
         self.officeID = officeID if officeID != None else ""
         self.wireNo = 0
         self.sentSeqNo = 0
@@ -86,7 +91,7 @@ class Internet:
     @property
     def packet_callback(self):
         return self._packet_callback
-    
+
     @packet_callback.setter
     def packet_callback(self, cb):
         self._packet_callback = cb
@@ -216,7 +221,7 @@ class Internet:
                 self.socket.sendto(shortPacket, self._get_address())
                 self.sentSeqNo += 2
                 idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
-                        self.sentSeqNo, 1, self.version)
+                        self.sentSeqNo, 1, self.app)
                 self.socket.sendto(idPacket, self.address)
                 if self._packet_callback:
                     self._packet_callback("\n<sent: {}>".format(DAT))
