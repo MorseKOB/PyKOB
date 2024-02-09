@@ -424,7 +424,6 @@ class KOB:
                     if self.loopIsEnergized:
                         self.gpo.on() # Pin goes high and energizes sounder
                         self.tSndrEnergized = now
-
             except(OSError):
                 log.err("GPIO output error setting sounder state")
         if self.useSerialOut:
@@ -437,18 +436,3 @@ class KOB:
                         self.tSndrEnergized = now
             except(OSError):
                 log.err("Serial RTS error setting sounder state")
-
-                except(OSError):
-                    log.err("GPIO output error setting sounder state")
-            if self.useSerialOut:
-                try:
-                    if enable:
-                        # De-energize the sounder without changing the 'sounderIsEnergized' state.
-                        self.port.rts = False # Causes interface to deenergize sounder
-                    else:
-                        # Restore the sounder state
-                        if self.sounderIsEnergized: # The loop was energized...
-                            self.port.rts = True # Causes interface to energize sounder
-                            self.tSndrEnergized = now
-                except(OSError):
-                    log.err("Serial RTS error setting sounder state")
