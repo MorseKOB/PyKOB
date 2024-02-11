@@ -43,7 +43,7 @@ print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     root = tk.Tk(className="MKOB")
-    icon = tk.PhotoImage(file="resources/mkob-icon.png")
+    icon = tk.PhotoImage(file="resources/mkob-icon_64.png")
     root.iconphoto(True, icon)
     # Set the theme
     #root.tk.call("source", "azure.tcl")

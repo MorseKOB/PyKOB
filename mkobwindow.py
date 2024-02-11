@@ -40,7 +40,7 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.scrolledtext as tkst
 
-DEBUG_GUI = True
+DEBUG_GUI = False
 DEBUG_LEVEL = 1
 
 def print_hierarchy(w, depth=0):
@@ -50,12 +50,21 @@ def print_hierarchy(w, depth=0):
 
 
 def ignore_event(e):
+    """
+    Event handler that simply does nothing, but continues propagation.
+    """
     return
 
 def ignore_event_no_propagate(e):
+    """
+    Event handler that does nothing and stops further processing.
+    """
     return "break"
 
 class ConnectIndicator(tk.Canvas):
+    """
+    Class that shows a rectangle that is filled with white or red.
+    """
     def __init__(self, parent, width=8, height=15):
         tk.Canvas.__init__(self, parent, width=width, height=height, background='white',
                 borderwidth=2, relief='sunken')
@@ -66,7 +75,7 @@ class ConnectIndicator(tk.Canvas):
         return self._connected
 
     @connected.setter
-    def connected(self, t:bool):
+    def connected(self, t:bool) -> None:
         self._connected = t
         self['background'] = 'red' if t else 'white'
 
@@ -147,19 +156,22 @@ class MKOBWindow(ttk.Frame):
         self.helpMenu.add_command(label='About', command=self._ka.doHelpAbout)
 
         # Paned/Splitter windows
-        pw_left_tb = tk.PanedWindow(self, orient=tk.VERTICAL, sashrelief='raised')  # top (Reader, Stations) / bottom (Sender, Controls)
+        ## left (the Reader|Sender paned window) / right: Stations Connected & Controls)
+        pw_left_right = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashrelief='raised')
+        # top: Reader / bottom: Sender
+        pw_topbottom_lf = tk.PanedWindow(pw_left_right, orient=tk.VERTICAL, sashrelief='raised')
 
         # Reader (top left)
         style_reader = ttk.Style()
         style_reader.configure('Reader.TFrame')
-        fm_reader = ttk.Frame(pw_left_tb, style='Reader.TFrame', padding=2)
+        fm_reader = ttk.Frame(pw_topbottom_lf, style='Reader.TFrame', padding=2)
         self._txtReader = tkst.ScrolledText(fm_reader, width=40, height=20, highlightthickness=0,
                 font='TkTextFont', wrap='word', takefocus=False)
         # Code Sender w/controls (bottom left)
         ## Sender  w/controls
         style_sender = ttk.Style()
         style_sender.configure('Sender.TFrame')
-        fm_sender_pad = ttk.Frame(pw_left_tb, style='Sender.TFrame', padding=4)
+        fm_sender_pad = ttk.Frame(pw_topbottom_lf, style='Sender.TFrame', padding=4)
         fm_sender = ttk.Frame(fm_sender_pad, borderwidth=2, relief='groove')
         self._txtKeyboard = tkst.ScrolledText(fm_sender, width=60, height=10, highlightthickness=0,
                 font='TkFixedFont', wrap='word')
@@ -176,7 +188,9 @@ class MKOBWindow(ttk.Frame):
 
         # Stations Connected | Office | Closer & Speed | Sender controls | Wire/Connect
         #  (right)
-        fm_right = ttk.Frame(self)
+        fm_right = ttk.Frame(pw_left_right)
+        style_spinbox = ttk.Style() # Add padding around the spinbox entry fields to move the text away from the arrows
+        style_spinbox.configure('MK.TSpinbox', padding=(1,1,6,1)) # padding='W N E S'
         ## Station list
         self._txtStnList = tkst.ScrolledText(fm_right, width=26, height=25, highlightthickness=0,
                 font='TkTextFont', wrap='none', takefocus=False)
@@ -198,7 +212,7 @@ class MKOBWindow(ttk.Frame):
         self._varCWPM = tk.StringVar()
         self._varCWPM.set(cfg.min_char_speed)
         self._varCWPM.trace_add('write', self._handle_speed_change)
-        spnCWPM = ttk.Spinbox(fm_closer_speed, from_=5, to=40, width=4, format="%1.0f", justify=tk.RIGHT,
+        spnCWPM = ttk.Spinbox(fm_closer_speed, style='MK.TSpinbox', from_=5, to=40, width=4, format="%1.0f", justify=tk.RIGHT,
                 validate="key", validatecommand=(self._digits_only_validator,'%P'), textvariable=self._varCWPM)
         # Wire & Connect
         fm_wire_connect = ttk.Frame(fm_right, borderwidth=3, relief='groove')
@@ -206,8 +220,8 @@ class MKOBWindow(ttk.Frame):
         lbl_wire = ttk.Label(fm_wire_connect, text='Wire:')
         self._varWireNo = tk.StringVar()
         self._varWireNo.set(cfg.wire)
-        self._varWireNo.trace_add('write', self._ka.doWireNo)
-        spnWireNo = ttk.Spinbox(fm_wire_connect, from_=1, to=32000, width=7, format="%1.0f", justify=tk.RIGHT,
+        self._varWireNo.trace_add('write', self._handle_wire_change)
+        spnWireNo = ttk.Spinbox(fm_wire_connect, style='MK.TSpinbox', from_=1, to=32000, width=7, format="%1.0f", justify=tk.RIGHT,
                 validate="key", validatecommand=(self._digits_only_validator,'%P'), textvariable=self._varWireNo)
         ## Connect
         self._btnConnect = ttk.Button(fm_wire_connect, text='Connect', width=10, command=self._ka.doConnect)
@@ -228,7 +242,7 @@ class MKOBWindow(ttk.Frame):
         # for spacingRadioButton in range(len(self._CHARACTER_SPACING_OPTIONS)):
         #     self._spacingRadioButtons.append(
         #         ttk.Radiobutton(fm_farnsworth, text=self._CHARACTER_SPACING_OPTIONS[spacingRadioButton],
-        #                         command=self._spacingChange,
+        #                         command=self._handle_spacing_change,
         #                         variable=self._characterSpacing,
         #                         value=spacingRadioButton + 1))
         #     self._spacingRadioButtons[spacingRadioButton].grid(row=0, column=(1+spacingRadioButton), sticky=(N,S,W))
@@ -263,7 +277,6 @@ class MKOBWindow(ttk.Frame):
         fm_sender.rowconfigure(1, weight=0, minsize=20, pad=2)
         fm_sender.columnconfigure(0, weight=1, minsize=80)
         ## Right:
-        fm_right.grid(row=0, column=1, sticky=(N,S,W,E))
         fm_right.rowconfigure(0, weight=1)
         fm_right.rowconfigure(1, weight=0)
         fm_right.columnconfigure(0, weight=0)
@@ -297,7 +310,7 @@ class MKOBWindow(ttk.Frame):
         fm_closer_speed.columnconfigure(1, weight=1)
         chkCCircuitCloser.grid(row=0, column=0, sticky=(W))
         lbl_cwpm.grid(row=0, column=1, sticky=(N,S,E), padx=2)
-        spnCWPM.grid(row=0, column=2, sticky=(N,S,W,E))
+        spnCWPM.grid(row=0, column=2, sticky=(E))
         ### Wire & Connect
         fm_wire_connect.grid(row=3, column=0, columnspan=2, sticky=(N,S,W,E), padx=(0,6), pady=(0,8))
         fm_wire_connect.columnconfigure(0, weight=1)
@@ -306,15 +319,19 @@ class MKOBWindow(ttk.Frame):
         fm_wire_connect.columnconfigure(3, weight=0)
         fm_wire_connect_pad = ttk.Frame(fm_wire_connect)
         fm_wire_connect_pad.grid(row=0, rowspan=2, column=0, sticky=(N,S,W,E), padx=1, pady=0)
-        lbl_wire.grid(row=0, column=1, sticky=(N,S,E))
-        spnWireNo.grid(row=0, column=2, sticky=(N,S,W))
-        self._connect_indicator.grid(row=0, column=3, sticky=(N,S,E), padx=2, pady=2)
+        lbl_wire.grid(row=0, column=1, sticky=(E))
+        spnWireNo.grid(row=0, column=2, sticky=(W))
+        self._connect_indicator.grid(row=0, column=3, sticky=(E), padx=2, pady=2)
         self._btnConnect.grid(row=1, column=1, columnspan=3, sticky=(E), padx=(0,2), pady=(2,3))
         ## Splitters (Paned Windows (Panels))
         ### Left: Top | Bottom
-        pw_left_tb.grid(row=0, column=0, sticky=(N,S,W,E))
-        pw_left_tb.add(fm_reader, minsize=100, padx=4, pady=2, sticky=(N,S,W,E), stretch='always')
-        pw_left_tb.add(fm_sender_pad, minsize=98, padx=0, pady=0, sticky=(N,S,W,E), stretch='always')
+        pw_topbottom_lf.grid(row=0, column=0, sticky=(N,S,W,E))
+        pw_topbottom_lf.add(fm_reader, minsize=100, padx=4, pady=2, sticky=(N,S,W,E), stretch='always')
+        pw_topbottom_lf.add(fm_sender_pad, minsize=98, padx=0, pady=0, sticky=(N,S,W,E), stretch='always')
+        ### Left | Right (paned window left | Stations & Controls)
+        pw_left_right.grid(row=0, column=0, sticky=(N,S,W,E))
+        pw_left_right.add(pw_topbottom_lf, minsize=200, padx=1, pady=1, sticky=(N,S,W,E), stretch='always')
+        pw_left_right.add(fm_right, minsize=98, padx=2, pady=1, sticky=(N,S,W,E), stretch='always')
 
         if DEBUG_GUI:
             style_reader.configure('Reader.TFrame', background='red')
@@ -376,12 +393,18 @@ class MKOBWindow(ttk.Frame):
         self.root.update() # Make sure window size reflects all widgets
         # Set to disconnected state
         self.connected(False)
-
         # Finish up...
         self._ka.doWPM()
 
 
-    def _spacingChange(self):
+    def _validate_number_entry(self, P):
+        """
+        Assure that 'P' is a number or blank.
+        """
+        p_is_ok = (P.isdigit() or P == '')
+        return p_is_ok
+
+    def _handle_spacing_change(self, *args):
         if self._characterSpacing.get() == self._CHARACTER_SPACING_NONE + 1:
             # Farnsworth spacing has been turned off - make sure only the "Code speed" control is enabled:
             if str(self._dotSpeedControl.cget('state')) == tk.NORMAL:
@@ -399,25 +422,32 @@ class MKOBWindow(ttk.Frame):
                     self._codeSpeed.set(int(self._dotSpeed.get()))
                 self._dotSpeedControl.config(state = tk.NORMAL)
 
-    def _validate_number_entry(self, P):
-        """
-        Assure that 'P' is a number or blank.
-        """
-        p_is_ok = (P.isdigit() or P == '')
-        return p_is_ok
+    def _handle_speed_change(self, *args):
+        log.debug("_handle_speed_change")
+        wpmstr = self._varCWPM.get().strip()
+        if not wpmstr == "":
+            new_wpm = int(wpmstr)
+            if new_wpm < 5:
+                new_wpm = 5
+            elif new_wpm > 40:
+                new_wpm = 40
+            self._cwpm = new_wpm
+            twpm = self._twpm
+            if new_wpm < twpm:
+                self._twpm = new_wpm
+            self._ka.trigger_speed_change()
 
-    def _handle_speed_change(self, e, *vargs):
-        log.debug("_handle_speed_change({},{})".format(e, vargs))
-        new_wpm = int(self._varCWPM.get())
-        if new_wpm < 5:
-            new_wpm = 5
-        elif new_wpm > 40:
-            new_wpm = 40
-        self._cwpm = new_wpm
-        twpm = self._twpm
-        if new_wpm < twpm:
-            self._twpm = new_wpm
-        self._ka.trigger_speed_change()
+    def _handle_wire_change(self, *args):
+        log.debug("_handle_wire_change")
+        wstr = self._varWireNo.get().strip()
+        if not wstr == "":
+            new_wire = int(wstr)
+            if new_wire < 0:
+                new_wire = 0
+            elif new_wire > 32000:
+                new_wire = 32000
+            self._wire = new_wire
+            self._ka.doWireNo()
 
     @property
     def code_sender_enabled(self):
