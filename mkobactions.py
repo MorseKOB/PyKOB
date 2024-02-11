@@ -31,6 +31,7 @@ import os
 import tkinter as tk
 import tkinter.messagebox as mb
 import tkinter.filedialog as fd
+import traceback
 
 from pykob import config, kob, internet, morse, preferencesWindow, recorder, VERSION
 import mkobevents
@@ -138,8 +139,13 @@ class MKOBActions():
                 self.km.change_wire(wire)
 
     def doConnect(self, event=None, *args):
-        if self.km.Recorder and not self.km.Recorder.playback_state == recorder.PlaybackState.idle:
-            return # If the recorder is playing a recording do not allow connection
+        """
+        Handle the 'Connect' button being pressed, by toggling the connected state.
+        """
+        if not self.km.connected:
+            # If the recorder is playing a recording do not allow connection
+            if self.km.Recorder and not self.km.Recorder.playback_state == recorder.PlaybackState.idle:
+                return
         self.km.toggle_connect()
         self.kw.connected(self.km.connected)
 
@@ -150,12 +156,14 @@ class MKOBActions():
     def trigger_circuit_close(self):
         """
         Generate an event to indicate that the circuit has closed.
+        'UNLATCH' (key/circuit closed)
         """
         self.kw.event_generate(mkobevents.EVENT_CIRCUIT_CLOSE, when='tail')
 
     def trigger_circuit_open(self):
         """
         Generate an event to indicate that the circuit has opened.
+        'LATCH' (key/circuit open)
         """
         self.kw.event_generate(mkobevents.EVENT_CIRCUIT_OPEN, when='tail')
 
@@ -391,7 +399,7 @@ class MKOBActions():
         on = eval(event_data)
         self.kw.code_sender_enabled = on
 
-    def handle_clear_stations(self, event):
+    def handle_clear_stations(self, event=None):
         """
         Handle a <<Clear_Stations>> message by:
         1. Telling the station list to clear
@@ -400,7 +408,7 @@ class MKOBActions():
         """
         self.ksl.handle_clear_station_list(event)
 
-    def handle_reader_clear(self, event):
+    def handle_reader_clear(self, event=None):
         """
         Handle a <<Clear_Reader>> message by:
         1. Telling the reader window to clear

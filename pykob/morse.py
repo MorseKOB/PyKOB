@@ -31,7 +31,8 @@ Provides classes for sending and reading American and International Morse code.
 import sys
 import codecs
 from pathlib import Path
-from threading import Timer
+from threading import current_thread, Timer
+import traceback
 from pykob import config, log
 
 DOTSPERWORD = 45     # dot units per word, including all spaces
@@ -263,11 +264,13 @@ class Reader:
     def char_space_max(self):
         return (self._dotLen * MAXMORSESPACE)
 
-    def decode(self, codeSeq):
+    def decode(self, codeSeq, use_flusher=True):
         # Code received - cancel an existing 'flusher'
-        if self._flusher:
-            self._flusher.cancel()
-            self._flusher = None
+        f = self._flusher
+        self._flusher = None
+        if f:
+            f.cancel()
+            f.join(0.38)
         self.updateDWPM(codeSeq)  # Update the 'detected' WPM
         nextSpace = 0  # space before next dot or dash
         i = 0
@@ -307,17 +310,22 @@ class Reader:
                     self._space = 0
                 elif self._mark > 0:  # continuation of mark
                     self._mark += c
-        self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self.flush)  # if idle call `flush`
-        self._flusher.setName("Reader-Flusher")
-        self._flusher.start()
+        if use_flusher:
+            self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self._flushHandler)  # if idle call `flush`
+            self._flusher.setName("Reader-Flusher <:{}".format(current_thread().name))
+            self._flusher.start()
+        else:
+            pass # To allow breakpoint for debugging
 
     def exit(self):
         """
         Cancel the flusher (if it exists) and exit.
         """
-        if self._flusher:
-            self._flusher.cancel()
-            self._flusher = None
+        f = self._flusher
+        self._flusher = None
+        if f:
+            f.cancel()
+            f.join(0.5)
 
     def setWPM(self, wpm, cwpm=0):
         self._wpm       = max(wpm, cwpm)  # configured code speed
@@ -336,10 +344,19 @@ class Reader:
                 self._d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self._d_dotLen)
                 self._d_wpm = 1200. / self._d_dotLen
 
+    def _flushHandler(self):
+        f = self._flusher
+        self._flusher = None
+        if f:
+            self.flush()
+
     def flush(self):
-        if self._flusher:
-            self._flusher.cancel()
-            self._flusher = None
+        f = self._flusher
+        self._flusher = None
+        if f:
+            f.cancel()
+            f.join(0.38)
+            pass
         if self._mark > 0 or self._latched:
             spacing = self._spaceBuf[self._nChars]
             if self._mark > MINDASHLEN * self._truDot:

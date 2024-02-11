@@ -87,8 +87,8 @@ class KOB:
         self.keyCallback = None # Set to the passed in value once we establish an interface
         self.audio = useAudio
         self.interfaceType = interfaceType
-        self.lastKeyState = False # False is key open
         self.keyHasCloser = False # We will determine once the interface is configured
+        self.lastKeyState = False # False is key open
         self.sounderIsEnergized = False
         self.synthSounderEnergized = False # True: last played 'click', False: played 'clack' (or hasn't played)
         #
@@ -132,16 +132,13 @@ class KOB:
                 log.info("Interface for key and/or sounder on serial port '{}' not available. Key and sounder will not function.".format(portToUse))
         self.tLastSdr = time.time()  # time of last sounder transition
         time.sleep(0.5)
-        # If configured for a loop interface, enable the loop power
-        if self.interfaceType == config.InterfaceType.loop:
-            if config.sounder:
-                self.loopPowerOn()
-            else:
-                # if no sounder output wanted, de-energize the loop
-                self.loopPowerOff()
+        if config.sounder:
+            self.loopPowerOn()
+        else:
+            # if no sounder output wanted, de-energize the loop
+            self.loopPowerOff()
         self.tLastKey = time.time()  # time of last key transition
         self.circuitClosed = self.keyIsClosed  # True: circuit latched closed
-        self.energizeSounder(self.circuitClosed, False)
         #
         self._recorder = None
         self.keyreadThread = None
@@ -203,7 +200,7 @@ class KOB:
         while not self.threadsStop.is_set():
             now = time.time()
             power_save_seconds = config.sounder_power_save
-            if power_save_seconds > 0 and not self.powerSaving and not self._virtualCloserIsOpen and not self._keyCloserIsOpen:
+            if power_save_seconds > 0 and not self.powerSaving:
                 if (now - self.tSndrEnergized) > power_save_seconds:
                     self.powerSave(True)
             time.sleep(1.0)
@@ -229,7 +226,8 @@ class KOB:
                 raise
         elif self.useSerialIn:
             try:
-                kc = self.port.dsr
+#                kc = self.port.dsr
+                kc = self.port.cts
             except(OSError):
                 log.err("Serial key interface not available.")
                 raise
@@ -282,13 +280,13 @@ class KOB:
         True: Energized/Click
         False: De-Energized/Clack
         '''
-        self.sounderIsEnergized = energize
         if energize:
             self.tSndrEnergized = time.time()
         if config.sounder and not (self.interfaceType == config.InterfaceType.loop and fromKey):
             # If using a loop interface and the source is the key,
             # don't do anything, as the closing of the key will energize the sounder,
             # since the loop is energized.
+            self.sounderIsEnergized = energize
             if self.useGpioOut:
                 try:
                     if energize:
@@ -333,7 +331,7 @@ class KOB:
                 dt = int((t - self.tLastKey) * 1000)
                 self.tLastKey = t
                 #
-                # For 'Seperate Key & Sounder' and the Audio Sounder,
+                # For 'Seperate Key & Sounder' and the Audio/Synth Sounder,
                 # drive it here to avoid as much delay from the key
                 # transitions as possible.
                 #
@@ -412,16 +410,15 @@ class KOB:
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         '''
         # Don't enable Power Save if the key is open.
-        if enable and not self.keyIsClosed:
+        if enable and (self._virtualCloserIsOpen or self._keyCloserIsOpen):
             return
-        
         now = time.time()
         if self.useGpioOut:
             try:
                 if enable:
                     self.gpo.off() # Pin goes low and deenergizes sounder
                 else:
-                    if self.loopIsEnergized:
+                    if self.sounderIsEnergized:
                         self.gpo.on() # Pin goes high and energizes sounder
                         self.tSndrEnergized = now
             except(OSError):
@@ -431,7 +428,7 @@ class KOB:
                 if enable:
                     self.port.rts = False
                 else:
-                    if self.loopIsEnergized:
+                    if self.sounderIsEnergized:
                         self.port.rts = True
                         self.tSndrEnergized = now
             except(OSError):

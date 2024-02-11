@@ -368,7 +368,7 @@ class MKOBWindow(ttk.Frame):
         self._varCodeSenderRepeat.set(False)
 
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._app_ver, self._ka, self._ksl, self)
+        self._km = MKOBMain(self._app_ver, self._ka, self)
         self._ka.start(self._km, self._kkb)
         #### Keyboard events
         self.root.bind(mkobevents.EVENT_KB_PROCESS_SEND, self._kkb.handle_keyboard_send)

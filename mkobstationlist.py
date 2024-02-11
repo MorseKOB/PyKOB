@@ -58,7 +58,7 @@ class MKOBStationList:
         self._last_sender = "" # Keep last sender to know when a sender changes
         self.kw = kw
 
-    def handle_clear_station_list(self, event):
+    def handle_clear_station_list(self, event=None):
         """
         reset the station list
         """
@@ -130,7 +130,7 @@ class MKOBStationList:
             # new station, add an entry
             station_info = [station_name, now, -1, now]
             if self._last_sender: # if there is a sender add this just before it
-               self._active_stations.insert(-1,station_info)
+                self._active_stations.insert(-1,station_info)
             else:
                 self._active_stations.append(station_info)
         if  self._trim_station_list() or not existing_entry_updated:

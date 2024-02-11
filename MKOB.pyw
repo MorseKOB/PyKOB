@@ -36,7 +36,7 @@ from pykob import config, log
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
-VERSION = "4.1.3"
+VERSION = "4.1.4"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print("Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))

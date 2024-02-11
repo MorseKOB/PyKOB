@@ -34,8 +34,9 @@ message events.
 class MKOBReader():
     """
     The main text window for the MKOB app. This primarily displays the
-    decoded Morse that is received from a wire or keyed locally. It is
-    also used to display various other content.
+    decoded Morse that is received from a wire or keyed locally.
+
+    It is also used to display various other content (messages to the user).
     """
 
     def __init__(self, mkwindow) -> None:

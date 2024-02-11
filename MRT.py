@@ -147,18 +147,19 @@ def handle_sender_update(sender):
         print()
         print(f'<<{sender_current}>>')
 
-def set_local_loop_active(state):
+def set_local_loop_active(active):
     """
-    Set local_circuit_active state
+    Set local_loop_active state
 
     True: Key or Keyboard active (Ciruit Closer OPEN)
     False: Circuit Closer (physical and virtual) CLOSED
     """
-    global local_circuit_active
-    local_circuit_active = state
-    # log.debug("local_circuit_active:{}".format(state))
+    global local_loop_active
+    local_loop_active = active
+    KOB.energizeSounder((not active), False)
+    # log.debug("local_loop_active:{}".format(state))
 
-def virtualCloserClosed(state):
+def set_virtual_closer_closed(closed):
     """
     Handle change of Circuit Closer state.
 
@@ -166,11 +167,12 @@ def virtualCloserClosed(state):
      True: 'latch'
      False: 'unlatch'
     """
-    global local_circuit_active, internet_station_active
-    code = LATCH_CODE if state == 1 else UNLATCH_CODE
+    global local_loop_active, internet_station_active
+    code = LATCH_CODE if closed else UNLATCH_CODE
     if not internet_station_active:
         if config.local:
-            handle_sender_update(config.station)
+            if not closed:
+                handle_sender_update(config.station)
             Reader.decode(code)
         if Recorder:
             Recorder.record(code, kob.CodeSource.local)
@@ -178,11 +180,11 @@ def virtualCloserClosed(state):
         Internet.write(code)
     if len(code) > 0:
         if code[-1] == 1:
-            # Unlatch
+            # Unlatch (Key closed)
             set_local_loop_active(False)
             Reader.flush()
         elif code[-1] == 2:
-            # Latch
+            # Latch (Key open)
             set_local_loop_active(True)
 
 def emit_local_code(code, code_source):
@@ -211,15 +213,15 @@ def from_key(code):
 
     Called from the 'KOB-KeyRead' thread.
     """
-    global internet_station_active, local_circuit_active
+    global internet_station_active, local_loop_active
     if len(code) > 0:
         if code[-1] == 1: # special code for closer/circuit closed
-            virtualCloserClosed(True)
+            set_virtual_closer_closed(True)
             return
         elif code[-1] == 2: # special code for closer/circuit open
-            virtualCloserClosed(False)
+            set_virtual_closer_closed(False)
             return
-    if not internet_station_active and local_circuit_active:
+    if not internet_station_active and local_loop_active:
         emit_local_code(code, kob.CodeSource.key)
 
 def from_keyboard(code):
@@ -232,10 +234,10 @@ def from_keyboard(code):
     global internet_station_active, local_loop_active
     if len(code) > 0:
         if code[-1] == 1: # special code for closer/circuit closed
-            circuit_closer_closed(True)
+            set_virtual_closer_closed(True)
             return
         elif code[-1] == 2: # special code for closer/circuit open
-            circuit_closer_closed(False)
+            set_virtual_closer_closed(False)
             print('[+ to close key]')
             sys.stdout.flush()
             return
@@ -255,7 +257,6 @@ def from_internet(code):
             internet_station_active = False
         else:
             internet_station_active = True
-
 
 def reader_callback(char, spacing):
     global last_received_para
