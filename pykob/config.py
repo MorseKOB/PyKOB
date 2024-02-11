@@ -533,7 +533,6 @@ def set_wire(w: str):
         The Wire number
     """
 
-    global wire
     try:
         _wire = int(w)
         set_wire_int(_wire)
@@ -542,6 +541,8 @@ def set_wire(w: str):
         raise
 
 def set_wire_int(w: int):
+    global wire
+    wire = w
     user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(w))
 
 def set_text_speed(s: str):
@@ -552,8 +553,6 @@ def set_text_speed(s: str):
     s : str
         The text speed in words-per-minute as an interger string value
     """
-
-    global text_speed
     try:
         _speed = int(s)
         set_text_speed_int(_speed)
@@ -562,6 +561,7 @@ def set_text_speed(s: str):
         raise
 
 def set_text_speed_int(s: int):
+    global text_speed
     text_speed = s
     user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
 

@@ -8,8 +8,6 @@ GUI = True                              # Hope for the best...
 try:
     import tkinter as tk
     from tkinter import ttk
-    from tkinter import scrolledtext
-    from tkinter import Menu
 except ModuleNotFoundError:
     GUI = False
 
@@ -248,10 +246,14 @@ class PreferencesWindow:
 
         ttk.Label(codeOptions, text="Speed (WPM) and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
 
+        # Customize the TSpinbox style to add some padding between the entry and the arrows.
+        style_spinbox = ttk.Style()
+        style_spinbox.configure('MK.TSpinbox', padding=(1,1,6,1)) # padding='W N E S'
+
         ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
         self._dotSpeed = tk.DoubleVar(value=config.min_char_speed)
         self._dotSpeedControl = \
-            ttk.Spinbox(codeOptions, from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
+            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
                         command=self._dotSpeedChange,
                         textvariable=self._dotSpeed)
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
@@ -260,7 +262,7 @@ class PreferencesWindow:
         # print("Setting code speed to", config.text_speed)
         self._codeSpeed = tk.DoubleVar(value=config.text_speed)
         self._codeSpeedControl = \
-            ttk.Spinbox(codeOptions, from_=5, to=40,
+            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,
                         width=4, format="%2.f", justify=tk.RIGHT,
                         command=self._codeSpeedChange,
                         textvariable=self._codeSpeed)

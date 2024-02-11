@@ -297,27 +297,24 @@ class MKOBMain:
             else:
                 self._key_graph_win.key_opened()
 
+    def connect(self, wire):
+        """
+        Connect if not connected, or disconnect and then reconnect.
+        """
+        if self._connected:
+            self.disconnect()
+        self._sender_ID = ""
+        self._ka.trigger_station_list_clear()
+        self._internet.monitor_IDs(self._ka.trigger_update_station_active) # Set callback for monitoring stations
+        self._internet.monitor_sender(self._ka.trigger_update_current_sender) # Set callback for monitoring current sender
+        self._internet.connect(wire)
+        self._connected = True
+
     def disconnect(self):
         """
         Disconnect if connected.
         """
         if self._connected:
-            self.toggle_connect()
-
-    def toggle_connect(self):
-        """
-        Connect or disconnect when user clicks on the Connect button.
-        """
-        if not self._connected:
-            # Connect
-            self._sender_ID = ""
-            self._ka.trigger_station_list_clear()
-            self._internet.monitor_IDs(self._ka.trigger_update_station_active) # Set callback for monitoring stations
-            self._internet.monitor_sender(self._ka.trigger_update_current_sender) # Set callback for monitoring current sender
-            self._internet.connect(config.wire)
-            self._connected = True
-        else:
-            # Disconnect
             self._connected = False
             self._internet.monitor_IDs(None) # don't monitor stations
             self._internet.monitor_sender(None) # don't monitor current sender
@@ -328,6 +325,17 @@ class MKOBMain:
                 self._mreader.decode(LATCH_CODE)
             self._sender_ID = ""
             self._ka.trigger_station_list_clear()
+
+    def toggle_connect(self, wire=config.wire):
+        """
+        Connect or disconnect when user clicks on the Connect button.
+        """
+        if not self._connected:
+            # Connect
+            self.connect(wire)
+        else:
+            # Disconnect
+            self.disconnect()
         self._internet_station_active = False
 
     def change_wire(self, wire:int):
@@ -341,7 +349,7 @@ class MKOBMain:
         self._recorder.wire = wire
         if was_connected:
             time.sleep(0.350) # Needed to allow UTP packets to clear
-            self.toggle_connect()
+            self.connect(wire)
 
 
     # callback functions
