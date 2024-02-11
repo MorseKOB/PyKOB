@@ -402,40 +402,37 @@ class KOB:
         # intending to send code), make sure the loop is powered if the sounder is enabled
         # (in the configuration) so the sounder will follow the key.
         #
-        if open and self._virtualCloserIsOpen \
-            and self.interfaceType == config.InterfaceType.loop and config.sounder:
-            self.loopPowerOn()
+        if config.interface_type == config.InterfaceType.loop and config.sounder:
+            self.energizeLoop(open, True)
+        if open:
+            self.powerSave(False)
 
     def powerSave(self, enable: bool):
         '''
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         '''
-        if not self.powerSaving == enable:
-            log.debug("powerSave:{}".format(enable))
-            self.powerSaving = enable
-            now = time.time()
-            if self.useGpioOut:
-                try:
-                    if enable:
-                        # De-energize the sounder without changing the 'sounderIsEnergized' state.
-                        self.gpo.off() # Pin goes low and deenergizes sounder
-                    else:
-                        # Restore the sounder state
-                        if self.sounderIsEnergized:
-                            self.gpo.on() # Pin goes high and energizes sounder
-                            self.tSndrEnergized = now
-
-                except(OSError):
-                    log.err("GPIO output error setting sounder state")
-            if self.useSerialOut:
-                try:
-                    if enable:
-                        # De-energize the sounder without changing the 'sounderIsEnergized' state.
-                        self.port.rts = False # Causes interface to deenergize sounder
-                    else:
-                        # Restore the sounder state
-                        if self.sounderIsEnergized: # The loop was energized...
-                            self.port.rts = True # Causes interface to energize sounder
-                            self.tSndrEnergized = now
-                except(OSError):
-                    log.err("Serial RTS error setting sounder state")
+        # Don't enable Power Save if the key is open.
+        if enable and not self.keyIsClosed:
+            return
+        
+        now = time.time()
+        if self.useGpioOut:
+            try:
+                if enable:
+                    self.gpo.off() # Pin goes low and deenergizes sounder
+                else:
+                    if self.loopIsEnergized:
+                        self.gpo.on() # Pin goes high and energizes sounder
+                        self.tSndrEnergized = now
+            except(OSError):
+                log.err("GPIO output error setting sounder state")
+        if self.useSerialOut:
+            try:
+                if enable:
+                    self.port.rts = False
+                else:
+                    if self.loopIsEnergized:
+                        self.port.rts = True
+                        self.tSndrEnergized = now
+            except(OSError):
+                log.err("Serial RTS error setting sounder state")

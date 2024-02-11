@@ -41,7 +41,8 @@ LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 class MKOBMain:
-    def __init__(self, mkactions, mkstationlist, mkwindow):
+    def __init__(self, app_ver, mkactions, mkstationlist, mkwindow):
+        self.app_ver = app_ver
         self._ka = mkactions
         self._mreader = None  # Set by MKOBActions.doWPM
         self._msender = None  # Set by MKOBActions.doWPM
@@ -69,7 +70,7 @@ class MKOBMain:
                 useAudio=config.sound, keyCallback=self.from_key)
         self._kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
         self._internet = internet.Internet(config.station, code_callback=self.from_internet,
-                                            pckt_callback=self._packet_callback, mka=self._ka)
+                                            pckt_callback=self._packet_callback, appver=self.app_ver, mka=self._ka)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if config.invert_key_input:
             log.warn("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \

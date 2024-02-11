@@ -85,7 +85,7 @@ class MKOBWindow(ttk.Frame):
         ttk.Frame.__init__(self, root)
 
         self.root = root
-        self._MKOB_VERSION_TEXT = mkob_version_text
+        self._app_ver = mkob_version_text
         # Hide the window from view until its content can be fully initialized
         self.root.withdraw()
 
@@ -385,7 +385,7 @@ class MKOBWindow(ttk.Frame):
         self._varCodeSenderRepeat.set(False)
 
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._ka, self._ksl, self)
+        self._km = MKOBMain(self._app_ver, self._ka, self._ksl, self)
         self._ka.start(self._km, self._kkb)
         #### Keyboard events
         self.root.bind(mkobevents.EVENT_KB_PROCESS_SEND, self._kkb.handle_keyboard_send)
@@ -479,8 +479,8 @@ class MKOBWindow(ttk.Frame):
         self._varCircuitCloser.set(v)
 
     @property
-    def MKOB_VERSION_TEXT(self):
-        return self._MKOB_VERSION_TEXT
+    def app_name_version(self):
+        return self._app_ver
 
     @property
     def show_packets(self):
