@@ -229,7 +229,8 @@ class KOB:
                 raise
         elif self.useSerialIn:
             try:
-                kc = self.port.dsr
+# ZZZ                kc = self.port.dsr
+                kc = self.port.cts
             except(OSError):
                 log.err("Serial key interface not available.")
                 raise
@@ -403,7 +404,7 @@ class KOB:
         # (in the configuration) so the sounder will follow the key.
         #
         if config.interface_type == config.InterfaceType.loop and config.sounder:
-            self.energizeLoop(open, True)
+            self.energizeSounder(open, True)
         if open:
             self.powerSave(False)
 
@@ -414,14 +415,13 @@ class KOB:
         # Don't enable Power Save if the key is open.
         if enable and not self.keyIsClosed:
             return
-        
         now = time.time()
         if self.useGpioOut:
             try:
                 if enable:
                     self.gpo.off() # Pin goes low and deenergizes sounder
                 else:
-                    if self.loopIsEnergized:
+                    if self.sounderIsEnergized:
                         self.gpo.on() # Pin goes high and energizes sounder
                         self.tSndrEnergized = now
             except(OSError):
@@ -431,7 +431,7 @@ class KOB:
                 if enable:
                     self.port.rts = False
                 else:
-                    if self.loopIsEnergized:
+                    if self.sounderIsEnergized:
                         self.port.rts = True
                         self.tSndrEnergized = now
             except(OSError):
