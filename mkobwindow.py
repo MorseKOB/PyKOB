@@ -66,7 +66,7 @@ class ConnectIndicator(tk.Canvas):
     Class that shows a rectangle that is filled with white or red.
     """
     def __init__(self, parent, width=8, height=15):
-        tk.Canvas.__init__(self, parent, width=width, height=height, background='white',
+        super().__init__(parent, width=width, height=height, background='white',
                 borderwidth=2, relief='sunken')
         self._connected = False
 
@@ -79,6 +79,56 @@ class ConnectIndicator(tk.Canvas):
         self._connected = t
         self['background'] = 'red' if t else 'white'
 
+class SenderControls(ttk.Frame):
+    """
+    Frame to encapsulate the Code Sender controls.
+    """
+    def __init__(self, parent, mkkbd, width=100, height=40, borderwidth=3, relief='groove'):
+        super().__init__(parent, width=width, height=height, borderwidth=borderwidth, relief=relief)
+        self._mkkbd = mkkbd
+        self._lbl_sender = ttk.Label(self, text='Code Sender:')
+        self._varCodeSenderOn = tk.IntVar()
+        self._chkCodeSenderOn = ttk.Checkbutton(self, text='Enable', variable=self._varCodeSenderOn)
+        self._varCodeSenderRepeat = tk.IntVar()
+        self._chkCodeSenderRepeat = ttk.Checkbutton(self, text='Repeat', variable=self._varCodeSenderRepeat)
+        self._btnCodeSenderClear = ttk.Button(self, text='Clear', command=self._mkkbd.handle_clear)
+        self._varCodeSenderOn.trace_add('write', self._handle_enable_change)
+        self._varCodeSenderRepeat.trace_add('write', self._handle_repeat_change)
+
+    def _handle_enable_change(self, *args):
+        self._mkkbd.enabled = self._varCodeSenderOn.get()
+
+    def _handle_repeat_change(self, *args):
+        self._mkkbd.repeat = self._varCodeSenderRepeat.get()
+
+    @property
+    def code_sender_enabled(self):
+        return self._varCodeSenderOn.get()
+    @code_sender_enabled.setter
+    def code_sender_enabled(self, b:bool):
+        self._varCodeSenderOn.set(b)
+
+    @property
+    def code_sender_repeat(self):
+        return self._varCodeSenderRepeat.get()
+    @code_sender_repeat.setter
+    def code_sender_repeat(self, b):
+        self._varCodeSenderRepeat.set(b)
+
+    def layout(self):
+        """
+        Layout the frame.
+        """
+        self.rowconfigure(0, minsize=22, weight=0)
+        self.rowconfigure(1, minsize=1, weight=0)
+        self.columnconfigure(0, weight=0)
+        self.columnconfigure(1, weight=0)
+        self.columnconfigure(2, weight=1)
+        self.columnconfigure(3, weight=0)
+        self._lbl_sender.grid(row=0, column=0, sticky=(W), padx=(0,2))
+        self._chkCodeSenderOn.grid(row=0, column=1, sticky=(W), padx=4)
+        self._chkCodeSenderRepeat.grid(row=0, column=2, sticky=(W), padx=4)
+        self._btnCodeSenderClear.grid(row=0, column=3, sticky=(E), padx=2)
 
 class MKOBWindow(ttk.Frame):
     def __init__(self, root, mkob_version_text, cfg: config):
@@ -178,13 +228,7 @@ class MKOBWindow(ttk.Frame):
         self._txtKeyboard.bind('<Key-F4>', self._ka.handle_decrease_wpm)
         self._txtKeyboard.focus_set()
         ### code sender checkboxes and clear
-        fm_sndr_controls = ttk.Frame(fm_sender)
-        lbl_sender = ttk.Label(fm_sndr_controls, text='Code Sender:')
-        self._varCodeSenderOn = tk.IntVar()
-        chkCodeSenderOn = ttk.Checkbutton(fm_sndr_controls, text='Enable', variable=self._varCodeSenderOn)
-        self._varCodeSenderRepeat = tk.IntVar()
-        chkCodeSenderRepeat = ttk.Checkbutton(fm_sndr_controls, text='Repeat', variable=self._varCodeSenderRepeat)
-        btnCodeSenderClear = ttk.Button(fm_sndr_controls, text='Clear', command=self._kkb.handle_clear)
+        self._fm_sndr_controls = SenderControls(fm_sender, self._kkb)
 
         # Stations Connected | Office | Closer & Speed | Sender controls | Wire/Connect
         #  (right)
@@ -205,7 +249,7 @@ class MKOBWindow(ttk.Frame):
         fm_closer_speed = ttk.Frame(fm_right, borderwidth=3, relief='groove')
         ## circuit closer
         self._varCircuitCloser = tk.IntVar()
-        chkCCircuitCloser = ttk.Checkbutton(fm_closer_speed, text='Circuit Closed',
+        chkCCircuitCloser = ttk.Checkbutton(fm_closer_speed, text='Key Closed',
                 variable=self._varCircuitCloser, command=self._ka.doCircuitCloser)
         ## Character speed
         lbl_cwpm = ttk.Label(fm_closer_speed, text='Speed:')
@@ -287,17 +331,8 @@ class MKOBWindow(ttk.Frame):
         ### Sender
         self._txtKeyboard.grid(row=0, column=0, sticky=(N,S,W,E), padx=2, pady=2)
         #### Sender Controls
-        fm_sndr_controls.grid(row=1, column=0, sticky=(N,S,W,E))
-        fm_sndr_controls.rowconfigure(0, minsize=22, weight=0)
-        fm_sndr_controls.rowconfigure(1, minsize=1, weight=0)
-        fm_sndr_controls.columnconfigure(0, weight=0)
-        fm_sndr_controls.columnconfigure(1, weight=0)
-        fm_sndr_controls.columnconfigure(2, weight=1)
-        fm_sndr_controls.columnconfigure(3, weight=0)
-        lbl_sender.grid(row=0, column=0, sticky=(W), padx=(0,2))
-        chkCodeSenderOn.grid(row=0, column=1, sticky=(W), padx=4)
-        chkCodeSenderRepeat.grid(row=0, column=2, sticky=(W), padx=4)
-        btnCodeSenderClear.grid(row=0, column=3, sticky=(E), padx=2)
+        self._fm_sndr_controls.grid(row=1, column=0, sticky=(N,S,W,E))
+        self._fm_sndr_controls.layout()
         ### Stations
         self._txtStnList.grid(row=0, column=0, columnspan=2, sticky=(N,S,W,E), padx=(2,6), pady=(6,2))
         ### Office
@@ -381,8 +416,8 @@ class MKOBWindow(ttk.Frame):
 
         # set option values
         self._varCircuitCloser.set(True)
-        self._varCodeSenderOn.set(True)
-        self._varCodeSenderRepeat.set(False)
+        self._fm_sndr_controls.code_sender_enabled = True
+        self._fm_sndr_controls.code_sender_repeat = False
 
         # Now that the windows and controls are initialized, create our MKOBMain.
         self._km = MKOBMain(self._app_ver, self._ka, self)
@@ -454,21 +489,14 @@ class MKOBWindow(ttk.Frame):
         """
         The state of the code sender checkbox.
         """
-        return self._varCodeSenderOn.get()
+        return self._fm_sndr_controls.code_sender_enabled
 
     @code_sender_enabled.setter
-    def code_sender_enabled(self, on: bool):
+    def code_sender_enabled(self, enabled: bool):
         """
         Set the state of the code sender checkbox ON|OFF
         """
-        self._varCodeSenderOn.set(on)
-
-    @property
-    def code_sender_repeat(self):
-        """
-        The state of the code sender repeat checkbox.
-        """
-        return self._varCodeSenderRepeat.get()
+        self._fm_sndr_controls.code_sender_enabled = enabled
 
     @property
     def circuit_closer(self):

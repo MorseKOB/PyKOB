@@ -214,10 +214,10 @@ class MKOBMain:
         Called from the 'KOB-KeyRead' thread.
         """
         if len(code) > 0:
-            if code[-1] == 1: # special code for 'UNLATCH' (key/circuit closed)
+            if code[-1] == 1: # special code for 'LATCH' (key/circuit closed)
                 self._ka.trigger_circuit_close()
                 return
-            elif code[-1] == 2: # special code for 'LATCH' (key/circuit open)
+            elif code[-1] == 2: # special code for 'UNLATCH' (key/circuit open)
                 self._ka.trigger_circuit_open()
                 return
         if not self._internet_station_active and self._kob.virtualCloserIsOpen:
@@ -264,8 +264,8 @@ class MKOBMain:
         the ESC keyboard shortcut, or by posting a message (from the Key handler).
 
         A state of:
-        True: 'latch' the circuit closed
-        False: 'unlatch' the circuit (now open)
+        True: 'LATCH' the circuit closed
+        False: 'UNLATCH' the circuit (now open)
 
         """
         code = LATCH_CODE if closed else UNLATCH_CODE
@@ -276,7 +276,7 @@ class MKOBMain:
             if config.local:
                 if not closed:
                     self._ka.handle_sender_update(config.station) # Can call 'handle_' as this is run on the UI thread
-                self._kob.energizeSounder(closed, True)
+                self._kob.energizeSounder(closed)
                 self._mreader.decode(code)
             self._recorder.record(code, kob.CodeSource.local)
         if self._connected.is_set() and config.remote:
@@ -331,7 +331,7 @@ class MKOBMain:
             self._mreader.flush()
             self._ka.trigger_reader_append_text("\n#####\n")
             if not self._kob.virtualCloserIsOpen:
-                self._kob.energizeSounder(True, False) # Sounder should be energized when disconnected.
+                self._kob.energizeSounder(True) # Sounder should be energized when disconnected.
 
 
     def change_wire(self, wire:int):

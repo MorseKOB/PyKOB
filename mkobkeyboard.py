@@ -44,6 +44,8 @@ class MKOBKeyboard():
         self.kw = mkwindow
         self.ka = mkactions
         self.km = None
+        self._enabled = False
+        self._repeat = False
         self._last_send_pos = 1.0
         self._waiting_for_sent_code = False
         self.keyboard_send_thread = threading.Thread(name='Keyboard-Send', target=self._thread_keyboard_send)
@@ -60,6 +62,20 @@ class MKOBKeyboard():
                 time.sleep(0.005)
             else:
                 time.sleep(0.8)
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+    @enabled.setter
+    def enabled(self, en:bool):
+        self._enabled = en
+
+    @property
+    def repeat(self) -> bool:
+        return self._repeat
+    @repeat.setter
+    def repeat(self, en:bool):
+        self._repeat = en
 
     def start(self, mkmain):
         self.km = mkmain
@@ -95,11 +111,11 @@ class MKOBKeyboard():
 
         This handles an event posted from the keyboard-send thread.
         """
-        if self.kw.code_sender_enabled and not self._waiting_for_sent_code:
+        if self._enabled and not self._waiting_for_sent_code:
             if self.kw.keyboard_win.compare(MARK_SEND, '==', 'end-1c'):
                 if not self.kw.keyboard_win.compare(MARK_SEND, '==', INSERT):
                     self.kw.keyboard_win.mark_set(INSERT, MARK_SEND) # Move the cursor to the END
-                if self.kw.code_sender_repeat:
+                if self._repeat and not self.kw.keyboard_win.compare(MARK_SEND, '==', '1.0'):
                     self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
                 else:
                     # Remove the Send mark highlight
@@ -164,7 +180,7 @@ class MKOBKeyboard():
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
         if mark == INSERT and not pos == MARK_SEND:
-            if (self.kw.code_sender_enabled and (float(ip) < float(ms))) or not self.kw.code_sender_enabled:
+            if (self._enabled and (float(ip) < float(ms))) or not self._enabled:
                 #self.ka.trigger_set_code_sender_on(False)
                 self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
                 self.kw.keyboard_win.mark_set(MARK_SEND, INSERT)

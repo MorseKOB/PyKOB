@@ -156,7 +156,7 @@ def set_local_loop_active(active):
     """
     global local_loop_active
     local_loop_active = active
-    KOB.energizeSounder((not active), False)
+    KOB.energizeSounder((not active))
     # log.debug("local_loop_active:{}".format(state))
 
 def set_virtual_closer_closed(closed):

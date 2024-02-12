@@ -156,14 +156,14 @@ class MKOBActions():
     def trigger_circuit_close(self):
         """
         Generate an event to indicate that the circuit has closed.
-        'UNLATCH' (key/circuit closed)
+        'LATCH' (key/circuit closed)
         """
         self.kw.event_generate(mkobevents.EVENT_CIRCUIT_CLOSE, when='tail')
 
     def trigger_circuit_open(self):
         """
         Generate an event to indicate that the circuit has opened.
-        'LATCH' (key/circuit open)
+        'UNLATCH' (key/circuit open)
         """
         self.kw.event_generate(mkobevents.EVENT_CIRCUIT_OPEN, when='tail')
 
