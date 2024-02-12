@@ -293,14 +293,14 @@ class MKOBMain:
             else:
                 self._key_graph_win.key_opened()
 
-    def connect(self, wire):
+    def disconnect(self):
         """
-        Connect if not connected, or disconnect and then reconnect.
+        Disconnect if connected.
         """
         if self._connected.is_set():
             self.toggle_connect()
 
-    def disconnect(self):
+    def toggle_connect(self):
         """
         Connect or disconnect when user clicks on the Connect button.
 
@@ -332,6 +332,7 @@ class MKOBMain:
             self._ka.trigger_reader_append_text("\n#####\n")
             if not self._kob.virtualCloserIsOpen:
                 self._kob.energizeSounder(True, False) # Sounder should be energized when disconnected.
+
 
     def change_wire(self, wire:int):
         """
@@ -413,4 +414,3 @@ class MKOBMain:
         True if the key graph is currently active.
         """
         return (self._key_graph_win and MKOBKeyTimeWin.active)
-
