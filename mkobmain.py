@@ -297,23 +297,11 @@ class MKOBMain:
         """
         Connect if not connected, or disconnect and then reconnect.
         """
-<<<<<<< HEAD
         if self._connected.is_set():
             self.toggle_connect()
-=======
-        if self._connected:
-            self.disconnect()
-        self._sender_ID = ""
-        self._ka.trigger_station_list_clear()
-        self._internet.monitor_IDs(self._ka.trigger_update_station_active) # Set callback for monitoring stations
-        self._internet.monitor_sender(self._ka.trigger_update_current_sender) # Set callback for monitoring current sender
-        self._internet.connect(wire)
-        self._connected = True
->>>>>>> 8119aec6343e08a93fde0abdecbf866728802058
 
     def disconnect(self):
         """
-<<<<<<< HEAD
         Connect or disconnect when user clicks on the Connect button.
 
         # Okay to call 'handle...' in here, as this is run on main thread.
@@ -329,12 +317,6 @@ class MKOBMain:
         else:
             # Disconnect
             self._connected.clear()
-=======
-        Disconnect if connected.
-        """
-        if self._connected:
-            self._connected = False
->>>>>>> 8119aec6343e08a93fde0abdecbf866728802058
             self._internet.monitor_IDs(None) # don't monitor stations
             self._internet.monitor_sender(None) # don't monitor current sender
             self._internet.disconnect(self._on_disconnect)
@@ -344,28 +326,12 @@ class MKOBMain:
             self._internet_station_active = False
             self._sender_ID = ""
             self._ka.trigger_station_list_clear()
-<<<<<<< HEAD
             self._mreader.flush()
             self._mreader.decode(LATCH_CODE, use_flusher=False)
             self._mreader.flush()
             self._ka.trigger_reader_append_text("\n#####\n")
             if not self._kob.virtualCloserIsOpen:
                 self._kob.energizeSounder(True, False) # Sounder should be energized when disconnected.
-
-=======
-
-    def toggle_connect(self, wire=config.wire):
-        """
-        Connect or disconnect when user clicks on the Connect button.
-        """
-        if not self._connected:
-            # Connect
-            self.connect(wire)
-        else:
-            # Disconnect
-            self.disconnect()
-        self._internet_station_active = False
->>>>>>> 8119aec6343e08a93fde0abdecbf866728802058
 
     def change_wire(self, wire:int):
         """
@@ -377,13 +343,8 @@ class MKOBMain:
         self.disconnect()
         self._recorder.wire = wire
         if was_connected:
-<<<<<<< HEAD
             time.sleep(0.50) # Needed to allow UTP packets to clear
             self.toggle_connect()
-=======
-            time.sleep(0.350) # Needed to allow UTP packets to clear
-            self.connect(wire)
->>>>>>> 8119aec6343e08a93fde0abdecbf866728802058
 
 
     # callback functions
