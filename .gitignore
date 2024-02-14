@@ -16,3 +16,7 @@ pyinstall/w/MKOB/
 Capture-Replay/*.txt
 # Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
 *.json
+# Ignore PKCFG files from saving configurations. If PKCFG files are needed in the source, include them with a '!' line.
+*.pkcfg
+# Ignore 'test' programs. If test programs are needed, include them with a '!' line
+_test*.py

@@ -27,7 +27,8 @@ SOFTWARE.
 """Feed.py
 
 Waits for a station to connect to a KOB wire and sends text from a RSS-formatted
-local file or news feed, or a PyKOB recording json file, in Morse at a given speed.
+local file or news feed in Morse at a given speed, or from a PyKOB recording
+json file.
 
 If the wait parameter is nonzero, then the feed will stop sending if
 another station starts sending, and will wait until the wire is idle for the
@@ -234,18 +235,18 @@ log.log('Starting Feed {0}'.format(VERSION))
 
 try:
     arg_parser = argparse.ArgumentParser(description="Morse wire feed", parents=\
-     [\
-      config.serial_port_override, \
-      config.code_type_override, \
-      config.interface_type_override, \
-      config.sound_override, \
-      config.sounder_override, \
-      config.spacing_override, \
-      config.server_url_override, \
-      config.min_char_speed_override, \
-    # config.text_speed_override, \         # Specified as positional arg. #4
-    # config.wire_override, \               # Specified as positional arg. #1
-     ])
+    [\
+        config.serial_port_override, \
+        config.code_type_override, \
+        config.interface_type_override, \
+        config.sound_override, \
+        config.sounder_override, \
+        config.spacing_override, \
+        config.server_url_override, \
+        config.min_char_speed_override, \
+        # config.text_speed_override, \         # Specified as positional arg. #4
+        # config.wire_override, \               # Specified as positional arg. #1
+    ])
     arg_parser.add_argument("wire", type=int, help="The wire no. for feed")
     arg_parser.add_argument("station", metavar="station-id", type=str,
                             help="The station identifier for the feed")
@@ -263,7 +264,7 @@ try:
                             help="Number of seconds to wait for the wire to be idle before sending (default: none)", dest="wait")
 
     args = arg_parser.parse_args()
-  # print("arg_parser returned", args)
+    # print("arg_parser returned", args)
 
     # Wire number for feed:
     wire = args.wire

@@ -330,7 +330,7 @@ class __ks_interface_serial(__ks_interface):
             pass
         return kia
 
-def _get_ks_interface(use_audio, use_sounder, use_gpio, port_to_use, invert_key_input, sounder_power_save_secs, interface_type) -> __ks_interface:
+def _get_ks_interface(use_audio: bool, use_sounder: bool, use_gpio: bool, port_to_use: str, invert_key_input: bool, sounder_power_save_secs: float, interface_type: config.InterfaceType) -> __ks_interface:
     """
     Given the arguments, do some tests and return a kob_hw object to use.
 
