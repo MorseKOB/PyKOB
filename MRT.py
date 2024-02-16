@@ -52,7 +52,7 @@ from threading import Event, Thread
 from time import sleep
 from typing import Any, Callable, Optional
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
@@ -169,6 +169,7 @@ class Mrt:
             self._kob.exit()
 
     def main_loop(self):
+        self._print_start_info()
         self._internet.connect(self._cfg.wire)
         self._connected = True
         sleep(0.5)
@@ -192,6 +193,17 @@ class Mrt:
             print()
             print(f'<<{self._sender_current}>>')
 
+    def _print_start_info(self):
+        cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
+        print("Using configuration: {}".format(cfgname))
+        print("Connecting to wire: " + str(self._cfg.wire))
+        print("Connecting as Station/Office: " + self._cfg.station)
+        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
+        if self._cfg.invert_key_input:
+            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+                "To enable/disable this setting use `Configure --iki`.")
+        print('[Use CTRL+Z for keyboard help.]', flush=True)
+
     def _set_local_loop_active(self, active):
         """
         Set local_loop_active state
@@ -210,6 +222,7 @@ class Mrt:
         True: 'latch'
         False: 'unlatch'
         """
+        self._kob.virtualCloserIsOpen = not closed
         code = LATCH_CODE if closed else UNLATCH_CODE
         if not self._internet_station_active:
             if self._cfg.local:
@@ -367,14 +380,14 @@ if __name__ == "__main__":
     exit_status = 1
     try:
         # Main code
-        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe current configuration is used except as overridden by optional arguments.", \
+        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.", \
             parents= [
             config2.station_override,
             config2.min_char_speed_override,
             config2.text_speed_override,
             config2.config_file_override])
-        arg_parser.add_argument('wire', nargs='?', type=int,
-            help='Wire to connect to. If specified, this is used rather than the configured wire.')
+        arg_parser.add_argument("wire", nargs='?', type=int,
+            help="Wire to connect to. If specified, this is used rather than the configured wire.")
         args = arg_parser.parse_args()
 
         cfg = Config()
@@ -400,21 +413,16 @@ if __name__ == "__main__":
         if args.wire:
             cfg.wire = args.wire # wire to connect to
 
-        print('Python ' + sys.version + ' on ' + sys.platform)
-        print('PyKOB ' + VERSION)
+        cfg.load_to_global()  # ZZZ Push our config values to the global store temporarily
+
+        print("Python " + sys.version + " on " + sys.platform)
+        print("PyKOB " + VERSION)
         try:
             import serial
-            print('PySerial ' + serial.VERSION)
+            print("PySerial " + serial.VERSION)
         except:
-            print('PySerial is not installed or the version information is not available (check installation)')
+            print("PySerial is not installed or the version information is not available (check installation)")
 
-        print('Connecting to wire: ' + str(cfg.wire))
-        print('Connecting as Station/Office: ' + cfg.station)
-        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
-        if cfg.invert_key_input:
-            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
-                "To enable/disable this setting use `Configure --iki`.")
-        print('[Use CTRL+Z for keyboard help.]', flush=True)
 
         mrt = Mrt(cfg)
         mrt.start()

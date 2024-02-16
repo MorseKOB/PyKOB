@@ -687,7 +687,7 @@ class Config:
 #
 config_file_override = argparse.ArgumentParser(add_help=False)
 config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg_filepath",
-    help="Configuration file to use. If not specified, the global configuration will be used.")
+    help="Configuration file to use. If not specified, the global configuration is used.")
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
 auto_connect_override.add_argument("-C", "--autoconnect", metavar="auto-connect", dest="auto_connect",
@@ -757,7 +757,7 @@ station_override.add_argument("-S", "--station", metavar="station", dest="statio
 text_speed_override = argparse.ArgumentParser(add_help=False)
 text_speed_override.add_argument("-t", "--textspeed", metavar="wpm", dest="text_speed", type=int, \
     help="The morse text speed in words per minute. Used for Farnsworth timing. " +
-    "Spacing (-s) must be other than 'NONE' to enable Farnsworth.")
+    "Spacing must not be 'NONE' to enable Farnsworth.")
 
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", metavar="wire", dest="wire", type=int,

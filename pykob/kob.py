@@ -132,7 +132,7 @@ class __ks_interface:
             # since the loop is energized.
             self._sounder_energized = energize
             self._energize_hw_sounder(energize)
-        if self._use_audio and self.audio:
+        if self._use_audio:
             if energize != self._synthsounder_energized:
                 self._synthsounder_energized = energize
                 try:
