@@ -685,85 +685,83 @@ class Config:
 #
 # ########################################################################
 #
+config_file_override = argparse.ArgumentParser(add_help=False)
+config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg_filepath",
+    help="Configuration file to use. If not specified, the global configuration will be used.")
+
 auto_connect_override = argparse.ArgumentParser(add_help=False)
-auto_connect_override.add_argument("-C", "--autoconnect",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
-metavar="auto-connect", dest="auto_connect")
+auto_connect_override.add_argument("-C", "--autoconnect", metavar="auto-connect", dest="auto_connect",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.")
 
 code_type_override = argparse.ArgumentParser(add_help=False)
-code_type_override.add_argument("-T", "--type", \
-help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
+code_type_override.add_argument("-T", "--type", metavar="code-type", dest="code_type",
+    help="The code type (AMERICAN|INTERNATIONAL) to use.")
 
 interface_type_override = argparse.ArgumentParser(add_help=False)
-interface_type_override.add_argument("-I", "--interface", \
-help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-type", dest="interface_type")
+interface_type_override.add_argument("-I", "--interface", metavar="interface-type", dest="interface_type",
+    help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.")
 
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
-invert_key_input_override.add_argument("-M", "--iki", \
-help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
+invert_key_input_override.add_argument("-M", "--iki", metavar="invert-key-input", dest="invert_key_input",
+    help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).")
 
 local_override = argparse.ArgumentParser(add_help=False)
-local_override.add_argument("-L", "--local", \
-help="True/False to Enable/Disable local copy of transmitted code.", metavar="local-copy", dest="local")
+local_override.add_argument("-L", "--local", metavar="local-copy", dest="local",
+    help="True/False to Enable/Disable local copy of transmitted code.")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
-min_char_speed_override.add_argument("-c", "--charspeed", type=int, \
-help="The minimum character speed to use in words per minute.", \
-metavar="wpm", dest="min_char_speed")
+min_char_speed_override.add_argument("-c", "--charspeed", metavar="wpm", dest="min_char_speed", type=int,
+    help="The minimum character speed to use in words per minute.")
 
 remote_override = argparse.ArgumentParser(add_help=False)
-remote_override.add_argument("-R", "--remote", \
-help="True/False to Enable/Disable transmission over the internet on the specified wire.", \
-metavar="remote-send", dest="remote")
+remote_override.add_argument("-R", "--remote", metavar="remote-send", dest="remote",
+    help="True/False to Enable/Disable transmission over the internet on the specified wire.")
 
 server_url_override = argparse.ArgumentParser(add_help=False)
-server_url_override.add_argument("-U", "--url", \
-help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
+server_url_override.add_argument("-U", "--url", metavar="url", dest="server_url",
+    help="The KOB Server URL to use (or 'NONE' to use the default).")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", \
-help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+serial_port_override.add_argument("-p", "--port", metavar="portname", dest="serial_port",
+    help="The name of the serial port to use (or 'NONE').")
 
 gpio_override = argparse.ArgumentParser(add_help=False)
-gpio_override.add_argument("-g", "--gpio",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
- GPIO takes priority over the serial interface.", \
-metavar="gpio", dest="gpio")
+gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="gpio",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used." +
+        "GPIO takes priority over the serial interface.")
 
 sound_override = argparse.ArgumentParser(add_help=False)
-sound_override.add_argument("-a", "--sound",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
-metavar="sound", dest="sound")
+sound_override.add_argument("-a", "--sound", metavar="sound", dest="sound",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
-sounder_override.add_argument("-A", "--sounder",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
-metavar="sounder", dest="sounder")
+sounder_override.add_argument("-A", "--sounder", metavar="sounder", dest="sounder",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.")
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
-sounder_pwrsv_override.add_argument("-P", "--pwrsv", type=int, \
-help="The sounder power-save delay in seconds, or '0' to disable.", \
-metavar="seconds", dest="sounder_power_save")
+sounder_pwrsv_override.add_argument("-P", "--pwrsv", metavar="seconds", dest="sounder_power_save", type=int,
+    help="The sounder power-save delay in seconds, or '0' to disable.")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
-spacing_override.add_argument("-s", "--spacing", \
-help="Where to add spacing for Farnsworth (NONE|CHAR|WORD).", metavar="spacing", dest="spacing")
+spacing_override.add_argument("-s", "--spacing", metavar="spacing", dest="spacing",
+    help="Where to add spacing for Farnsworth (NONE|CHAR|WORD).")
 
 station_override = argparse.ArgumentParser(add_help=False)
-station_override.add_argument("-S", "--station", \
-help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
+station_override.add_argument("-S", "--station", metavar="station", dest="station",
+    help="The Station ID to use (or 'NONE').")
 
 text_speed_override = argparse.ArgumentParser(add_help=False)
-text_speed_override.add_argument("-t", "--textspeed", type=int, \
-help="The morse text speed in words per minute. Used for Farnsworth timing. Spacing (-s) must not be 'NONE' to enable Farnsworth.", metavar="wpm", dest="text_speed")
+text_speed_override.add_argument("-t", "--textspeed", metavar="wpm", dest="text_speed", type=int, \
+    help="The morse text speed in words per minute. Used for Farnsworth timing. " +
+    "Spacing (-s) must be other than 'NONE' to enable Farnsworth.")
 
 wire_override = argparse.ArgumentParser(add_help=False)
-wire_override.add_argument("-W", "--wire", type=int, \
-help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")
+wire_override.add_argument("-W", "--wire", metavar="wire", dest="wire", type=int,
+    help="The Wire to use (or 'NONE').")
 
 
 """

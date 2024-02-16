@@ -216,8 +216,8 @@ def main(argv):
             cfg.station = s
         if not args.text_speed == None:
             n = args.text_speed
-            if n < 5 or n > 40:
-                raise Exception("Text speed of {} is outside of the supported range of 5-40.".format(n))
+            if n < 5 or n > 50:
+                raise Exception("Text speed of {} is outside of the supported range of 5-50.".format(n))
             cfg.text_speed = n
         if not args.wire == None:
             n = args.wire

@@ -207,7 +207,7 @@ class __ks_interface:
         # (in the configuration) so the sounder will follow the key.
         #
         if self._interface_type == config.InterfaceType.loop and config.sounder:
-            self._energize_hw_sounder(open, True)
+            self._energize_hw_sounder(open)
         if open:
             self.power_save(False)
 
