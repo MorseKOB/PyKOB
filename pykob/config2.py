@@ -26,15 +26,17 @@ SOFTWARE.
 config class module
 
 Class that holds current configuration values and can read and write to
-configuration files. It can read and write the legacy configuration information
+configuration files. It can read and write the global configuration information
 but is intended to be used for newer multiple-configuration operation. This is
-to allow users to have multiple configurations and select between, or to run
-multiple copies of the applications simultaniously with different configurations
-for each (something that can't be done with the current 'global' config module).
+to allow users to have multiple configuration files and select between them,
+or to run multiple copies of the applications simultaniously with different
+configurations for each (something that can't be done with the current 'global'
+config module).
 
 A mechanism for change notification is available.
 
 """
+import argparse
 from enum import IntEnum, unique
 import json
 import sys
@@ -397,7 +399,7 @@ class Config:
         cfg = Config()
         cfg.copy_from(self)
         return cfg
-    
+
     def copy_from(self, cfg_src):
         """
         Copy all values from a source config to this config.
@@ -453,17 +455,19 @@ class Config:
         }
         return data
 
+    def get_filepath(self) -> Optional[str]:
+        """
+        The file path used to load from and save to.
+        
+        Return: File path or None if the path hasn't been established.
+        """
+        return self._filepath
+    
     def is_dirty(self) -> bool:
         """
         True if any values have changed and the configuration has not been successfully saved.
         """
         return self._dirty
-
-    def legacy_save(self) -> None:
-        """
-        Save our copy of the Legacy Config.
-        """
-        config.save_config()
 
     def load_config(self, filepath:Optional[str]=None) -> None:
         """
@@ -497,9 +501,9 @@ class Config:
             self._pause_notify = pause_notify
             self._notify_listeners()
 
-    def load_from_legacy(self) -> None:
+    def load_from_global(self) -> None:
         """
-        Load this config instance from the Legacy Config.
+        Load this config instance from the Global Config.
         """
         # Disable change notifications until we are complete
         pause_notify = self._pause_notify  # Save current pause-notify state
@@ -526,34 +530,33 @@ class Config:
         self.spacing = config.spacing
         self.text_speed = config.text_speed
         #
-        self._filepath = None
         self._pause_notify = pause_notify  # Put the state back and notify
         self._notify_listeners()
 
-    def load_to_legacy(self) -> None:
+    def load_to_global(self) -> None:
         """
-        Load this config instance into the Legacy Config
+        Load this config instance into the Global Config
         """
         # Hardware Settings
-        config.gpio = self._gpio
-        config.serial_port = self._serial_port
-        config.interface_type = self._interface_type
-        config.invert_key_input = self._invert_key_input
-        config.sounder_power_save = self._sounder_power_save
+        config.set_gpio(self._gpio)
+        config.set_serial_port(self._serial_port)
+        config.set_interface_type(self._interface_type.name)
+        config.set_invert_key_input(self._invert_key_input)
+        config.set_sounder_power_save(str(self._sounder_power_save))
         # App Operation Settings
-        config.auto_connect = self._auto_connect
-        config.local = self._local
-        config.remote = self._remote
-        config.server_url = self._server_url
-        config.sound = self._sound
-        config.sounder = self._sounder
-        config.station = self._station
-        config.wire = self._wire
+        config.set_auto_connect(self._auto_connect)
+        config.set_local(self._local)
+        config.set_remote(self._remote)
+        config.set_server_url(self._server_url)
+        config.set_sound(self._sound)
+        config.set_sounder(self._sounder)
+        config.set_station(self._station)
+        config.set_wire_int(self._wire)
         # Morse Settings
-        config.code_type = self._code_type
-        config.min_char_speed = self._min_char_speed
-        config.spacing = self._spacing
-        config.text_speed = self._text_speed
+        config.set_code_type(self._code_type.name)
+        config.set_min_char_speed_int(self._min_char_speed)
+        config.set_spacing(self._spacing.name)
+        config.set_text_speed_int(self._text_speed)
 
     def print_config(self, file=sys.stdout) -> None:
         """
@@ -563,22 +566,24 @@ class Config:
         url = url if url else ''
         f = file
         print("======================================", file=f)
-        print("Serial serial_port: '{}'".format(self._serial_port), file=f)
         print("GPIO interface (Raspberry Pi): {}".format(config.onOffFromBool(self._gpio)), file=f)
+        print("Serial serial_port: '{}'".format(self._serial_port), file=f)
         print("--------------------------------------", file=f)
-        print("Auto Connect to Wire: {}".format(config.onOffFromBool(self._auto_connect)), file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(config.onOffFromBool(self._invert_key_input)), file=f)
         print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
         print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
-        print("KOB Server URL: {}".format(url), file=f)
         print("Sound: {}".format(config.onOffFromBool(self._sound)), file=f)
         print("Sounder: {}".format(config.onOffFromBool(self._sounder)), file=f)
         print("Sounder Power Save (seconds): {}".format(self._sounder_power_save), file=f)
-        print("Station: '{}'".format(config.noneOrValueFromStr(self._station)), file=f)
+        print("--------------------", file=f)
+        print("KOB Server URL: {}".format(url), file=f)
+        print("Auto Connect to Wire: {}".format(config.onOffFromBool(self._auto_connect)), file=f)
         print("Wire: {}".format(self._wire), file=f)
+        print("Station: '{}'".format(config.noneOrValueFromStr(self._station)), file=f)
+        print("--------------------", file=f)
         print("Code type: {}".format(self._code_type.name.upper()), file=f)
-        print("Character speed {}".format(self._min_char_speed), file=f)
+        print("Character speed: {}".format(self._min_char_speed), file=f)
         print("Words per min speed: {}".format(self._text_speed), file=f)
         print("Spacing: {}".format(self._spacing.name.upper()), file=f)
 
@@ -628,6 +633,12 @@ class Config:
         self._filepath = filepath
         self._dirty = False
 
+    def save_global(self) -> None:
+        """
+        Save our copy of the Global Config.
+        """
+        config.save_config()
+
     def set_dirty(self):
         """
         Clear the 'dirty' status.
@@ -639,11 +650,106 @@ class Config:
         """
         self._dirty = True
 
+    def set_filepath(self, filepath:str):
+        self._filepath = filepath
+
+
+# ########################################################################
+# Arg Parse parsers for each of the configuration values.
+#
+# These can be used by applications/utilities to provide standardized
+# command-line options processing.
+#
+# See 'Configure.py' for an example of all of them in use.
+#
+# ########################################################################
+#
+auto_connect_override = argparse.ArgumentParser(add_help=False)
+auto_connect_override.add_argument("-C", "--autoconnect",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
+metavar="auto-connect", dest="auto_connect")
+
+code_type_override = argparse.ArgumentParser(add_help=False)
+code_type_override.add_argument("-T", "--type", \
+help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
+
+interface_type_override = argparse.ArgumentParser(add_help=False)
+interface_type_override.add_argument("-I", "--interface", \
+help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-type", dest="interface_type")
+
+invert_key_input_override = argparse.ArgumentParser(add_help=False)
+invert_key_input_override.add_argument("-M", "--iki", \
+help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
+
+local_override = argparse.ArgumentParser(add_help=False)
+local_override.add_argument("-L", "--local", \
+help="True/False to Enable/Disable local copy of transmitted code.", metavar="local-copy", dest="local")
+
+min_char_speed_override = argparse.ArgumentParser(add_help=False)
+min_char_speed_override.add_argument("-c", "--charspeed", type=int, \
+help="The minimum character speed to use in words per minute.", \
+metavar="wpm", dest="min_char_speed")
+
+remote_override = argparse.ArgumentParser(add_help=False)
+remote_override.add_argument("-R", "--remote", \
+help="True/False to Enable/Disable transmission over the internet on the specified wire.", \
+metavar="remote-send", dest="remote")
+
+server_url_override = argparse.ArgumentParser(add_help=False)
+server_url_override.add_argument("-U", "--url", \
+help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
+
+serial_port_override = argparse.ArgumentParser(add_help=False)
+serial_port_override.add_argument("-p", "--port", \
+help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+
+gpio_override = argparse.ArgumentParser(add_help=False)
+gpio_override.add_argument("-g", "--gpio",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
+ GPIO takes priority over the serial interface.", \
+metavar="gpio", dest="gpio")
+
+sound_override = argparse.ArgumentParser(add_help=False)
+sound_override.add_argument("-a", "--sound",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
+metavar="sound", dest="sound")
+
+sounder_override = argparse.ArgumentParser(add_help=False)
+sounder_override.add_argument("-A", "--sounder",
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
+help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
+metavar="sounder", dest="sounder")
+
+sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
+sounder_pwrsv_override.add_argument("-P", "--pwrsv", type=int, \
+help="The sounder power-save delay in seconds, or '0' to disable.", \
+metavar="seconds", dest="sounder_power_save")
+
+spacing_override = argparse.ArgumentParser(add_help=False)
+spacing_override.add_argument("-s", "--spacing", \
+help="Where to add spacing for Farnsworth (NONE|CHAR|WORD).", metavar="spacing", dest="spacing")
+
+station_override = argparse.ArgumentParser(add_help=False)
+station_override.add_argument("-S", "--station", \
+help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
+
+text_speed_override = argparse.ArgumentParser(add_help=False)
+text_speed_override.add_argument("-t", "--textspeed", type=int, \
+help="The morse text speed in words per minute. Used for Farnsworth timing. Spacing (-s) must not be 'NONE' to enable Farnsworth.", metavar="wpm", dest="text_speed")
+
+wire_override = argparse.ArgumentParser(add_help=False)
+wire_override.add_argument("-W", "--wire", type=int, \
+help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")
+
+
 """
 Test code
 """
 if __name__ == "__main__":
     # Self-test
     cfg = Config()
-    cfg.load_from_legacy()
+    cfg.load_from_global()
     cfg.print_config()
