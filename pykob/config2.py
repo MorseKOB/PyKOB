@@ -42,10 +42,12 @@ import json
 import sys
 from typing import Any, Callable, Optional
 
-from pykob import config
+from pykob import config, log
 from pykob.config import CodeType, InterfaceType, Spacing
 
 PYKOB_CFG_EXT = ".pkcfg"
+VERSION = "2.0.0"
+_PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
 def add_ext_if_needed(s: str) -> str:
     if s and not s.endswith(".pkcfg"):
@@ -60,6 +62,8 @@ class ChangeType(IntEnum):
 
 class Config:
     def __init__(self) -> None:
+        self._version: str = VERSION
+        self._version_loaded: Optional[str] = None
         # Hardware Settings
         self._gpio: bool = False
         self._serial_port: Optional[str] = None
@@ -162,6 +166,18 @@ class Config:
         self._dirty = True
         self._notify_listeners()
 
+
+    # ########################################################################
+    # Config (internal) Settings
+    #
+
+    @property
+    def version(self) -> str:
+        return self._version
+
+    @property
+    def version_loaded(self) -> Optional[str]:
+        return self._version_loaded
 
     # ########################################################################
     # Hardware Settings
@@ -435,6 +451,7 @@ class Config:
         Get the complete config data as a Dictionary.
         """
         data = {
+            _PYKOB_CFG_VERSION_KEY: self._version,
             config._GPIO_KEY: self._gpio,
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
@@ -458,11 +475,11 @@ class Config:
     def get_filepath(self) -> Optional[str]:
         """
         The file path used to load from and save to.
-        
+
         Return: File path or None if the path hasn't been established.
         """
         return self._filepath
-    
+
     def is_dirty(self) -> bool:
         """
         True if any values have changed and the configuration has not been successfully saved.
@@ -494,8 +511,12 @@ class Config:
             pause_notify = self._pause_notify  # Save current pause-notify state
             self._pause_notify = True
             # Use the 'properties' to set the values in order to properly flag changes
+            self._version_loaded = None
             for key, value in data.items():
-                self._key_prop_setters[key](value)
+                if _PYKOB_CFG_VERSION_KEY == key:
+                    self._version_loaded = value
+                else:
+                    self._key_prop_setters[key](value)
             #
             self._filepath = filepath
             self._pause_notify = pause_notify
