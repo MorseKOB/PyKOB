@@ -140,9 +140,7 @@ class Mrt:
 
         self._exit_status = 1
 
-        self._kob = kob.KOB(
-                portToUse=cfg.serial_port, useGpio=cfg.gpio, interfaceType=cfg.interface_type,
-                useAudio=cfg.sound, keyCallback=self._from_key)
+        self._kob = kob.KOB(cfg=self._cfg, keyCallback=self._from_key)
         self._internet = internet.Internet(cfg.station, code_callback=self._from_internet)
         self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
         self._reader = morse.Reader(wpm=cfg.text_speed, cwpm=cfg.min_char_speed, codeType=cfg.code_type,

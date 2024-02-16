@@ -59,6 +59,7 @@ class ChangeType(IntEnum):
     hardware = 1
     morse = 2
     operations = 4
+    all = 7
 
 class Config:
     def __init__(self) -> None:

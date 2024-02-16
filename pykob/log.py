@@ -30,7 +30,13 @@ logs status, debug and error messages.
 import sys
 import datetime
 
-DEBUG_ENABLED = True
+__debug_level = 0
+
+def get_debug_level():
+    return __debug_level
+
+def set_debug_level(level):
+    __debug_level = level
 
 def log(msg, type="", dt=None):
     dtl = dt if dt else str(datetime.datetime.now())[:19]
@@ -44,17 +50,17 @@ def logErr(msg):
     log(msg, type=typestr, dt=dtstr) # Output to the normal output
     sys.stderr.write('{0} {1}:\t{2}\n'.format(dtstr, typestr, msg))
     sys.stderr.flush()
-    
-def debug(msg):
-    if DEBUG_ENABLED:
+
+def debug(msg, level=1):
+    if level >= __debug_level:
         log(msg, type="DEBUG")
-    
+
 def err(msg):
     typ, val, trc = sys.exc_info()
     logErr("{0}\n{1}".format(msg, val))
 
 def info(msg):
     log(msg, type="INFO")
-    
+
 def warn(msg):
     log(msg, type="WARN")
