@@ -378,38 +378,21 @@ if __name__ == "__main__":
     exit_status = 1
     try:
         # Main code
-        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.", \
+        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
             parents= [
-            config2.station_override,
-            config2.min_char_speed_override,
-            config2.text_speed_override,
-            config2.config_file_override])
+                config2.station_override,
+                config2.min_char_speed_override,
+                config2.text_speed_override,
+                config2.config_file_override,
+                config2.debug_level_override
+            ]
+        )
         arg_parser.add_argument("wire", nargs='?', type=int,
             help="Wire to connect to. If specified, this is used rather than the configured wire.")
         args = arg_parser.parse_args()
+        cfg = config2.process_config_args(args)
 
-        cfg = Config()
-        if args.pkcfg_filepath:
-            file_path = args.pkcfg_filepath
-            file_path = config2.add_ext_if_needed(file_path)
-            cfg.load_config(file_path)
-        else:
-            cfg.load_from_global()
-
-        if args.station:
-            cfg.station = args.station  # the Station/Office ID string to attach with
-        if args.min_char_speed:
-            if (args.min_char_speed < 5) or (args.min_char_speed > 50):
-                print("text speed specified must be between 5 and 50 [-t|--textspeed]")
-                sys.exit(1)
-            cfg.min_char_speed = args.min_char_speed
-        if args.text_speed:
-            if (args.text_speed < 5) or (args.text_speed > 50):
-                print("text speed specified must be between 5 and 50 [-t|--textspeed]")
-                sys.exit(1)
-            cfg.text_speed = args.text_speed  # text speed (words per minute)
-        if args.wire:
-            cfg.wire = args.wire # wire to connect to
+        log.set_debug_level(cfg.debug_level)
 
         cfg.load_to_global()  # ZZZ Push our config values to the global store temporarily
 
@@ -425,6 +408,8 @@ if __name__ == "__main__":
         mrt = Mrt(cfg)
         mrt.start()
         mrt.main_loop()
+    except FileNotFoundError as fnf:
+        print(fnf.args[0])
     except KeyboardInterrupt:
         exit_status = 0 # Since the main program is an infinite loop, ^C is a normal way to exit.
     finally:

@@ -30,13 +30,16 @@ logs status, debug and error messages.
 import sys
 import datetime
 
+global __debug_level
 __debug_level = 0
 
 def get_debug_level():
+    global __debug_level
     return __debug_level
 
 def set_debug_level(level):
-    __debug_level = level
+    global __debug_level
+    __debug_level = level if level >= 0 else 0
 
 def log(msg, type="", dt=None):
     dtl = dt if dt else str(datetime.datetime.now())[:19]
@@ -52,7 +55,8 @@ def logErr(msg):
     sys.stderr.flush()
 
 def debug(msg, level=1):
-    if level >= __debug_level:
+    global __debug_level
+    if level > 0 and level >= __debug_level:
         log(msg, type="DEBUG")
 
 def err(msg):

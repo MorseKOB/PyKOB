@@ -76,6 +76,9 @@ def main(argv):
     #  If values are specified, update the config and save it, then
     #  print the configuration.
     #
+    cfg:Config = Config()
+    cfg.load_from_global()
+    original_cfg:Config = cfg.copy()
     try:
         arg_parser = argparse.ArgumentParser(prog="Configure",
                 description="Display the PyKOB configuration as well as key system values. "
@@ -121,7 +124,6 @@ def main(argv):
                 "If specified, the configuration will be saved to this file rather than 'config-file'.")
 
         args = arg_parser.parse_args()
-        cfg = Config()
 
         load_from_global = False
         save_to_global = False
@@ -169,71 +171,11 @@ def main(argv):
             if save_only_to_global:
                 cfg.set_filepath(None)  # Clear the filepath so is doesn't save there
 
-        # Set config values if they were specified
-        if args.auto_connect:
-            cfg.auto_connect = strtobool(args.auto_connect)
-        if args.code_type:
-            cfg.code_type = config.codeTypeFromString(args.code_type)
-        if args.interface_type:
-            cfg.interface_type = config.interface_type_from_str(args.interface_type)
-        if args.invert_key_input:
-            cfg.invert_key_input = strtobool(args.invert_key_input)
-        if not args.min_char_speed == None:
-            n = args.min_char_speed
-            if n < 5 or n > 40:
-                raise Exception("Character speed of {} is outside of the supported range of 5-40.".format(n))
-            cfg.min_char_speed = n
-        if args.local:
-            cfg.local = strtobool(args.local)
-        if args.remote:
-            cfg.remote = strtobool(args.remote)
-        if args.serial_port:
-            si = args.serial_port
-            s = config.noneOrValueFromStr(si)
-            if s or si.strip().upper() == 'NONE':
-                cfg.serial_port = s
-        if args.gpio:
-            cfg.gpio = strtobool(args.gpio)
-        if args.server_url:
-            s = args.server_url.strip()
-            if s.upper() == 'DEFAULT':
-                cfg.server_url = None
-            else:
-                cfg.server_url = s
-        if args.sound:
-            cfg.sound = strtobool(args.sound)
-        if args.sounder:
-            cfg.sounder = strtobool(args.sounder)
-        if not args.sounder_power_save == None:
-            n = args.sounder_power_save
-            if n < 0:
-                n = 0
-            cfg.sounder_power_save = n
-        if args.spacing:
-            cfg.spacing = config.spacing_from_str(args.spacing)
-        if args.station:
-            s = args.station.strip()
-            cfg.station = s
-        if not args.text_speed == None:
-            n = args.text_speed
-            if n < 5 or n > 50:
-                raise Exception("Text speed of {} is outside of the supported range of 5-50.".format(n))
-            cfg.text_speed = n
-        if not args.wire == None:
-            n = args.wire
-            if n < 0:
-                n = 0
-            elif n > 32000:
-                n = 32000
-            cfg.wire = n
+        # Keep the original config at this point
+        original_cfg.copy_from(cfg)
 
-        # If any of the configuration values changed, save the configuration.
-        if cfg.is_dirty():
-            if cfg.get_filepath():
-                cfg.save_config()
-            if save_to_global:
-                cfg.load_to_global()
-                cfg.save_global()
+        # Set config values if they were specified
+        config2.process_config_args(args, cfg)
     except Exception as ex:
         print("Error processing arguments: {}".format(ex))
         sys.exit(1)
@@ -252,14 +194,21 @@ def main(argv):
             fileMenu.add_separator()
             fileMenu.add_command(label='Quit', command=_doFileExit)
 
-            prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=True)
+            prefs = preferencesWindow.PreferencesWindow(cfg, quitWhenDismissed=True)
             prefs.display()
-
             # root.quit()
-
         except KeyboardInterrupt:
             print()
             sys.exit(0)
+    else:
+        # If any of the configuration values changed, save the configuration.
+        if cfg.is_dirty():
+            if cfg.get_filepath():
+                cfg.save_config()
+            if save_to_global:
+                cfg.load_to_global()
+                cfg.save_global()
+                cfg.clear_dirty()
 
     # If no arguments were given print the system info in addition to the configuration.
     if len(argv) == 0:
@@ -274,7 +223,11 @@ def main(argv):
     print("======================================")
     print(config_header)
 
-    cfg.print_config()
+    # Check if the cfg is dirty at this point. If so, it wasn't saved, so print the original.
+    if cfg.is_dirty():
+        original_cfg.print_config()
+    else:
+        cfg.print_config()
     sys.exit(0)
 
 if __name__ == "__main__":

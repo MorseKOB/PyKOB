@@ -138,7 +138,7 @@ class MKOBKeyboard():
     def on_delete(self, *args):
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB delete: {}:{} {}".format(ip, ms, args))
+        log.debug("KB delete: {}:{} {}".format(ip, ms, args), 3)
         r = None
         try:
             r = self.original_delete(*args)
@@ -146,13 +146,13 @@ class MKOBKeyboard():
             pass
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB delete end insert/send point: {}:{}".format(ip, ms))
+        log.debug("KB delete end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 
     def on_insert(self, *args):
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB insert: {}:{} {}".format(ip, ms, args))
+        log.debug("KB insert: {}:{} {}".format(ip, ms, args), 3)
         s = args[1]
         r = None
         try:
@@ -162,7 +162,7 @@ class MKOBKeyboard():
         # self.ka.trigger_keyboard_text_inserted(s)
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB insert end insert/send point: {}:{}".format(ip, ms))
+        log.debug("KB insert end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 
     def on_mark(self, *args):
@@ -171,7 +171,7 @@ class MKOBKeyboard():
         op = args[0]
         mark = args[1]
         pos = args[2]
-        log.debug("KB mark: {}:{} {}".format(ip, ms, args))
+        log.debug("KB mark: {}:{} {}".format(ip, ms, args), 3)
         r = None
         try:
             r = self.original_mark(*args)
@@ -186,11 +186,11 @@ class MKOBKeyboard():
                 self.kw.keyboard_win.mark_set(MARK_SEND, INSERT)
                 self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
                 ms = self.kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB mark end insert/send point: {}:{}".format(ip, ms))
+        log.debug("KB mark end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 
     def on_right_click(self, event):
-        log.debug("KB mrc: {}".format(event))
+        log.debug("KB mrc: {}".format(event), 3)
         pos = "@{},{}".format(event.x, event.y)
         self.kw.keyboard_win.mark_set(MARK_SEND, pos)
 

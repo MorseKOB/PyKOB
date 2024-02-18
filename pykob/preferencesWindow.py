@@ -1,8 +1,11 @@
 #============================================
 # Imports
 #============================================
+from distutils.util import strtobool
+from typing import Any, Callable, Optional
 
-from pykob import config
+from pykob import config, config2, log
+from pykob.config2 import Config
 
 GUI = True                              # Hope for the best...
 try:
@@ -21,20 +24,21 @@ except ModuleNotFoundError:
 global preferencesDialog
 preferencesDialog = None                # Force creation of a new dialog when first invoked
 
-#
-# 'callback' is invoked when the window is dismissed
-# 'quitWhenDismissed' forces an exit from the running Tkinter mainloop on exit
-#
 class PreferencesWindow:
-    def __init__(self, callback=None, quitWhenDismissed=False):
+    """
+    Preferences window for setting the configuration in a GUI.
+
+    callback: Invoked when the window is dismissed
+    quitWhenDismissed: Forces an exit from the running Tkinter mainloop on exit
+    cfg: Configuration to use. If 'None', the global configuration will be used.
+
+    """
+    def __init__(self, cfg:Config, callback=None, quitWhenDismissed=False):
+        if not GUI:
+            return  # Tkinter isn't available, so we can't run.
         self._callback = callback
         self._quitOnExit = quitWhenDismissed
-        config.read_config()
-        if not GUI:
-            return
-
-      # print("Configured serial port  =", config.serial_port)
-      # print("Configured code speed  =", config.text_speed)
+        self._cfg = cfg
 
         interface = 'SERIAL'      # Placeholder until HW interface type is configured
 
@@ -43,8 +47,8 @@ class PreferencesWindow:
         self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
 
         self.EQUIPMENT_TYPES = ['Local loop (key and sounder in series)',
-                                       'Separate key and sounder',
-                                       'Separate dot/dash paddle and sounder']
+                                'Separate key and sounder',
+                                'Separate dot/dash paddle and sounder']
         self.EQUIPMENT_TYPE_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
         self.DEFAULT_EQUIPMENT_TYPE = 1
 
@@ -109,10 +113,10 @@ class PreferencesWindow:
                                                              column=1, columnspan=1,
                                                              sticky=tk.W)
             # GPIO takes precidence
-            if config.gpio:
+            if self._cfg.gpio:
               if "GPIO" == self.HW_INTERFACE_CONFIG_SETTINGS[interfaceRadioButton]:
                 self._interfaceType.set(interfaceRadioButton + 1)
-            elif config.serial_port and ("SERIAL" == self.HW_INTERFACE_CONFIG_SETTINGS[interfaceRadioButton]):
+            elif self._cfg.serial_port and ("SERIAL" == self.HW_INTERFACE_CONFIG_SETTINGS[interfaceRadioButton]):
               self._interfaceType.set(interfaceRadioButton + 1)
 
         # Add a pop-up menu with the list of available serial connections:
@@ -131,7 +135,7 @@ class PreferencesWindow:
                                                                     sticky=tk.W)
         for serial_device in serialPortValues:
             # If port device  matches this radio button, update the selected value
-            if config.serial_port == serial_device:
+            if self._cfg.serial_port == serial_device:
                 self._serialPort.set(serial_device)
 
         # Label the equipment type:
@@ -151,30 +155,30 @@ class PreferencesWindow:
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
+            if self._cfg.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
                 self._equipmentType.set(equipmentRadioButton + 1)
 
         # Add a checkbox for the 'Use system sound' option
-        self._useSystemSound = tk.IntVar(value=config.sound)
+        self._useSystemSound = tk.IntVar(value=self._cfg.sound)
         ttk.Checkbutton(basiclocalInterface,
                         text="Use system sound",
                         variable=self._useSystemSound).grid(column=0, columnspan=6,
                                                            sticky=tk.W)
 
         # Add a checkbox for the 'Use local sounder' option
-        self._useLocalSounder = tk.IntVar(value=config.sounder)
+        self._useLocalSounder = tk.IntVar(value=self._cfg.sounder)
         ttk.Checkbutton(basiclocalInterface,
                         text="Use local sounder",
                         variable=self._useLocalSounder).grid(column=0, columnspan=6,
                                                             sticky=tk.W)
 
         # Add a number field for the 'Sounder Power Save' time
-        self._sounderPowerSave = tk.IntVar(value=config.sounder_power_save)
+        self._sounderPowerSave = tk.IntVar(value=self._cfg.sounder_power_save)
         ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=(20,4), sticky=tk.W)
         ttk.Entry(advancedlocalInterface, width=12, textvariable=self._sounderPowerSave).grid(row=6, column=2, sticky=tk.W)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
-        self._invertKeyInput = tk.IntVar(value=config.invert_key_input)
+        self._invertKeyInput = tk.IntVar(value=self._cfg.invert_key_input)
         ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
                         variable=self._invertKeyInput).grid(row=7, column=0, padx=20, sticky=tk.W)
 
@@ -191,7 +195,7 @@ class PreferencesWindow:
         internetConnection = ttk.LabelFrame(advanced_prefs, text=" Internet Connection")
         # ttk.Label(internetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
 
-        server_url = config.server_url if config.server_url else HOST_DEFAULT
+        server_url = self._cfg.server_url if self._cfg.server_url else HOST_DEFAULT
         server_port = PORT_DEFAULT
         # see if a port was included
         # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
@@ -211,23 +215,23 @@ class PreferencesWindow:
         ttk.Entry(internetConnection, width=12, textvariable=self._portNumber).grid(row=0, column=3, sticky=tk.E)
 
         # Add a checkbox for the 'Transmit to remote stations' option
-        self._transmitToRemoteStations = tk.IntVar(value=config.remote)
+        self._transmitToRemoteStations = tk.IntVar(value=self._cfg.remote)
         ttk.Checkbutton(internetConnection,
                         text="Transmit to remote stations",
                         variable=self._transmitToRemoteStations).grid(row=1, column=0, columnspan=4, sticky=tk.W)
 
         # Create and label an entry for the station ID:
-        self._stationID = tk.StringVar(value=config.station)
+        self._stationID = tk.StringVar(value=self._cfg.station)
         ttk.Label(internetConnection, text="Station ID:").grid(row=2, column=0, sticky=tk.E)
         ttk.Entry(internetConnection, width=55, textvariable=self._stationID).grid(row=2, column=1, columnspan=3, sticky=tk.W)
 
         # Create and label an entry for the wire number:
-        self._wireNumber = tk.StringVar(value=config.wire)
+        self._wireNumber = tk.StringVar(value=self._cfg.wire)
         ttk.Label(internetConnection, text="Wire number:").grid(row=3, column=0, sticky=tk.E)
         ttk.Entry(internetConnection, width=5, textvariable=self._wireNumber).grid(row=3, column=1, sticky=tk.W)
 
         # Add a checkbox for the 'Automatically connect at startup' option
-        self._autoConnectAtStartup = tk.IntVar(value=config.auto_connect)
+        self._autoConnectAtStartup = tk.IntVar(value=self._cfg.auto_connect)
         ttk.Checkbutton(internetConnection,
                         text="Automatically connect at startup",
                         variable=self._autoConnectAtStartup).grid(row=4, column=0, columnspan=2, padx=20, sticky=tk.W)
@@ -251,7 +255,7 @@ class PreferencesWindow:
         style_spinbox.configure('MK.TSpinbox', padding=(1,1,6,1)) # padding='W N E S'
 
         ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
-        self._dotSpeed = tk.DoubleVar(value=config.min_char_speed)
+        self._dotSpeed = tk.DoubleVar(value=self._cfg.min_char_speed)
         self._dotSpeedControl = \
             ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
                         command=self._dotSpeedChange,
@@ -259,8 +263,8 @@ class PreferencesWindow:
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
 
         ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
-        # print("Setting code speed to", config.text_speed)
-        self._codeSpeed = tk.DoubleVar(value=config.text_speed)
+        # print("Setting code speed to", self._cfg.text_speed)
+        self._codeSpeed = tk.DoubleVar(value=self._cfg.text_speed)
         self._codeSpeedControl = \
             ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,
                         width=4, format="%2.f", justify=tk.RIGHT,
@@ -285,7 +289,7 @@ class PreferencesWindow:
                                 value=spacingRadioButton + 1))
             self._spacingRadioButtonWidgets[spacingRadioButton].grid(column=1, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
+            if self._cfg.spacing.name.upper() == self.CHARACTER_SPACING_SETTINGS[spacingRadioButton]:
                 self._original_configured_spacing = spacingRadioButton + 1
                 self._characterSpacing.set(spacingRadioButton + 1)
 
@@ -300,7 +304,7 @@ class PreferencesWindow:
                             variable=self._codeType,
                             value=codeTypeRadioButton + 1).grid(row=7, column=1 + codeTypeRadioButton, sticky=tk.W)
             # If current config matches this radio button, update the selected value
-            if config.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
+            if self._cfg.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self._codeType.set(codeTypeRadioButton + 1)
 
 
@@ -385,40 +389,48 @@ class PreferencesWindow:
         self.dismiss()
 
     def _clickOK(self):
-        if self._serialPort.get() != "":
-            # print("Serial port: ", self._serialPort.get())
-            config.set_serial_port(self._serialPort.get())
-      # print("Serial connection type: {} ({})".format(self.EQUIPMENT_TYPES[self._equipmentType.get() - 1], \
-      #                                                self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
-        config.set_interface_type(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
-      # print("Invert key input: ", self._invertKeyInput.get())
-        config.set_invert_key_input(self._invertKeyInput.get())
-      # print("Use system sound: ", self._useSystemSound.get())
-        config.set_sound(self._useSystemSound.get())
-      # print("Use local sounder: ", self._useLocalSounder.get())
-        config.set_sounder(self._useLocalSounder.get())
-      # print("Sounder Power Save: ", self._sounderPowerSave.get())
-        config.set_sounder_power_save(self._sounderPowerSave.get())
-      # print("Server URL: {}".format(self._serverUrl.get() + ":" + self._portNumber.get()))
-        config.set_server_url(self._serverUrl.get() + ":" + self._portNumber.get())
-      # print("Transmit to remote stations: ", self._transmitToRemoteStations.get())
-        config.set_remote(self._transmitToRemoteStations.get())
-      # print("Station ID:", self._stationID.get())
-        config.set_station(self._stationID.get())
-      # print("Wire number:", self._wireNumber.get())
-        config.set_wire(self._wireNumber.get())
-      # print("Auto-connect at startup:", self._autoConnectAtStartup.get())
-        config.set_auto_connect(self._autoConnectAtStartup.get())
-      # print("Code speed:", self._codeSpeed.get())
-        config.set_text_speed(self._codeSpeed.get())
-      # print("Character rate:", self._dotSpeed.get())
-        config.set_min_char_speed(self._dotSpeed.get())
-      # print("Character spacing:", self.CHARACTER_SPACING_OPTIONS[self._characterSpacing.get() - 1])
-        config.set_spacing(self.CHARACTER_SPACING_SETTINGS[self._characterSpacing.get() - 1])
-      # print("Code type:", self.CODE_TYPES[self._codeType.get() - 1])
-        config.set_code_type(self.CODE_TYPE_SETTINGS[self._codeType.get() - 1])
+        with self._cfg.notification_pauser() as muted_cfg:
 
-        config.save_config()
+          if self._serialPort.get() != "":
+            # print("Serial port: ", self._serialPort.get())
+            muted_cfg.serial_port = self._serialPort.get()
+            log.debug("Serial connection type: {} ({})".format(self.EQUIPMENT_TYPES[self._equipmentType.get() - 1],
+              self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
+          muted_cfg.interface_type = config.interface_type_from_str(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
+        # print("Invert key input: ", self._invertKeyInput.get())
+          muted_cfg.invert_key_input = self._invertKeyInput.get()
+        # print("Use system sound: ", self._useSystemSound.get())
+          muted_cfg.sound = self._useSystemSound.get()
+        # print("Use local sounder: ", self._useLocalSounder.get())
+          muted_cfg.sounder = self._useLocalSounder.get()
+        # print("Sounder Power Save: ", self._sounderPowerSave.get())
+          muted_cfg.sounder_power_save = int(self._sounderPowerSave.get())
+        # print("Server URL: {}".format(self._serverUrl.get() + ":" + self._portNumber.get()))
+          muted_cfg.server_url = self._serverUrl.get() + ":" + self._portNumber.get()
+        # print("Transmit to remote stations: ", self._transmitToRemoteStations.get())
+          muted_cfg.remote = self._transmitToRemoteStations.get()
+        # print("Station ID:", self._stationID.get())
+          muted_cfg.station = self._stationID.get()
+        # print("Wire number:", self._wireNumber.get())
+          muted_cfg.wire = int(self._wireNumber.get())
+        # print("Auto-connect at startup:", self._autoConnectAtStartup.get())
+          muted_cfg.auto_connect = self._autoConnectAtStartup.get()
+        # print("Code speed:", self._codeSpeed.get())
+          muted_cfg.text_speed = int(self._codeSpeed.get())
+        # print("Character rate:", self._dotSpeed.get())
+          muted_cfg.min_char_speed = int(self._dotSpeed.get())
+        # print("Character spacing:", self.CHARACTER_SPACING_OPTIONS[self._characterSpacing.get() - 1])
+          muted_cfg.spacing = config.spacing_from_str(self.CHARACTER_SPACING_SETTINGS[self._characterSpacing.get() - 1])
+        # print("Code type:", self.CODE_TYPES[self._codeType.get() - 1])
+          muted_cfg.code_type = config.codeTypeFromString(self.CODE_TYPE_SETTINGS[self._codeType.get() - 1])
+
+          if muted_cfg.is_dirty():
+              if muted_cfg.get_filepath():
+                  muted_cfg.save_config()
+              else:
+                  muted_cfg.load_to_global()
+                  muted_cfg.save_global()
+                  muted_cfg.clear_dirty()
 
         self.dismiss()
 

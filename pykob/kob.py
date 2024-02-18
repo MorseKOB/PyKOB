@@ -401,22 +401,8 @@ class KOB:
         self._threadsStop = Event()
         self.tCodeSounded = -1.0  # Keep track of when the code was first sounded
         self._key_callback = None # Set to the passed in value once we establish an interface
-        # self._ks_interface:__ks_interface = _get_ks_interface(use_audio=self._cfg.sound, use_sounder=self._cfg.sounder, use_gpio=self._cfg.gpio, port_to_use=self._cfg.serial_port, invert_key_input=self._cfg.invert_key_input, sounder_power_save_secs=self._cfg.sounder_power_save, interface_type=self._cfg.interface_type)
-        # self._ks_interface.start()
-        # self._ks_interface.set_key_closer_open(False)
-        # self._ks_interface.set_virtual_closer_open(False)  # Manage a virtual closer that might be different from the physical
-        # self._last_key_state = self._ks_interface.key_is_closed # False is key open
-        # self._tLastSdr = time.time()  # time of last sounder transition
-        # time.sleep(0.5)
-        # if self._cfg.sounder:
-        #     self._ks_interface.loop_power_on()
-        # else:
-        #     # if no sounder output wanted, de-energize the loop
-        #     self._ks_interface.loop_power_off()
-        # self._tLastKey = time.time()  # time of last key transition
-        # self._circuit_is_closed = self._ks_interface.key_is_closed()  # True: circuit latched closed
-        self._cfg.register_listener(self._cfg_changed, config2.ChangeType.all)
-        self._cfg_changed(config2.ChangeType.all)
+        self._cfg.register_listener(self._cfg_changed, config2.ChangeType.any)
+        self._cfg_changed(config2.ChangeType.hardware + config2.ChangeType.morse + config2.ChangeType.operations)
         #
         self._recorder = None
         self._keyreadThread = None
