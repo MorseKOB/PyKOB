@@ -95,6 +95,9 @@ VERSION     = '2.0'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
+global CWComText
+CWComText = ""
+
 def checkForActivity():
     global tLastSender
     while True:
@@ -108,8 +111,14 @@ def activeSender():
     global wait
     return time.time() < tLastSender + wait
 
-def send(code):
-    myInternet.write(code)
+def send(code, char=''):
+    global CWComText
+    if not code:
+        CWComText += ' '
+        return
+    CWComText += char
+    myInternet.write(code, CWComText.upper())
+    CWComText = ''
     myKOB.soundCode(code, code_source=kob.CodeSource.player)  # to pace the code sent to the wire
 
 def sendParagraph():
@@ -197,6 +206,7 @@ def processRSS():
     """
     global uri, days, artPause, grpPause
     while True:
+        cwtext = ""
         articles = newsreader.getArticles(uri)
         for (title, description, pubDate) in articles:
             if days and pubDate:
@@ -218,7 +228,7 @@ def processRSS():
                     break
                 code = mySender.encode(char)
                 if code:
-                    send(code)
+                    send(code, char)
             send((-1000, +1))  # close circuit after 1 sec
             time.sleep(artPause)
         time.sleep(grpPause - artPause)
