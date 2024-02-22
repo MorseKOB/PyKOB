@@ -57,6 +57,9 @@ Examples:
 
 Change history:
 
+Feed 2.1  2024-02-21
+- Send text character along with the code for compatibility with CWCOM clients
+
 Feed 2.0  2021-01-22
 - Change to use standard command line argument processing
 
@@ -91,7 +94,7 @@ from pykob import config, newsreader, morse, internet, kob, log, recorder
 from distutils.util import strtobool
 
 
-VERSION     = '2.0'
+VERSION     = '2.1'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
@@ -103,6 +106,7 @@ def checkForActivity():
     while True:
         myInternet.read()
         tLastSender = time.time()
+        time.sleep(0.1)
 
 def activeListener():
     return time.time() < myInternet.tLastListener + TIMEOUT
@@ -167,9 +171,9 @@ def processRecording():
     playback_finished.clear()
     while True:
         myRecorder = recorder.Recorder(None, uri, station_id=idText,
-          play_code_callback=callbackPlay,
-          play_finished_callback=callbackPlayFinished,
-          play_sender_id_callback = callbackSenderId)
+            play_code_callback=callbackPlay,
+            play_finished_callback=callbackPlayFinished,
+            play_sender_id_callback = callbackSenderId)
         # Wait until there is an active listener on the wire and there isn't an active sender
         while activeSender() or not activeListener():
             time.sleep(1)
@@ -227,8 +231,7 @@ def processRSS():
                 if activeSender() or not activeListener():
                     break
                 code = mySender.encode(char)
-                if code:
-                    send(code, char)
+                send(code, char)
             send((-1000, +1))  # close circuit after 1 sec
             time.sleep(artPause)
         time.sleep(grpPause - artPause)
@@ -243,19 +246,19 @@ global wait
 log.log('Starting Feed {0}'.format(VERSION))
 
 try:
-    arg_parser = argparse.ArgumentParser(description="Morse wire feed", parents=\
-     [\
-      config.serial_port_override, \
-      config.code_type_override, \
-      config.interface_type_override, \
-      config.sound_override, \
-      config.sounder_override, \
-      config.spacing_override, \
-      config.server_url_override, \
-      config.min_char_speed_override, \
-    # config.text_speed_override, \         # Specified as positional arg. #4
-    # config.wire_override, \               # Specified as positional arg. #1
-     ])
+    arg_parser = argparse.ArgumentParser(description="Morse wire feed", 
+        parents= [
+            config.serial_port_override,
+            config.code_type_override,
+            config.interface_type_override,
+            config.sound_override,
+            config.sounder_override,
+            config.spacing_override,
+            config.server_url_override,
+            config.min_char_speed_override,
+            # config.text_speed_override,         # Specified as positional arg. #4
+            # config.wire_override,               # Specified as positional arg. #1
+        ])
     arg_parser.add_argument("wire", type=int, help="The wire no. for feed")
     arg_parser.add_argument("station", metavar="station-id", type=str,
                             help="The station identifier for the feed")
@@ -273,7 +276,6 @@ try:
                             help="Number of seconds to wait for the wire to be idle before sending (default: none)", dest="wait")
 
     args = arg_parser.parse_args()
-  # print("arg_parser returned", args)
 
     # Wire number for feed:
     wire = args.wire
@@ -319,14 +321,13 @@ try:
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
     myInternet = internet.Internet(idText)
     audio_setting = strtobool(str(args.sound))
-    # ZZZ - add option to support GPIO
     myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, useAudio=audio_setting)
 
     myInternet.connect(wire)
 
     # create thread to listen for activity on the wire
     tLastSender = time.time()  # time of last activity
-    listenerThread = threading.Thread(target=checkForActivity)
+    listenerThread = threading.Thread(name="Feed-ActivityListener", target=checkForActivity)
     listenerThread.daemon = True
     listenerThread.start()
 
@@ -357,3 +358,8 @@ try:
 except KeyboardInterrupt:
     print()
     sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
+except Exception as ex:
+    print()
+    print(ex)
+    sys.exit(1)
+
