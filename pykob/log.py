@@ -50,6 +50,10 @@ def err(msg):
     typ, val, trc = sys.exc_info()
     logErr("{0}\n{1}".format(msg, val))
 
+def error(msg):
+    typ, val, trc = sys.exc_info()
+    logErr("{0}\n{1}".format(msg, val))
+
 def info(msg):
     log(msg, type="INFO")
     
