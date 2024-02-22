@@ -70,9 +70,10 @@ if ok:
     nullFrames = bytes(frameWidth*BUFFERSIZE)
 
 def play(snd):
-    global sound
-    sound = snd
-    iFrame[sound] = 0
+    if ok:
+        global sound
+        sound = snd
+        iFrame[sound] = 0
 
 def callback(in_data, frame_count, time_info, status_flags):
     if frame_count != BUFFERSIZE:
@@ -87,11 +88,15 @@ def callback(in_data, frame_count, time_info, status_flags):
         return(nullFrames, pyaudio.paContinue)
 
 if ok:
-    apiInfo = pa.get_default_host_api_info()
-    apiName = apiInfo['name']
-    devIdx = apiInfo['defaultOutputDevice']
-    devInfo = pa.get_device_info_by_index(devIdx)
-    devName = devInfo['name']
-    strm = pa.open(rate=frameRate, channels=nChannels, format=sampleFormat,
-            output=True, output_device_index=devIdx, frames_per_buffer=BUFFERSIZE,
-            stream_callback=callback)
+    try:
+        apiInfo = pa.get_default_host_api_info()
+        apiName = apiInfo['name']
+        devIdx = apiInfo['defaultOutputDevice']
+        devInfo = pa.get_device_info_by_index(devIdx)
+        devName = devInfo['name']
+        strm = pa.open(rate=frameRate, channels=nChannels, format=sampleFormat,
+                output=True, output_device_index=devIdx, frames_per_buffer=BUFFERSIZE,
+                stream_callback=callback)
+    except Exception as ex:
+        log.error("audio - Disabling audio output due to encountered exception: {}".format(ex))
+        ok = False
