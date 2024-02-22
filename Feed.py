@@ -356,10 +356,12 @@ try:
     else:
         processRSS()
 except KeyboardInterrupt:
-    print()
+    print('.')
     sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
 except Exception as ex:
     print()
-    print(ex)
+    print("Feed encountered error: {}".format(ex))
     sys.exit(1)
-
+finally:
+    print("Goodbye")
+    print("")
