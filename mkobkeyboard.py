@@ -1,7 +1,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,20 +48,6 @@ class MKOBKeyboard():
         self._repeat = False
         self._last_send_pos = 1.0
         self._waiting_for_sent_code = False
-        self.keyboard_send_thread = threading.Thread(name='Keyboard-Send', target=self._thread_keyboard_send)
-        self.keyboard_send_thread.daemon = True
-
-
-    def _thread_keyboard_send(self):
-        """
-        thread to send Morse from the code sender window
-        """
-        while True:
-            if not self._waiting_for_sent_code:
-                self.ka.trigger_keyboard_send()
-                time.sleep(0.005)
-            else:
-                time.sleep(0.8)
 
     @property
     def enabled(self) -> bool:
@@ -69,6 +55,8 @@ class MKOBKeyboard():
     @enabled.setter
     def enabled(self, en:bool):
         self._enabled = en
+        if en:
+            self.ka.trigger_keyboard_send()
 
     @property
     def repeat(self) -> bool:
@@ -76,19 +64,20 @@ class MKOBKeyboard():
     @repeat.setter
     def repeat(self, en:bool):
         self._repeat = en
+        if en:
+            self.ka.trigger_keyboard_send()
 
     def start(self, mkmain):
         self.km = mkmain
         self.kw.keyboard_win.bind("<Button-2>", self.on_right_click)
         self.kw.keyboard_win.bind("<Button-3>", self.on_right_click)
-        self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
-        self.kw.keyboard_win.mark_gravity(MARK_SEND, 'left')
         self.kw.keyboard_win.tag_config(HIGHLIGHT, background='gray75', underline='yes')
         redirector = WidgetRedirector(self.kw.keyboard_win)
         self.original_mark = redirector.register("mark", self.on_mark)
         self.original_insert = redirector.register("insert", self.on_insert)
         self.original_delete = redirector.register("delete", self.on_delete)
-        self.keyboard_send_thread.start()
+        self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
+        self.kw.keyboard_win.mark_gravity(MARK_SEND, "left")
 
     def handle_clear(self, event_data=None):
         """
@@ -104,6 +93,7 @@ class MKOBKeyboard():
         if self.kw.keyboard_win.compare(MARK_SEND, '<', 'end-1c'):
             self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
         self._waiting_for_sent_code = False
+        self.ka.trigger_keyboard_send()
 
     def handle_keyboard_send(self, event_data):
         """
@@ -146,6 +136,7 @@ class MKOBKeyboard():
             pass
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
+        self.ka.trigger_keyboard_send()
         log.debug("KB delete end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 
@@ -162,6 +153,7 @@ class MKOBKeyboard():
         # self.ka.trigger_keyboard_text_inserted(s)
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
+        self.ka.trigger_keyboard_send()
         log.debug("KB insert end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 
@@ -181,11 +173,11 @@ class MKOBKeyboard():
         ms = self.kw.keyboard_win.index(MARK_SEND)
         if mark == INSERT and not pos == MARK_SEND:
             if (self._enabled and (float(ip) < float(ms))) or not self._enabled:
-                #self.ka.trigger_set_code_sender_on(False)
                 self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
                 self.kw.keyboard_win.mark_set(MARK_SEND, INSERT)
                 self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
                 ms = self.kw.keyboard_win.index(MARK_SEND)
+                self.ka.trigger_keyboard_send()
         log.debug("KB mark end insert/send point: {}:{}".format(ip, ms), 3)
         return r
 

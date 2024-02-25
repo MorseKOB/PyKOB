@@ -31,7 +31,8 @@ Reads/writes code sequences from/to a KOB wire.
 import socket
 import struct
 import time
-from pykob import VERSION, config, log
+from pykob import VERSION, config2, log
+from pykob.config2 import Config
 from threading import Event, Thread
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
@@ -48,13 +49,16 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 
 NUL = '\x00'
 
+def _emptyOrValueFromStr(s:str) -> str:
+    return s if s else ""
+
 class Internet:
-    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None, appver=None, mka=None):
+    def __init__(self, officeID='', code_callback=None, record_callback=None, pckt_callback=None, appver=None, server_url=None, mka=None):
         self.host = HOST_DEFAULT
         self.port = PORT_DEFAULT
         self.mka = mka # MKOBAction - to be able to display warning messages to the user
-        self.address = None
-        s = config.server_url
+        self.ip_address = None  # Set when a connection is made
+        s = server_url
         if s:
             # see if a port was included
             # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
@@ -69,7 +73,7 @@ class Internet:
             self.app = "{} (PK-{})".format(appver, VERSION).encode(encoding='latin-1')
         else:
             self.app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
-        self.officeID = officeID if officeID != None else ""
+        self.officeID = _emptyOrValueFromStr(officeID)
         self.wireNo = 0
         self.threadStop = Event()
         self.connected = Event()
@@ -99,11 +103,11 @@ class Internet:
         self._packet_callback = cb
 
     def _get_address(self, renew=False):
-        if not self.address or renew:
+        if not self.ip_address or renew:
             success = False
             while not success:
                 try:
-                    self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
+                    self.ip_address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
                     success = True
                 except (OSError, socket.gaierror) as ex:
                     # Network error
@@ -112,7 +116,7 @@ class Internet:
                     if self.mka:
                         self.mka.trigger_reader_append_text("{}\n".format(s))
                     time.sleep(5.0)
-        return self.address
+        return self.ip_address
 
     def connect(self, wireNo):
         self.wireNo = wireNo
@@ -222,7 +226,6 @@ class Internet:
         if self._packet_callback:
             self._packet_callback("\n<sent: {}:{}>".format(DAT, code))
 
-
     def keepAlive(self):
         while not self.threadStop.is_set():
             self.sendID()
@@ -236,7 +239,7 @@ class Internet:
                 self.sentSeqNo += 2
                 idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
                         self.sentSeqNo, 1, self.app)
-                self.socket.sendto(idPacket, self.address)
+                self.socket.sendto(idPacket, self.ip_address)
                 if self._packet_callback:
                     self._packet_callback("\n<sent: {}>".format(DAT))
                 if self.ID_callback:
@@ -246,7 +249,7 @@ class Internet:
 
     def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
-        self.officeID = officeID if officeID != None else ""
+        self.officeID = _emptyOrValueFromStr(officeID)
 
     def monitor_IDs(self, ID_callback):
         """start monitoring incoming and outgoing station IDs"""
@@ -259,4 +262,3 @@ class Internet:
     def record_code(self, record_callback):
         """Start recording code received and sent"""
         self._record_callback = record_callback
-

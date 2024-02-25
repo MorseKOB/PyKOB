@@ -72,23 +72,22 @@ class __ks_interface:
         self._key_closer_is_open: bool = False
         self._power_saving: bool = False  # Indicates if Power-Save is active
         self._sounder_energized: bool = False
-        self._t_sounder_energized: float = 0.0
+        self._t_sounder_energized: float = -1.0
         self._sounder_power_save_secs: float = sounder_power_save_secs
         self._synthsounder_energized: bool = False  # True: last played 'click', False: played 'clack' (or hasn't played)
         self._threadsStop: Event = Event()
         self._virtual_closer_is_open: bool = False
         #
-        self._powersave_thread = Thread(name='Sounder-PowerSave', daemon=True, target=self.__callbackPowerSave)
+        self._powersave_thread = None
 
-
-    def __callbackPowerSave(self):
+    def _callbackPowerSave(self):
         """
         Called by the PowerSave thread 'run' to control the power save (sounder energize)
         """
         while not self._threadsStop.is_set():
             now = time.time()
             if self._sounder_power_save_secs > 0 and not self._power_saving:
-                if (now - self._t_sounder_energized) > self._sounder_power_save_secs:
+                if self._t_sounder_energized > 0 and (now - self._t_sounder_energized) > self._sounder_power_save_secs:
                     self.power_save(True)
             time.sleep(1.0)
 
@@ -190,10 +189,19 @@ class __ks_interface:
         # Don't enable Power Save if the key is open.
         if enable and (self._virtual_closer_is_open or self._key_closer_is_open):
             return
+        if not enable and not self._power_saving:
+            return  # Already disabled
+        if enable and self._power_saving:
+            return  # Already enabled
+
         now = time.time()
         if enable:
             self._energize_hw_sounder(False)
+            self._power_saving = True
+            log.debug("Sounder power-save on", 2)
         else: # disable power-save. restore the state of the sounder
+            self._power_saving = False
+            log.debug("Sounder power-save off", 2)
             if self._sounder_energized:
                 self._energize_hw_sounder(True)
                 self.tSndrEnergized = now
@@ -222,7 +230,7 @@ class __ks_interface:
             self.power_save(False)
 
     def start(self):
-        self._powersave_thread.start()
+        pass
 
 class __ks_interface_gpio(__ks_interface):
     def __init__(self, gpio_button, gpio_led, use_audio: bool, use_sounder: bool, sounder_power_save_secs: float, invert_key_input: bool, interface_type: config.InterfaceType=config.InterfaceType.loop):
@@ -272,6 +280,13 @@ class __ks_interface_gpio(__ks_interface):
         except(OSError):
             pass
         return kia
+
+    def start(self):
+        self._powersave_thread = Thread(
+            name="Sounder-PowerSave", daemon=True, target=self._callbackPowerSave
+        )
+        self._powersave_thread.start()
+
 
 class __ks_interface_serial(__ks_interface):
     def __init__(self, port, use_audio: bool, use_sounder: bool, sounder_power_save_secs: float, invert_key_input: bool, interface_type: config.InterfaceType=config.InterfaceType.loop):
@@ -332,6 +347,13 @@ class __ks_interface_serial(__ks_interface):
             pass
         return kia
 
+    def start(self):
+        self._powersave_thread = Thread(
+            name="Sounder-PowerSave", daemon=True, target=self._callbackPowerSave
+        )
+        self._powersave_thread.start()
+
+
 def _get_ks_interface(use_audio: bool, use_sounder: bool, use_gpio: bool, port_to_use: str, invert_key_input: bool, sounder_power_save_secs: float, interface_type: config.InterfaceType) -> __ks_interface:
     """
     Given the arguments, do some tests and return a kob_hw object to use.
@@ -389,46 +411,43 @@ def _get_ks_interface(use_audio: bool, use_sounder: bool, use_gpio: bool, port_t
 class KOB:
     def __init__(
             self, interfaceType=config.InterfaceType.loop, portToUse=None,
-            useGpio=False, useAudio=False, keyCallback=None, cfg:Config=None):
-        self._cfg = cfg
-        if not cfg:
-            self._cfg = Config()
-            self._cfg.load_from_global()
-            self._cfg.interface_type = interfaceType
-            self._cfg.serial_port = portToUse
-            self._cfg.gpio = useGpio
-            self._cfg.sound = useAudio
+            useGpio=False, useAudio=False, useSounder=False, invertKeyInput=False, soundLocal=True,sounderPowerSaveSecs=0, keyCallback=None):
+        self._interface_type = interfaceType
+        self._invert_key_input = invertKeyInput
+        self._port_to_use = portToUse
+        self._sound_local = soundLocal
+        self._sounder_power_save_secs = sounderPowerSaveSecs
+        self._use_gpio = useGpio
+        self._use_audio = useAudio
+        self._use_sounder = useSounder
+        #
         self._threadsStop = Event()
-        self.tCodeSounded = -1.0  # Keep track of when the code was first sounded
+        self._tCodeSounded = -1.0  # Keep track of when the code was first sounded
         self._key_callback = None # Set to the passed in value once we establish an interface
-        self._cfg.register_listener(self._cfg_changed, config2.ChangeType.any)
-        self._cfg_changed(config2.ChangeType.hardware + config2.ChangeType.morse + config2.ChangeType.operations)
         #
         self._recorder = None
         self._keyreadThread = None
-        self._key_callback = keyCallback
-        if self._key_callback:
-            self._keyreadThread = Thread(name='KOB-KeyRead', daemon=True, target=self._callbackKeyRead)
-            self._keyreadThread.start()
-
-    def _cfg_changed(self, type:int):
-        """
-        The configuration has changed. Pick up the changed values and adjust.
-        """
-        self._ks_interface:__ks_interface = _get_ks_interface(use_audio=self._cfg.sound, use_sounder=self._cfg.sounder, use_gpio=self._cfg.gpio, port_to_use=self._cfg.serial_port, invert_key_input=self._cfg.invert_key_input, sounder_power_save_secs=self._cfg.sounder_power_save, interface_type=self._cfg.interface_type)
+        #
+        self._ks_interface:__ks_interface = _get_ks_interface(self._use_audio, self._use_sounder, self._use_gpio, self._port_to_use, self._invert_key_input, self._sounder_power_save_secs, self._interface_type)
         self._ks_interface.start()
         self._ks_interface.set_key_closer_open(False)
-        self._ks_interface.set_virtual_closer_open(False)  # Manage a virtual closer that might be different from the physical
+        self._ks_interface.set_virtual_closer_open(False)  # Manage virtual closer that might be different from physical
         self._last_key_state = self._ks_interface.key_is_closed # False is key open
         self._tLastSdr = time.time()  # time of last sounder transition
         time.sleep(0.5)
-        if self._cfg.sounder:
+        if self._use_sounder:
             self._ks_interface.loop_power_on()
         else:
             # if no sounder output wanted, de-energize the loop
             self._ks_interface.loop_power_off()
         self._tLastKey = time.time()  # time of last key transition
         self._circuit_is_closed = self._ks_interface.key_is_closed()  # True: circuit latched closed
+        self._key_callback = keyCallback
+        if self._key_callback:
+            self._keyreadThread = Thread(
+                name="KOB-KeyRead", daemon=True, target=self._callbackKeyRead
+            )
+            self._keyreadThread.start()
 
     def _callbackKeyRead(self):
         """
@@ -499,7 +518,7 @@ class KOB:
                 # drive it here to avoid as much delay from the key
                 # transitions as possible.
                 #
-                if self._cfg.local and self._ks_interface.virtual_closer_is_open:
+                if self._sound_local and self._ks_interface.virtual_closer_is_open:
                     self._ks_interface.energize_sounder(kc, True)
                 time.sleep(DEBOUNCE)
                 if kc:
@@ -520,7 +539,7 @@ class KOB:
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
-            time.sleep(0.001)
+            time.sleep(0.005)
         return ""
 
     def soundCode(self, code, code_source=CodeSource.local, sound=True):
@@ -529,8 +548,8 @@ class KOB:
         '''
         if sound:
             self._ks_interface.power_save(False)
-        if self.tCodeSounded < 0:  # capture start time
-            self.tCodeSounded = time.time()
+        if self._tCodeSounded < 0:  # capture start time
+            self._tCodeSounded = time.time()
         if self._recorder and not code_source == CodeSource.player:
             self._recorder.record(code_source, code)
         for c in code:

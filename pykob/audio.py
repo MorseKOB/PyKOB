@@ -36,7 +36,7 @@ try:
     import pyaudio
     ok = True
 except:
-    log.log("PyAudio can't be loaded.")
+    log.warn("PyAudio can't be loaded.")
     ok = False
 
 BUFFERSIZE = 16
@@ -71,6 +71,7 @@ if ok:
 
 def play(snd):
     global sound
+    log.debug("audio: play({})".format(snd), 4)
     sound = snd
     iFrame[sound] = 0
 

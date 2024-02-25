@@ -41,6 +41,7 @@ from distutils.util import strtobool
 from enum import IntEnum, unique
 import json
 import os.path
+from pathlib import Path
 import sys
 from typing import Any, Callable, Optional
 
@@ -52,16 +53,17 @@ VERSION = "2.0.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
 def add_ext_if_needed(s: str) -> str:
-    if s and not s.endswith(".pkcfg"):
+    if s and not s.endswith(PYKOB_CFG_EXT):
         return (s + PYKOB_CFG_EXT)
     return s
 
 @unique
 class ChangeType(IntEnum):
-    hardware = 1
-    morse = 2
-    operations = 4
-    any = 7
+    hardware        = 0x01
+    morse           = 0x02
+    operations      = 0x04
+    save            = 0x80
+    any             = 0xFF
 
 
 class Config:
@@ -94,6 +96,8 @@ class Config:
         self._serial_port: Optional[str] = None
         self._interface_type: InterfaceType = InterfaceType.loop
         self._invert_key_input: bool = False
+        self._sound: bool = True
+        self._sounder: bool = False
         self._sounder_power_save: int = 0
         # Morse Settings
         self._code_type: CodeType = CodeType.american
@@ -105,8 +109,6 @@ class Config:
         self._local: bool = True
         self._remote: bool = True
         self._server_url: Optional[str] = None
-        self._sound: bool = True
-        self._sounder: bool = False
         self._station: str = ""
         self._wire: int = 0
         self._debug_level: int = 0
@@ -115,11 +117,12 @@ class Config:
         self._hw_chng: bool = False
         self._morse_chng: bool = False
         self._ops_chng: bool = False
+        self._saved_chng: bool = False
         self._pause_notify: int = 0
-        self._use_global: bool = False
         #
         # Our operational values
         self._filepath: Optional[str] = None  # The path used to load or last saved to
+        self._use_global: bool = False
         #
         # Key to property setter dictionary
         self._key_prop_setters: dict[str,Any] = {
@@ -146,7 +149,6 @@ class Config:
         self._change_listeners: dict[Callable[[int],None],int] = {}  # Start out empty
         self._dirty = False
 
-
     def _notify_listeners(self):
         """
         Notify interested parties of changes
@@ -161,20 +163,21 @@ class Config:
             ct = ct | ChangeType.morse
         if self._ops_chng:
             ct = ct | ChangeType.operations
-        for listener, change_types in self._change_listeners.items():
-            if not ((ct & change_types) == 0):
-                # Call the listener with the change types
-                listener(ct)
-        self._hw_chng = False
-        self._morse_chng = False
-        self._ops_chng = False
+        if self._saved_chng:
+            ct = ct | ChangeType.save
+        if ct > 0:
+            for listener, change_types in self._change_listeners.items():
+                if not ((ct & change_types) == 0):
+                    # Call the listener with the change types
+                    listener(ct)
+        self.clear_pending_notifications()
 
     def _changed_hw(self):
         """
         Hardware settings changed.
         """
         self._hw_chng = True
-        self._dirty = True
+        self.set_dirty()
         self._notify_listeners()
 
     def _changed_morse(self):
@@ -182,7 +185,7 @@ class Config:
         Morse settings changed.
         """
         self._morse_chng = True
-        self._dirty = True
+        self.set_dirty()
         self._notify_listeners()
 
     def _changed_ops(self):
@@ -190,9 +193,8 @@ class Config:
         Operational settings changed.
         """
         self._ops_chng = True
-        self._dirty = True
+        self.set_dirty()
         self._notify_listeners()
-
 
     # ########################################################################
     # Config (internal) Settings
@@ -223,6 +225,35 @@ class Config:
         self.gpio = v
 
     @property
+    def interface_type(self) -> InterfaceType:
+        return self._interface_type
+
+    @interface_type.setter
+    def interface_type(self, v: InterfaceType) -> None:
+        x = self._interface_type
+        self._interface_type = v
+        if not v == x:
+            self._changed_hw()
+
+    def _set_interface_type(self, v: str) -> None:
+        o = config.interface_type_from_str(v)
+        self.interface_type = o
+
+    @property
+    def invert_key_input(self) -> bool:
+        return self._invert_key_input
+
+    @invert_key_input.setter
+    def invert_key_input(self, v: bool) -> None:
+        x = self._invert_key_input
+        self._invert_key_input = v
+        if not v == x:
+            self._changed_hw()
+
+    def _set_invert_key_input(self, v: bool) -> None:
+        self.invert_key_input = v
+
+    @property
     def serial_port(self) -> str:
         return self._serial_port
     @serial_port.setter
@@ -235,29 +266,32 @@ class Config:
         self.serial_port = v
 
     @property
-    def interface_type(self) -> InterfaceType:
-        return self._interface_type
-    @interface_type.setter
-    def interface_type(self, v: InterfaceType) -> None:
-        x = self._interface_type
-        self._interface_type = v
+    def sound(self) -> bool:
+        return self._sound
+
+    @sound.setter
+    def sound(self, v: bool) -> None:
+        x = self._sound
+        self._sound = v
         if not v == x:
             self._changed_hw()
-    def _set_interface_type(self, v: str) -> None:
-        o = config.interface_type_from_str(v)
-        self.interface_type = o
+
+    def _set_sound(self, v: bool) -> None:
+        self.sound = v
 
     @property
-    def invert_key_input(self) -> bool:
-        return self._invert_key_input
-    @invert_key_input.setter
-    def invert_key_input(self, v: bool) -> None:
-        x = self._invert_key_input
-        self._invert_key_input = v
+    def sounder(self) -> bool:
+        return self._sounder
+
+    @sounder.setter
+    def sounder(self, v: bool) -> None:
+        x = self._sounder
+        self._sounder = v
         if not v == x:
             self._changed_hw()
-    def _set_invert_key_input(self, v: bool) -> None:
-        self.invert_key_input = v
+
+    def _set_sounder(self, v: bool) -> None:
+        self.sounder = v
 
     @property
     def sounder_power_save(self) -> int:
@@ -378,30 +412,6 @@ class Config:
         self.server_url = v
 
     @property
-    def sound(self) -> bool:
-        return self._sound
-    @sound.setter
-    def sound(self, v: bool) -> None:
-        x = self._sound
-        self._sound = v
-        if not v == x:
-            self._changed_ops()
-    def _set_sound(self, v: bool) -> None:
-        self.sound = v
-
-    @property
-    def sounder(self) -> bool:
-        return self._sounder
-    @sounder.setter
-    def sounder(self, v: bool) -> None:
-        x = self._sounder
-        self._sounder = v
-        if not v == x:
-            self._changed_ops()
-    def _set_sounder(self, v: bool) -> None:
-        self.sounder = v
-
-    @property
     def station(self) -> str:
         return self._station
     @station.setter
@@ -433,11 +443,21 @@ class Config:
         x = self._debug_level
         self._debug_level = v
         if not v == x:
+            log.set_debug_level(v)
             self._changed_ops()
     def _set_debug_level(self, v: int) -> None:
         self.debug_level = v
 
     # ########################################################################
+
+    def clear_pending_notifications(self):
+        """
+        Clear pending notification flags (as if the notifications had been sent)
+        """
+        self._hw_chng = False
+        self._morse_chng = False
+        self._ops_chng = False
+        self._saved_chng = False
 
     def clear_dirty(self):
         """
@@ -509,6 +529,20 @@ class Config:
         }
         return data
 
+    def get_directory(self) -> Optional[str]:
+        """
+        Get the configuration file directory that the '.pkcfg' file
+        was loaded from or last saved to.
+
+        Returns: The name if a configuration was loaded or None if copied or from Global
+        """
+        dir = None
+        if self._filepath:
+            p = Path(self._filepath)
+            p = p.resolve()
+            dir = p.parent
+        return dir
+
     def get_filepath(self) -> Optional[str]:
         """
         The file path used to load from and save to.
@@ -516,6 +550,22 @@ class Config:
         Return: File path or None if the path hasn't been established.
         """
         return self._filepath
+
+    def get_name(self, include_ext:bool=False) -> Optional[str]:
+        """
+        Get the configuration name. It is the (base) name of the '.pkcfg' file
+        used to load the configuration or that it was last saved to.
+
+        include_ext: Set to True to include the file extension
+        """
+        name = None
+        if self._filepath:
+            p = Path(self._filepath)
+            n = p.name
+            if not include_ext:
+                n = n.removesuffix(PYKOB_CFG_EXT)
+            name = n
+        return name
 
     def is_dirty(self) -> bool:
         """
@@ -695,6 +745,8 @@ class Config:
                 fp.write('\n')
             self._filepath = filepath
             self._dirty = False
+            self._saved_chng = True
+            self._notify_listeners()
 
     def save_global(self) -> None:
         """
@@ -705,7 +757,7 @@ class Config:
 
     def set_dirty(self):
         """
-        Clear the 'dirty' status.
+        Set the 'dirty' status.
 
         The dirty status is internally managed (set when values change and
         cleared when the configuration is saved), but this can be used

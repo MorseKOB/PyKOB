@@ -44,7 +44,6 @@ from pykob import VERSION, config, config2, log, kob, internet, morse
 from pykob.config2 import Config
 
 import argparse
-import os
 import platform
 import queue
 import sys

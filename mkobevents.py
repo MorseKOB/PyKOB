@@ -43,7 +43,6 @@ EVENT_KB_PROCESS_SEND = "<<KB_Process_Send>>" # Process text from the keyboard w
 EVENT_PLAYER_WIRE_CHANGE = "<<Player_Wire_Change>>" # The player detected a wire change
 EVENT_READER_APPEND_TEXT = "<<Reader_Append_Text>>" # Append text to the reader window
 EVENT_READER_CLEAR = "<<Clear_Reader>>" # Clear the reader window
-EVENT_SET_CODE_SENDER_ON = "<<Set_Code_Sender_On>>" # Set the Code Sender ON|OFF
 EVENT_SPEED_CHANGE = "<<Speed_Change>>" # The character or text speed has changed (user change)
 EVENT_STATION_ACTIVE = "<<Station_Active>>" # A station has indicated that it is still listening
 EVENT_STATIONS_CLEAR = "<<Clear_Stations>>" # Clear the station window and station list

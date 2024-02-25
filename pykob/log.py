@@ -56,7 +56,7 @@ def logErr(msg):
 
 def debug(msg, level=1):
     global __debug_level
-    if level > 0 and level >= __debug_level:
+    if level > 0 and __debug_level >= level:
         log(msg, type="DEBUG")
 
 def err(msg):
