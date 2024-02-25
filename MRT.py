@@ -44,26 +44,34 @@ from pykob import VERSION, config, log, kob, internet, morse
 
 import argparse
 import os
+import platform
+import queue
 import sys
-import threading as thr
+from threading import Event, Thread
 from time import sleep
+
+__version__ = '1.1.0'
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 Control_C_Pressed = False
+KB_Queue = None
+ThreadsStop = Event()
+
 KOB = None
-our_office_id = ""
 Sender = None
 Reader = None
 Recorder = None
 Internet = None
-connected = False
 
-local_loop_active = False  # True if sending on key or keyboard
+connected = False
 internet_station_active = False  # True if a remote station is sending
+last_received_para = False # The last character received was a Paragraph ('=')
+local_loop_active = False  # True if sending on key or keyboard
+our_office_id = ""
 sender_current = ""
-last_received_para = False
+
 exit_status = 1
 
 class _Getch:
@@ -74,10 +82,23 @@ class _Getch:
     the Subclasses for each platform.
     """
     def __init__(self):
-        try:
-            self.impl = _GetchWindows()
-        except ImportError:
-            self.impl = _GetchUnix()
+        self.impl = None
+        operating_system = platform.system()
+        if operating_system == "Windows":
+            try:
+                self.impl = _GetchWindows()
+            except Exception as ex:
+                log.error("Unable to get direct keyboard access (Win:{})".format(ex))
+        elif operating_system == "Darwin": # MacOSX
+            try:
+                self.impl = _GetchUnix()
+            except Exception as ex:
+                log.error("unable to get direct keyboard access (Mac:{})".format(ex))
+        elif operating_system == "Linux":
+            try:
+                self.impl = _GetchUnix()
+            except Exception as ex:
+                log.error("unable to get direct keyboard access (Linux:{})".format(ex))
 
     def __call__(self): return self.impl()
 
@@ -100,7 +121,6 @@ class _GetchUnix:
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return ch
-
 
 class _GetchWindows:
     """
@@ -216,6 +236,8 @@ def from_keyboard(code):
             return
         elif code[-1] == 2: # special code for closer/circuit open
             circuit_closer_closed(False)
+            print('[+ to close key]')
+            sys.stdout.flush()
             return
     if not internet_station_active and local_loop_active:
         emit_local_code(code, kob.CodeSource.keyboard)
@@ -258,24 +280,50 @@ def reader_callback(char, spacing):
     if char == '_':
         print()
 
-def kb_thread_run():
-    global Control_C_Pressed
+def thread_kbreader_run():
+    global Control_C_Pressed, KB_Queue, local_loop_active, ThreadsStop
     kbrd_char = _Getch()
-    while True:
+    while not ThreadsStop.is_set():
         try:
             ch = kbrd_char()
             if ch == '\x03': # They pressed ^C
+                ThreadsStop.set()
                 Control_C_Pressed = True
                 return # We are done
+            if ch == '\x00': # CTRL-SP on some terminals will send NULL, use it for help...
+                print("\n['~' to open the key]\n['+' to close the key]\n[^C to exit]")
+                sys.stdout.flush()
+                continue
+            if not local_loop_active and not ch == '~':
+                # The local loop needs to be active
+                print('\x07[~ to open key]') # Ring the bell to let them know we are full
+                sys.stdout.flush()
+                continue
             if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
-                # Since this is from the keyboard, print it so it can be seen.
-                nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
-                print(ch, end=nl)
-                code = Sender.encode(ch)
-                from_keyboard(code)
+                # See if there is room in the keyboard queue
+                if KB_Queue.not_full:
+                    # Since this is from the keyboard, print it so it can be seen.
+                    nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
+                    print(ch, end=nl)
+                    sys.stdout.flush()
+                    # Put it in our queue
+                    KB_Queue.put(ch)
+                else:
+                    print('\x07', end='') # Ring the bell to let them know we are full
+                    sys.stdout.flush()
             sleep(0.01)
         except Exception as ex:
-            print("<<< Keyboard reader encountered an error and will stop reading. Exception: {} >>>").format(ex)
+            print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
+
+def thread_kbsender_run():
+    global KB_Queue
+    while not ThreadsStop.is_set():
+        try:
+            ch = KB_Queue.get()
+            code = Sender.encode(ch)
+            from_keyboard(code)
+        except Exception as ex:
+            print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
 
 try:
     # Main code
@@ -297,6 +345,11 @@ try:
 
     print('Python ' + sys.version + ' on ' + sys.platform)
     print('PyKOB ' + VERSION)
+    try:
+        import serial
+        print('PySerial ' + serial.VERSION)
+    except:
+        print('PySerial is not installed or the version information is not available (check installation)')
 
     print('Connecting to wire: ' + str(wire))
     print('Connecting as Station/Office: ' + our_office_id)
@@ -304,6 +357,8 @@ try:
     if config.invert_key_input:
         print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
             "To enable/disable this setting use `Configure --iki`.")
+    print('[Use CTRL+SPACE for keyboard help.]')
+    sys.stdout.flush()
 
     KOB = kob.KOB(
             portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
@@ -314,16 +369,20 @@ try:
     Sender = morse.Sender(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type)
 
     # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
-    kbthread = thr.Thread(name="Keyboard-thread", daemon=True, target=kb_thread_run)
-    kbthread.start()
+    KB_Queue = queue.Queue(128)
+    kbrthread = Thread(name="Keyboard-read-thread", daemon=True, target=thread_kbreader_run)
+    kbsthread = Thread(name="Keyboard-send-thread", daemon=True, target=thread_kbsender_run)
+    kbrthread.start()
+    kbsthread.start()
 
     Internet.connect(wire)
     connected = True
     sleep(0.5)
-    while True:
+    while not ThreadsStop.is_set():
         sleep(0.1)  # Loop while background threads take care of 'stuff'
         if Control_C_Pressed:
             raise KeyboardInterrupt
+    exit_status = 0
 except KeyboardInterrupt:
     exit_status = 0 # Since the main program is an infinite loop, ^C is a normal way to exit.
 finally:

@@ -346,11 +346,17 @@ class KOB:
         #
         if config.interface_type == config.InterfaceType.loop and config.sounder:
             self.energizeLoop(open, True)
+        if open:
+            self.powerSave(False)
 
     def powerSave(self, enable: bool):
         '''
         Turn off the loop power to save power (reduce risk of fire, etc.)
         '''
+        # Don't enable Power Save if the key is open.
+        if enable and not self.keyIsClosed:
+            return
+        
         now = time.time()
         if self.useGpioOut:
             try:
