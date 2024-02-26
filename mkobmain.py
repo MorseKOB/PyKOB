@@ -287,6 +287,7 @@ class MKOBMain:
 
         Called from the 'KOB-KeyRead' thread.
         """
+        log.debug("MKOBMain.from_key: {}".format(code), 3)
         if len(code) > 0:
             if code[-1] == 1:  # special code for 'LATCH' (key/circuit closed)
                 self._ka.trigger_circuit_close()
@@ -357,7 +358,7 @@ class MKOBMain:
                     self._ka.handle_sender_update(
                         self._cfg.station
                     )  # Can call 'handle_' as this is run on the UI thread
-                self._kob.energizeSounder(closed)
+                self._kob.energize_sounder(closed)
                 self._mreader.decode(code)
             self._recorder.record(code, kob.CodeSource.local)
         if self._connected.is_set() and self._cfg.remote:
@@ -416,7 +417,7 @@ class MKOBMain:
         self._mreader.flush()
         self._ka.trigger_reader_append_text("\n#####\n")
         if not self._kob.virtualCloserIsOpen:
-            self._kob.energizeSounder(
+            self._kob.energize_sounder(
                 True
             )  # Sounder should be energized when disconnected.
 

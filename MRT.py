@@ -209,7 +209,7 @@ class Mrt:
         False: Circuit Closer (physical and virtual) CLOSED
         """
         self._local_loop_active = active
-        self._kob.energizeSounder((not active))
+        self._kob.energize_sounder((not active))
 
     def _set_virtual_closer_closed(self, closed):
         """

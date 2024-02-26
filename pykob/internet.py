@@ -89,6 +89,7 @@ class Internet:
         self._record_callback = record_callback
         self.ID_callback = None
         self.sender_callback = None
+        self._current_sender = None
         self.internetReadThread = None
         if code_callback or record_callback:
             self.internetReadThread = Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
@@ -193,7 +194,9 @@ class Internet:
                         self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
                 elif n > 0 and seqNo != self.rcvdSeqNo:  # code packet
                     if self.sender_callback:
-                        self.sender_callback(stnID)
+                        if not self._current_sender or not self._current_sender == stnID:
+                            self._current_sender = stnID
+                            self.sender_callback(self._current_sender)
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
                         code = (-0x7fff,) + code[1:n]
                     else:
@@ -258,6 +261,7 @@ class Internet:
     def monitor_sender(self, sender_callback):
         """start monitoring changes in current sender"""
         self.sender_callback = sender_callback
+        self._current_sender = None
 
     def record_code(self, record_callback):
         """Start recording code received and sent"""

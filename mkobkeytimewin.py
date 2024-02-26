@@ -82,8 +82,6 @@ class MKOBKeyTimeWin(tk.Toplevel):
         self._fb.rowconfigure(0, weight=1)
         # graph
         self._txtGraph = tkst.ScrolledText(self._fb, wrap='none', font='TkFixedFont')
-        #self._txtGraph.rowconfigure(0, weight=1)
-        #self._txtGraph.columnconfigure(0, weight=2)
         self._txtGraph.grid(row=0, column=0, padx=2, pady=2, sticky=tk.E+tk.W+tk.N+tk.S)
         self._txtGraph.tag_config(TAG_NORMAL)
         self._txtGraph.tag_config(TAG_ERROR, foreground="#EE0000") # Medium red
@@ -140,6 +138,7 @@ class MKOBKeyTimeWin(tk.Toplevel):
 
     def destroy(self):
         # Restore the attribute on close.
+        self._txtGraph = None
         self.__class__.active = False
         return super().destroy()
 
@@ -147,8 +146,9 @@ class MKOBKeyTimeWin(tk.Toplevel):
         """
         Clear the contents of the graph.
         """
-        self._txtGraph.delete("1.0", "end")
-        self._txtGraph.see("end")
+        if self._txtGraph:
+            self._txtGraph.delete("1.0", "end")
+            self._txtGraph.see("end")
 
     def do_mark_text_enter(self, event):
         """
@@ -163,13 +163,15 @@ class MKOBKeyTimeWin(tk.Toplevel):
         Append a line of text to the graph.
         """
         self._check_graph_full()
-        self._txtGraph.insert("end", text, tag)
-        self._txtGraph.see("end")
+        if self._txtGraph:
+            self._txtGraph.insert("end", text, tag)
+            self._txtGraph.see("end")
 
     def _check_graph_full(self):
-        index = float(self._txtGraph.index("end"))
-        if index >= GRAPH_UPPER_BOUND:
-            self._txtGraph.delete("0.0", GRAPH_LINES_TO_DEL)
+        if self._txtGraph:
+            index = float(self._txtGraph.index("end"))
+            if index >= GRAPH_UPPER_BOUND:
+                self._txtGraph.delete("0.0", GRAPH_LINES_TO_DEL)
 
     def _gen_line_graph(self, fc, fl, tc='', lc='|'):
         # Generate a string of fill characters (fc) that is fill length (fl) long.
