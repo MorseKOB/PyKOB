@@ -60,6 +60,7 @@ class MKOBMain:
         self._key_graph_win = None
 
         self._connected = Event()
+        self._odc_fu = None
         self._show_packets = False
         self._lastCharWasParagraph = False
 
@@ -412,19 +413,24 @@ class MKOBMain:
             self._internet.monitor_sender(None)  # don't monitor current sender
             self._internet.disconnect(self._on_disconnect)
 
-    def _on_disconnect(self):
-        # These should be false and blank from the 'disconnect', but make sure.
-        self._internet_station_active = False
-        self._sender_ID = ""
-        self._ka.trigger_station_list_clear()
-        self._mreader.flush()
+    def _on_disconnect_followup(self, *args):
+        self._odc_fu = None
         self._mreader.decode(LATCH_CODE, use_flusher=False)
         self._mreader.flush()
+        self._ka.trigger_station_list_clear()
         self._ka.trigger_reader_append_text("\n#####\n")
         if not self._kob.virtualCloserIsOpen:
             self._kob.energize_sounder(
                 True
             )  # Sounder should be energized when disconnected.
+
+    def _on_disconnect(self):
+        # These should be false and blank from the 'disconnect', but make sure.
+        self._internet_station_active = False
+        self._sender_ID = ""
+        self._mreader.flush()
+        if not self._odc_fu:
+            self._odc_fu = self._kw.root_win.after(1800, self._on_disconnect_followup)
 
     def change_wire(self, wire: int):
         """
@@ -491,6 +497,33 @@ class MKOBMain:
         """
         return self._key_graph_win and MKOBKeyTimeWin.active
 
+    def _update_from_config(self, cfg:Config, ct:config2.ChangeType):
+        try:
+            self._set_on_cfg = False
+            log.set_debug_level(cfg.debug_level)
+            if ct & config2.ChangeType.HARDWARE:
+                self._create_kob(
+                    cfg
+                )  # If the hardware changed, we need a new KOB instance.
+            if ct & config2.ChangeType.MORSE:
+                self._kw.spacing = cfg.spacing
+                self._kw.twpm = cfg.text_speed
+                self._kw.cwpm = cfg.min_char_speed
+                # Update the Reader and Sender instances
+                self.set_morse(
+                    cfg.code_type,
+                    cfg.min_char_speed,
+                    cfg.text_speed,
+                    cfg.spacing,
+                )
+            if ct & config2.ChangeType.OPERATIONS:
+                self._kw.office_id = cfg.station
+                self._kw.wire_number = cfg.wire
+                if cfg.server_url_changed:
+                    self._create_internet(cfg)
+        finally:
+            self._set_on_cfg = True
+
     def preferences_closed(self, prefsDialog):
         """
         The preferences (config) window returned.
@@ -500,26 +533,7 @@ class MKOBMain:
         log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct))
         if not ct == 0:
             self._cfg.copy_from(cfg_from_prefs)
-            self._set_on_cfg = False
-            log.set_debug_level(cfg_from_prefs.debug_level)
-            if ct & config2.ChangeType.HARDWARE:
-                self._create_kob(cfg_from_prefs)  # If the hardware changed, we need a new KOB instance.
-            if ct & config2.ChangeType.MORSE:
-                self._kw.spacing = cfg_from_prefs.spacing
-                self._kw.twpm = cfg_from_prefs.text_speed
-                self._kw.cwpm = cfg_from_prefs.min_char_speed
-                # Update the Reader and Sender instances
-                self.setmorse(
-                    cfg_from_prefs.code_type,
-                    cfg_from_prefs.min_char_speed,
-                    cfg_from_prefs.text_speed,
-                    cfg_from_prefs.spacing
-                )
-            if ct & config2.ChangeType.OPERATIONS:
-                self._kw.office_id = cfg_from_prefs.station
-                self._kw.wire_number = cfg_from_prefs.wire
-                if cfg_from_prefs.server_url_changed:
-                    self._create_internet(cfg_from_prefs)
+            self._update_from_config(cfg_from_prefs, ct)
             if prefsDialog.save_pressed:
                 self.preferences_save()
             self._set_on_cfg = True
@@ -541,6 +555,7 @@ class MKOBMain:
         if pf:
             print(" Load Config: ", pf)
             self._cfg.load_config(pf)
+            self._update_from_config(self._cfg, config2.ChangeType.ANY)
             self._cfg.clear_dirty()
 
     def preferences_opening(self) -> Config:

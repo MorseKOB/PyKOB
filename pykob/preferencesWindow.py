@@ -71,8 +71,8 @@ class PreferencesWindow:
         self.DEFAULT_CODE_TYPE = 0
 
         self.root = tk.Toplevel()
+        self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
-
         self.root.title("Preferences")
 
         # validators
@@ -365,7 +365,7 @@ class PreferencesWindow:
             self._apply_button["default"] = "active"
             self._OK_button["default"] = "normal"
         else:
-            self._OK_button["defualt"] = "active"
+            self._OK_button["default"] = "active"
 
         # self._OK_button.configure(state='disabled')
         self._OK_button.grid(row=0, column=3, padx=6, pady=12, sticky=tk.E)
@@ -385,14 +385,16 @@ class PreferencesWindow:
         # eventual displayed size.
         self.root.update()
 
+        ## The following causes trouble on some Linux (RaspberryPi, Quadra). Just let the OS place it.
         # Center the preferences window on the screen, about 40% of the way from the top:
-        prefs_width = self. root.winfo_reqwidth()
-        prefs_height = self.root.winfo_reqheight()
-        win_width = self.root.winfo_screenwidth()
-        win_height = self.root.winfo_screenheight()
-        left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
-        top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
-        self.root.geometry('+%d+%d' % (left_offset, top_offset))
+        # prefs_width = self. root.winfo_reqwidth()
+        # prefs_height = self.root.winfo_reqheight()
+        # win_width = self.root.winfo_screenwidth()
+        # win_height = self.root.winfo_screenheight()
+        # left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
+        # top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
+        # self.root.geometry('+%d+%d' % (left_offset, top_offset))
+        self.root.state("normal")
 
     # #############################################################################################
 
