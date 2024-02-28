@@ -36,14 +36,14 @@ from time import sleep
 from typing import Any, List
 
 class Audio:
-    FRAMES_PER_BUFFER = 256
+    FRAMES_PER_BUFFER = 16
 
     def __init__(self):
         self._audio_available = False
         self._pa = None
         try:
             import pyaudio
-            self._pa = pyaudio
+            self._pyaudio = pyaudio
             self._audio_available = True
         except:
             log.warn("Audio: PyAudio can't be loaded. Audio will not be available.")
@@ -58,8 +58,8 @@ class Audio:
         self._sampleWidth = [0, 0]
         self._sound = 0
         self._frameWidth = [0, 0]
-        self._strm = [None, None]
-        self._last_sound = -1
+        self._strm = None
+        self._callback_retval = self._pyaudio.paContinue
 
         if not self._audio_available:
             return
@@ -90,16 +90,15 @@ class Audio:
         self._devIdx = self._apiInfo["defaultOutputDevice"]
         self._devInfo = self._pa.get_device_info_by_index(self._devIdx)
         self._devName = self._devInfo["name"]
-        for i in range(len(self._audio_files)):
-            self._strm[i] = self._pa.open(
-                rate=self._frameRate[i],
-                channels=self._nChannels[i],
-                format=self._sampleFormat[i],
-                output=True,
-                output_device_index=self._devIdx,
-                frames_per_buffer=Audio.FRAMES_PER_BUFFER,
-                stream_callback=self._audio_callback
-            )
+        self._strm = self._pa.open(
+            rate=self._frameRate[0],
+            channels=self._nChannels[0],
+            format=self._sampleFormat[0],
+            output=True,
+            output_device_index=self._devIdx,
+            frames_per_buffer=Audio.FRAMES_PER_BUFFER,
+            stream_callback=self._audio_callback
+        )
 
     def _audio_callback(self, in_data, frame_count, time_info, status_flags):
         if frame_count != Audio.FRAMES_PER_BUFFER:
@@ -110,26 +109,22 @@ class Audio:
             endByte = (self._iFrame[self._sound] + frame_count) * self._frameWidth[self._sound]
             outData = self._frames[self._sound][startByte:endByte]
             self._iFrame[self._sound] += frame_count
-            return (outData, 0)
+            return (outData, self._callback_retval)
         else:
-            return (self._nullFrames, 0)
+            return (self._nullFrames, self._callback_retval)
 
     def audio_available(self):
         return self._audio_available
 
     def exit(self):
+        self._callback_retval = self._pyaudio.paAbort
         self._iFrame[0] = self._nFrames[0]
         self._iFrame[1] = self._nFrames[1]
 
     def play(self, snd:int):
         if self._audio_available:
-            log.debug("audio: play({})".format(snd), 8)
+            self._iFrame[snd] = 0
             self._sound = snd
-            if not self._last_sound == self._sound:
-                if self._last_sound >= 0:
-                    self._iFrame[self._last_sound] = self._nFrames[self._last_sound]
-                self._last_sound = self._sound
-                self._iFrame[self._sound] = 0
 
 class Audio2:
     def __init__(self):

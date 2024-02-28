@@ -57,8 +57,7 @@ def print_hierarchy(w, depth=0):
         + " x="
         + str(w.winfo_x())
         + " y="
-        + str(w.winfo_y()),
-        2,
+        + str(w.winfo_y())
     )
     children = w.winfo_children()
     for i in children:
@@ -114,10 +113,10 @@ class SenderControls:
         self,
         parent,
         mkkbd,
-        mka,
         spacing: config.Spacing,
         text_speed: int,
         input_validator,
+        text_change_callback,
         farns_change_callback,
         width=100,
         height=40,
@@ -128,11 +127,11 @@ class SenderControls:
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
         )
         self._mkkbd = mkkbd
-        self._ka = mka
         self._spacing = spacing
         self._text_speed = text_speed
         self._input_validator = input_validator
         self._farns_change_callback = farns_change_callback
+        self._text_change_callback = text_change_callback
         self._lbl_code_sender = ttk.Label(self.window, text="Code Sender:")
         self._varCodeSenderOn = tk.IntVar()
         self._chkCodeSenderOn = ttk.Checkbutton(
@@ -182,7 +181,7 @@ class SenderControls:
         ## Text/Word speed
         self._varTWPM = tk.StringVar()
         self._varTWPM.set(self._text_speed)
-        self._varTWPM.trace_add("write", self._ka.doWPM)
+        self._varTWPM.trace_add("write", self._text_change_callback)
         self._spnTWPM = ttk.Spinbox(
             self.window,
             style="MK.TSpinbox",
@@ -236,7 +235,8 @@ class SenderControls:
     @property
     def farnsworth_spacing(self) -> config.Spacing:
         v = self._farnsworthSpacing.get() - 1
-        return v
+        sp = config.Spacing(v)
+        return sp
 
     @farnsworth_spacing.setter
     def farnsworth_spacing(self, v: config.Spacing) -> None:
@@ -309,6 +309,8 @@ class MKOBWindow:
         self._code_type = cfg.code_type
         self._cwpm = cfg.min_char_speed
         self._twpm = cfg.text_speed
+        self._spacing = cfg.spacing
+        self._ignore_morse_setting_change = False
 
         # Pointers for other modules
         self._krdr = MKOBReader(self)
@@ -318,6 +320,12 @@ class MKOBWindow:
 
         # validators
         self._digits_only_validator = root.register(self._validate_number_entry)
+
+        # delay IDs
+        self._after_csc = None
+        self._after_hmc = None
+        self._after_hwc = None
+        self._after_tsc = None
 
         # Needed to avoid F4 inserting clipboard
         self._root.bind_class(
@@ -443,11 +451,11 @@ class MKOBWindow:
         self._fm_sndr_controls = SenderControls(
             fm_sender,
             self._kkb,
-            self._ka,
-            self._cfg.spacing,
-            self._cfg.text_speed,
+            self._spacing,
+            self._twpm,
             self._digits_only_validator,
-            self._handle_farnsworth_change,
+            self._handle_text_speed_change,
+            self._handle_morse_change,
         )
 
         # Stations Connected | Office | Closer & Speed | Wire/Connect
@@ -490,7 +498,7 @@ class MKOBWindow:
         self._lbl_cwpm = ttk.Label(fm_closer_speed, text="Speed:")
         self._varCWPM = tk.StringVar()
         self._varCWPM.set(cfg.min_char_speed)
-        self._varCWPM.trace_add("write", self._handle_speed_change)
+        self._varCWPM.trace_add("write", self._handle_char_speed_change)
         spnCWPM = ttk.Spinbox(
             fm_closer_speed,
             style="MK.TSpinbox",
@@ -649,7 +657,6 @@ class MKOBWindow:
         ### self._root.bind(mkobevents.EVENT_CURRENT_SENDER, self._ka.handle_sender_update)
         cmd = self._root.register(self._ka.handle_sender_update)
         self._root.tk.call("bind", root, mkobevents.EVENT_CURRENT_SENDER, cmd + " %d")
-        self._root.bind(mkobevents.EVENT_SPEED_CHANGE, self._ka.doWPM)
         ### self._root.bind(mkobevents.EVENT_STATION_ACTIVE, ksl.handle_update_station_active)
         cmd = self._root.register(self._ksl.handle_update_station_active)
         self._root.tk.call("bind", root, mkobevents.EVENT_STATION_ACTIVE, cmd + " %d")
@@ -675,7 +682,7 @@ class MKOBWindow:
         self._set_app_title()
         self._root.update()
         self._cfg.register_listener(
-            self._config_changed_handler, config2.ChangeType.any
+            self._config_changed_handler, config2.ChangeType.ANY
         )
 
         #### Keyboard event for the code send window (this must go after the 'root.update')
@@ -685,7 +692,7 @@ class MKOBWindow:
         # Set to disconnected state
         self.connected(False)
         # Finish up...
-        self._ka.doWPM()
+        self._ka.doMorseChange()
 
     def _config_changed_handler(self, ct: int):
         self._set_app_title()
@@ -697,27 +704,55 @@ class MKOBWindow:
         p_is_ok = P.isdigit() or P == ""
         return p_is_ok
 
-    def _handle_farnsworth_change(self):
-        log.debug("_handle_farnsworth_change")
+    def _handle_char_speed_change_delayed(self, *args):
+        self._after_csc = None
+        cwpmstr = self._varCWPM.get().strip()
+        new_cwpm = self._cwpm
+        if not cwpmstr == "":
+            new_cwpm = int(cwpmstr)
+        if not new_cwpm == self._cwpm:
+            log.debug("_handle_char_speed_change")
+            if new_cwpm < self._twpm:
+                self._fm_sndr_controls.text_speed = new_cwpm
+            self._handle_morse_change()
+
+    def _handle_char_speed_change(self, *args):
+        if self._after_csc:
+            self._root.after_cancel(self._after_csc)
+        self._after_csc = self._root.after(800, self._handle_char_speed_change_delayed)
+
+    def _handle_morse_change_delayed(self, *args):
+        self._after_hmc = None
         fspacing = self._fm_sndr_controls.farnsworth_spacing
-        self._cfg.spacing = fspacing
+        cwpmstr = self._varCWPM.get().strip()
+        new_cwpm = self._cwpm
+        if not cwpmstr == "":
+            new_cwpm = int(cwpmstr)
+        twpmstr = self._fm_sndr_controls.text_speed
+        new_twpm = self._twpm
+        if not twpmstr == "":
+            new_twpm = int(twpmstr)
+        changed = False
+        if not new_cwpm == self._cwpm:
+            self._cwpm = new_cwpm
+            changed = True
+        if not new_twpm == self._twpm:
+            self._twpm = new_twpm
+            changed = True
+        if not fspacing == self._spacing:
+            self._spacing = fspacing
+            changed = True
+        if changed:
+            log.debug("_handle_morse_change")
+            self._ka.doMorseChange()
 
-    def _handle_speed_change(self, *args):
-        log.debug("_handle_speed_change")
-        wpmstr = self._varCWPM.get().strip()
-        if not wpmstr == "":
-            new_wpm = int(wpmstr)
-            if new_wpm < 5:
-                new_wpm = 5
-            elif new_wpm > 40:
-                new_wpm = 40
-            self._cwpm = new_wpm
-            twpm = self._twpm
-            if new_wpm < twpm:
-                self._twpm = new_wpm
-            self._ka.trigger_speed_change()
+    def _handle_morse_change(self, *args):
+        if self._after_hmc:
+            self._root.after_cancel(self._after_hmc)
+        self._after_hmc = self._root.after(1333, self._handle_morse_change_delayed)
 
-    def _handle_wire_change(self, *args):
+    def _handle_wire_change_delayed(self, *args):
+        self._after_hwc = None
         log.debug("_handle_wire_change")
         wstr = self._varWireNo.get().strip()
         if not wstr == "":
@@ -726,8 +761,29 @@ class MKOBWindow:
                 new_wire = 0
             elif new_wire > 32000:
                 new_wire = 32000
-            self._wire = new_wire
             self._ka.doWireNo()
+
+    def _handle_wire_change(self, *args):
+        if self._after_hwc:
+            self._root.after_cancel(self._after_hwc)
+        self._after_hwc = self._root.after(1333, self._handle_wire_change_delayed)
+
+    def _handle_text_speed_change_delayed(self, *args):
+        self._after_tsc = None
+        twpmstr = self._fm_sndr_controls.text_speed
+        new_twpm = self._twpm
+        if not twpmstr == "":
+            new_twpm = int(twpmstr)
+        if not new_twpm == self._twpm:
+            log.debug("_handle_text_speed_change")
+            if new_twpm > self._cwpm:
+                self.cwpm = new_twpm
+            self._handle_morse_change()
+
+    def _handle_text_speed_change(self, *args):
+        if self._after_tsc:
+            self._root.after_cancel(self._after_tsc)
+        self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
 
     def _set_app_title(self):
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
@@ -798,23 +854,21 @@ class MKOBWindow:
 
     @cwpm.setter
     def cwpm(self, speed: int):
-        new_wpm = speed
-        if speed < 5:
-            new_wpm = 5
-        elif speed > 40:
-            new_wpm = 40
-        if not new_wpm == self._cwpm:
-            self._cwpm = new_wpm
-            self._varCWPM.set(new_wpm)
-            self._ka.doWPM()
+        self._cwpm = speed
+        self._ignore_morse_setting_change = True
+        self._varCWPM.set(speed)
+        self._ignore_morse_setting_change = False
 
     @property
-    def spacing(self):
+    def spacing(self) -> config.Spacing:
         return self._fm_sndr_controls.farnsworth_spacing
 
     @spacing.setter
     def spacing(self, sp: config.Spacing):
+        self._ignore_morse_setting_change = True
+        self._spacing = sp
         self._fm_sndr_controls.farnsworth_spacing = sp
+        self._ignore_morse_setting_change = False
 
     @property
     def twpm(self) -> int:
@@ -825,19 +879,10 @@ class MKOBWindow:
 
     @twpm.setter
     def twpm(self, speed: int):
-        new_wpm = speed
-        if speed < 5:
-            new_wpm = 5
-        elif speed > 40:
-            new_wpm = 40
-        if not new_wpm == self._twpm:
-            self._twpm = new_wpm
-            self._fm_sndr_controls.text_speed = new_wpm
-            # ZZZ !!! self._varTWPM.set(new_wpm)
-            if new_wpm > self._cwpm:
-                # Character speed must be at least the text speed
-                self._cwpm = new_wpm
-            self._ka.doWPM()
+        self._ignore_morse_setting_change = True
+        self._twpm = speed
+        self._fm_sndr_controls.text_speed = speed
+        self._ignore_morse_setting_change = False
 
     @property
     def office_id(self):

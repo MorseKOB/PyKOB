@@ -445,6 +445,7 @@ class KOB:
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
             time.sleep(0.005)
+        time.sleep(1.2)
         return ""
 
     def power_save(self, enable: bool):

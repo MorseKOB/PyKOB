@@ -37,8 +37,6 @@ from pykob import config2, kob, log, preferencesWindow, recorder, VERSION
 from pykob.config2 import Config
 import mkobevents
 
-print("PyKOB " + VERSION)
-
 class MKOBActions():
     def __init__(self, mkwindow, mksl, mkrdr, cfg:Config) -> None:
         self._cfg = cfg
@@ -87,62 +85,35 @@ class MKOBActions():
         """
         Called when the Preferences Dialog is dismissed via 'Cancel'/'Apply'/'Save'
         """
-        self._preferencesDialog = None
-        self._km.preferences_closed()
         # Put the ESC key binding back.
         self._kw._root.bind_all("<Key-Escape>", self.handle_toggle_closer)
+        self._preferencesDialog = None
+        self._km.preferences_closed(prefsDialog)
 
     def doFilePreferences(self):
         if not self._preferencesDialog:
+            # Unbind the ESC key so the dialog can use it
+            self._kw._root.unbind_all("<Key-Escape>")
+            cfg = self._km.preferences_opening()
             self._preferencesDialog = preferencesWindow.PreferencesWindow(
-                self._cfg,
+                cfg,
                 callback=self._preferencesDialogDismissed,
                 quitWhenDismissed=False,
-                allowApply=True)
-        # Unbind the ESC key so the dialog can use it
-        self._kw._root.unbind_all("<Key-Escape>")
+                allowApply=True,
+                saveIfRequested=False
+            )
         #
         self._preferencesDialog.root.deiconify()
         self._preferencesDialog.root.lift()
 
     def doFilePrefsLoad(self):
-        dir = self._cfg.get_directory()
-        dir = dir if dir else ""
-        name = self._cfg.get_name(True)
-        name = name if name else ""
-        pf = fd.askopenfilename(
-            title="Load Configuration",
-            initialdir=dir,
-            initialfile=name,
-            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
-        )
-        if pf:
-            print(" Load Config: ", pf)
-            self._cfg.load_config(pf)
-            self._cfg.clear_dirty()
+        self._km.preferences_load()
 
     def doFilePrefsSave(self):
-        if not self._cfg.get_filepath() and not self._cfg.load_from_global:
-            # The config doesn't have a file path and it isn't global
-            # call the SaveAs
-            self.doFilePrefsSaveAs()
-        else:
-            self._cfg.save_config()
+        self._km.preferences_save()
 
     def doFilePrefsSaveAs(self):
-        dir = self._cfg.get_directory()
-        dir = dir if dir else ""
-        name = self._cfg.get_name(True)
-        name = name if name else ""
-        pf = fd.asksaveasfile(
-            title="Save As",
-            initialdir=dir,
-            initialfile=name,
-            defaultextension=config2.PYKOB_CFG_EXT,
-            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
-        )
-        if pf:
-            self._cfg.save_config(pf.name)
+        self._km.preferences_save_as()
 
     def doFileExit(self):
         self._kw.exit()
@@ -170,16 +141,10 @@ class MKOBActions():
         self._km.Internet.set_officeID(new_officeID)
 
     def doCircuitCloser(self, event=None, *args):
-        self._km.virtualCloserClosed(self._kw.circuit_closer == 1)
+        self._km.set_virtual_closer_closed(self._kw.circuit_closer == 1)
 
-    def doWPM(self, event=None, *args):
-        new_cwpm = self._kw.cwpm
-        new_twpm = self._kw.twpm
-        if new_cwpm > -1 and new_twpm > -1:
-            with self._cfg.notification_pauser() as npcfg:
-                npcfg.text_speed = new_twpm
-                npcfg.min_char_speed = new_cwpm
-            self._km.setwpm(new_cwpm, new_twpm)
+    def doMorseChange(self, event=None, *args):
+        self._km.do_morse_change()
 
     def doWireNo(self, event=None, *args):
         wire = self._kw.wire_number
@@ -255,12 +220,6 @@ class MKOBActions():
         """
         self._kw.event_generate(mkobevents.EVENT_READER_CLEAR, when='tail')
 
-    def trigger_speed_change(self):
-        """
-        Generate an event to indicate that the user changed the character or text speed.
-        """
-        self._kw.event_generate(mkobevents.EVENT_SPEED_CHANGE, when='tail')
-
     def trigger_station_list_clear(self):
         """
         Generate an event to clear the station list and the window.
@@ -287,13 +246,13 @@ class MKOBActions():
         """
         Close the circuit and trigger associated local functions (checkbox, etc.)
         """
-        self._km.virtualCloserClosed(True)
+        self._km.set_virtual_closer_closed(True)
 
     def handle_circuit_open(self, event):
         """
         Open the circuit and trigger associated local functions (checkbox, sender, etc.)
         """
-        self._km.virtualCloserClosed(False)
+        self._km.set_virtual_closer_closed(False)
 
     def handle_emit_key_code(self, event_data):
         """

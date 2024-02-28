@@ -147,17 +147,22 @@ class Sender:
         return code
 
     def setWPM(self, wpm, cwpm=0):
+        if cwpm == 0:
+            cwpm = wpm  # adjust for legacy clients
         if self._spacing == config.Spacing.none:
-            cwpm = wpm  # send characters at overall code speed
+            wpm = cwpm  # send text at character speed
         else:
-            cwpm = max(wpm, cwpm)  # send at Farnsworth speed
+            maxs = max(wpm, cwpm)  # send at Farnsworth speed
+            mins = min(wpm, cwpm)
+            cwpm = maxs
+            wpm = mins
         self._dotLen    = int(1200 / cwpm)  # dot length (ms)
         self._charSpace = 3 * self._dotLen  # space between characters (ms)
         self._wordSpace = 7 * self._dotLen  # space between words (ms)
         if self._codeType == config.CodeType.american:
             self._charSpace += int((60000 / cwpm - self._dotLen * DOTSPERWORD) / 6)
             self._wordSpace = 2 * self._charSpace
-        delta = 60000 / wpm - 60000 / cwpm  # amount to stretch each word
+        delta = (60000 / wpm) - (60000 / cwpm)  # amount to stretch each word
         if self._spacing == config.Spacing.char:
             self._charSpace += int(delta / 6)
             self._wordSpace += int(delta / 3)

@@ -80,7 +80,6 @@ class Internet:
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
         self.tLastListener = 0.0
-        self._on_disconnect = None
         self.disconnect()  # to establish a UDP connection with the server
         self.keepAliveThread = Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
         self.keepAliveThread.start()
@@ -91,9 +90,6 @@ class Internet:
         self.sender_callback = None
         self._current_sender = None
         self.internetReadThread = None
-        if code_callback or record_callback:
-            self.internetReadThread = Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
-            self.internetReadThread.start()
 
     @property
     def packet_callback(self):
@@ -121,20 +117,28 @@ class Internet:
 
     def connect(self, wireNo):
         self.wireNo = wireNo
+        if self.connected.is_set():
+            self.disconnect()
         self.connected.set()
+        if self._code_callback or self._record_callback:
+            self.internetReadThread = Thread(
+                name="Internet-DataRead", daemon=True, target=self.callbackRead
+            )
+            self.internetReadThread.start()
         self.sendID()
 
     def disconnect(self, on_disconnect=None):
         self.wireNo = 0
-        self.connected.clear()
         shortPacket = shortPacketFormat.pack(DIS, 0)
         try:
-            self._on_disconnect = on_disconnect
             self.socket.sendto(shortPacket, self._get_address())
         except:
             self._get_address(renew=True)
         finally:
-            pass
+            self.connected.clear()
+            self.internetReadThread = None
+            if on_disconnect:
+                on_disconnect()
 
     def exit(self):
         """
@@ -147,18 +151,15 @@ class Internet:
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
         while not self.threadStop.is_set():
-            if self.connected.is_set():
+            if self.connected.wait(0.8):
                 code = self.read()
                 if code and self.connected.is_set():
                     if self._code_callback:
                         self._code_callback(code)
                     if self._record_callback:
                         self._record_callback(code)
-            else:
-                if self._on_disconnect:
-                    od = self._on_disconnect
-                    self._on_disconnect = None
-                    od()
+            if not self.connected.is_set():
+                return
 
     def read(self):
         while self.connected.is_set() and not self.threadStop.is_set():
@@ -231,8 +232,9 @@ class Internet:
 
     def keepAlive(self):
         while not self.threadStop.is_set():
-            self.sendID()
-            time.sleep(10.0)  # send another keepalive sequence every ten seconds
+            if self.connected.wait(1.5):
+                self.sendID()
+                time.sleep(10.0)  # send another keepalive sequence every ten seconds
 
     def sendID(self):
         if self.connected.is_set() and self.wireNo > 0:

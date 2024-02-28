@@ -33,7 +33,7 @@ class PreferencesWindow:
     cfg: Configuration to use. If 'None', the global configuration will be used.
 
     """
-    def __init__(self, cfg:Config, callback=None, quitWhenDismissed:bool=False, allowApply:bool=False):
+    def __init__(self, cfg:Config, callback=None, quitWhenDismissed:bool=False, allowApply:bool=False, saveIfRequested:bool=True):
         if not GUI:
             return  # Tkinter isn't available, so we can't run.
         self._callback = callback
@@ -41,6 +41,8 @@ class PreferencesWindow:
         self._cfg = cfg
 
         self._allowApply = allowApply  # If True, provide an 'Apply' button and change 'OK' to 'Save'
+        self._saveIfRequested = saveIfRequested
+        self._save_pressed = False
 
         self.HW_INTERFACE_TYPES = ["None", "Serial Port", "GPIO (Raspberry Pi)"]
         self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
@@ -491,8 +493,9 @@ class PreferencesWindow:
             self.dismiss()
 
     def _clickOK(self):
+        self._save_pressed = True
         self._clickApply(dismiss=False)
-        if self._cfg.is_dirty():
+        if self._saveIfRequested and self._cfg.is_dirty():
             if self._cfg.get_filepath():
                 self._cfg.save_config()
             else:
@@ -500,6 +503,14 @@ class PreferencesWindow:
                 self._cfg.save_global()
                 self._cfg.clear_dirty()
         self.dismiss()
+
+    @property
+    def cfg(self) -> Config:
+        return self._cfg
+
+    @property
+    def save_pressed(self) -> bool:
+        return self._save_pressed
 
     def display(self):
         if GUI:

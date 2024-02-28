@@ -32,6 +32,7 @@ import time
 from datetime import datetime
 from queue import Queue
 from threading import Event, Thread
+import tkinter.filedialog as fd
 
 from pykob import config, config2, kob, morse, internet, recorder, log
 from pykob.config2 import Config
@@ -46,10 +47,15 @@ class MKOBMain:
     def __init__(self, app_ver, mkactions, mkwindow, cfg: Config) -> None:
         self.app_ver = app_ver
         self._ka = mkactions
-        self._mreader = None  # Set by MKOBActions.doWPM
-        self._msender = None  # Set by MKOBActions.doWPM
         self._kw = mkwindow
         self._cfg = cfg
+        self._set_on_cfg:bool = False # Flag to control setting values on our config
+        self._mreader = None  # Set by do_morse_change
+        self._msender = None  # Set by do_morse_change
+        self._code_type = None  # Set by do_morse_change
+        self._cwpm = 0  # Set by do_morse_change
+        self._twpm = 0  # Set by do_morse_change
+        self._spacing = None  # Set by do_morse_change
 
         self._key_graph_win = None
 
@@ -60,8 +66,6 @@ class MKOBMain:
         self._internet_station_active = False  # True if a remote station is sending
 
         self._sender_ID = ""
-        self._cwpm = self._kw.cwpm
-        self._twpm = self._kw.twpm
 
         # For emitting code
         self._emit_code_queue = Queue()
@@ -70,9 +74,10 @@ class MKOBMain:
         )
 
         self._kob = None
-        self._create_kob()
+        self._create_kob(self._cfg)
         self._internet = None
-        self._create_internet()
+        self._create_internet(self._cfg)
+        self.do_morse_change()
 
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if self._cfg.invert_key_input:
@@ -80,51 +85,29 @@ class MKOBMain:
                 "IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). "
                 + "To enable/disable this setting use `Configure --iki`."
             )
-        self._cfg.register_listener(self._cfg_change_listener, config2.ChangeType.any)
 
-    def _cfg_change_listener(self, ct):
-        """
-        Adjust to changes to the configuration values.
-        """
-        log.debug("MKMain tracking all Changes. Change type: {}".format(ct))
-        with self._cfg.notification_pauser() as muted_cfg: # Don't trigger change listeners...
-            log.set_debug_level(muted_cfg.debug_level)
-            if (ct & config2.ChangeType.hardware):
-                self._create_kob()  # If the hardware changed, we need a new KOB instance.
-            if (ct & config2.ChangeType.morse):
-                self._kw.spacing = muted_cfg.spacing
-                self._kw.twpm = muted_cfg.text_speed
-                self._kw.cwpm = muted_cfg.min_char_speed
-                # Update the Reader and Sender instances
-                self.setwpm(cwpm=muted_cfg.min_char_speed, twpm=muted_cfg.text_speed)
-            if (ct & config2.ChangeType.operations):
-                self._kw.office_id = muted_cfg.station
-                self._kw.wire_number = muted_cfg.wire
-                self._create_internet()
-            muted_cfg.clear_pending_notifications()
-
-    def _create_internet(self):
+    def _create_internet(self, cfg:Config):
         if self._internet:
             self._internet.exit()
         self._internet = internet.Internet(
-            officeID=self._cfg.station,
+            officeID=cfg.station,
             code_callback=self.from_internet,
             pckt_callback=self._packet_callback,
             appver=self.app_ver,
-            server_url=self._cfg.server_url,
+            server_url=cfg.server_url,
             mka=self._ka,
         )
 
-    def _create_kob(self):
+    def _create_kob(self, cfg:Config):
         if self._kob:
             self._kob.exit()
         self._kob = kob.KOB(
-            portToUse=self._cfg.serial_port,
-            useGpio=self._cfg.gpio,
-            useAudio=self._cfg.sound,
-            useSounder=self._cfg.sounder,
-            invertKeyInput=self._cfg.invert_key_input,
-            sounderPowerSaveSecs=self._cfg.sounder_power_save,
+            portToUse=cfg.serial_port,
+            useGpio=cfg.gpio,
+            useAudio=cfg.sound,
+            useSounder=cfg.sounder,
+            invertKeyInput=cfg.invert_key_input,
+            sounderPowerSaveSecs=cfg.sounder_power_save,
             keyCallback=self.from_key,
         )
         self._kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
@@ -155,6 +138,9 @@ class MKOBMain:
         # connect to the currently configured wire.
         if self._cfg.auto_connect:
             self._ka.doConnect()  # Suggest a connect.
+        #
+        # If operational values change, set them on our config
+        self._set_on_cfg = True
 
     @property
     def connected(self):
@@ -169,6 +155,7 @@ class MKOBMain:
         True if the user requested the received and sent packets be displayed.
         """
         return self._show_packets
+
     @show_packets.setter
     def show_packets(self, b: bool):
         """
@@ -183,9 +170,6 @@ class MKOBMain:
     @property
     def Reader(self):
         return self._mreader
-    @Reader.setter
-    def Reader(self, morse_reader):
-        self._mreader = morse_reader
 
     @property
     def Recorder(self):
@@ -194,38 +178,20 @@ class MKOBMain:
     @property
     def Sender(self):
         return self._msender
-    @Sender.setter
-    def Sender(self, morse_sender):
-        self._msender = morse_sender
 
     @property
     def wpm(self):
         return self._cwpm
 
-    def setwpm(self, cwpm, twpm):
-        self._cwpm = cwpm
-        self._twpm = twpm
-        self.Sender = morse.Sender(
-            wpm=twpm,
-            cwpm=cwpm,
-            codeType=self._cfg.code_type,
-            spacing=self._cfg.spacing
-        )
-        self.Reader = morse.Reader(
-            wpm=twpm,
-            cwpm=cwpm,
-            codeType=self._cfg.code_type,
-            callback=self.readerCallback,
-        )
-        if self.key_graph_is_active():
-            self._key_graph_win.wpm = cwpm
-
-    def _packet_callback(self, pckt_text):
+    def do_morse_change(self):
         """
-        Set as a callback for the Internet package to print packets
+        Read Morse values from the UI and Config and update our operations.
         """
-        if self.show_packets:
-            self._ka.trigger_reader_append_text(pckt_text)
+        code_type = self._cfg.code_type
+        cwpm = self._kw.cwpm
+        twpm = self._kw.twpm
+        spacing = self._kw.spacing
+        self.set_morse(code_type, cwpm, twpm, spacing)
 
     def _thread_emit_code(self):
         while True:
@@ -337,7 +303,7 @@ class MKOBMain:
         if self.key_graph_is_active():
             self._key_graph_win.key_code(code)
 
-    def virtualCloserClosed(self, closed):
+    def set_virtual_closer_closed(self, closed):
         """
         Handle change of Circuit Closer state.
         This must be called from the GUI thread handling the Circuit-Closer checkbox,
@@ -374,6 +340,45 @@ class MKOBMain:
                 self._key_graph_win.key_closed()
             else:
                 self._key_graph_win.key_opened()
+
+    def set_morse(self, code_type:config.CodeType, cwpm:int, twpm:int, spacing:config.Spacing):
+        if cwpm < 5:
+            cwpm = 5
+        if cwpm > 45:
+            cwpm = 45
+        if twpm < 5:
+            twpm = 5
+        if twpm > 45:
+            twpm = 45
+        if cwpm < twpm:
+            cwpm = twpm  # Character (dot) speed needs to be at least the text speed
+        if (not cwpm == self._cwpm)\
+        or (not twpm == self._twpm)\
+        or (not code_type == self._code_type)\
+        or (not spacing == self._spacing):
+            self._code_type = code_type
+            self._cwpm = cwpm
+            self._twpm = twpm
+            self._spacing = spacing
+            if self._set_on_cfg:
+                self._cfg.code_type = code_type
+                self._cfg.min_char_speed = cwpm
+                self._cfg.text_speed = twpm
+                self._cfg.spacing = spacing
+            self._msender = morse.Sender(
+                wpm=twpm, cwpm=cwpm, codeType=code_type, spacing=spacing
+            )
+            self._mreader = morse.Reader(
+                wpm=twpm,
+                cwpm=cwpm,
+                codeType=code_type,
+                callback=self._reader_callback,
+            )
+            if self.key_graph_is_active():
+                self._key_graph_win.wpm = cwpm
+            self._kw.cwpm = cwpm
+            self._kw.twpm = twpm
+            self._kw.spacing = self._cfg.spacing
 
     def disconnect(self):
         """
@@ -436,17 +441,14 @@ class MKOBMain:
 
     # callback functions
 
-    def update_sender(self, id):
-        """display station ID in reader window when there's a new sender"""
-        if id != self._sender_ID:  # new sender
-            self._sender_ID = id
-            self._ka.trigger_reader_append_text("\n<{}>".format(self._sender_ID))
-        ### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
-        ##        Reader = morse.Reader(
-        ##                wpm=self._cfg.text_speed, codeType=self._cfg.code_type,
-        ##                callback=readerCallback)  # reset to nominal code speed
+    def _packet_callback(self, pckt_text):
+        """
+        Set as a callback for the Internet package to print packets
+        """
+        if self.show_packets:
+            self._ka.trigger_reader_append_text(pckt_text)
 
-    def readerCallback(self, char, spacing):
+    def _reader_callback(self, char, spacing):
         """display characters returned from the decoder"""
         self._recorder.record([], "", text=char)
         if self._cfg.code_type == config.CodeType.american:
@@ -489,6 +491,91 @@ class MKOBMain:
         """
         return self._key_graph_win and MKOBKeyTimeWin.active
 
+    def preferences_closed(self, prefsDialog):
+        """
+        The preferences (config) window returned.
+        """
+        cfg_from_prefs:Config = prefsDialog.cfg
+        ct = cfg_from_prefs.get_changes_types()
+        log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct))
+        if not ct == 0:
+            self._cfg.copy_from(cfg_from_prefs)
+            self._set_on_cfg = False
+            log.set_debug_level(cfg_from_prefs.debug_level)
+            if ct & config2.ChangeType.HARDWARE:
+                self._create_kob(cfg_from_prefs)  # If the hardware changed, we need a new KOB instance.
+            if ct & config2.ChangeType.MORSE:
+                self._kw.spacing = cfg_from_prefs.spacing
+                self._kw.twpm = cfg_from_prefs.text_speed
+                self._kw.cwpm = cfg_from_prefs.min_char_speed
+                # Update the Reader and Sender instances
+                self.setmorse(
+                    cfg_from_prefs.code_type,
+                    cfg_from_prefs.min_char_speed,
+                    cfg_from_prefs.text_speed,
+                    cfg_from_prefs.spacing
+                )
+            if ct & config2.ChangeType.OPERATIONS:
+                self._kw.office_id = cfg_from_prefs.station
+                self._kw.wire_number = cfg_from_prefs.wire
+                if cfg_from_prefs.server_url_changed:
+                    self._create_internet(cfg_from_prefs)
+            if prefsDialog.save_pressed:
+                self.preferences_save()
+            self._set_on_cfg = True
+
+    def preferences_load(self):
+        """
+        Load a new configuration.
+        """
+        dir = self._cfg.get_directory()
+        dir = dir if dir else ""
+        name = self._cfg.get_name(True)
+        name = name if name else ""
+        pf = fd.askopenfilename(
+            title="Load Configuration",
+            initialdir=dir,
+            initialfile=name,
+            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
+        )
+        if pf:
+            print(" Load Config: ", pf)
+            self._cfg.load_config(pf)
+            self._cfg.clear_dirty()
+
+    def preferences_opening(self) -> Config:
+        """
+        The Preferences (config) Dialog is being opened.
+
+        Return a config for it to use.
+        """
+        cfg_for_prefs = self._cfg.copy()
+        cfg_for_prefs.clear_dirty()
+        return cfg_for_prefs
+
+    def preferences_save(self):
+        if not self._cfg.get_filepath() and not self._cfg.load_from_global:
+            # The config doesn't have a file path and it isn't global
+            # call the SaveAs
+            self.preferences_save_as()
+        else:
+            self._cfg.save_config()
+
+    def preferences_save_as(self):
+        dir = self._cfg.get_directory()
+        dir = dir if dir else ""
+        name = self._cfg.get_name(True)
+        name = name if name else ""
+        pf = fd.asksaveasfile(
+            title="Save As",
+            initialdir=dir,
+            initialfile=name,
+            defaultextension=config2.PYKOB_CFG_EXT,
+            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
+        )
+        if pf:
+            self._cfg.save_config(pf.name)
+
     def reset_wire_state(self):
         """regain control of the wire"""
         self._internet_station_active = False
@@ -501,8 +588,12 @@ class MKOBMain:
             self._key_graph_win = MKOBKeyTimeWin(self._cwpm)
         self._key_graph_win.focus()
 
-    def preferences_closed(self):
-        """
-        The properties window returned. Our change listener will perform updates.
-        """
-        log.debug("mkm - Preferences Dialog closed.")
+    def update_sender(self, id):
+        """display station ID in reader window when there's a new sender"""
+        if id != self._sender_ID:  # new sender
+            self._sender_ID = id
+            self._ka.trigger_reader_append_text("\n<{}>".format(self._sender_ID))
+        ### ZZZ not necessary if code speed recognition is disabled in pykob/morse.py
+        ##        Reader = morse.Reader(
+        ##                wpm=self._cfg.text_speed, codeType=self._cfg.code_type,
+        ##                callback=readerCallback)  # reset to nominal code speed

@@ -2,7 +2,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ import argparse
 import tkinter as tk
 import sys
 from pykob import config2, log
+from pykob import VERSION as PKVERSION
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
@@ -39,7 +40,7 @@ VERSION = "4.1.4"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print(" Python " + sys.version + " on " + sys.platform)
-print(" PyKOB " + VERSION)
+print(" PyKOB " + PKVERSION)
 print(" Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
