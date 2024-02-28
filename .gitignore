@@ -1,9 +1,39 @@
+# IDE/OS files
+.DS_Store
+.vscode/
+
+# Build and Output
 build*/
 dist*/
 zips/
 __pycache__/
-.vscode/
-.DS_Store
+pyinstall/w/Configure/
+pyinstall/w/MKOB/
+
+# Generated / Intermediate
+**/CMakeCache.txt
+**/CMakePresets.json
+**/CTestTestfile.cmake
+**/CPackConfig.cmake
+**/cmake_install.cmake
+**/install_manifest.txt
+**/compie_commands.json
+
+# PCB
+*/#auto_saved_files#
+*/#auto_saved_files#/*
+*/_autosave-*.kicad_pcb
+*/*-bak
+*/*-backups/*
+*/_reports/*
+*.dsn
+Fp-info-cache
+
+# temporary
+~$*.docx
+*.bak
+
+# Runtime output
 *.log
 *.out
 *.pyo
@@ -11,8 +41,6 @@ __pycache__/
 *.toc
 *.zip
 log.txt
-pyinstall/w/Configure/
-pyinstall/w/MKOB/
 Capture-Replay/*.txt
 # Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
 *.json
