@@ -101,6 +101,8 @@ class MKOBKeyboard():
 
         This handles an event posted from the keyboard-send thread.
         """
+        log.debug("mkkb.handle_keyboard_send: Enabled:{} Waiting:{}".format(
+            self._enabled, self._waiting_for_sent_code), 4)
         if self._enabled and not self._waiting_for_sent_code:
             if self.kw.keyboard_win.compare(MARK_SEND, '==', 'end-1c'):
                 if not self.kw.keyboard_win.compare(MARK_SEND, '==', INSERT):
@@ -154,31 +156,36 @@ class MKOBKeyboard():
         ip = self.kw.keyboard_win.index(INSERT)
         ms = self.kw.keyboard_win.index(MARK_SEND)
         self.ka.trigger_keyboard_send()
-        log.debug("KB insert end insert/send point: {}:{}".format(ip, ms), 3)
+        log.debug("KB insert end [i:s]: {}:{}".format(ip, ms), 3)
         return r
 
     def on_mark(self, *args):
-        ip = self.kw.keyboard_win.index(INSERT)
-        ms = self.kw.keyboard_win.index(MARK_SEND)
-        op = args[0]
-        mark = args[1]
-        pos = args[2]
-        log.debug("KB mark: {}:{} {}".format(ip, ms, args), 3)
         r = None
         try:
             r = self.original_mark(*args)
         except:
             pass
+        op = args[0]
+        mark = args[1]
+        pos = args[2]
         ip = self.kw.keyboard_win.index(INSERT)
+        ipl = ip.split('.')
+        iline = int(ipl[0])
+        ichar = int(ipl[1])
         ms = self.kw.keyboard_win.index(MARK_SEND)
-        if mark == INSERT and not pos == MARK_SEND:
-            if (self._enabled and (float(ip) < float(ms))) or not self._enabled:
+        msl = ms.split(".")
+        sline = int(msl[0])
+        schar = int(msl[1])
+        en = self._enabled
+        log.debug("KB mark [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 3)
+        if op == 'set' and mark == INSERT and not pos == MARK_SEND:
+            if (en and ((iline < sline) or (iline == sline and ichar < schar))) or (not en):
                 self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
-                self.kw.keyboard_win.mark_set(MARK_SEND, INSERT)
+                self.kw.keyboard_win.mark_set(MARK_SEND, ip)
                 self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
                 ms = self.kw.keyboard_win.index(MARK_SEND)
                 self.ka.trigger_keyboard_send()
-        log.debug("KB mark end insert/send point: {}:{}".format(ip, ms), 3)
+        log.debug("KB mark end [i:s]: {}:{}".format(ip, ms), 3)
         return r
 
     def on_right_click(self, event):

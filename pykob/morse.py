@@ -273,7 +273,7 @@ class Reader:
         # Code received - cancel an existing 'flusher'
         f = self._flusher
         self._flusher = None
-        if f:
+        if f and f.is_alive():
             f.cancel()
             f.join(0.38)
         self.updateDWPM(codeSeq)  # Update the 'detected' WPM
