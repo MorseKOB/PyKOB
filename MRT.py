@@ -417,21 +417,20 @@ class Mrt:
                                     break
                                 # Collect the repeat count
                                 l = fp.readline()
-                                if l == "":
-                                    # Just repeat once
-                                    self._send_repeat_count = 1
-                                else:
-                                    if l[0] == '*':
+                                if l == "" or l[0] == '*':
                                         self._send_repeat_count = -2  # Repeat indefinately
+                                else:
+                                    # Try to collect a number
+                                    rc = 1
+                                    p = re.compile("[0-9]+")
+                                    m = p.match(l)
+                                    n = m.group()
+                                    if n:
+                                        rc = int(n)
+                                    if rc > 0:
+                                        self._send_repeat_count = rc
                                     else:
-                                        # Try to collect a number
-                                        p = re.compile("[0-9]+")
-                                        m = p.match(l)
-                                        n = m.group()
-                                        if n:
-                                            rc = int(n)
-                                            if rc > 0:
-                                                self._send_repeat_count = rc
+                                        self._send_repeat_count = 1
                                 break
                             if ch < ' ':
                                 # don't send control characters
