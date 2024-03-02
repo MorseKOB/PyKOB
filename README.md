@@ -1,13 +1,26 @@
 # MorseKOB Version 4 - Python
 
-Written by Les Kerr, this is a Python library and programs that implement
-the MorseKOB functionality. The library functions in pykob provide modules
-and functions that can be used within a Python program to perform MorseKOB
-operations.
+Originally written by Les Kerr, this is a Python library and programs that
+implement the MorseKOB functionality. The library functions in pykob provide
+modules and functions that can be used within a Python program to perform
+MorseKOB operations.
 
 The MKOB application provides a full graphical interface that allows the
 station to connect to a MorseKOB wire on the Morse KOB server. Instructions
 for running the MKOB application are in the MKOB-README.
+
+The MRT application provides a command-line application that connects to a
+wire and allows text to be typed and sent.
+
+Both applications support a serial interface to a key and sounder. On
+Raspberry Pi, the key and sounder can be connected using an interface connected
+to the GPIO.
+
+# Documentation
+
+Unfortunately, the documentation is a bit lacking, but it is being worked on.
+Please take a look in the **doc** folder for information about the applications
+and more.
 
 # Simple 'Getting Started'
 Even if you aren't familiar with Git/GitHub, it is easy to grab a ZIP file from it. You can also use the 'Issues' section to report problems and request features.
