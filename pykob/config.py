@@ -22,12 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""config module
+"""
+config module
 
-Reads configuration information for `per-machine` and `per-user` values.
-
-An example of a `per-machine` value is the KOB serial/com port (PORT).
-An example of a `per-user` value is the code speed (WPM).
+Reads configuration information for the PyKOB modules and applications.
 
 Configuration/preference values are read/written to:
  Windows:
@@ -45,7 +43,6 @@ The files are INI format with the values in a section named "PYKOB".
 """
 import argparse
 import configparser
-import distutils
 import getpass
 import os
 import platform
@@ -53,7 +50,7 @@ import pykob
 import socket
 import sys
 from distutils.util import strtobool
-from enum import Enum, IntEnum, unique
+from enum import IntEnum, unique
 from pykob import log
 
 @unique
@@ -74,28 +71,28 @@ class InterfaceType(IntEnum):
     keyer = 3
 
 # Application name
-__APP_NAME = "pykob"
+_APP_NAME = "pykob"
 # INI Section
-__CONFIG_SECTION = "PYKOB"
+_CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
-__SERIAL_PORT_KEY = "PORT"
-__GPIO_KEY = "GPIO"
+_SERIAL_PORT_KEY = "PORT"
+_GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
-__AUTO_CONNECT_KEY = "AUTO_CONNECT"
-__CODE_TYPE_KEY = "CODE_TYPE"
-__INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
-__INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
-__LOCAL_KEY = "LOCAL"
-__MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
-__REMOTE_KEY = "REMOTE"
-__SERVER_URL_KEY = "SERVER_URL"
-__SOUND_KEY = "SOUND"
-__SOUNDER_KEY = "SOUNDER"
-__SOUNDER_POWER_SAVE_KEY = "SOUNDER_POWER_SAVE"
-__SPACING_KEY = "SPACING"
-__STATION_KEY = "STATION"
-__TEXT_SPEED_KEY = "TEXT_SPEED"
-__WIRE_KEY = "WIRE"
+_AUTO_CONNECT_KEY = "AUTO_CONNECT"
+_CODE_TYPE_KEY = "CODE_TYPE"
+_INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
+_INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
+_LOCAL_KEY = "LOCAL"
+_MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
+_REMOTE_KEY = "REMOTE"
+_SERVER_URL_KEY = "SERVER_URL"
+_SOUND_KEY = "SOUND"
+_SOUNDER_KEY = "SOUNDER"
+_SOUNDER_POWER_SAVE_KEY = "SOUNDER_POWER_SAVE"
+_SPACING_KEY = "SPACING"
+_STATION_KEY = "STATION"
+_TEXT_SPEED_KEY = "TEXT_SPEED"
+_WIRE_KEY = "WIRE"
 
 
 # Paths and Configurations
@@ -202,30 +199,51 @@ def create_config_files_if_needed():
 def set_auto_connect(s):
     """Sets the Auto Connect to wire enable state
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should
     automatically connect to the configured wire.
 
-    Note that this is a 'suggestion'. It isn't used by the base pykob 
-    modules. It should be used by applications (like MKOB) to initiate a connection 
+    Note that this is a 'suggestion'. It isn't used by the base pykob
+    modules. It should be used by applications (like MKOB) to initiate a connection
     to the configured wire.
-    
+
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable auto-connect. Values of `NO`|`OFF`|`FALSE` will disable auto-connect.
     """
 
     global auto_connect
     try:
         auto_connect = strtobool(str(s))
-        user_config.set(__CONFIG_SECTION, __AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+        user_config.set(_CONFIG_SECTION, _AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
     except ValueError as ex:
         log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
+def code_type_from_str(s):
+    """
+    CodeType object from the string representation (for American or International)
+
+    Parameters
+    ----------
+    s : str
+        The value `A|AMERICAN` will return code type 'American'.
+        The value `I|INTERNATIONAL` will return code type 'International'.
+    """
+    s = s.upper()
+    if s=="A" or s=="AMERICAN":
+        return CodeType.american
+    elif s=="I" or s=="INTERNATIONAL":
+        return CodeType.international
+    else:
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+
 def set_code_type(s):
-    """Sets the Code Type (for American or International)
+    """
+    Sets the Code Type (for American or International)
 
     Parameters
     ----------
@@ -233,19 +251,32 @@ def set_code_type(s):
         The value `A|AMERICAN` will set the code type to 'American'.
         The value `I|INTERNATIONAL` will set the code type to 'International'.
     """
-
     global code_type
+    code_type = code_type_from_str(s)
+    user_config.set(_CONFIG_SECTION, _CODE_TYPE_KEY, code_type.name.upper())
+
+def interface_type_from_str(s):
+    """
+    Interface Type object from the string representation.
+
+        Parameters
+        ----------
+        s : str
+            The value `KS|KEY_SOUNDER` will return 'InterfaceType.key_sounder'.
+            The value `L|LOOP` will return 'InterfaceType.loop'.
+            The value `K|KEYER` will return 'InterfaceType.keyer'.
+    """
     s = s.upper()
-    if s=="A" or s=="AMERICAN":
-        code_type = CodeType.american
-    elif s=="I" or s=="INTERNATIONAL":
-        code_type = CodeType.international
+    if s=="KS" or s=="KEY_SOUNDER":
+        return(InterfaceType.key_sounder)
+    elif s=="L" or s=="LOOP":
+        return (InterfaceType.loop)
+    elif s=="K" or s=="KEYER":
+        return(InterfaceType.keyer)
     else:
-        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        msg = "TYPE value '{}' is not a valid `Interface Type` value of 'KEY_SOUNDER', 'LOOP' or 'KEYER'.".format(s)
         log.err(msg)
         raise ValueError(msg)
-    user_config.set(__CONFIG_SECTION, __CODE_TYPE_KEY, code_type.name.upper())
-
 
 def set_interface_type(s):
     """Sets the Interface Type (for Key-Sounder, Loop or Keyer)
@@ -257,20 +288,9 @@ def set_interface_type(s):
         The value `L|LOOP` will set the interface type to 'InterfaceType.loop'.
         The value `K|KEYER` will set the interface type to 'InterfaceType.keyer'.
     """
-
     global interface_type
-    s = s.upper()
-    if s=="KS" or s=="KEY_SOUNDER":
-        interface_type = InterfaceType.key_sounder
-    elif s=="L" or s=="LOOP":
-        interface_type = InterfaceType.loop
-    elif s=="K" or s=="KEYER":
-        interface_type = InterfaceType.keyer
-    else:
-        msg = "TYPE value '{}' is not a valid `Interface Type` value of 'KEY_SOUNDER', 'LOOP' or 'KEYER'.".format(s)
-        log.err(msg)
-        raise ValueError(msg)
-    user_config.set(__CONFIG_SECTION, __INTERFACE_TYPE_KEY, interface_type.name.upper())
+    interface_type = interface_type_from_str(s)
+    user_config.set(_CONFIG_SECTION, _INTERFACE_TYPE_KEY, interface_type.name.upper())
 
 
 def set_invert_key_input(b):
@@ -290,7 +310,7 @@ def set_invert_key_input(b):
     global invert_key_input
     try:
         invert_key_input = strtobool(str(b))
-        user_config.set(__CONFIG_SECTION, __INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
+        user_config.set(_CONFIG_SECTION, _INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
     except ValueError as ex:
         log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -311,7 +331,7 @@ def set_local(l):
     global local
     try:
         local = strtobool(str(l))
-        user_config.set(__CONFIG_SECTION, __LOCAL_KEY, onOffFromBool(local))
+        user_config.set(_CONFIG_SECTION, _LOCAL_KEY, onOffFromBool(local))
     except ValueError as ex:
         log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -332,12 +352,12 @@ def set_remote(r):
     global remote
     try:
         remote = strtobool(str(r))
-        user_config.set(__CONFIG_SECTION, __REMOTE_KEY, onOffFromBool(remote))
+        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, onOffFromBool(remote))
     except ValueError as ex:
         log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
-def set_min_char_speed(s):
+def set_min_char_speed(s: str):
     """Sets the minimum character speed in words per minute
 
     A difference between character speed (in WPM) and text speed
@@ -353,14 +373,17 @@ def set_min_char_speed(s):
         The speed in words-per-minute as an interger string value
     """
 
-    global min_char_speed
     try:
         _speed = int(s)
-        min_char_speed = _speed
-        user_config.set(__CONFIG_SECTION, __MIN_CHAR_SPEED_KEY, str(min_char_speed))
+        set_min_char_speed_int(_speed)
     except ValueError as ex:
         log.err("CHARS value '{}' is not a valid integer value. Not setting CWPM value.".format(ex.args[0]))
         raise
+
+def set_min_char_speed_int(si: int):
+    global min_char_speed
+    min_char_speed = si
+    user_config.set(_CONFIG_SECTION, _MIN_CHAR_SPEED_KEY, str(min_char_speed))
 
 def set_serial_port(p):
     """Sets the name/path of the serial/tty port to use for a
@@ -374,18 +397,18 @@ def set_serial_port(p):
 
     global serial_port
     serial_port = noneOrValueFromStr(p)
-    app_config.set(__CONFIG_SECTION, __SERIAL_PORT_KEY, serial_port)
+    app_config.set(_CONFIG_SECTION, _SERIAL_PORT_KEY, serial_port)
 
 def set_gpio(s):
     """Sets the key/sounder interface to Raspberry Pi GPIO
 
-    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should 
+    When set to `True` via a value of "TRUE"/"ON"/"YES" the application should
     enable the GPIO interface to the key/sounder.
-    
+
     Parameters
     ----------
     s : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE` 
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
         will enable GPIO interface. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
         Serial port will become active (if configured for sounder = ON)
     """
@@ -393,7 +416,7 @@ def set_gpio(s):
     global gpio
     try:
         gpio = strtobool(str(s))
-        app_config.set(__CONFIG_SECTION, __GPIO_KEY, onOffFromBool(gpio))
+        app_config.set(_CONFIG_SECTION, _GPIO_KEY, onOffFromBool(gpio))
     except ValueError as ex:
         log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -411,7 +434,7 @@ def set_server_url(s):
     server_url = noneOrValueFromStr(s)
     if server_url and server_url.upper() == 'DEFAULT':
         server_url = None
-    user_config.set(__CONFIG_SECTION, __SERVER_URL_KEY, server_url)
+    user_config.set(_CONFIG_SECTION, _SERVER_URL_KEY, server_url)
 
 def set_sound(s):
     """Sets the Sound/Audio enable state
@@ -429,7 +452,7 @@ def set_sound(s):
     global sound
     try:
         sound = strtobool(str(s))
-        user_config.set(__CONFIG_SECTION, __SOUND_KEY, onOffFromBool(sound))
+        user_config.set(_CONFIG_SECTION, _SOUND_KEY, onOffFromBool(sound))
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -451,7 +474,7 @@ def set_sounder(s):
     global sounder
     try:
         sounder = strtobool(str(s))
-        user_config.set(__CONFIG_SECTION, __SOUNDER_KEY, onOffFromBool(sounder))
+        user_config.set(_CONFIG_SECTION, _SOUNDER_KEY, onOffFromBool(sounder))
     except ValueError as ex:
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -472,13 +495,40 @@ def set_sounder_power_save(s):
     try:
         _seconds = int(s)
         sounder_power_save = _seconds if _seconds >= 0 else 0
-        user_config.set(__CONFIG_SECTION, __SOUNDER_POWER_SAVE_KEY, str(sounder_power_save))
+        user_config.set(_CONFIG_SECTION, _SOUNDER_POWER_SAVE_KEY, str(sounder_power_save))
     except ValueError as ex:
         log.err("Idle time '{}' is not a valid integer value. Not setting SounderPowerSave value.".format(ex.args[0]))
         raise
 
+def spacing_from_str(s):
+    """
+    Spacing object (for Farnsworth timing) from the string representation of
+    "None" (disabled) `Spacing.none`,
+    "Character" `Spacing.char`
+    "Word" `Spacing.word`
+
+    Parameters
+    ----------
+    s : str
+        The value `N|NONE` will return `Spacing.none` (disabled).
+        The value `C|CHAR` will return `Spacing.char`.
+        The value `W|WORD` will return `Spacing.word`.
+    """
+    s = s.upper()
+    if s=="N" or s=="NONE":
+        return Spacing.none
+    elif s=="C" or s=="CHAR" or s=="CHARACTER":
+        return Spacing.char
+    elif s=="W" or s=="WORD":
+        return Spacing.word
+    else:
+        msg = "SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+
 def set_spacing(s):
-    """Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,
+    """
+    Sets the Spacing (for Farnsworth timing) to None (disabled) `Spacing.none`,
     Character `Spacing.char` or Word `Spacing.word`
 
     When set to `Spacing.none` Farnsworth spacing will not be added.
@@ -492,20 +542,9 @@ def set_spacing(s):
         The value `C|CHAR` will set the spacing to `Spacing.char`.
         The value `W|WORD` will set the spacing to `Spacing.word`.
     """
-
     global spacing
-    s = s.upper()
-    if s=="N" or s=="NONE":
-        spacing = Spacing.none
-    elif s=="C" or s=="CHAR" or s=="CHARACTER":
-        spacing = Spacing.char
-    elif s=="W" or s=="WORD":
-        spacing = Spacing.word
-    else:
-        msg = "SPACING value '{}' is not a valid `Spacing` value of 'NONE', 'CHAR' or 'WORD'.".format(s)
-        log.err(msg)
-        raise ValueError(msg)
-    user_config.set(__CONFIG_SECTION, __SPACING_KEY, spacing.name.upper())
+    spacing = spacing_from_str(s)
+    user_config.set(_CONFIG_SECTION, _SPACING_KEY, spacing.name.upper())
 
 
 def set_station(s):
@@ -519,7 +558,7 @@ def set_station(s):
 
     global station
     station = noneOrValueFromStr(s)
-    user_config.set(__CONFIG_SECTION, __STATION_KEY, station)
+    user_config.set(_CONFIG_SECTION, _STATION_KEY, station)
 
 def set_wire(w: str):
     """Sets the wire to connect to
@@ -530,16 +569,19 @@ def set_wire(w: str):
         The Wire number
     """
 
-    global wire
     try:
         _wire = int(w)
-        wire = _wire
-        user_config.set(__CONFIG_SECTION, __WIRE_KEY, str(wire))
+        set_wire_int(_wire)
     except ValueError as ex:
         log.err("Wire number value '{}' is not a valid integer value.".format(ex.args[0]))
         raise
 
-def set_text_speed(s):
+def set_wire_int(w: int):
+    global wire
+    wire = w
+    user_config.set(_CONFIG_SECTION, _WIRE_KEY, str(w))
+
+def set_text_speed(s: str):
     """Sets the Text (code) speed in words per minute
 
     Parameters
@@ -547,15 +589,17 @@ def set_text_speed(s):
     s : str
         The text speed in words-per-minute as an interger string value
     """
-
-    global text_speed
     try:
         _speed = int(s)
-        text_speed = _speed
-        user_config.set(__CONFIG_SECTION, __TEXT_SPEED_KEY, str(text_speed))
+        set_text_speed_int(_speed)
     except ValueError as ex:
         log.err("Text speed value '{}' is not a valid integer value.".format(ex.args[0]))
         raise
+
+def set_text_speed_int(s: int):
+    global text_speed
+    text_speed = s
+    user_config.set(_CONFIG_SECTION, _TEXT_SPEED_KEY, str(text_speed))
 
 def print_info():
     """Print system and PyKOB configuration information
@@ -685,11 +729,11 @@ def read_config():
 
         # Create the user and application configuration paths
         if system_name == "Windows":
-            user_config_file_path = os.path.join(os.environ["LOCALAPPDATA"], os.path.normcase(os.path.join(__APP_NAME, userConfigFileName)))
-            app_config_file_path = os.path.join(os.environ["ProgramData"], os.path.normcase(os.path.join(__APP_NAME, app_configFileName)))
+            user_config_file_path = os.path.join(os.environ["LOCALAPPDATA"], os.path.normcase(os.path.join(_APP_NAME, userConfigFileName)))
+            app_config_file_path = os.path.join(os.environ["ProgramData"], os.path.normcase(os.path.join(_APP_NAME, app_configFileName)))
         elif system_name == "Linux" or system_name == "Darwin": # Linux or Mac
-            user_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(__APP_NAME), userConfigFileName)))
-            app_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(__APP_NAME), app_configFileName)))
+            user_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), userConfigFileName)))
+            app_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), app_configFileName)))
         else:
             log.err("Unknown System name")
             exit
@@ -701,25 +745,25 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {\
-        __AUTO_CONNECT_KEY:"OFF", \
-        __CODE_TYPE_KEY:"AMERICAN", \
-        __INTERFACE_TYPE_KEY:"LOOP", \
-        __INVERT_KEY_INPUT_KEY:"OFF", \
-        __LOCAL_KEY:"ON", \
-        __MIN_CHAR_SPEED_KEY:"18", \
-        __REMOTE_KEY:"ON", \
-        __SERVER_URL_KEY:"NONE", \
-        __SOUND_KEY:"ON", \
-        __SOUNDER_KEY:"OFF", \
-        __SOUNDER_POWER_SAVE_KEY:"60", \
-        __SPACING_KEY:"NONE", \
-        __STATION_KEY:"", \
-        __WIRE_KEY:"", \
-        __TEXT_SPEED_KEY:"18"}
+        _AUTO_CONNECT_KEY:"OFF", \
+        _CODE_TYPE_KEY:"AMERICAN", \
+        _INTERFACE_TYPE_KEY:"LOOP", \
+        _INVERT_KEY_INPUT_KEY:"OFF", \
+        _LOCAL_KEY:"ON", \
+        _MIN_CHAR_SPEED_KEY:"18", \
+        _REMOTE_KEY:"ON", \
+        _SERVER_URL_KEY:"NONE", \
+        _SOUND_KEY:"ON", \
+        _SOUNDER_KEY:"OFF", \
+        _SOUNDER_POWER_SAVE_KEY:"60", \
+        _SPACING_KEY:"NONE", \
+        _STATION_KEY:"", \
+        _WIRE_KEY:"", \
+        _TEXT_SPEED_KEY:"18"}
     app_config_defaults = {"PORT":"", "GPIO":"OFF"}
 
-    user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
-    app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=__CONFIG_SECTION)
+    user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=_CONFIG_SECTION)
+    app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=_CONFIG_SECTION)
 
     user_config.read(user_config_file_path)
     app_config.read(app_config_file_path)
@@ -728,25 +772,25 @@ def read_config():
         ###
         # Get the System (App) config values
         ###
-        serial_port = app_config.get(__CONFIG_SECTION, __SERIAL_PORT_KEY)
+        serial_port = app_config.get(_CONFIG_SECTION, _SERIAL_PORT_KEY)
         # If there isn't a PORT value set PORT to None
         if not serial_port:
             serial_port = None
 
         # GPIO (Raspberry Pi)
         __option = "GPIO interface"
-        __key = __GPIO_KEY
-        gpio = app_config.getboolean(__CONFIG_SECTION, __key)
-  
+        __key = _GPIO_KEY
+        gpio = app_config.getboolean(_CONFIG_SECTION, __key)
+
         ###
         # Get the User config values
         ###
         __option = "Auto Connect to Wire"
-        __key = __AUTO_CONNECT_KEY
-        auto_connect = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _AUTO_CONNECT_KEY
+        auto_connect = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Code type"
-        __key = __CODE_TYPE_KEY
-        _code_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        __key = _CODE_TYPE_KEY
+        _code_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
         if  _code_type == "AMERICAN":
             code_type = CodeType.american
         elif _code_type == "INTERNATIONAL":
@@ -754,8 +798,8 @@ def read_config():
         else:
             raise ValueError(_code_type)
         __option = "Interface type"
-        __key = __INTERFACE_TYPE_KEY
-        _interface_type = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        __key = _INTERFACE_TYPE_KEY
+        _interface_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
         if _interface_type == "KEY_SOUNDER":
             interface_type = InterfaceType.key_sounder
         elif _interface_type == "LOOP":
@@ -765,37 +809,37 @@ def read_config():
         else:
             raise ValueError(_interface_type)
         __option = "Invert key input"
-        __key = __INVERT_KEY_INPUT_KEY
-        invert_key_input = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _INVERT_KEY_INPUT_KEY
+        invert_key_input = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Local copy"
-        __key = __LOCAL_KEY
-        local = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _LOCAL_KEY
+        local = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Minimum character speed"
-        __key = __MIN_CHAR_SPEED_KEY
-        min_char_speed = user_config.getint(__CONFIG_SECTION, __key)
+        __key = _MIN_CHAR_SPEED_KEY
+        min_char_speed = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Remote send"
-        __key = __REMOTE_KEY
-        remote = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _REMOTE_KEY
+        remote = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Text speed"
-        __key = __TEXT_SPEED_KEY
-        text_speed = user_config.getint(__CONFIG_SECTION, __key)
+        __key = _TEXT_SPEED_KEY
+        text_speed = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Server URL"
-        __key = __SERVER_URL_KEY
-        _server_url = user_config.get(__CONFIG_SECTION, __key)
+        __key = _SERVER_URL_KEY
+        _server_url = user_config.get(_CONFIG_SECTION, __key)
         if (not _server_url) or (_server_url.upper() != "NONE"):
             server_url = _server_url
         __option = "Sound"
-        __key = __SOUND_KEY
-        sound = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _SOUND_KEY
+        sound = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Sounder"
-        __key = __SOUNDER_KEY
-        sounder = user_config.getboolean(__CONFIG_SECTION, __key)
+        __key = _SOUNDER_KEY
+        sounder = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Sounder power save (seconds)"
-        __key = __SOUNDER_POWER_SAVE_KEY
-        sounder_power_save = user_config.getint(__CONFIG_SECTION, __key)
+        __key = _SOUNDER_POWER_SAVE_KEY
+        sounder_power_save = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Spacing"
-        __key = __SPACING_KEY
-        _spacing = (user_config.get(__CONFIG_SECTION, __key)).upper()
+        __key = _SPACING_KEY
+        _spacing = (user_config.get(_CONFIG_SECTION, __key)).upper()
         if _spacing == "NONE":
             spacing = Spacing.none
         elif _spacing == "CHAR":
@@ -805,13 +849,13 @@ def read_config():
         else:
             raise ValueError(_spacing)
         __option = "Station"
-        __key = __STATION_KEY
-        _station = user_config.get(__CONFIG_SECTION, __key)
+        __key = _STATION_KEY
+        _station = user_config.get(_CONFIG_SECTION, __key)
         if (not _station) or (_station.upper() != "NONE"):
             station = _station
         __option = "Wire"
-        __key = __WIRE_KEY
-        _wire = user_config.get(__CONFIG_SECTION, __key)
+        __key = _WIRE_KEY
+        _wire = user_config.get(_CONFIG_SECTION, __key)
         if (_wire) or (_wire.upper() != "NONE"):
             try:
                 wire = int(_wire)
@@ -829,7 +873,7 @@ def read_config():
 read_config()
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
-auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF", 
+auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
 help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
 metavar="auto-connect", dest="auto_connect")

@@ -34,45 +34,29 @@ closer is opened, then sends the local code to the wire.
 This reads the current configuration and supports the common option flags.
 To maintain backward compatibility it also allows a positional command
 line parameter:
-    1. KOB wire no.
+    1. KOB Server wire no.
 
 Example:
     python MRT.py 11
 """
 
-from pykob import VERSION, config, log, kob, internet, morse
+from pykob import VERSION, config, config2, log, kob, internet, morse
+from pykob.config2 import Config
 
 import argparse
-import os
+from pathlib import Path
 import platform
 import queue
+import re
 import sys
 from threading import Event, Thread
 from time import sleep
+from typing import Any, Callable, Optional
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
-
-Control_C_Pressed = False
-KB_Queue = None
-ThreadsStop = Event()
-
-KOB = None
-Sender = None
-Reader = None
-Recorder = None
-Internet = None
-
-connected = False
-internet_station_active = False  # True if a remote station is sending
-last_received_para = False # The last character received was a Paragraph ('=')
-local_loop_active = False  # True if sending on key or keyboard
-our_office_id = ""
-sender_current = ""
-
-exit_status = 1
 
 class _Getch:
     """
@@ -135,267 +119,426 @@ class _GetchWindows:
         import msvcrt
         return msvcrt.getch().decode("utf-8")
 
+class Mrt:
 
-def handle_sender_update(sender):
-    """
-    Handle a <<Current_Sender>> message by:
-    1. Displaying the sender if new
-    """
-    global sender_current
-    if not sender_current == sender:
-        sender_current = sender
-        print()
-        print(f'<<{sender_current}>>')
+    def __init__(self, wire: int, cfg: Config, file_to_send: Optional[str]=None) -> None:
+        self._wire = wire
+        self._cfg = cfg
+        self._kb_queue = None
+        self._threadsStop = Event()
+        self._control_c_pressed = Event()
 
-def set_local_loop_active(state):
-    """
-    Set local_loop_active state
+        self._send_file_path = None
+        self._send_repeat_count = -1  # -1 is flag to indicate that a repeat hasn't been set
+        if file_to_send:
+            self._send_file_path = file_to_send.strip()
+            p = Path(self._send_file_path)
+            p.resolve()
+            if not p.is_file():
+                print("File to send not found. '{}'".format(self._send_file_path))
+                self._send_file_path = None
+        self._kob = None
+        self._sender = None
+        self._reader = None
+        self._recorder = None
+        self._internet = None
 
-    True: Key or Keyboard active (Ciruit Closer OPEN)
-    False: Circuit Closer (physical and virtual) CLOSED
-    """
-    global local_loop_active
-    local_loop_active = state
-    # log.debug("local_loop_active:{}".format(state))
+        self._connected = False
+        self._internet_station_active = False  # True if a remote station is sending
+        self._last_received_para = False # The last character received was a Paragraph ('=')
+        self._local_loop_active = False  # True if sending on key or keyboard
+        self._our_office_id = cfg.station
+        self._sender_current = ""
 
-def circuit_closer_closed(state):
-    """
-    Handle change of Circuit Closer state.
+        self._exit_status = 1
 
-    A state of:
-     True: 'latch'
-     False: 'unlatch'
-    """
-    global local_loop_active, internet_station_active
-    code = LATCH_CODE if state == 1 else UNLATCH_CODE
-    if not internet_station_active:
-        if config.local:
-            handle_sender_update(config.station)
-            Reader.decode(code)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.local)
-    if connected and config.remote:
-        Internet.write(code)
-    if len(code) > 0:
-        if code[-1] == 1:
-            # Unlatch
-            set_local_loop_active(False)
-            Reader.flush()
-        elif code[-1] == 2:
-            # Latch
-            set_local_loop_active(True)
+        self._kob = kob.KOB(
+            interfaceType=cfg.interface_type,
+            portToUse=cfg.serial_port,
+            useGpio=cfg.gpio,
+            useAudio=cfg.sound,
+            useSounder=cfg.sounder,
+            invertKeyInput=cfg.invert_key_input,
+            soundLocal=cfg.local,
+            sounderPowerSaveSecs=cfg.sounder_power_save,
+            keyCallback=self._from_key
+            )
+        self._internet = internet.Internet(
+            officeID=self._our_office_id,
+            code_callback=self._from_internet,
+            server_url=cfg.server_url,
+        )
+        self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
+        self._reader = morse.Reader(
+            wpm=cfg.text_speed,
+            cwpm=cfg.min_char_speed,
+            codeType=cfg.code_type,
+            callback=self._reader_callback
+            )
+        self._sender = morse.Sender(
+            wpm=cfg.text_speed,
+            cwpm=cfg.min_char_speed,
+            codeType=cfg.code_type,
+            spacing=cfg.spacing
+            )
 
-def emit_local_code(code, code_source):
-    """
-    Emit local code. That involves:
-    1. Record code if recording is enabled
-    2. Send code to the wire if connected
+        # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
+        self._kb_queue = queue.Queue(128)
+        self._kbrthread = Thread(name="Keyboard-read-thread", daemon=True, target=self._thread_kbreader_run)
+        self._kbsthread = Thread(name="Keyboard-send-thread", daemon=True, target=self._thread_kbsender_run)
+        self._fsndthread = None
+        if self._send_file_path:
+            self._fsndthread = Thread(name="File-send-thread", daemon=True, target=self._thread_fsender_run)
 
-    This is used indirectly from the key or the keyboard threads to emit code once they
-    determine it should be emitted.
-    """
-    global connected
-    handle_sender_update(config.station)
-    #Reader.decode(code)
-    if Recorder:
-        Recorder.record(code, code_source) # ZZZ ToDo: option to enable/disable recording
-    if connected and config.remote:
-        Internet.write(code)
-    if code_source == kob.CodeSource.keyboard and config.local:
-        KOB.soundCode(code, code_source)
+    def exit(self):
+        self._threadsStop.set()
+        sleep(0.3)
+        if self._internet:
+            if self._connected:
+                self._internet.disconnect()
+                sleep(0.8)
+            self._internet.exit()
+        if self._reader:
+            self._reader.exit()
+        if self._kob:
+            self._kob.exit()
 
-def from_key(code):
-    """
-    Handle inputs received from the external key.
-    Only send if the circuit is open.
+    def main_loop(self):
+        self._print_start_info()
+        if not self._wire == 0:
+            self._internet.connect(self._wire)
+            self._connected = True
+        sleep(0.5)
+        try:
+            if self._fsndthread:
+                self._fsndthread.start()
+            while not self._threadsStop.is_set() and not self._control_c_pressed.is_set():
+                sleep(0.1)  # Loop while background threads take care of 'stuff'
+                if self._control_c_pressed.is_set():
+                    raise KeyboardInterrupt
+        except KeyboardInterrupt:
+            self.exit()
 
-    Called from the 'KOB-KeyRead' thread.
-    """
-    global internet_station_active, local_loop_active
-    if len(code) > 0:
-        if code[-1] == 1: # special code for closer/circuit closed
-            circuit_closer_closed(True)
-            return
-        elif code[-1] == 2: # special code for closer/circuit open
-            circuit_closer_closed(False)
-            return
-    if not internet_station_active and local_loop_active:
-        emit_local_code(code, kob.CodeSource.key)
+    def start(self):
+        self._kbrthread.start()
+        self._kbsthread.start()
 
-def from_keyboard(code):
-    """
-    Handle inputs received from the keyboard sender.
-    Only send if the circuit is open.
-
-    Called from the 'Keyboard-Send' thread.
-    """
-    global internet_station_active, local_loop_active
-    if len(code) > 0:
-        if code[-1] == 1: # special code for closer/circuit closed
-            circuit_closer_closed(True)
-            return
-        elif code[-1] == 2: # special code for closer/circuit open
-            circuit_closer_closed(False)
-            print('[+ to close key]')
-            sys.stdout.flush()
-            return
-    if not internet_station_active and local_loop_active:
-        emit_local_code(code, kob.CodeSource.keyboard)
-
-def from_internet(code):
-    """handle inputs received from the internet"""
-    global local_loop_active, internet_station_active, sender_current, our_office_id
-    if connected:
-        if not sender_current == our_office_id:
-            Reader.decode(code)
-            KOB.soundCode(code, kob.CodeSource.wire)
-        if Recorder:
-            Recorder.record(code, kob.CodeSource.wire)
-        if len(code) > 0 and code[-1] == +1:
-            internet_station_active = False
-        else:
-            internet_station_active = True
-
-
-def reader_callback(char, spacing):
-    global last_received_para
-    if not char == '=':
-        if last_received_para:
+    def _handle_sender_update(self, sender):
+        """
+        Handle a <<Current_Sender>> message by:
+        1. Displaying the sender if new
+        """
+        if not self._sender_current == sender:
+            self._sender_current = sender
             print()
-        last_received_para = False
-    else:
-        last_received_para = True
-    halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
-    fullSpace = False
-    if halfSpaces > 0:
-        halfSpaces -=1
-    if halfSpaces >= 2:
-        fullSpace = True
-        halfSpaces = (halfSpaces - 1) // 2
-    for i in range(halfSpaces):
-        print(' ', end='')
-    if fullSpace:
-        print(' ', end='')
-    print(char, end='', flush=True)
-    if char == '_':
-        print()
+            print(f'<<{self._sender_current}>>')
 
-def thread_kbreader_run():
-    global Control_C_Pressed, KB_Queue, local_loop_active, ThreadsStop
-    kbrd_char = _Getch()
-    while not ThreadsStop.is_set():
-        try:
-            ch = kbrd_char()
-            if ch == '\x03': # They pressed ^C
-                ThreadsStop.set()
-                Control_C_Pressed = True
-                return # We are done
-            if ch == '\x00': # CTRL-SP on some terminals will send NULL, use it for help...
-                print("\n['~' to open the key]\n['+' to close the key]\n[^C to exit]")
+    def _print_start_info(self):
+        cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
+        print("Using configuration: {}".format(cfgname))
+        if self._wire == 0:
+            print("Not connecting to a wire.")
+        else:
+            print("Connecting to wire: " + str(self._wire))
+        print("Connecting as Station/Office: " + self._our_office_id)
+        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
+        if self._cfg.invert_key_input:
+            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+                "To enable/disable this setting use `Configure --iki`.")
+        if self._send_file_path:
+            print("Sending text from file: {}".format(self._send_file_path))
+        print("[Use CTRL+Z for keyboard help.]", flush=True)
+
+    def _set_local_loop_active(self, active):
+        """
+        Set local_loop_active state
+
+        True: Key or Keyboard active (Ciruit Closer OPEN)
+        False: Circuit Closer (physical and virtual) CLOSED
+        """
+        self._local_loop_active = active
+        self._kob.energize_sounder((not active))
+
+    def _set_virtual_closer_closed(self, closed):
+        """
+        Handle change of Circuit Closer state.
+
+        A state of:
+        True: 'latch'
+        False: 'unlatch'
+        """
+        self._kob.virtualCloserIsOpen = not closed
+        code = LATCH_CODE if closed else UNLATCH_CODE
+        if not self._internet_station_active:
+            if self._cfg.local:
+                if not closed:
+                    self._handle_sender_update(self._our_office_id)
+                self._reader.decode(code)
+            if self._recorder:
+                self._recorder.record(code, kob.CodeSource.local)
+        if self._connected and self._cfg.remote:
+            self._internet.write(code)
+        if len(code) > 0:
+            if code[-1] == 1:
+                # Unlatch (Key closed)
+                self._set_local_loop_active(False)
+                self._reader.flush()
+            elif code[-1] == 2:
+                # Latch (Key open)
+                self._set_local_loop_active(True)
+
+    def _emit_local_code(self, code, code_source):
+        """
+        Emit local code. That involves:
+        1. Record code if recording is enabled
+        2. Send code to the wire if connected
+
+        This is used indirectly from the key or the keyboard threads to emit code once they
+        determine it should be emitted.
+        """
+        self._handle_sender_update(self._our_office_id)
+        # Reader.decode(code)
+        if self._recorder:
+            self._recorder.record(code, code_source)
+        if self._connected and self._cfg.remote:
+            self._internet.write(code)
+        if code_source == kob.CodeSource.keyboard:
+            self._kob.soundCode(code, code_source)
+
+    def _from_file(self, code):
+        """
+        Handle inputs received from reading a file.
+        Only send if the circuit is open.
+
+        Called from the 'File Sender' thread.
+        """
+        if len(code) > 0:
+            if code[-1] == 1:  # special code for closer/circuit closed
+                self._set_virtual_closer_closed(True)
+                return
+            elif code[-1] == 2:  # special code for closer/circuit open
+                self._set_virtual_closer_closed(False)
+                return
+        if not self._internet_station_active and self._local_loop_active:
+            self._emit_local_code(code, kob.CodeSource.keyboard) # Say that it' from the keyboard
+
+    def _from_key(self, code):
+        """
+        Handle inputs received from the external key.
+        Only send if the circuit is open.
+
+        Called from the 'KOB-KeyRead' thread.
+        """
+        if len(code) > 0:
+            if code[-1] == 1: # special code for closer/circuit closed
+                self._set_virtual_closer_closed(True)
+                return
+            elif code[-1] == 2: # special code for closer/circuit open
+                self._set_virtual_closer_closed(False)
+                return
+        if not self._internet_station_active and self._local_loop_active:
+            self._emit_local_code(code, kob.CodeSource.key)
+
+    def _from_keyboard(self, code):
+        """
+        Handle inputs received from the keyboard sender.
+        Only send if the circuit is open.
+
+        Called from the 'Keyboard-Send' thread.
+        """
+        if len(code) > 0:
+            if code[-1] == 1: # special code for closer/circuit closed
+                self._set_virtual_closer_closed(True)
+                return
+            elif code[-1] == 2: # special code for closer/circuit open
+                self._set_virtual_closer_closed(False)
+                print('[+ to close key (Ctrl-Z=Help)]')
                 sys.stdout.flush()
-                continue
-            if not local_loop_active and not ch == '~':
-                # The local loop needs to be active
-                print('\x07[~ to open key]') # Ring the bell to let them know we are full
-                sys.stdout.flush()
-                continue
-            if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
-                # See if there is room in the keyboard queue
-                if KB_Queue.not_full:
-                    # Since this is from the keyboard, print it so it can be seen.
-                    nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
-                    print(ch, end=nl)
-                    sys.stdout.flush()
-                    # Put it in our queue
-                    KB_Queue.put(ch)
-                else:
-                    print('\x07', end='') # Ring the bell to let them know we are full
-                    sys.stdout.flush()
-            sleep(0.01)
-        except Exception as ex:
-            print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
+                return
+        if not self._internet_station_active and self._local_loop_active:
+            self._emit_local_code(code, kob.CodeSource.keyboard)
 
-def thread_kbsender_run():
-    global KB_Queue
-    while not ThreadsStop.is_set():
-        try:
-            ch = KB_Queue.get()
-            code = Sender.encode(ch)
-            from_keyboard(code)
-        except Exception as ex:
-            print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
+    def _from_internet(self, code):
+        """handle inputs received from the internet"""
+        if self._connected:
+            if not self._sender_current == self._our_office_id:
+                self._reader.decode(code)
+                self._kob.soundCode(code, kob.CodeSource.wire)
+            if self._recorder:
+                self._recorder.record(code, kob.CodeSource.wire)
+            if len(code) > 0 and code[-1] == +1:
+                self._internet_station_active = False
+            else:
+                self._internet_station_active = True
 
-try:
-    # Main code
-    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe current configuration is used except as overridden by optional arguments.", \
-        parents=\
-        [\
-        config.station_override, \
-        config.text_speed_override])
-    arg_parser.add_argument('wire', nargs='?', default=config.wire, type=int,\
-        help='Wire to connect to. If specified, this is used rather than the configured wire.')
-    args = arg_parser.parse_args()
+    def _reader_callback(self, char, spacing):
+        if not char == '=':
+            if self._last_received_para:
+                print()
+            self._last_received_para = False
+        else:
+            self._last_received_para = True
+        halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
+        fullSpace = False
+        if halfSpaces > 0:
+            halfSpaces -=1
+        if halfSpaces >= 2:
+            fullSpace = True
+            halfSpaces = (halfSpaces - 1) // 2
+        for i in range(halfSpaces):
+            print(' ', end='')
+        if fullSpace:
+            print(' ', end='')
+        print(char, end='', flush=True)
+        if char == '_':
+            print()
 
-    our_office_id = args.station # the Station/Office ID string to attach with
-    text_speed = args.text_speed  # text speed (words per minute)
-    if (text_speed < 1) or (text_speed > 50):
-        print("text speed specified must be between 1 and 50 [-t|--textspeed]")
-        sys.exit(1)
-    wire = args.wire # wire to connect to
+    def _thread_fsender_run(self):
+        done_sending = False
+        while not done_sending and not self._threadsStop.is_set():
+            try:
+                self._set_virtual_closer_closed(False)
+                while (
+                    not self._send_repeat_count == 0
+                    and not self._threadsStop.is_set()
+                    ):
+                    with open(self._send_file_path, "r") as fp:
+                        while not self._threadsStop.is_set():
+                            ch = fp.read(1)
+                            if not ch:
+                                # at the end, adjust repeat count
+                                self._send_repeat_count = 0
+                                break
+                            elif ch == '`':
+                                if not self._send_repeat_count == -1:
+                                    # We already set a repeat count, so repeat now.
+                                    if not self._send_repeat_count == -2:
+                                        self._send_repeat_count -= 1
+                                    break
+                                # Collect the repeat count
+                                l = fp.readline()
+                                if l == "" or l[0] == '*':
+                                        self._send_repeat_count = -2  # Repeat indefinately
+                                else:
+                                    # Try to collect a number
+                                    rc = 1
+                                    p = re.compile("[0-9]+")
+                                    m = p.match(l)
+                                    n = m.group()
+                                    if n:
+                                        rc = int(n)
+                                    if rc > 0:
+                                        self._send_repeat_count = rc
+                                    else:
+                                        self._send_repeat_count = 1
+                                break
+                            if ch < ' ':
+                                # don't send control characters
+                                continue
+                            code = self._sender.encode(ch)
+                            self._from_file(code)
+                done_sending = True
+            except Exception as ex:
+                print(
+                    "<<< File sender encountered an error and will stop running. Exception: {}"
+                ).format(ex)
+                self._threadsStop.set()
+            finally:
+                self._set_virtual_closer_closed(True)
 
-    print('Python ' + sys.version + ' on ' + sys.platform)
-    print('PyKOB ' + VERSION)
+    def _thread_kbreader_run(self):
+        kbrd_char = _Getch()
+        while not self._threadsStop.is_set():
+            try:
+                ch = kbrd_char()
+                if ch == '\x03': # They pressed ^C
+                    self._threadsStop.set()
+                    self._control_c_pressed.set()
+                    return # We are done
+                if ch == '\x1a': # CTRL-Z, help...
+                    print("\n['~' to open the key]\n['+' to close the key]\n[^C to exit]", flush=True)
+                    continue
+                if not self._local_loop_active and not ch == '~':
+                    # The local loop needs to be active
+                    print('\x07[~ to open key (Ctrl-Z=Help)]', flush=True) # Ring the bell to let them know we are full
+                    continue
+                if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
+                    # See if there is room in the keyboard queue
+                    if self._kb_queue.not_full:
+                        # Since this is from the keyboard, print it so it can be seen.
+                        nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
+                        print(ch, end=nl, flush=True)
+                        # Put it in our queue
+                        self._kb_queue.put(ch)
+                    else:
+                        print('\x07', end='', flush=True) # Ring the bell to let them know we are full
+                sleep(0.01)
+            except Exception as ex:
+                print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
+                self._threadsStop.set()
+
+    def _thread_kbsender_run(self):
+        while not self._threadsStop.is_set():
+            try:
+                ch = self._kb_queue.get()
+                code = self._sender.encode(ch)
+                self._from_keyboard(code)
+            except Exception as ex:
+                print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
+                self._threadsStop.set()
+
+"""
+Main code
+"""
+if __name__ == "__main__":
+    mrt = None
+    exit_status = 1
     try:
-        import serial
-        print('PySerial ' + serial.VERSION)
-    except:
-        print('PySerial is not installed or the version information is not available (check installation)')
+        # Main code
+        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
+            parents= [
+                config2.station_override,
+                config2.min_char_speed_override,
+                config2.text_speed_override,
+                config2.config_file_override,
+                config2.debug_level_override
+            ]
+        )
+        arg_parser.add_argument(
+            "--send",
+            metavar="text-file",
+            dest="sendtext_filepath",
+            help="Text file to send when started. If the text ends with a back-tick and a number '`2', "
+            + "it will be repeated that many times. Ending with '`*' will repeat indefinately.",
+        )
+        arg_parser.add_argument("wire", nargs='?', type=int,
+            help="Wire to connect to. If specified, this is used rather than the configured wire. "
+            + "Use 0 to not connect.")
+        args = arg_parser.parse_args()
+        cfg = config2.process_config_args(args)
+        wire = args.wire if args.wire else cfg.wire
+        log.set_debug_level(cfg.debug_level)
 
-    print('Connecting to wire: ' + str(wire))
-    print('Connecting as Station/Office: ' + our_office_id)
-    # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
-    if config.invert_key_input:
-        print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
-            "To enable/disable this setting use `Configure --iki`.")
-    print('[Use CTRL+SPACE for keyboard help.]')
-    sys.stdout.flush()
+        print("Python " + sys.version + " on " + sys.platform)
+        print("PyKOB " + VERSION)
+        try:
+            import serial
+            print("PySerial " + serial.VERSION)
+        except:
+            print("PySerial is not installed or the version information is not available (check installation)")
 
-    KOB = kob.KOB(
-            portToUse=config.serial_port, useGpio=config.gpio, interfaceType=config.interface_type,
-            useAudio=config.sound, keyCallback=from_key)
-    Internet = internet.Internet(our_office_id, code_callback=from_internet)
-    Internet.monitor_sender(handle_sender_update) # Set callback for monitoring current sender
-    Reader = morse.Reader(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type, callback=reader_callback)
-    Sender = morse.Sender(wpm=text_speed, cwpm=int(config.min_char_speed), codeType=config.code_type)
-
-    # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
-    KB_Queue = queue.Queue(128)
-    kbrthread = Thread(name="Keyboard-read-thread", daemon=True, target=thread_kbreader_run)
-    kbsthread = Thread(name="Keyboard-send-thread", daemon=True, target=thread_kbsender_run)
-    kbrthread.start()
-    kbsthread.start()
-
-    Internet.connect(wire)
-    connected = True
-    sleep(0.5)
-    while not ThreadsStop.is_set():
-        sleep(0.1)  # Loop while background threads take care of 'stuff'
-        if Control_C_Pressed:
-            raise KeyboardInterrupt
-    exit_status = 0
-except KeyboardInterrupt:
-    exit_status = 0 # Since the main program is an infinite loop, ^C is a normal way to exit.
-finally:
-    print()
-    print()
-    if Internet:
-        if connected:
-            Internet.disconnect()
-            sleep(0.8)
-        Internet.exit()
-    if Reader:
-        Reader.exit()
-    if KOB:
-        KOB.exit()
-    sleep(0.5)
-    sys.exit(exit_status)
+        mrt = Mrt(wire, cfg, args.sendtext_filepath)
+        mrt.start()
+        mrt.main_loop()
+        exit_status = 0
+    except FileNotFoundError as fnf:
+        print("File not found: {}".format(fnf.args[0]))
+    except Exception as ex:
+        print("Error encountered: {}".format(ex))
+    finally:
+        print()
+        print("~73")
+        if mrt:
+            mrt.exit()
+        sleep(0.5)
+        sys.exit(exit_status)

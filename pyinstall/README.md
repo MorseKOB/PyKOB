@@ -1,3 +1,5 @@
+**This has not been used for some time. Consider it OUT-OF-DATE. It may be resurrected at some point.**
+
 # Executable Packager Files for PyInstaller
 
 This folder contains scripts and PyInstaller `spec` files to create 'frozen' application bundles 

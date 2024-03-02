@@ -27,7 +27,8 @@ SOFTWARE.
 """Feed.py
 
 Waits for a station to connect to a KOB wire and sends text from a RSS-formatted
-local file or news feed, or a PyKOB recording json file, in Morse at a given speed.
+local file or news feed in Morse at a given speed, or from a PyKOB recording
+json file.
 
 If the wait parameter is nonzero, then the feed will stop sending if
 another station starts sending, and will wait until the wire is idle for the

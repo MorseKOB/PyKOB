@@ -54,16 +54,16 @@ class MKOBStationList:
         #  1: Time initially connected
         #  2: Time received from
         #  3: Last PING time
-        self.__active_stations = [] # List of lists with [station ID, time initially connected, time received from, ping time]
-        self.__last_sender = "" # Keep last sender to know when a sender changes
+        self._active_stations = [] # List of lists with [station ID, time initially connected, time received from, ping time]
+        self._last_sender = "" # Keep last sender to know when a sender changes
         self.kw = kw
 
-    def handle_clear_station_list(self, event):
+    def handle_clear_station_list(self, event=None):
         """
         reset the station list
         """
-        self.__active_stations = []
-        self.__last_sender = ""
+        self._active_stations = []
+        self._last_sender = ""
         self.kw.station_list_win.delete('1.0', 'end')
 
     def handle_update_current_sender(self, station_name: str):
@@ -85,30 +85,30 @@ class MKOBStationList:
 
         existing_entry_updated = False
         sender_changed = False
-        for i in range(0, len(self.__active_stations)): # better way to do this?
-            station_info = self.__active_stations[i]
+        for i in range(0, len(self._active_stations)): # better way to do this?
+            station_info = self._active_stations[i]
             if (station_info[0] == station_name):
                 # update the last received from time for this station
                 station_info[2] = now
-                if not station_name == self.__last_sender:
-                    self.__active_stations.pop(i)
+                if not station_name == self._last_sender:
+                    self._active_stations.pop(i)
                     # find the entry for the last (current) sender
-                    for j in range(0, len(self.__active_stations)):
-                        si = self.__active_stations[j]
-                        if (si[0] == self.__last_sender):
+                    for j in range(0, len(self._active_stations)):
+                        si = self._active_stations[j]
+                        if (si[0] == self._last_sender):
                             # move this entry to the end
-                            self.__active_stations.pop(j)
-                            self.__active_stations.append(si)
-                    self.__active_stations.insert(0, station_info)
+                            self._active_stations.pop(j)
+                            self._active_stations.append(si)
+                    self._active_stations.insert(0, station_info)
                     sender_changed = True
                 existing_entry_updated = True
                 break
         if not existing_entry_updated:
             # add an entry
-            self.__active_stations.append([station_name, now, now, now])
-        if self.__trim_station_list() or (not existing_entry_updated) or sender_changed:
-            self.__last_sender = station_name
-            self.__display_station_list()
+            self._active_stations.append([station_name, now, now, now])
+        if self._trim_station_list() or (not existing_entry_updated) or sender_changed:
+            self._last_sender = station_name
+            self._display_station_list()
 
     def handle_update_station_active(self, station_name: str):
         """
@@ -119,8 +119,8 @@ class MKOBStationList:
         now = time.time()
 
         existing_entry_updated = False
-        for i in range(0, len(self.__active_stations)): # is there a better way to do this?
-            station_info = self.__active_stations[i]
+        for i in range(0, len(self._active_stations)): # is there a better way to do this?
+            station_info = self._active_stations[i]
             if (station_info[0] == station_name):
                 # update the ping time for this station
                 station_info[3] = now
@@ -129,14 +129,14 @@ class MKOBStationList:
         if not existing_entry_updated:
             # new station, add an entry
             station_info = [station_name, now, -1, now]
-            if self.__last_sender: # if there is a sender add this just before it
-               self. __active_stations.insert(-1,station_info)
+            if self._last_sender: # if there is a sender add this just before it
+                self._active_stations.insert(-1,station_info)
             else:
-                self.__active_stations.append(station_info)
-        if  self.__trim_station_list() or not existing_entry_updated:
-            self.__display_station_list()
+                self._active_stations.append(station_info)
+        if  self._trim_station_list() or not existing_entry_updated:
+            self._display_station_list()
 
-    def __trim_station_list(self) -> bool:
+    def _trim_station_list(self) -> bool:
         """
         Check the timestamp of the stations and remove old ones.
 
@@ -146,21 +146,21 @@ class MKOBStationList:
 
         # find and purge inactive stations
         ## keep stations with ping time (element 3) within the last 2/3rds a minute
-        new_station_list = [row for row in self.__active_stations if row[3] > now - 40]
-        station_removed = len(new_station_list) < len(self.__active_stations)
+        new_station_list = [row for row in self._active_stations if row[3] > now - 40]
+        station_removed = len(new_station_list) < len(self._active_stations)
         if station_removed:
             last_sender_found = False
             # If the last sender was removed, clear __last_sender
             for station_info in new_station_list:
-                if station_info[0] == self.__last_sender:
+                if station_info[0] == self._last_sender:
                     last_sender_found = True
                     break
                 if not last_sender_found:
-                    self.__last_sender = ''
-        self.__active_stations = new_station_list
+                    self._last_sender = ''
+        self._active_stations = new_station_list
         return station_removed
 
-    def __display_station_list(self):
+    def _display_station_list(self):
         """
         Display the updated station list
         ordered by last send time (new sender at the top, then most recent at the bottom).
@@ -168,11 +168,11 @@ class MKOBStationList:
         """
         # Delete the current window contents
         self.kw.station_list_win.delete('1.0', 'end')
-        for i in range(0, len(self.__active_stations)):
-            station_info = self.__active_stations[i]
+        for i in range(0, len(self._active_stations)):
+            station_info = self._active_stations[i]
             indent = "    " if station_info[2] < 0 else ""
             self.kw.station_list_win.insert('end', "{}{}\n".format(indent, station_info[0]))
-            if i == 0 and len(self.__active_stations) > 1 and self.__last_sender:
+            if i == 0 and len(self._active_stations) > 1 and self._last_sender:
                 # Insert a line of dashes (-----------------)
                 self.kw.station_list_win.insert('end', "------------------------\n")
 

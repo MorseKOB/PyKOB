@@ -2,7 +2,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,20 +30,26 @@ Configures system values and user preferences for the suite of PyKOB application
 Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
+from distutils.util import strtobool
+import os.path
 import sys
+from typing import Optional
+
 GUI = True                              # Hope for the best
 try:
     import tkinter as tk
 except ModuleNotFoundError:
     GUI = False
 
-from pykob import config
+from pykob import config, config2
+from pykob.config2 import Config
 from pykob import preferencesWindow
 
 NONE_CFG_VALUE = "NONE"
 
-def stringOrNone(s:str) -> str:
-    """Return `None` if the value is "NONE" (case insensitive) or the value
+def stringOrNone(s:str) -> Optional[str]:
+    """
+    Return `None` if the value is "NONE" (case insensitive) or the value
 
     Parameters
     ----------
@@ -69,116 +75,107 @@ def main(argv):
     #  If arguments are given, process them for 'help' or the setting values.
     #  If values are specified, update the config and save it, then
     #  print the configuration.
-
-    # System configuration
-    port = None
-    gpio = None
-    # User configuration
-    auto_connect = None
-    invert_key_input = None
-    remote = None
-    interface_type = None
-    server_url = None
-    sound = None
-    sounder = None
-    sounder_pwrsv = None
-    spacing = None
-    station = None
-    code_type = None
-    wire = None
-    min_char_speed = None
-    text_speed = None
-    gui_config = False
-
+    #
+    cfg:Config = Config()
+    cfg.load_from_global()
+    original_cfg:Config = cfg.copy()
     try:
-        arg_parser = argparse.ArgumentParser(description="Display the PyKOB configuration as well as key system values. "
-            + "Allow configuration values to be set and saved.", \
-            parents=\
-            [\
-            config.auto_connect_override, \
-            config.code_type_override, \
-            config.interface_type_override, \
-            config.invert_key_input_override, \
-            config.min_char_speed_override, \
-            config.local_override, \
-            config.remote_override, \
-            config.serial_port_override, \
-            config.gpio_override, \
-            config.server_url_override, \
-            config.sound_override, \
-            config.sounder_override, \
-            config.sounder_pwrsv_override, \
-            config.spacing_override, \
-            config.station_override, \
-            config.text_speed_override, \
-            config.wire_override])
+        arg_parser = argparse.ArgumentParser(prog="Configure",
+                description="Display the PyKOB configuration as well as key system values. "
+                + "Allow configuration values to be set and saved.",
+                epilog="If configuration values are changed, the configuration will be saved.\n",
+                parents=
+                [
+                    config2.server_url_override,
+                    config2.station_override,
+                    config2.wire_override,
+                    config2.auto_connect_override,
+                    config2.gpio_override,
+                    config2.serial_port_override,
+                    config2.interface_type_override,
+                    config2.invert_key_input_override,
+                    config2.local_override,
+                    config2.remote_override,
+                    config2.sound_override,
+                    config2.sounder_override,
+                    config2.sounder_pwrsv_override,
+                    config2.code_type_override,
+                    config2.min_char_speed_override,
+                    config2.text_speed_override,
+                    config2.spacing_override
+                ])
+        arg_parser.add_argument('--gload', dest="global_load", action='store_true',
+                help="Load configuration from the global store. " +
+                "Allows setting an existing configuration file to the global values.")
+        arg_parser.add_argument('--gsave', dest="global_only_save", action='store_true',
+                help="Save configuration to the global store.")
         if GUI:
             arg_parser.add_argument('-G', '--gui', dest="gui_config", action='store_true',
-                            help="Use preferences panel GUI for interactive configuration.")
+                    help="Use preferences panel GUI for interactive configuration.")
+        # Optional positional argument #1: Config file to use
+        arg_parser.add_argument("pkcfg", metavar="config-file", nargs='?',
+                help="PyKOB configuration file to use. " +
+                "If specified, this will be used rather than the global configuration. " +
+                "If the file doesn't exist it will be created. To save this configuration " +
+                "to the global store, use the '--global' option along with this.")
+        # Optional positional argument #2: Config file to save to
+        arg_parser.add_argument("pkcfg_save_to", metavar="save-as-file", nargs='?',
+                help="PyKOB configuration file to save to. " +
+                "If specified, the configuration will be saved to this file rather than 'config-file'.")
 
         args = arg_parser.parse_args()
 
-        # Set config values if they were specified
-        save_config = False
-        if not args.auto_connect == config.auto_connect:
-            config.set_auto_connect(args.auto_connect)
-            save_config = True
-        if not args.code_type == config.code_type:
-            config.set_code_type(args.code_type)
-            save_config = True
-        if not args.interface_type == config.interface_type:
-            config.set_interface_type(args.interface_type)
-            save_config = True
-        if not args.invert_key_input == config.invert_key_input:
-            config.set_invert_key_input(args.invert_key_input)
-            save_config = True
-        if not args.min_char_speed == config.min_char_speed:
-            config.set_min_char_speed(args.min_char_speed)
-            save_config = True
-        if not args.local == config.local:
-            config.set_local(args.local)
-            save_config = True
-        if not args.remote == config.remote:
-            config.set_remote(args.remote)
-            save_config = True
-        if not args.serial_port == config.serial_port:
-            config.set_serial_port(args.serial_port)
-            save_config = True
-        if not args.gpio == config.gpio:
-            config.set_gpio(args.gpio)
-            save_config = True
-        if not args.server_url == config.server_url:
-            s = config.server_url
-            if s and s.upper() == 'DEFAULT':
-                config.set_server_url(None)
-            else:
-                config.set_server_url(args.server_url)
-            save_config = True
-        if not args.sound == config.sound:
-            config.set_sound(args.sound)
-            save_config = True
-        if not args.sounder == config.sounder:
-            config.set_sounder(args.sounder)
-            save_config = True
-        if not args.sounder_power_save == config.sounder_power_save:
-            config.set_sounder_power_save(args.sounder_power_save)
-            save_config = True
-        if not args.spacing == config.spacing:
-            config.set_spacing(args.spacing)
-            save_config = True
-        if not args.station == config.station:
-            config.set_station(args.station)
-            save_config = True
-        if not args.text_speed == config.text_speed:
-            config.set_text_speed(args.text_speed)
-            save_config = True
-        if not args.wire == config.wire:
-            config.set_wire(args.wire)
-            save_config = True
+        load_from_global = False
+        save_to_global = False
+        save_only_to_global = False
+        save_to_filepath = None
+        # See if we have a 'save to' config.
+        if args.pkcfg_save_to:
+            s = args.pkcfg_save_to
+            save_to_filepath = config2.add_ext_if_needed(s.strip())
 
-        # If any of the configuration values changed, save the configuration.
-        if save_config:
-            config.save_config()
+        # See if a pkcfg file was specified to use
+        if args.pkcfg:
+            # They specified a config file, load it if it exists.
+            file_path = config2.add_ext_if_needed(args.pkcfg)
+            cfg.set_filepath(file_path)
+            load_from_global = args.global_load
+            save_only_to_global = args.global_only_save
+            save_to_global = save_only_to_global
+            if os.path.isfile(file_path):
+                # The file exists. Load it unless 'load_from_global'. Then apply any changes.
+                if not load_from_global:
+                    cfg.load_config(file_path)
+                if save_to_filepath:
+                    # Set the file path to save to and mark as dirty to assure it gets saved.
+                    cfg.set_filepath(save_to_filepath)
+                    cfg.set_dirty()
+            else:
+                # The file does not exist.
+                # That's okay if they want to create a new configuration, but
+                # if a 'save to' file was specified, it's an error.
+                if save_to_filepath:
+                    raise Exception("Configuration file specified does not exist: {}".format(file_path))
+                # Load the global config values to start with.
+                cfg.load_from_global()
+        else:
+            # They did not specify a config file, so they want to work with the global config
+            load_from_global = True
+            save_to_global = True
+
+        if load_from_global:
+            cfg.load_from_global()
+
+        if save_to_global:
+            cfg.set_dirty()  # Mark as dirty to assure it gets saved
+            if save_only_to_global:
+                cfg.set_filepath(None)  # Clear the filepath so is doesn't save there
+
+        # Keep the original config at this point
+        original_cfg.copy_from(cfg)
+
+        # Set config values if they were specified
+        config2.process_config_args(args, cfg)
     except Exception as ex:
         print("Error processing arguments: {}".format(ex))
         sys.exit(1)
@@ -197,25 +194,40 @@ def main(argv):
             fileMenu.add_separator()
             fileMenu.add_command(label='Quit', command=_doFileExit)
 
-            prefs = preferencesWindow.PreferencesWindow(quitWhenDismissed=True)
+            prefs = preferencesWindow.PreferencesWindow(cfg, quitWhenDismissed=True)
             prefs.display()
-
             # root.quit()
-
         except KeyboardInterrupt:
             print()
             sys.exit(0)
+    else:
+        # If any of the configuration values changed, save the configuration.
+        if cfg.is_dirty():
+            if cfg.get_filepath():
+                cfg.save_config()
+            if save_to_global:
+                cfg.load_to_global()
+                cfg.save_global()
+                cfg.clear_dirty()
 
     # If no arguments were given print the system info in addition to the configuration.
     if len(argv) == 0:
         print("======================================")
-        print("        System Information")
+        print("         System Information")
         print("======================================")
         config.print_system_info()
-        print("======================================")
-        print("          Configuration")
+    config_header = \
+          "        Global Configuration" \
+        if save_to_global else \
+          "           Configuration"
+    print("======================================")
+    print(config_header)
 
-    config.print_config()
+    # Check if the cfg is dirty at this point. If so, it wasn't saved, so print the original.
+    if cfg.is_dirty():
+        original_cfg.print_config()
+    else:
+        cfg.print_config()
     sys.exit(0)
 
 if __name__ == "__main__":

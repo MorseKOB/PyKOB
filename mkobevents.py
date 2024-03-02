@@ -39,6 +39,7 @@ EVENT_CIRCUIT_OPEN = "<<Circuit_Open>>" # Open the local circuit
 EVENT_CURRENT_SENDER = "<<Current_Sender>>" # Record the current sender (station)
 EVENT_EMIT_KEY_CODE = "<<Emit_Key_Code>>" # Emit a code sequence originating from the key
 EVENT_EMIT_KB_CODE = "<<Emit_KB_Code>>" # Emit a code sequence originating from the keyboard
+EVENT_KB_PROCESS_SEND = "<<KB_Process_Send>>" # Process text from the keyboard window
 EVENT_PLAYER_WIRE_CHANGE = "<<Player_Wire_Change>>" # The player detected a wire change
 EVENT_READER_APPEND_TEXT = "<<Reader_Append_Text>>" # Append text to the reader window
 EVENT_READER_CLEAR = "<<Clear_Reader>>" # Clear the reader window

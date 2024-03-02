@@ -31,7 +31,8 @@ Reads/writes code sequences from/to a KOB wire.
 import socket
 import struct
 import time
-from pykob import VERSION, config, log
+from pykob import VERSION, config2, log
+from pykob.config2 import Config
 from threading import Event, Thread
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
@@ -48,13 +49,16 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 
 NUL = '\x00'
 
+def _emptyOrValueFromStr(s:str) -> str:
+    return s if s else ""
+
 class Internet:
-    def __init__(self, officeID, code_callback=None, record_callback=None, pckt_callback=None, mka=None):
+    def __init__(self, officeID='', code_callback=None, record_callback=None, pckt_callback=None, appver=None, server_url=None, mka=None):
         self.host = HOST_DEFAULT
         self.port = PORT_DEFAULT
         self.mka = mka # MKOBAction - to be able to display warning messages to the user
-        self.address = None
-        s = config.server_url
+        self.ip_address = None  # Set when a connection is made
+        s = server_url
         if s:
             # see if a port was included
             # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
@@ -63,40 +67,44 @@ class Internet:
                 self.port = hp[1]
             self.host = hp[0]
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.version = ("PyKOB " + VERSION).encode(encoding='latin-1')
-        self.officeID = officeID if officeID != None else ""
+        # Application name/version to register with on the server
+        self.appver = None if appver == None or appver.strip() == "" else appver.strip()
+        if appver:
+            self.app = "{} (PK-{})".format(appver, VERSION).encode(encoding='latin-1')
+        else:
+            self.app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
+        self.officeID = _emptyOrValueFromStr(officeID)
         self.wireNo = 0
+        self.threadStop = Event()
+        self.connected = Event()
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
         self.tLastListener = 0.0
-        self.threadStop = Event()
         self.disconnect()  # to establish a UDP connection with the server
         self.keepAliveThread = Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
         self.keepAliveThread.start()
-        self.__code_callback = code_callback
-        self.__packet_callback = pckt_callback
-        self.__record_callback = record_callback
-        self.internetReadThread = None
-        if code_callback or record_callback:
-            self.internetReadThread = Thread(name='Internet-DataRead', daemon=True, target=self.callbackRead)
-            self.internetReadThread.start()
+        self._code_callback = code_callback
+        self._packet_callback = pckt_callback
+        self._record_callback = record_callback
         self.ID_callback = None
         self.sender_callback = None
+        self._current_sender = None
+        self.internetReadThread = None
 
     @property
     def packet_callback(self):
-        return self.__packet_callback
-    
+        return self._packet_callback
+
     @packet_callback.setter
     def packet_callback(self, cb):
-        self.__packet_callback = cb
+        self._packet_callback = cb
 
     def _get_address(self, renew=False):
-        if not self.address or renew:
+        if not self.ip_address or renew:
             success = False
             while not success:
                 try:
-                    self.address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
+                    self.ip_address = socket.getaddrinfo(self.host, self.port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
                     success = True
                 except (OSError, socket.gaierror) as ex:
                     # Network error
@@ -105,19 +113,32 @@ class Internet:
                     if self.mka:
                         self.mka.trigger_reader_append_text("{}\n".format(s))
                     time.sleep(5.0)
-        return self.address
+        return self.ip_address
 
     def connect(self, wireNo):
         self.wireNo = wireNo
+        if self.connected.is_set():
+            self.disconnect()
+        self.connected.set()
+        if self._code_callback or self._record_callback:
+            self.internetReadThread = Thread(
+                name="Internet-DataRead", daemon=True, target=self.callbackRead
+            )
+            self.internetReadThread.start()
         self.sendID()
 
-    def disconnect(self):
+    def disconnect(self, on_disconnect=None):
         self.wireNo = 0
         shortPacket = shortPacketFormat.pack(DIS, 0)
         try:
             self.socket.sendto(shortPacket, self._get_address())
         except:
             self._get_address(renew=True)
+        finally:
+            self.connected.clear()
+            self.internetReadThread = None
+            if on_disconnect:
+                on_disconnect()
 
     def exit(self):
         """
@@ -130,18 +151,22 @@ class Internet:
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
         while not self.threadStop.is_set():
-            code = self.read()
-            if self.__code_callback:
-                self.__code_callback(code)
-            if self.__record_callback:
-                self.__record_callback(code)
+            if self.connected.wait(0.8):
+                code = self.read()
+                if code and self.connected.is_set():
+                    if self._code_callback:
+                        self._code_callback(code)
+                    if self._record_callback:
+                        self._record_callback(code)
+            if not self.connected.is_set():
+                return
 
     def read(self):
-        while True:
+        while self.connected.is_set() and not self.threadStop.is_set():
             success = False
             buf = None
             nBytes = 0
-            while not success:
+            while self.connected.is_set() and not success and not self.threadStop.is_set():
                 try:
                     buf = self.socket.recv(500)
                     nBytes = len(buf)
@@ -155,8 +180,8 @@ class Internet:
                     time.sleep(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
-                if self.__packet_callback:
-                    self.__packet_callback("\n<rcvd: {}>".format(ACK))
+                if self._packet_callback:
+                    self._packet_callback("\n<rcvd: {}>".format(ACK))
             elif nBytes == 496:  # code or ID packet
                 self.tLastListener = time.time()
                 cp = codePacketFormat.unpack(buf)
@@ -170,14 +195,16 @@ class Internet:
                         self.rcvdSeqNo = seqNo  # update sender's seq no, ignore others
                 elif n > 0 and seqNo != self.rcvdSeqNo:  # code packet
                     if self.sender_callback:
-                        self.sender_callback(stnID)
+                        if not self._current_sender or not self._current_sender == stnID:
+                            self._current_sender = stnID
+                            self.sender_callback(self._current_sender)
                     if seqNo != self.rcvdSeqNo + 1:  # sequence break
                         code = (-0x7fff,) + code[1:n]
                     else:
                         code = code[:n]
                     self.rcvdSeqNo = seqNo
-                    if self.__packet_callback:
-                        self.__packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
+                    if self._packet_callback:
+                        self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
             else:
                 log.warn("PyKOB.internet received invalid record length: {0}".format(nBytes))
@@ -200,26 +227,26 @@ class Internet:
             except:
                 self._get_address(renew=True)
         # Write packet info if requested
-        if self.__packet_callback:
-            self.__packet_callback("\n<sent: {}:{}>".format(DAT, code))
-
+        if self._packet_callback:
+            self._packet_callback("\n<sent: {}:{}>".format(DAT, code))
 
     def keepAlive(self):
         while not self.threadStop.is_set():
-            self.sendID()
-            time.sleep(10.0)  # send another keepalive sequence every ten seconds
+            if self.connected.wait(1.5):
+                self.sendID()
+                time.sleep(10.0)  # send another keepalive sequence every ten seconds
 
     def sendID(self):
-        if self.wireNo:
+        if self.connected.is_set() and self.wireNo > 0:
             try:
                 shortPacket = shortPacketFormat.pack(CON, self.wireNo)
                 self.socket.sendto(shortPacket, self._get_address())
                 self.sentSeqNo += 2
                 idPacket = idPacketFormat.pack(DAT, 492, self.officeID.encode('latin-1'),
-                        self.sentSeqNo, 1, self.version)
-                self.socket.sendto(idPacket, self.address)
-                if self.__packet_callback:
-                    self.__packet_callback("\n<sent: {}>".format(DAT))
+                        self.sentSeqNo, 1, self.app)
+                self.socket.sendto(idPacket, self.ip_address)
+                if self._packet_callback:
+                    self._packet_callback("\n<sent: {}>".format(DAT))
                 if self.ID_callback:
                     self.ID_callback(self.officeID)
             except (OSError, socket.gaierror) as ex:
@@ -227,7 +254,7 @@ class Internet:
 
     def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
-        self.officeID = officeID if officeID != None else ""
+        self.officeID = _emptyOrValueFromStr(officeID)
 
     def monitor_IDs(self, ID_callback):
         """start monitoring incoming and outgoing station IDs"""
@@ -236,8 +263,8 @@ class Internet:
     def monitor_sender(self, sender_callback):
         """start monitoring changes in current sender"""
         self.sender_callback = sender_callback
+        self._current_sender = None
 
     def record_code(self, record_callback):
         """Start recording code received and sent"""
-        self.__record_callback = record_callback
-
+        self._record_callback = record_callback
