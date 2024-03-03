@@ -154,7 +154,7 @@ class PreferencesWindow:
         for equipmentRadioButton in range(len(self.EQUIPMENT_TYPES)):
             ttk.Radiobutton(basiclocalInterface, text=self.EQUIPMENT_TYPES[equipmentRadioButton],
                             variable=self._equipmentType,
-                            state='enabled' if SERIAL or GPIO else 'disabled',
+                            state='enabled',
                             value=equipmentRadioButton + 1).grid(row=8 + equipmentRadioButton,
                                                              column=1, columnspan=2,
                                                              sticky=tk.W)
