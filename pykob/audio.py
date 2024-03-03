@@ -41,9 +41,11 @@ class Audio:
     def __init__(self):
         self._audio_available = False
         self._pa = None
+        self._callback_retval = None
         try:
             import pyaudio
             self._pyaudio = pyaudio
+            self._callback_retval = pyaudio.paContinue
             self._audio_available = True
         except:
             log.warn("Audio: PyAudio can't be loaded. Audio will not be available.")
@@ -59,7 +61,6 @@ class Audio:
         self._sound = 0
         self._frameWidth = [0, 0]
         self._strm = None
-        self._callback_retval = self._pyaudio.paContinue
 
         if not self._audio_available:
             return
@@ -117,7 +118,7 @@ class Audio:
         return self._audio_available
 
     def exit(self):
-        self._callback_retval = self._pyaudio.paAbort
+        self._callback_retval = None if not self._pyaudio else self._pyaudio.paAbort
         self._iFrame[0] = self._nFrames[0]
         self._iFrame[1] = self._nFrames[1]
 
