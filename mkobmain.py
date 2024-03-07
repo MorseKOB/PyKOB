@@ -35,7 +35,7 @@ from threading import Event, Thread
 import tkinter.filedialog as fd
 
 from pykob import config, config2, kob, morse, internet, recorder, log
-from pykob.config2 import Config
+from pykob.config2 import Config, ConfigLoadError
 from mkobkeytimewin import MKOBKeyTimeWin
 
 NNBSP = "\u202f"  # narrow no-break space
@@ -59,6 +59,7 @@ class MKOBMain:
 
         self._key_graph_win = None
 
+        self._wire = self._cfg.wire
         self._connected = Event()
         self._odc_fu = None
         self._show_packets = False
@@ -74,10 +75,10 @@ class MKOBMain:
             name="MKMain-EmitCode", daemon=True, target=self._thread_emit_code
         )
 
-        self._kob = None
-        self._create_kob(self._cfg)
         self._internet = None
+        self._kob = None
         self._create_internet(self._cfg)
+        self._create_kob(self._cfg)
         self.do_morse_change()
 
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
@@ -88,7 +89,10 @@ class MKOBMain:
             )
 
     def _create_internet(self, cfg:Config):
+        was_connected = self._connected.is_set()
         if self._internet:
+            if was_connected:
+                self.disconnect()
             self._internet.exit()
         self._internet = internet.Internet(
             officeID=cfg.station,
@@ -98,20 +102,32 @@ class MKOBMain:
             server_url=cfg.server_url,
             mka=self._ka,
         )
+        if was_connected:
+            self.toggle_connect()
 
     def _create_kob(self, cfg:Config):
+        was_connected = self._connected.is_set()
+        wire = None
+        vcloser = False
+        if self._internet and self._internet.connected:
+            self.disconnect()
         if self._kob:
+            vcloser = self._kob.virtual_closer_is_open
             self._kob.exit()
         self._kob = kob.KOB(
+            interfaceType=cfg.interface_type,
             portToUse=cfg.serial_port,
             useGpio=cfg.gpio,
             useAudio=cfg.sound,
             useSounder=cfg.sounder,
             invertKeyInput=cfg.invert_key_input,
+            soundLocal=cfg.local,
             sounderPowerSaveSecs=cfg.sounder_power_save,
-            keyCallback=self.from_key,
+            keyCallback=self.from_key
         )
-        self._kob.virtualCloserIsOpen = False  # True if sending on key or keyboard
+        self._kob.virtual_closer_is_open = vcloser
+        if was_connected:
+            self.toggle_connect()
 
     def start(self):
         """
@@ -128,7 +144,7 @@ class MKOBMain:
             targetFileName,
             None,
             station_id=self._sender_ID,
-            wire=self._cfg.wire,
+            wire=self._wire,
             play_code_callback=self.from_recorder,
             play_sender_id_callback=self._ka.trigger_update_current_sender,
             play_station_list_callback=self._ka.trigger_update_station_active,
@@ -262,7 +278,7 @@ class MKOBMain:
             elif code[-1] == 2:  # special code for 'UNLATCH' (key/circuit open)
                 self._ka.trigger_circuit_open()
                 return
-        if not self._internet_station_active and self._kob.virtualCloserIsOpen:
+        if not self._internet_station_active and self._kob.virtual_closer_is_open:
             self._ka.trigger_emit_key_code(code)
 
     def from_keyboard(self, code, finished_callback=None, cb_arg=None):
@@ -275,7 +291,7 @@ class MKOBMain:
             self.emit_code(
                 code,
                 kob.CodeSource.keyboard,
-                self._kob.virtualCloserIsOpen,
+                self._kob.virtual_closer_is_open,
                 finished_callback,
                 cb_arg,
             )
@@ -318,7 +334,7 @@ class MKOBMain:
         code = LATCH_CODE if closed else UNLATCH_CODE
         # Set the Circuit Closer checkbox appropriately
         self._kw.circuit_closer = 1 if closed else 0
-        self._kob.virtualCloserIsOpen = not closed
+        self._kob.virtual_closer_is_open = not closed
         if not self._internet_station_active:
             if self._cfg.local:
                 if not closed:
@@ -404,7 +420,7 @@ class MKOBMain:
             self._internet.monitor_sender(
                 self._ka.trigger_update_current_sender
             )  # Set callback for monitoring current sender
-            self._internet.connect(self._cfg.wire)
+            self._internet.connect(self._wire)
             self._connected.set()
         else:
             # Disconnect
@@ -419,7 +435,7 @@ class MKOBMain:
         self._mreader.flush()
         self._ka.trigger_station_list_clear()
         self._ka.trigger_reader_append_text("\n#####\n")
-        if not self._kob.virtualCloserIsOpen:
+        if not self._kob.virtual_closer_is_open:
             self._kob.energize_sounder(
                 True
             )  # Sounder should be energized when disconnected.
@@ -430,20 +446,23 @@ class MKOBMain:
         self._sender_ID = ""
         self._mreader.flush()
         if not self._odc_fu:
-            self._odc_fu = self._kw.root_win.after(1800, self._on_disconnect_followup)
+            self._odc_fu = self._kw.root_win.after(1400, self._on_disconnect_followup)
 
     def change_wire(self, wire: int):
         """
         Change the current wire. If connected, drop the current connection and
         connect to the new wire.
         """
-        # Disconnect, change wire, reconnect.
-        was_connected = self._connected.is_set()
-        self.disconnect()
-        self._recorder.wire = wire
-        if was_connected:
-            time.sleep(0.50)  # Needed to allow UTP packets to clear
-            self.toggle_connect()
+        if not wire == self._wire:
+            # Disconnect, change wire, reconnect.
+            log.debug("mkm - change_wire: {}->{}".format(self._wire, wire))
+            was_connected = self._connected.is_set()
+            self.disconnect()
+            self._wire = wire
+            self._recorder.wire = wire
+            if was_connected:
+                time.sleep(0.50)  # Needed to allow UTP packets to clear
+                self.toggle_connect()
 
     # callback functions
 
@@ -500,11 +519,12 @@ class MKOBMain:
     def _update_from_config(self, cfg:Config, ct:config2.ChangeType):
         try:
             self._set_on_cfg = False
+            new_kob_created = False
             log.set_debug_level(cfg.debug_level)
             if ct & config2.ChangeType.HARDWARE:
-                self._create_kob(
-                    cfg
-                )  # If the hardware changed, we need a new KOB instance.
+                # If the hardware changed, we need a new KOB instance.
+                self._create_kob(cfg)
+                new_kob_created = True
             if ct & config2.ChangeType.MORSE:
                 self._kw.spacing = cfg.spacing
                 self._kw.twpm = cfg.text_speed
@@ -519,8 +539,11 @@ class MKOBMain:
             if ct & config2.ChangeType.OPERATIONS:
                 self._kw.office_id = cfg.station
                 self._kw.wire_number = cfg.wire
+                if cfg.local_changed and not new_kob_created:
+                    self._create_kob(cfg)
                 if cfg.server_url_changed:
                     self._create_internet(cfg)
+            self._kw.set_app_title()
         finally:
             self._set_on_cfg = True
 
@@ -528,15 +551,16 @@ class MKOBMain:
         """
         The preferences (config) window returned.
         """
-        cfg_from_prefs:Config = prefsDialog.cfg
-        ct = cfg_from_prefs.get_changes_types()
-        log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct))
-        if not ct == 0:
-            self._cfg.copy_from(cfg_from_prefs)
-            self._update_from_config(cfg_from_prefs, ct)
-            if prefsDialog.save_pressed:
-                self.preferences_save()
-            self._set_on_cfg = True
+        if not prefsDialog.cancelled:
+            cfg_from_prefs:Config = prefsDialog.cfg
+            ct = cfg_from_prefs.get_changes_types()
+            log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct))
+            if not ct == 0:
+                self._cfg.copy_from(cfg_from_prefs)
+                self._update_from_config(cfg_from_prefs, ct)
+                if prefsDialog.save_pressed:
+                    self.preferences_save()
+                self._set_on_cfg = True
 
     def preferences_load(self):
         """
@@ -553,10 +577,13 @@ class MKOBMain:
             filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
         )
         if pf:
-            print(" Load Config: ", pf)
-            self._cfg.load_config(pf)
-            self._update_from_config(self._cfg, config2.ChangeType.ANY)
-            self._cfg.clear_dirty()
+            try:
+                print(" Load Config: ", pf)
+                self._cfg.load_config(pf)
+                self._cfg.clear_dirty()
+                self._update_from_config(self._cfg, config2.ChangeType.ANY)
+            except ConfigLoadError as err:
+                log.warn("Unable to load configuration: {}  Error: {}".format(pf, err))
 
     def preferences_opening(self) -> Config:
         """
@@ -565,6 +592,10 @@ class MKOBMain:
         Return a config for it to use.
         """
         cfg_for_prefs = self._cfg.copy()
+        if self._cfg.using_global():
+            cfg_for_prefs.use_global(True)
+        else:
+            cfg_for_prefs.set_filepath(self._cfg.get_filepath())
         cfg_for_prefs.clear_dirty()
         return cfg_for_prefs
 
@@ -581,15 +612,16 @@ class MKOBMain:
         dir = dir if dir else ""
         name = self._cfg.get_name(True)
         name = name if name else ""
-        pf = fd.asksaveasfile(
+        pf = fd.asksaveasfilename(
             title="Save As",
             initialdir=dir,
             initialfile=name,
             defaultextension=config2.PYKOB_CFG_EXT,
-            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)]
+            filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)],
         )
         if pf:
-            self._cfg.save_config(pf.name)
+            self._cfg.use_global(False)
+            self._cfg.save_config(pf)
 
     def reset_wire_state(self):
         """regain control of the wire"""

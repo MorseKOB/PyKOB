@@ -80,6 +80,7 @@ _GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
 _CODE_TYPE_KEY = "CODE_TYPE"
+_DEBUG_LEVEL_KEY = "DEBUG_LEVEL"
 _INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 _LOCAL_KEY = "LOCAL"
@@ -123,6 +124,7 @@ gpio = False
 # User Settings
 auto_connect = False
 code_type = CodeType.american
+debug_level = 0
 interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
@@ -130,6 +132,7 @@ remote = True
 server_url = None
 sound = True
 sounder = False
+sounder_power_save = 0
 spacing = Spacing.none
 station = None
 wire = 0
@@ -255,6 +258,31 @@ def set_code_type(s):
     code_type = code_type_from_str(s)
     user_config.set(_CONFIG_SECTION, _CODE_TYPE_KEY, code_type.name.upper())
 
+def set_debug_level(s: str):
+    """Sets the debug level (0-...)
+
+    Parameters
+    ----------
+    s : str
+        The debug level
+    """
+
+    try:
+        _l = int(s)
+        set_debug_level_int(_l)
+    except ValueError as ex:
+        log.err(
+            "Debug Level value '{}' is not a valid integer value.".format(ex.args[0])
+        )
+        raise
+
+
+def set_debug_level_int(l: int):
+    global debug_level
+    debug_level = l if l >=0 else 0
+    user_config.set(_CONFIG_SECTION, _DEBUG_LEVEL_KEY, str(debug_level))
+
+
 def interface_type_from_str(s):
     """
     Interface Type object from the string representation.
@@ -277,6 +305,7 @@ def interface_type_from_str(s):
         msg = "TYPE value '{}' is not a valid `Interface Type` value of 'KEY_SOUNDER', 'LOOP' or 'KEYER'.".format(s)
         log.err(msg)
         raise ValueError(msg)
+
 
 def set_interface_type(s):
     """Sets the Interface Type (for Key-Sounder, Loop or Keyer)
@@ -650,6 +679,8 @@ def print_config():
     print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
+    print()
+    print("Debug level:", debug_level)
 
 def save_config():
     """Save (write) the configuration values out to the user and
@@ -687,6 +718,7 @@ def read_config():
     #
     global auto_connect
     global code_type
+    global debug_level
     global interface_type
     global invert_key_input
     global local
@@ -744,21 +776,22 @@ def read_config():
 
     create_config_files_if_needed()
 
-    user_config_defaults = {\
-        _AUTO_CONNECT_KEY:"OFF", \
-        _CODE_TYPE_KEY:"AMERICAN", \
-        _INTERFACE_TYPE_KEY:"LOOP", \
-        _INVERT_KEY_INPUT_KEY:"OFF", \
-        _LOCAL_KEY:"ON", \
-        _MIN_CHAR_SPEED_KEY:"18", \
-        _REMOTE_KEY:"ON", \
-        _SERVER_URL_KEY:"NONE", \
-        _SOUND_KEY:"ON", \
-        _SOUNDER_KEY:"OFF", \
-        _SOUNDER_POWER_SAVE_KEY:"60", \
-        _SPACING_KEY:"NONE", \
-        _STATION_KEY:"", \
-        _WIRE_KEY:"", \
+    user_config_defaults = {
+        _AUTO_CONNECT_KEY:"OFF",
+        _CODE_TYPE_KEY:"AMERICAN",
+        _DEBUG_LEVEL_KEY:"0",
+        _INTERFACE_TYPE_KEY:"LOOP",
+        _INVERT_KEY_INPUT_KEY:"OFF",
+        _LOCAL_KEY:"ON",
+        _MIN_CHAR_SPEED_KEY:"18",
+        _REMOTE_KEY:"ON",
+        _SERVER_URL_KEY:"NONE",
+        _SOUND_KEY:"ON",
+        _SOUNDER_KEY:"OFF",
+        _SOUNDER_POWER_SAVE_KEY:"60",
+        _SPACING_KEY:"NONE",
+        _STATION_KEY:"",
+        _WIRE_KEY:"101",
         _TEXT_SPEED_KEY:"18"}
     app_config_defaults = {"PORT":"", "GPIO":"OFF"}
 
@@ -797,6 +830,9 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
+        __option = "Debug Level"
+        __key = _DEBUG_LEVEL_KEY
+        debug_level = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Interface type"
         __key = _INTERFACE_TYPE_KEY
         _interface_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
@@ -882,6 +918,16 @@ code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
 
+debug_level_override = argparse.ArgumentParser(add_help=False)
+debug_level_override.add_argument(
+    "--debug-level",
+    metavar="debug-level",
+    dest="debug_level",
+    type=int,
+    default=0,
+    help="Debug logging level. A value of '0' disables output, higher values enable more output.",
+)
+
 interface_type_override = argparse.ArgumentParser(add_help=False)
 interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(), \
 help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-type", dest="interface_type")
@@ -951,4 +997,3 @@ help="The morse text speed in words per minute.", metavar="wpm", dest="text_spee
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \
 help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")
-

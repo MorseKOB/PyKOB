@@ -132,7 +132,7 @@ class SenderControls:
         self._input_validator = input_validator
         self._farns_change_callback = farns_change_callback
         self._text_change_callback = text_change_callback
-        self._lbl_code_sender = ttk.Label(self.window, text="Code Sender:")
+        self._lbl_code_sender = ttk.Label(self.window, text="Keyboard Code Sender:")
         self._varCodeSenderOn = tk.IntVar()
         self._chkCodeSenderOn = ttk.Checkbutton(
             self.window, text="Enable", variable=self._varCodeSenderOn
@@ -516,7 +516,7 @@ class MKOBWindow:
         ## Wire
         self._lbl_wire = ttk.Label(fm_wire_connect, text="Wire:")
         self._varWireNo = tk.StringVar()
-        self._varWireNo.set(cfg.wire)
+        self._varWireNo.set(str(cfg.wire))
         self._varWireNo.trace_add("write", self._handle_wire_change)
         self._spnWireNo = ttk.Spinbox(
             fm_wire_connect,
@@ -679,10 +679,10 @@ class MKOBWindow:
         self._ka.start(self._km, self._kkb)
 
         # Make sure window size reflects all widgets
-        self._set_app_title()
+        self.set_app_title()
         self._root.update()
         self._cfg.register_listener(
-            self._config_changed_handler, config2.ChangeType.ANY
+            self._config_changed_listener, config2.ChangeType.ANY
         )
 
         #### Keyboard event for the code send window (this must go after the 'root.update')
@@ -694,8 +694,11 @@ class MKOBWindow:
         # Finish up...
         self._ka.doMorseChange()
 
-    def _config_changed_handler(self, ct: int):
-        self._set_app_title()
+    def _config_changed_listener(self, ct: int):
+        """
+        Called by the Config instance when a change is made.
+        """
+        self.set_app_title()
 
     def _validate_number_entry(self, P):
         """
@@ -761,6 +764,8 @@ class MKOBWindow:
                 new_wire = 0
             elif new_wire > 32000:
                 new_wire = 32000
+            if not str(new_wire) == wstr:
+                self._varWireNo.set(str(new_wire))
             self._ka.doWireNo()
 
     def _handle_wire_change(self, *args):
@@ -784,13 +789,6 @@ class MKOBWindow:
         if self._after_tsc:
             self._root.after_cancel(self._after_tsc)
         self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
-
-    def _set_app_title(self):
-        cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
-        # If our config has a filename, display it as part of our title
-        name = self._cfg.get_name()
-        n = " - " + name if name and not name == '' else ''
-        self._root.title(self._app_name_version + n + cfg_modified_attrib)
 
     @property
     def code_sender_enabled(self):
@@ -905,10 +903,10 @@ class MKOBWindow:
         return -1
 
     @wire_number.setter
-    def wire_number(self, v):
+    def wire_number(self, v:int):
         w = self._varWireNo.get()
-        if not v == w:
-            self._varWireNo.set(v)
+        if not str(v) == w:
+            self._varWireNo.set(str(v))
 
     def connected(self, connected):
         """
@@ -937,6 +935,13 @@ class MKOBWindow:
         Make the keyboard window the active (focused) window.
         """
         self._txtKeyboard.focus_set()
+
+    def set_app_title(self):
+        cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
+        # If our config has a filename, display it as part of our title
+        name = self._cfg.get_name()
+        n = " - " + name if name and not name == "" else ""
+        self._root.title(self._app_name_version + n + cfg_modified_attrib)
 
     def set_minimum_sizes(self):
         """

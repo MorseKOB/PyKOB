@@ -267,7 +267,7 @@ class Mrt:
         True: 'latch'
         False: 'unlatch'
         """
-        self._kob.virtualCloserIsOpen = not closed
+        self._kob.virtual_closer_is_open = not closed
         code = LATCH_CODE if closed else UNLATCH_CODE
         if not self._internet_station_active:
             if self._cfg.local:
@@ -418,7 +418,7 @@ class Mrt:
                                 # Collect the repeat count
                                 l = fp.readline()
                                 if l == "" or l[0] == '*':
-                                        self._send_repeat_count = -2  # Repeat indefinately
+                                    self._send_repeat_count = -2  # Repeat indefinately
                                 else:
                                     # Try to collect a number
                                     rc = 1

@@ -150,8 +150,7 @@ class MKOBActions():
         wire = self._kw.wire_number
         if wire > -1:
             self._cfg.wire = wire
-            if self._km.connected:
-                self._km.change_wire(wire)
+            self._km.change_wire(wire)
 
     def doConnect(self, event=None, *args):
         """
