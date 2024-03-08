@@ -53,7 +53,8 @@ from threading import Event, Thread
 from time import sleep
 from typing import Any, Callable, Optional
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'
+MRT_VERSION_TEXT = "MRT " + __version__
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
@@ -121,7 +122,13 @@ class _GetchWindows:
 
 class Mrt:
 
-    def __init__(self, wire: int, cfg: Config, file_to_send: Optional[str]=None) -> None:
+    def __init__(
+        self,
+        app_name_version: str, wire: int,
+        cfg: Config,
+        file_to_send: Optional[str] = None,
+    ) -> None:
+        self._app_name_version = app_name_version
         self._wire = wire
         self._cfg = cfg
         self._kb_queue = None
@@ -157,6 +164,7 @@ class Mrt:
             portToUse=cfg.serial_port,
             useGpio=cfg.gpio,
             useAudio=cfg.sound,
+            audioType=cfg.audio_type,
             useSounder=cfg.sounder,
             invertKeyInput=cfg.invert_key_input,
             soundLocal=cfg.local,
@@ -166,6 +174,7 @@ class Mrt:
         self._internet = internet.Internet(
             officeID=self._our_office_id,
             code_callback=self._from_internet,
+            appver=self._app_name_version,
             server_url=cfg.server_url,
         )
         self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
@@ -519,15 +528,12 @@ if __name__ == "__main__":
         wire = args.wire if args.wire else cfg.wire
         log.set_debug_level(cfg.debug_level)
 
-        print("Python " + sys.version + " on " + sys.platform)
-        print("PyKOB " + VERSION)
-        try:
-            import serial
-            print("PySerial " + serial.VERSION)
-        except:
-            print("PySerial is not installed or the version information is not available (check installation)")
+        print(MRT_VERSION_TEXT)
+        print("Python: " + sys.version + " on " + sys.platform)
+        print("pykob: " + VERSION)
+        print("PySerial: " + config.pyserial_version)
 
-        mrt = Mrt(wire, cfg, args.sendtext_filepath)
+        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, args.sendtext_filepath)
         mrt.start()
         mrt.main_loop()
         exit_status = 0

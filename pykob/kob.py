@@ -37,8 +37,8 @@ physical sounder (loop), only the virtual/synthesized sounder.
 import sys
 import time
 from enum import Enum, IntEnum, unique
-from pykob import config, config2, log
-from pykob.config2 import Config
+from pykob import config, log
+from pykob.config import AudioType
 from threading import Event, Thread
 from typing import Any, Callable, Optional
 
@@ -71,14 +71,15 @@ class HWInterface(IntEnum):
 class KOB:
     def __init__(
             self, interfaceType:config.InterfaceType=config.InterfaceType.loop, portToUse:Optional[str]=None,
-            useGpio:bool=False, useAudio:bool=False, useSounder:bool=False, invertKeyInput:bool=False, soundLocal:bool=True,sounderPowerSaveSecs:int=0, keyCallback=None):
+            useGpio:bool=False, useAudio:bool=False, audioType:AudioType=AudioType.SOUNDER, useSounder:bool=False, invertKeyInput:bool=False, soundLocal:bool=True,sounderPowerSaveSecs:int=0, keyCallback=None):
         self._interface_type:config.InterfaceType = interfaceType
         self._invert_key_input:bool = invertKeyInput
         self._port_to_use:str = portToUse
         self._sound_local:bool = soundLocal
         self._sounder_power_save_secs: float = sounderPowerSaveSecs
         self._use_gpio: bool = useGpio
-        self._use_audio:bool = useAudio
+        self._use_audio: bool = useAudio
+        self._audio_type: AudioType = audioType
         self._use_sounder:bool = useSounder
         self._hw_interface:HWInterface = HWInterface.none
         self._gpi = None
@@ -202,10 +203,10 @@ class KOB:
             try:
                 from pykob import audio
 
-                self._audio = audio.Audio()
+                self._audio = audio.Audio(self._audio_type)
             except ModuleNotFoundError:
                 log.err(
-                    "Audio module is not available. The synth sounder cannot be used."
+                    "Audio module is not available. The synth sounder or tone cannot be used."
                 )
                 self._use_audio = False
 

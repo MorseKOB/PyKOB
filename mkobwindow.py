@@ -34,9 +34,11 @@ from mkobmain import MKOBMain
 from mkobreader import MKOBReader
 from mkobstationlist import MKOBStationList
 from pykob import config, config2, log
+from pykob import VERSION as PKVERSION
 from pykob.config2 import Config
 import mkobevents
 
+import sys
 from tkinter import N, S, W, E
 import tkinter as tk
 from tkinter import ttk
@@ -964,6 +966,21 @@ class MKOBWindow:
             self._fm_right, minsize=w
         )
         self._root.minsize(self._root.winfo_width(), int(self._root.winfo_height() * 0.666))
+
+    def show_help_about(self):
+        """
+        Display help about the app and environment.
+        """
+        msg = "{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
+            self.app_name_version,
+            PKVERSION,
+            sys.version,
+            config.pyaudio_version,
+            config.pyserial_version,
+            tk.TclVersion,
+            tk.TkVersion,
+        )
+        tk.messagebox.showinfo(title="About", message=msg)
 
     def show_shortcuts(self):
         """

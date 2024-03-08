@@ -46,6 +46,8 @@ class PreferencesWindow:
         self._save_pressed = False
         self._cancelled = False
 
+        self.AUDIO_TYPES = ["Sounder", "Tone"]
+        self.AUDIO_TYPE_SETTINGS = [config.AudioType.SOUNDER, config.AudioType.TONE]
         self.HW_INTERFACE_TYPES = ["None", "Serial Port", "GPIO (Raspberry Pi)"]
         self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
         self.NONE_HW_INTERFACE = 0      # index of 'None' in list above
@@ -90,7 +92,7 @@ class PreferencesWindow:
         prefs_nb = ttk.Notebook(self.root)
         prefs_nb.pack(fill=tk.BOTH)
         basic_prefs = ttk.Frame(prefs_nb)
-        prefs_nb.add(basic_prefs, text="Basic")
+        prefs_nb.add(basic_prefs, text="Base")
         code_prefs = ttk.Frame(prefs_nb)
         prefs_nb.add(code_prefs, text="Morse Code")
         advanced_prefs = ttk.Frame(prefs_nb)
@@ -154,29 +156,38 @@ class PreferencesWindow:
         # Initialize the equipment type to its default value of 'Separate key and sounder':
         self._equipmentType.set(self.DEFAULT_EQUIPMENT_TYPE)
 
+        _row = 8
         for equipmentRadioButton in range(len(self.EQUIPMENT_TYPES)):
+            _row += equipmentRadioButton
             ttk.Radiobutton(basiclocalInterface, text=self.EQUIPMENT_TYPES[equipmentRadioButton],
                             variable=self._equipmentType,
                             state='enabled',
-                            value=equipmentRadioButton + 1).grid(row=8 + equipmentRadioButton,
-                                                             column=1, columnspan=2,
-                                                             sticky=tk.W)
+                            value=equipmentRadioButton + 1).grid(row=_row, column=1, columnspan=2, sticky=tk.W)
             # If current config matches this radio button, update the selected value
             if self._cfg.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
                 self._equipmentType.set(equipmentRadioButton + 1)
 
         # Add a checkbox for the 'Use system sound' option
         self._useSystemSound = tk.IntVar(value=self._cfg.sound)
+        _row += 1
         ttk.Checkbutton(basiclocalInterface,
                         text="Use system sound",
-                        variable=self._useSystemSound).grid(column=0, columnspan=6, sticky=tk.W)
+                        variable=self._useSystemSound).grid(row=_row, column=0, sticky=tk.W)
+        # Drop-down list of Audio Types
+        self._audioType = self._cfg.audio_type
+        audioTypeLabel = ttk.Label(basiclocalInterface, text="Type").grid(row=_row, column=1, sticky=tk.W)
+        self._audioTypeMenu = ttk.Combobox(basiclocalInterface, width=20, state='readonly')
+        self._audioTypeMenu.grid(row=_row, column=2, columnspan=2, sticky=tk.W)
+        self._audioTypeMenu["values"] = self.AUDIO_TYPES
+        self._audioTypeMenu.current(self.AUDIO_TYPE_SETTINGS.index(self._audioType))
+        self._audioTypeMenu.bind("<<ComboboxSelected>>", self._audioTypeSelected)
 
         # Add a checkbox for the 'Use local sounder' option
         self._useLocalSounder = tk.IntVar(value=self._cfg.sounder)
+        _row += 1
         ttk.Checkbutton(basiclocalInterface,
                         text="Use local sounder",
-                        variable=self._useLocalSounder).grid(column=0, columnspan=6,
-                                                            sticky=tk.W)
+                        variable=self._useLocalSounder).grid(row=_row, column=0, columnspan=6, sticky=tk.W)
 
         # Add a number field for the 'Sounder Power Save' time
         self._sounderPowerSave = tk.IntVar(value=self._cfg.sounder_power_save)
@@ -442,6 +453,14 @@ class PreferencesWindow:
 
     # #############################################################################################
 
+    def _audioTypeSelected(self, *args):
+        #
+        # Audio type was selected.
+        #
+        selidx = self._audioTypeMenu.current()
+        self._audioType = self.AUDIO_TYPE_SETTINGS[selidx]
+        self._audioTypeMenu.selection_clear()
+
     def _codeSpeedChange(self):
         #
         # Text speed was changed - if it just went above "dot speed", adjust
@@ -509,6 +528,7 @@ class PreferencesWindow:
             muted_cfg.local = self._soundLocalCode.get()
             muted_cfg.invert_key_input = self._invertKeyInput.get()
             muted_cfg.sound = self._useSystemSound.get()
+            muted_cfg.audio_type = self._audioType
             muted_cfg.sounder = self._useLocalSounder.get()
             muted_cfg.sounder_power_save = int(self._sounderPowerSave.get())
             muted_cfg.server_url = self._serverUrl.get() + ":" + self._portNumber.get()

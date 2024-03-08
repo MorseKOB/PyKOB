@@ -60,6 +60,11 @@ class Spacing(IntEnum):
     word = 2
 
 @unique
+class AudioType(IntEnum):
+    SOUNDER = 1
+    TONE = 10
+
+@unique
 class CodeType(IntEnum):
     american = 1
     international = 2
@@ -78,6 +83,7 @@ _CONFIG_SECTION = "PYKOB"
 _SERIAL_PORT_KEY = "PORT"
 _GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
+_AUDIO_TYPE_KEY = "AUDIO_TYPE"
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
 _CODE_TYPE_KEY = "CODE_TYPE"
 _DEBUG_LEVEL_KEY = "DEBUG_LEVEL"
@@ -122,6 +128,7 @@ serial_port = None
 gpio = False
 
 # User Settings
+audio_type = AudioType.SOUNDER
 auto_connect = False
 code_type = CodeType.american
 debug_level = 0
@@ -198,6 +205,42 @@ def create_config_files_if_needed():
             os.makedirs(app_config_dir)
         f = open(app_config_file_path, 'w')
         f.close()
+
+def audio_type_from_str(s):
+    """
+    From a string of 'SOUNDER'|'S' or 'TONE'|'T' return the AudioType.
+
+    Parameters
+    ----------
+    s : str
+        'T|TONE' for AudioType.TONE
+        'S|SOUNDER' for AudioType.SOUNDER
+
+    Raise a value error if it isn't one of those values
+    """
+    s = s.upper()
+    if s == 'S' or s == "SOUNDER":
+        return AudioType.SOUNDER
+    elif s == 'T' or s == "TONE":
+        return AudioType.TONE
+    else:
+        msg = "TYPE value '{}' is not a valid `Audio Type` value of 'SOUNDER' or 'TONE'.".format(s)
+        log.err(msg)
+        raise ValueError(msg)
+
+def set_audio_type(s):
+    """
+    Sets the Audio Type (for SOUNDER or TONE)
+
+    Parameters
+    ----------
+    s : str
+        The value `S|SOUNDER` will set the audio type to 'SOUNDER'.
+        The value `T|TONE` will set the audio type to 'TONE'.
+    """
+    global audio_type
+    audio_type = audio_type_from_str(s)
+    user_config.set(_CONFIG_SECTION, _AUDIO_TYPE_KEY, audio_type.name.upper())
 
 def set_auto_connect(s):
     """Sets the Auto Connect to wire enable state
@@ -664,6 +707,7 @@ def print_config():
     print("Serial serial_port: '{}'".format(serial_port))
     print("GPIO interface (Raspberry Pi):", onOffFromBool(gpio))
     print("--------------------------------------")
+    print("Audio type:", audio_type.name.upper())
     print("Auto Connect to Wire:", onOffFromBool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
@@ -716,6 +760,7 @@ def read_config():
     global serial_port
     global gpio
     #
+    global audio_type
     global auto_connect
     global code_type
     global debug_level
@@ -777,6 +822,7 @@ def read_config():
     create_config_files_if_needed()
 
     user_config_defaults = {
+        _AUDIO_TYPE_KEY:"SOUNDER",
         _AUTO_CONNECT_KEY:"OFF",
         _CODE_TYPE_KEY:"AMERICAN",
         _DEBUG_LEVEL_KEY:"0",
@@ -818,6 +864,15 @@ def read_config():
         ###
         # Get the User config values
         ###
+        __option = "Audio type"
+        __key = _AUDIO_TYPE_KEY
+        _audio_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
+        if _audio_type == "SOUNDER":
+            audio_type = AudioType.SOUNDER
+        elif _audio_type == "TONE":
+            audio_type = AudioType.TONE
+        else:
+            raise ValueError(_audio_type)
         __option = "Auto Connect to Wire"
         __key = _AUTO_CONNECT_KEY
         auto_connect = user_config.getboolean(_CONFIG_SECTION, __key)
@@ -908,6 +963,16 @@ def read_config():
 # ### Mainline
 read_config()
 
+audio_type_override = argparse.ArgumentParser(add_help=False)
+audio_type_override.add_argument(
+    "-Z",
+    "--audiotype",
+    default=audio_type.name.upper(),
+    help="The audio type (SOUNDER|TONE) to use.",
+    metavar="audio-type",
+    dest="audio_type",
+)
+
 auto_connect_override = argparse.ArgumentParser(add_help=False)
 auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
@@ -937,8 +1002,14 @@ invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, 
 help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
 
 local_override = argparse.ArgumentParser(add_help=False)
-local_override.add_argument("-L", "--local", default=local, \
-help="True/False to Enable/Disable local copy of transmitted code.", metavar="local-copy", dest="local")
+local_override.add_argument(
+    "-L",
+    "--local",
+    default=local,
+    help="'ON' or 'OFF' to Enable/Disable sounding of local code.",
+    metavar="local-copy",
+    dest="local",
+)
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
@@ -946,9 +1017,14 @@ help="The minimum character speed to use in words per minute (used for Farnswort
 metavar="wpm", dest="min_char_speed")
 
 remote_override = argparse.ArgumentParser(add_help=False)
-remote_override.add_argument("-R", "--remote", default=remote, \
-help="True/False to Enable/Disable transmission over the internet on the specified wire.", \
-metavar="remote-send", dest="remote")
+remote_override.add_argument(
+    "-R",
+    "--remote",
+    default=remote,
+    help="'ON' or 'OFF' to Enable/Disable sending code to the connected wire (internet).",
+    metavar="remote-send",
+    dest="remote",
+)
 
 server_url_override = argparse.ArgumentParser(add_help=False)
 server_url_override.add_argument("-U", "--url", default=server_url, \
@@ -959,40 +1035,72 @@ serial_port_override.add_argument("-p", "--port", default=serial_port, \
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
 gpio_override = argparse.ArgumentParser(add_help=False)
-gpio_override.add_argument("-g", "--gpio", default="ON" if gpio else "OFF",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
- GPIO takes priority over the serial interface.", \
-metavar="gpio", dest="gpio")
+gpio_override.add_argument(
+    "-g",
+    "--gpio",
+    default="ON" if gpio else "OFF",
+    choices=[
+        "ON",
+        "On",
+        "on",
+        "YES",
+        "Yes",
+        "yes",
+        "OFF",
+        "Off",
+        "off",
+        "NO",
+        "No",
+        "no",
+    ],
+    help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
+ GPIO takes priority over the serial interface if both are specified.",
+    metavar="gpio",
+    dest="gpio",
+)
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.", \
+help="'ON' or 'OFF' to indicate whether computer audio should be used to sound code.", \
 metavar="sound", dest="sound")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
 sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF",
 choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.", \
+help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.", \
 metavar="sounder", dest="sounder")
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
 sounder_pwrsv_override.add_argument("-P", "--pwrsv", default=sounder_power_save, type=int, \
-help="The sounder power-save delay in seconds, or '0' to disable.", \
+help="The sounder power-save delay in seconds, or '0' to disable power-save.", \
 metavar="seconds", dest="sounder_power_save")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
-spacing_override.add_argument("-s", "--spacing", default=spacing.name.upper(), \
-help="The spacing (NONE|CHAR|WORD) to use.", metavar="spacing", dest="spacing")
+spacing_override.add_argument(
+    "-s",
+    "--spacing",
+    default=spacing.name.upper(),
+    help="Where to add spacing for Farnsworth (NONE|CHAR|WORD).",
+    metavar="spacing",
+    dest="spacing",
+)
 
 station_override = argparse.ArgumentParser(add_help=False)
 station_override.add_argument("-S", "--station", default=station, \
 help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
 
 text_speed_override = argparse.ArgumentParser(add_help=False)
-text_speed_override.add_argument("-t", "--textspeed", default=text_speed, type=int, \
-help="The morse text speed in words per minute.", metavar="wpm", dest="text_speed")
+text_speed_override.add_argument(
+    "-t",
+    "--textspeed",
+    default=text_speed,
+    type=int,
+    help="The morse text speed in words per minute. Used for Farnsworth timing. "
+    + "Spacing must not be 'NONE' to enable Farnsworth.",
+    metavar="wpm",
+    dest="text_speed",
+)
 
 wire_override = argparse.ArgumentParser(add_help=False)
 wire_override.add_argument("-W", "--wire", default=wire, \

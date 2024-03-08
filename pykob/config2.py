@@ -47,7 +47,7 @@ import sys
 from typing import Any, Callable, Optional
 
 from pykob import config, log
-from pykob.config import CodeType, InterfaceType, Spacing
+from pykob.config import AudioType, CodeType, InterfaceType, Spacing
 
 PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
@@ -97,6 +97,8 @@ class Config:
         self._version: str = VERSION
         self._version_loaded: Optional[str] = None
         # Hardware Settings
+        self._audio_type: AudioType = AudioType.SOUNDER
+        self._p_audio_type: AudioType = AudioType.SOUNDER
         self._gpio: bool = False
         self._p_gpio: bool = False
         self._serial_port: Optional[str] = None
@@ -146,7 +148,7 @@ class Config:
         # Our operational values
         self._dirty = False
         self._filepath: Optional[str] = None  # The path used to load or last saved to
-        self._use_global: bool = False
+        self._using_global: bool = False
         #
         # Key to property setter dictionary
         self._key_prop_setters: dict[str,Any] = {
@@ -232,6 +234,29 @@ class Config:
     # ########################################################################
     # Hardware Settings
     #
+
+    @property
+    def audio_type(self) -> AudioType:
+        return self._audio_type
+
+    @audio_type.setter
+    def audio_type(self, v: AudioType) -> None:
+        x = self._audio_type
+        self._audio_type = v
+        if not v == x:
+            self._changed_hw()
+
+    def _set_audio_type(self, v: str) -> None:
+        o = config.audio_type_from_str(v)
+        self.audio_type = o
+
+    @property
+    def audio_type_p(self) -> AudioType:
+        return self._p_audio_type
+
+    @property
+    def audio_type_changed(self) -> bool:
+        return not self._audio_type == self._p_audio_type
 
     @property
     def gpio(self) -> bool:
@@ -633,6 +658,7 @@ class Config:
         not dirty.
         """
         # Hardware Settings
+        self._p_audio_type = self._audio_type
         self._p_gpio = self._gpio
         self._p_serial_port = self._serial_port
         self._p_interface_type = self._interface_type
@@ -668,6 +694,7 @@ class Config:
         with self.notification_pauser() as muted_cfg:
             # Use the 'properties' to set the values in order to properly flag changes
             # Hardware Settings
+            muted_cfg.audio_type = cfg_src._audio_type
             muted_cfg.gpio = cfg_src._gpio
             muted_cfg.serial_port = cfg_src._serial_port
             muted_cfg.interface_type = cfg_src._interface_type
@@ -738,6 +765,7 @@ class Config:
         """
         data = {
             _PYKOB_CFG_VERSION_KEY: self._version,
+            config._AUDIO_TYPE_KEY: self._audio_type.name.upper(),
             config._GPIO_KEY: self._gpio,
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
@@ -805,6 +833,8 @@ class Config:
         if self._dirty:
             return True
         # Hardware Settings
+        if not self._p_audio_type == self._audio_type:
+            return True
         if  not self._p_gpio == self._gpio:
             return True
         if  not self._p_serial_port == self._serial_port:
@@ -856,7 +886,7 @@ class Config:
         Raises: FileNotFoundError if a path hasn't been established.
                 System may throw other file related exceptions.
         """
-        if not filepath and not self._filepath and not self._use_global:
+        if not filepath and not self._filepath and not self._using_global:
             e = FileNotFoundError("File path not yet established")
             raise e
         elif not filepath:
@@ -926,6 +956,7 @@ class Config:
         """
         try:
             # Hardware Settings
+            config.set_audio_type(self._audio_type.name)
             config.set_gpio(self._gpio)
             config.set_serial_port(self._serial_port)
             config.set_interface_type(self._interface_type.name)
@@ -969,6 +1000,7 @@ class Config:
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(config.onOffFromBool(self._invert_key_input)), file=f)
         print("Sound: {}".format(config.onOffFromBool(self._sound)), file=f)
+        print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
         print("Sounder: {}".format(config.onOffFromBool(self._sounder)), file=f)
         print("Sounder Power Save (seconds): {}".format(self._sounder_power_save), file=f)
         print("--------------------", file=f)
@@ -1010,6 +1042,7 @@ class Config:
 
     def restore_config(self, clear_dirty:bool=True):
         # Hardware Settings
+        self._audio_type = self._p_audio_type
         self._gpio = self._p_gpio
         self._serial_port = self._p_serial_port
         self._interface_type = self._p_interface_type
@@ -1039,7 +1072,7 @@ class Config:
         Save this configuration.
 
         filepath: File path to use. If 'None', use the path loaded from or last saved to.
-                If 'None' is supplied, and a path hasn't been established, and 'use_global'
+                If 'None' is supplied, and a path hasn't been established, and 'using_global'
                 has not been set, raise a FileNotFoundError exception.
 
         Raises: FileNotFoundError if a path hasn't been established and not using global.
@@ -1087,15 +1120,15 @@ class Config:
     def set_filepath(self, filepath:str):
         self._filepath = filepath
         if filepath:
-            self._use_global = False
+            self._using_global = False
 
-    def use_global(self, global_):
-        self._use_global = global_
-        if self._use_global:
+    def set_using_global(self, global_):
+        self._using_global = global_
+        if self._using_global:
             self._filepath = None
 
     def using_global(self) -> bool:
-        return self._use_global
+        return self._using_global
 
 # ########################################################################
 # Arg Parse parsers for each of the configuration values.
@@ -1116,6 +1149,15 @@ debug_level_override.add_argument("--debug-level", metavar="debug-level", dest="
     type=int, default=0,
     help="Debug logging level. A value of '0' disables output, higher values enable more output.")
 
+audio_type_override = argparse.ArgumentParser(add_help=False)
+audio_type_override.add_argument(
+    "-Z",
+    "--audiotype",
+    metavar="audio-type",
+    dest="audio_type",
+    help="The audio type (SOUNDER|TONE) to use.",
+)
+
 auto_connect_override = argparse.ArgumentParser(add_help=False)
 auto_connect_override.add_argument("-C", "--autoconnect", metavar="auto-connect", dest="auto_connect",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
@@ -1135,15 +1177,20 @@ invert_key_input_override.add_argument("-M", "--iki", metavar="invert-key-input"
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", metavar="local-copy", dest="local",
-    help="True/False to Enable/Disable local copy of transmitted code.")
+    help="'ON' or 'OFF' to Enable/Disable sounding of local code.")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", metavar="wpm", dest="min_char_speed", type=int,
     help="The minimum character speed to use in words per minute.")
 
 remote_override = argparse.ArgumentParser(add_help=False)
-remote_override.add_argument("-R", "--remote", metavar="remote-send", dest="remote",
-    help="True/False to Enable/Disable transmission over the internet on the specified wire.")
+remote_override.add_argument(
+    "-R",
+    "--remote",
+    metavar="remote-send",
+    dest="remote",
+    help="'ON' or 'OFF' to Enable/Disable sending code to the connected wire (internet).",
+)
 
 server_url_override = argparse.ArgumentParser(add_help=False)
 server_url_override.add_argument("-U", "--url", metavar="url", dest="server_url",
@@ -1157,21 +1204,39 @@ gpio_override = argparse.ArgumentParser(add_help=False)
 gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="gpio",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
     help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used." +
-        "GPIO takes priority over the serial interface.")
+        "GPIO takes priority over the serial interface if both are specified.")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", metavar="sound", dest="sound",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.")
+    help="'ON' or 'OFF' to indicate whether computer audio should be used to sound code.")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
-sounder_override.add_argument("-A", "--sounder", metavar="sounder", dest="sounder",
-    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.")
+sounder_override.add_argument(
+    "-A",
+    "--sounder",
+    metavar="sounder",
+    dest="sounder",
+    choices=[
+        "ON",
+        "On",
+        "on",
+        "YES",
+        "Yes",
+        "yes",
+        "OFF",
+        "Off",
+        "off",
+        "NO",
+        "No",
+        "no",
+    ],
+    help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.",
+)
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
 sounder_pwrsv_override.add_argument("-P", "--pwrsv", metavar="seconds", dest="sounder_power_save", type=int,
-    help="The sounder power-save delay in seconds, or '0' to disable.")
+    help="The sounder power-save delay in seconds, or '0' to disable power-save.")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
 spacing_override.add_argument("-s", "--spacing", metavar="spacing", dest="spacing",
@@ -1214,11 +1279,11 @@ def process_config_arg(args) -> Config:
             if not os.path.isfile(file_path):
                 raise FileNotFoundError("Configuration file '{}' does not exist.".format(file_path))
             cfg.load_config(file_path)
-            cfg.use_global(False)
+            cfg.set_using_global(False)
             return cfg
     #
     cfg.load_from_global()
-    cfg.use_global(True)
+    cfg.set_using_global(True)
     return cfg
 
 def process_config_args(args, cfg:Config=None) -> Config:
@@ -1232,12 +1297,16 @@ def process_config_args(args, cfg:Config=None) -> Config:
     Raises: Various Exceptions from processing the arguments.
     """
     if not cfg:
+        # Get a Config instance to use as a base
         cfg = process_config_arg(args)
     # Set config values if they were specified
     if hasattr(args, "debug_level"):
         if args.debug_level:
             n = args.debug_level
             cfg.debug_level = n if n >= 0 else 0
+    if hasattr(args, "audio_type"):
+        if args.audio_type:
+            cfg.audio_type = config.audio_type_from_str(args.audio_type)
     if hasattr(args, "auto_connect"):
         if args.auto_connect:
             cfg.auto_connect = strtobool(args.auto_connect)

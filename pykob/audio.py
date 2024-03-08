@@ -25,12 +25,13 @@ SOFTWARE.
 """
 audio module
 
-Provides audio for simulated sounder.
+Provides audio for simulated sounder or tone.
 """
 
 import wave
 from pathlib import Path
 from pykob import log
+from pykob.config import AudioType
 from threading import Event, Thread
 from time import sleep
 from typing import Any, List
@@ -38,7 +39,8 @@ from typing import Any, List
 class Audio:
     FRAMES_PER_BUFFER = 16
 
-    def __init__(self):
+    def __init__(self, audio_type: AudioType = AudioType.SOUNDER):
+        self._audio_type = audio_type
         self._audio_available = False
         self._pa = None
         self._callback_retval = None
@@ -69,8 +71,11 @@ class Audio:
         self._root_folder = Path(__file__).parent
         self._resource_folder = self._root_folder / "resources"
         # Audio files
-        self._audio_files = ["clack48.wav", "click48.wav"]
-        # self._audio_files = ["tone0.wav", "tone750.wav"]
+        self._audio_files = (
+            ["clack48.wav", "click48.wav"]
+            if self._audio_type == AudioType.SOUNDER
+            else ["tone0.wav", "tone750.wav"]
+        )
         for i in range(len(self._audio_files)):
             fn = self._resource_folder / self._audio_files[i]
             log.debug("Load audio file: {}".format(fn), 8)
@@ -128,7 +133,9 @@ class Audio:
             self._sound = snd
 
 class Audio2:
-    def __init__(self):
+
+    def __init__(self, audio_type: AudioType = AudioType.SOUNDER):
+        self._audio_type = audio_type
         self._audio_available = False
         self._pg = None
         try:
@@ -148,8 +155,11 @@ class Audio2:
         self._resource_folder = self._root_folder / "resources"
         # Audio files
         self._sounds:List[Sound,Sound] = [None, None]
-        self._audio_files = ["clack48.wav", "click48.wav"]
-        # self._audio_files:List[str,str] = ["tone0.wav", "tone750.wav"]
+        self._audio_files = (
+            ["clack48.wav", "click48.wav"]
+            if self._audio_type == AudioType.SOUNDER
+            else ["tone0.wav", "tone750.wav"]
+        )
         for i in range(len(self._audio_files)):
             fn = self._resource_folder / self._audio_files[i]
             log.debug("Load audio file: {}".format(fn), 8)

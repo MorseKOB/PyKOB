@@ -29,7 +29,6 @@ Handle actions for controls on main MKOB window
 """
 import os
 import tkinter as tk
-import tkinter.messagebox as mb
 import tkinter.filedialog as fd
 import traceback
 
@@ -129,7 +128,7 @@ class MKOBActions():
     # Help menu
 
     def doHelpAbout(self):
-        mb.showinfo(title="About", message=self._kw.app_name_version)
+        self._kw.show_help_about()
 
     def doHelpShortcuts(self):
         self._kw.show_shortcuts()

@@ -119,6 +119,7 @@ class MKOBMain:
             portToUse=cfg.serial_port,
             useGpio=cfg.gpio,
             useAudio=cfg.sound,
+            audioType=cfg.audio_type,
             useSounder=cfg.sounder,
             invertKeyInput=cfg.invert_key_input,
             soundLocal=cfg.local,
@@ -593,7 +594,7 @@ class MKOBMain:
         """
         cfg_for_prefs = self._cfg.copy()
         if self._cfg.using_global():
-            cfg_for_prefs.use_global(True)
+            cfg_for_prefs.set_using_global(True)
         else:
             cfg_for_prefs.set_filepath(self._cfg.get_filepath())
         cfg_for_prefs.clear_dirty()
@@ -620,7 +621,7 @@ class MKOBMain:
             filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)],
         )
         if pf:
-            self._cfg.use_global(False)
+            self._cfg.set_using_global(False)
             self._cfg.save_config(pf)
 
     def reset_wire_state(self):

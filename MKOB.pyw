@@ -39,9 +39,9 @@ from mkobwindow import MKOBWindow
 VERSION = "4.1.4"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
-print(" Python " + sys.version + " on " + sys.platform)
-print(" PyKOB " + PKVERSION)
-print(" Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
+print(" Python: " + sys.version + " on " + sys.platform)
+print(" pykob: " + PKVERSION)
+print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 try:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",

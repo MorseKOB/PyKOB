@@ -97,6 +97,7 @@ def main(argv):
                     config2.local_override,
                     config2.remote_override,
                     config2.sound_override,
+                    config2.audio_type_override,
                     config2.sounder_override,
                     config2.sounder_pwrsv_override,
                     config2.code_type_override,
@@ -165,6 +166,7 @@ def main(argv):
 
         if load_from_global:
             cfg.load_from_global()
+            cfg.set_using_global(True)
 
         if save_to_global:
             cfg.set_dirty()  # Mark as dirty to assure it gets saved
