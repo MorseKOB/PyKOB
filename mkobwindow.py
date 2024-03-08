@@ -28,6 +28,7 @@ kobwindow.py
 Create the main window for MKOB and lay out its widgets (controls).
 """
 from mkobactions import MKOBActions
+from mkobhelpkeys import MKOBHelpKeys
 from mkobkeyboard import MKOBKeyboard
 from mkobmain import MKOBMain
 from mkobreader import MKOBReader
@@ -317,6 +318,7 @@ class MKOBWindow:
         self._ksl = MKOBStationList(self)
         self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
         self._kkb = MKOBKeyboard(self._ka, self)
+        self._shortcuts_win = None
 
         # validators
         self._digits_only_validator = root.register(self._validate_number_entry)
@@ -406,6 +408,8 @@ class MKOBWindow:
         # Help menu
         self._helpMenu = tk.Menu(self._menu)
         self._menu.add_cascade(label="Help", menu=self._helpMenu)
+        self._helpMenu.add_command(label="Keyboard Shortcuts", command=self._ka.doHelpShortcuts)
+        self._helpMenu.add_separator()
         self._helpMenu.add_command(label="About", command=self._ka.doHelpAbout)
 
         # Paned/Splitter windows
@@ -960,6 +964,14 @@ class MKOBWindow:
             self._fm_right, minsize=w
         )
         self._root.minsize(self._root.winfo_width(), int(self._root.winfo_height() * 0.666))
+
+    def show_shortcuts(self):
+        """
+        Display the Keyboard Shortcuts window.
+        """
+        if not (self._shortcuts_win and MKOBHelpKeys.active):
+            self._shortcuts_win = MKOBHelpKeys()
+        self._shortcuts_win.focus()
 
     def start(self):
         self._kkb.start(self._km)

@@ -437,6 +437,7 @@ class PreferencesWindow:
         # left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
         # top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
         # self.root.geometry('+%d+%d' % (left_offset, top_offset))
+        self.root.geometry("+36+36")
         self.root.state("normal")
 
     # #############################################################################################

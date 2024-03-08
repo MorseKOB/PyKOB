@@ -131,6 +131,9 @@ class MKOBActions():
     def doHelpAbout(self):
         mb.showinfo(title="About", message=self._kw.app_name_version)
 
+    def doHelpShortcuts(self):
+        self._kw.show_shortcuts()
+        
     ####
     #### Action handlers for control events
     ####
