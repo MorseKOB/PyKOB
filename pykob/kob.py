@@ -226,11 +226,11 @@ class KOB:
         if self._hw_is_available() and not self._threadsStop.is_set():
             if self._key_callback:
                 self._keyread_thread = Thread(
-                    name="KOB-KeyRead", daemon=True, target=self._keyReadThread_run
+                    name="KOB-KeyRead", target=self._keyReadThread_run
                 )
                 self._keyread_thread.start()
             self._powersave_thread = Thread(
-                name="KOB-PowerSave", daemon=True, target=self._powerSaveThread_run
+                name="KOB-PowerSave", target=self._powerSaveThread_run
             )
             self._powersave_thread.start()
 

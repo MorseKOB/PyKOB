@@ -128,7 +128,7 @@ class Selector:
                         oof_changed = False
                         binary_changed = False
             time.sleep(self._pole_cycle_time)
-
+        log.debug("Selector-Port-Checker thread done.")
 
     @property
     def binary_value(self):

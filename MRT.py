@@ -201,6 +201,7 @@ class Mrt:
             self._fsndthread = Thread(name="File-send-thread", daemon=True, target=self._thread_fsender_run)
 
     def exit(self):
+        print("\nClosing...")
         self._threadsStop.set()
         sleep(0.3)
         if self._internet:
@@ -455,6 +456,7 @@ class Mrt:
                 self._threadsStop.set()
             finally:
                 self._set_virtual_closer_closed(True)
+        log.debug("MRT-File Sender thread done.")
 
     def _thread_kbreader_run(self):
         kbrd_char = _Getch()
@@ -486,6 +488,7 @@ class Mrt:
             except Exception as ex:
                 print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
                 self._threadsStop.set()
+        log.debug("MRT-KB Reader thread done.")
 
     def _thread_kbsender_run(self):
         while not self._threadsStop.is_set():
@@ -496,6 +499,7 @@ class Mrt:
             except Exception as ex:
                 print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
                 self._threadsStop.set()
+        log.debug("MRT-KB Sender thread done.")
 
 """
 Main code
@@ -537,15 +541,16 @@ if __name__ == "__main__":
         mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, args.sendtext_filepath)
         mrt.start()
         mrt.main_loop()
+        mrt = None
         exit_status = 0
     except FileNotFoundError as fnf:
         print("File not found: {}".format(fnf.args[0]))
     except Exception as ex:
         print("Error encountered: {}".format(ex))
     finally:
-        print()
-        print("~73")
         if mrt:
             mrt.exit()
+        print()
+        print("~73")
         sleep(0.5)
         sys.exit(exit_status)

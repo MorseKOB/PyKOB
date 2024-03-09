@@ -27,7 +27,6 @@ kobactions.py
 
 Handle actions for controls on main MKOB window
 """
-import os
 import tkinter as tk
 import tkinter.filedialog as fd
 import traceback
@@ -69,16 +68,19 @@ class MKOBActions():
         log.debug("Play a file...")
         pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
         if pf:
-            log.debug(" Play: {}".format(pf))
-            self._km.disconnect()
-            self._km.StationList.handle_clear_station_list(None) # okay to call directly as we are in a handler
-            self._km.Recorder.source_file_path = pf
-            self._krdr.handle_clear(None)
-            self._km.sender_ID = None
-            dirpath, filename = os.path.split(pf)
-            self._krdr.handle_append_text('[{}]\n'.format(filename))
-            self._km.Recorder.playback_start(list_data=False, max_silence=5)
+            self._km.recording_play(pf)
         self._kw.give_keyboard_focus()
+        return
+
+    def doFileRecord(self):
+        log.debug("Record session...")
+        self._km.record_session()
+        return
+
+    def doFileRecordEnd(self):
+        log.debug("End recording...")
+        self._km.recording_end()
+        return
 
     def _preferencesDialogDismissed(self, prefsDialog):
         """
@@ -88,6 +90,7 @@ class MKOBActions():
         self._kw._root.bind_all("<Key-Escape>", self.handle_toggle_closer)
         self._preferencesDialog = None
         self._km.preferences_closed(prefsDialog)
+        return
 
     def doFilePreferences(self):
         if not self._preferencesDialog:
@@ -104,34 +107,43 @@ class MKOBActions():
         #
         self._preferencesDialog.root.deiconify()
         self._preferencesDialog.root.lift()
+        return
 
     def doFilePrefsLoad(self):
         self._km.preferences_load()
+        return
 
     def doFilePrefsSave(self):
         self._km.preferences_save()
+        return
 
     def doFilePrefsSaveAs(self):
         self._km.preferences_save_as()
+        return
 
     def doFileExit(self):
         self._kw.exit()
+        return
 
     # Tools menu
     def doShowPacketsChanged(self):
         sp = self._kw.show_packets
         self._km.show_packets = sp
+        return
 
     def doKeyGraphShow(self):
         self._km.show_key_graph()
+        return
 
     # Help menu
 
     def doHelpAbout(self):
         self._kw.show_help_about()
+        return
 
     def doHelpShortcuts(self):
         self._kw.show_shortcuts()
+        return
 
     ####
     #### Action handlers for control events
@@ -141,18 +153,22 @@ class MKOBActions():
         new_officeID = self._kw.office_id
         self._cfg.station = new_officeID
         self._km.Internet.set_officeID(new_officeID)
+        return
 
     def doCircuitCloser(self, event=None, *args):
         self._km.set_virtual_closer_closed(self._kw.circuit_closer == 1)
+        return
 
     def doMorseChange(self, event=None, *args):
         self._km.do_morse_change()
+        return
 
     def doWireNo(self, event=None, *args):
         wire = self._kw.wire_number
         if wire > -1:
             self._cfg.wire = wire
             self._km.change_wire(wire)
+        return
 
     def doConnect(self, event=None, *args):
         """
@@ -160,10 +176,11 @@ class MKOBActions():
         """
         if not self._km.connected:
             # If the recorder is playing a recording do not allow connection
-            if self._km.Recorder and not self._km.Recorder.playback_state == recorder.PlaybackState.idle:
+            if self._km.Player and not self._km.Player.playback_state == recorder.PlaybackState.idle:
                 return
         self._km.toggle_connect()
         self._kw.connected(self._km.connected)
+        return
 
     ####
     #### Trigger event messages ###
@@ -175,6 +192,7 @@ class MKOBActions():
         'LATCH' (key/circuit closed)
         """
         self._kw.event_generate(mkobevents.EVENT_CIRCUIT_CLOSE, when='tail')
+        return
 
     def trigger_circuit_open(self):
         """
@@ -182,18 +200,21 @@ class MKOBActions():
         'UNLATCH' (key/circuit open)
         """
         self._kw.event_generate(mkobevents.EVENT_CIRCUIT_OPEN, when='tail')
+        return
 
     def trigger_emit_kb_code(self, code: list):
         """
         Generate an event to emit the code sequence originating from the keyboard.
         """
         self._kw.event_generate(mkobevents.EVENT_EMIT_KB_CODE, when='tail', data=code)
+        return
 
     def trigger_emit_key_code(self, code: list):
         """
         Generate an event to emit the code sequence originating from the key.
         """
         self._kw.event_generate(mkobevents.EVENT_EMIT_KEY_CODE, when='tail', data=code)
+        return
 
     def trigger_keyboard_send(self):
         """
@@ -201,6 +222,7 @@ class MKOBActions():
         """
         log.debug("mka.trigger_keyboard_send", 3)
         self._kw.event_generate(mkobevents.EVENT_KB_PROCESS_SEND, when='tail')
+        return
 
     def trigger_player_wire_change(self, id: int):
         """
@@ -208,64 +230,74 @@ class MKOBActions():
         from the player has changed.
         """
         self._kw.event_generate(mkobevents.EVENT_PLAYER_WIRE_CHANGE, when='tail', data=str(id))
+        return
 
     def trigger_reader_append_text(self, text: str):
         """
         Generate an event to add text to the reader window.
         """
         self._kw.event_generate(mkobevents.EVENT_READER_APPEND_TEXT, when='tail', data=text)
+        return
 
     def trigger_reader_clear(self):
         """
         Generate an event to clear the Reader window
         """
         self._kw.event_generate(mkobevents.EVENT_READER_CLEAR, when='tail')
+        return
 
     def trigger_station_list_clear(self):
         """
         Generate an event to clear the station list and the window.
         """
         self._kw.event_generate(mkobevents.EVENT_STATIONS_CLEAR, when='tail')
+        return
 
     def trigger_update_current_sender(self, id: str):
         """
         Generate an event to record the current sender.
         """
         self._kw.event_generate(mkobevents.EVENT_CURRENT_SENDER, when='tail', data=id)
+        return
 
     def trigger_update_station_active(self, id: str):
         """
         Generate an event to update the active status (timestamp) of a station.
         """
         self._kw.event_generate(mkobevents.EVENT_STATION_ACTIVE, when='tail', data=id)
+        return
 
     ####
     #### Event (message) handlers
     ####
 
-    def handle_circuit_close(self, event):
+    def handle_circuit_close(self, event=None):
         """
         Close the circuit and trigger associated local functions (checkbox, etc.)
         """
         self._km.set_virtual_closer_closed(True)
+        return
 
-    def handle_circuit_open(self, event):
+    def handle_circuit_open(self, event=None):
         """
         Open the circuit and trigger associated local functions (checkbox, sender, etc.)
         """
         self._km.set_virtual_closer_closed(False)
+        return
 
     def handle_emit_key_code(self, event_data):
         """
         Emit code originating from the key
         """
         self.handle_emit_code(event_data, kob.CodeSource.key)
+        return
 
     def handle_emit_kb_code(self, event_data):
         """
         Emit code originating from the keyboard
         """
         self.handle_emit_code(event_data, kob.CodeSource.keyboard)
+        return
 
     def handle_emit_code(self, event_data, code_source):
         """
@@ -278,8 +310,9 @@ class MKOBActions():
         if (data and (not data.isspace())):
             code = tuple(map(int, data.split(', ')))
             self._km.emit_code(code, code_source)
+        return
 
-    def handle_toggle_closer(self, event):
+    def handle_toggle_closer(self, event=None):
         """
         toggle Circuit Closer and regain control of the wire
         """
@@ -288,7 +321,7 @@ class MKOBActions():
         self._km.reset_wire_state()  # regain control of the wire
         return "break"
 
-    def handle_decrease_wpm(self, event):
+    def handle_decrease_wpm(self, event=None):
         """
         Decrease code speed
         """
@@ -298,7 +331,7 @@ class MKOBActions():
             self._kw.cwpm = cwpm
         return "break"
 
-    def handle_increase_wpm(self, event):
+    def handle_increase_wpm(self, event=None):
         """
         Increase code speed
         """
@@ -308,77 +341,89 @@ class MKOBActions():
             self._kw.cwpm = cwpm
         return "break"
 
-    def handle_clear_reader_window(self, event):
+    def handle_clear_reader_window(self, event=None):
         """
         Clear Code Reader window
         """
         self._krdr.handle_clear()
         return "break"
 
-    def handle_clear_sender_window(self, event):
+    def handle_clear_sender_window(self, event=None):
         """
         Clear Code Sender window
         """
         self._kw.keyboard_sender.handle_clear()
         return "break"
 
-    def handle_toggle_code_sender(self, event):
+    def handle_toggle_code_sender(self, event=None):
         """
         Toggle Code Sender ON|OFF
         """
         self._kw.code_sender_enabled = not self._kw.code_sender_enabled
         return "break"
 
-    def handle_playback_move_back15(self, event):
+    def handle_playback_move_back15(self, event=None):
         """
         Move the playback position back 15 seconds.
         """
         log.debug("Playback - move back 15 seconds...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
-        self._km.Recorder.playback_move_seconds(-15)
+        if self._km.Player:
+            self._km.Player.playback_move_seconds(-15)
+        return
 
-    def handle_playback_move_forward15(self, event):
+    def handle_playback_move_forward15(self, event=None):
         """
         Move the playback position forward 15 seconds.
         """
         log.debug("Playback - move forward 15 seconds...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
-        self._km.Recorder.playback_move_seconds(15)
+        if self._km.Player:
+            self._km.Player.playback_move_seconds(15)
+        return
 
-    def handle_playback_move_sender_start(self, event):
+    def handle_playback_move_sender_start(self, event=None):
         """
         Move the playback position to the start of the current sender.
         """
         log.debug("Playback - move to sender start...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
-        self._km.Recorder.playback_move_to_sender_begin()
+        if self._km.Player:
+            self._km.Player.playback_move_to_sender_begin()
+        return
 
-    def handle_playback_move_sender_end(self, event):
+    def handle_playback_move_sender_end(self, event=None):
         """
         Move the playback position to the end of the current sender.
         """
         log.debug("Playback - move to next sender...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
-        self._km.Recorder.playback_move_to_sender_end()
+        if self._km.Player:
+            self._km.Player.playback_move_to_sender_end()
+        return
 
-    def handle_playback_pauseresume(self, event):
+    def handle_playback_pauseresume(self, event=None):
         """
         Pause/Resume a recording if currently playing/paused.
 
         This does not play 'from scratch'. A playback must have been started
         for this to have any effect.
         """
-        self._km.Recorder.playback_pause_resume()
+        if self._km.Player:
+            self._km.Player.playback_pause_resume()
+        return
 
-    def handle_playback_stop(self, event):
+    def handle_playback_stop(self, event=None):
         """
         Stop playback of a recording if playing.
         """
-        self._km.Recorder.playback_stop()
+        if self._km.Player:
+            self._km.Player.playback_stop()
+        return
 
     def handle_sender_update(self, event_data):
         """
@@ -391,7 +436,9 @@ class MKOBActions():
         """
         self._km.update_sender(event_data)
         self._ksl.handle_update_current_sender(event_data)
-        self._km.Recorder.station_id = event_data
+        if self._km.Recorder:
+            self._km.Recorder.station_id = event_data
+        return
 
     def handle_clear_stations(self, event=None):
         """
@@ -400,7 +447,8 @@ class MKOBActions():
 
         event has no meaningful information
         """
-        self._ksl.handle_clear_station_list(event)
+        self._ksl.handle_clear_station_list(None)
+        return
 
     def handle_reader_clear(self, event=None):
         """
@@ -410,6 +458,7 @@ class MKOBActions():
         event has no meaningful information
         """
         self._krdr.handle_clear()
+        return
 
     def handle_reader_append_text(self, event_data):
         """
@@ -419,6 +468,7 @@ class MKOBActions():
         event_data is the text to append
         """
         self._krdr.handle_append_text(event_data)
+        return
 
     def handle_player_wire_change(self, event_data):
         """
@@ -428,3 +478,4 @@ class MKOBActions():
         event_data contains a string version of the wire number
         """
         self._krdr.handle_append_text("\n\n<<{}>>\n".format(event_data))
+        return

@@ -120,6 +120,7 @@ class Internet:
                     if self._record_callback:
                         self._record_callback(code)
             pass
+        log.debug("Internet-Data-Read thread done.")
         return
 
     def _keep_alive_run(self):
@@ -132,6 +133,7 @@ class Internet:
                 self.sendID()
                 time.sleep(10.0)  # send another keepalive sequence every ten seconds
             pass
+        log.debug("Internet-Keep-Alive thread done.")
         return
 
     def _close_socket(self):
@@ -147,6 +149,7 @@ class Internet:
             if not self._socket:
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self._get_address(renew=True)
+                self.sendID()
             pass
         return
 
@@ -185,8 +188,10 @@ class Internet:
                 self._threadStop.set()
                 self._close_socket()
             finally:
-                self._internetReadThread.join()
-                self._keepAliveThread.join()
+                if self._internetReadThread.is_alive():
+                    self._internetReadThread.join()
+                if self._keepAliveThread.is_alive():
+                    self._keepAliveThread.join()
             pass
         return
 

@@ -379,6 +379,8 @@ class MKOBWindow:
         self._fileMenu.add_command(label="New", command=self._ka.doFileNew)
         self._fileMenu.add_command(label="Open...", command=self._ka.doFileOpen)
         self._fileMenu.add_separator()
+        self._fileMenu.add_command(label="Record", command=self._ka.doFileRecord)
+        self._fileMenu.add_command(label="End Recording", command=self._ka.doFileRecordEnd)
         self._fileMenu.add_command(label="Play...", command=self._ka.doFilePlay)
         self._fileMenu.add_separator()
         self._fileMenu.add_command(
@@ -935,6 +937,8 @@ class MKOBWindow:
         Exit the program by distroying the main window and quiting
         the message loop.
         """
+        if self._km:
+            self._km.exit()
         self._root.destroy()
         self._root.quit()
 

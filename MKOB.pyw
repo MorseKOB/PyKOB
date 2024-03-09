@@ -84,6 +84,8 @@ except Exception as ex:
     print("Error: {}".format(ex))
     sys.exit(1)
 finally:
+    if mkobwin:
+        mkobwin.exit()
     print("~73")
 sys.exit(0)
 
