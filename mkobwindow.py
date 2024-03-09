@@ -683,7 +683,7 @@ class MKOBWindow:
         self._fm_sndr_controls.code_sender_repeat = False
 
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._app_name_version, self._ka, self, cfg)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, cfg)
         self._ka.start(self._km, self._kkb)
 
         # Make sure window size reflects all widgets

@@ -60,7 +60,7 @@ Time 1.3  2019-02-13
 """
 
 def send(code):
-    if wire and time.time() < myInternet.tLastListener + TIMEOUT:
+    if wire and time.time() < myInternet._tLastListener + TIMEOUT:
         myInternet.write(code)
     myKOB.soundCode(code)
 

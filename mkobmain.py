@@ -44,8 +44,9 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 
 
 class MKOBMain:
-    def __init__(self, app_ver, mkactions, mkwindow, cfg: Config) -> None:
+    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config) -> None:
         self.app_ver = app_ver
+        self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
         self._cfg = cfg
@@ -100,7 +101,7 @@ class MKOBMain:
             pckt_callback=self._packet_callback,
             appver=self.app_ver,
             server_url=cfg.server_url,
-            mka=self._ka,
+            msg_receiver=self._critical_msg_handler
         )
         if was_connected:
             self.toggle_connect()
@@ -128,6 +129,10 @@ class MKOBMain:
         self._kob.virtual_closer_is_open = vcloser
         if was_connected:
             self.toggle_connect()
+
+    def _critical_msg_handler(self, msg:str) -> None:
+        log.warn(msg)
+        self._ka.trigger_reader_append_text(msg)
 
     def start(self):
         """
@@ -167,6 +172,10 @@ class MKOBMain:
         return self._connected.is_set()
 
     @property
+    def internet_station_active(self) -> bool:
+        return self._internet_station_active
+
+    @property
     def show_packets(self):
         """
         True if the user requested the received and sent packets be displayed.
@@ -197,6 +206,10 @@ class MKOBMain:
         return self._msender
 
     @property
+    def tkroot(self):
+        return self._tkroot
+
+    @property
     def wpm(self):
         return self._cwpm
 
@@ -221,31 +234,30 @@ class MKOBMain:
             code_source = emit_code_packet[1]
             closer_open = emit_code_packet[2]
             done_callback = emit_code_packet[3]
-            cb_arg = emit_code_packet[4]
 
-            if closer_open:
-                self.update_sender(self._cfg.station)
-                self._mreader.decode(code)
-                self._recorder.record(
-                    code, code_source
-                )  # ZZZ ToDo: option to enable/disable recording
-                if self._connected.is_set() and self._cfg.remote:
-                    self._internet.write(code)
-                if self.key_graph_is_active():
-                    self._key_graph_win.key_code(code)
-            if self._cfg.local and not code_source == kob.CodeSource.key:
-                # Don't call if from key. Local sounder handled in key processing.
-                # Call even if closer closed in order to take the appropriate amount of time.
-                self._kob.soundCode(code, code_source, closer_open)
+            callback_delay = 30
+            if not self._internet_station_active:
+                callback_delay = 1
+                if closer_open:
+                    self.update_sender(self._cfg.station)
+                    self._mreader.decode(code)
+                    self._recorder.record(
+                        code, code_source
+                    )  # ZZZ ToDo: option to enable/disable recording
+                    if self._connected.is_set() and self._cfg.remote:
+                        self._internet.write(code)
+                    if self.key_graph_is_active():
+                        self._key_graph_win.key_code(code)
+                if self._cfg.local and not code_source == kob.CodeSource.key:
+                    # Don't call if from key. Local sounder handled in key processing.
+                    # Call even if closer closed in order to take the appropriate amount of time.
+                    self._kob.soundCode(code, code_source, closer_open)
             if done_callback:
-                if cb_arg:
-                    done_callback(cb_arg)
-                else:
-                    done_callback()
+                self._tkroot.after(callback_delay, done_callback)
+            pass
+        return
 
-    def emit_code(
-        self, code, code_source, closer_open=True, done_callback=None, cb_arg=None
-    ):
+    def emit_code(self, code, code_source, closer_open=True, done_callback=None):
         """
         Emit local code. That involves:
         1. Record code if recording is enabled
@@ -257,8 +269,9 @@ class MKOBMain:
         It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' message,
         or from the keyboard sender.
         """
-        emit_code_packet = [code, code_source, closer_open, done_callback, cb_arg]
+        emit_code_packet = [code, code_source, closer_open, done_callback]
         self._emit_code_queue.put(emit_code_packet)
+        return
 
     def from_key(self, code):
         """
@@ -280,21 +293,21 @@ class MKOBMain:
                 return
         if not self._internet_station_active and self._kob.virtual_closer_is_open:
             self._ka.trigger_emit_key_code(code)
+        return
 
-    def from_keyboard(self, code, finished_callback=None, cb_arg=None):
+    def from_keyboard(self, code, finished_callback=None):
         """
         Handle inputs received from the keyboard sender.
 
-        Called from the 'Keyboard-Send' thread.
+        Called from the Keyboard-Sender.
         """
-        if not self._internet_station_active:
-            self.emit_code(
-                code,
-                kob.CodeSource.keyboard,
-                self._kob.virtual_closer_is_open,
-                finished_callback,
-                cb_arg,
-            )
+        self.emit_code(
+            code,
+            kob.CodeSource.keyboard,
+            self._kob.virtual_closer_is_open,
+            finished_callback
+        )
+        return
 
     def from_internet(self, code):
         """handle inputs received from the internet"""
@@ -308,6 +321,8 @@ class MKOBMain:
                 self._internet_station_active = True
             if self.key_graph_is_active():
                 self._key_graph_win.wire_code(code)
+        else:
+            self._internet_station_active = False
 
     def from_recorder(self, code, source=None):
         """
@@ -446,7 +461,7 @@ class MKOBMain:
         self._sender_ID = ""
         self._mreader.flush()
         if not self._odc_fu:
-            self._odc_fu = self._kw.root_win.after(800, self._on_disconnect_followup)
+            self._odc_fu = self._tkroot.after(800, self._on_disconnect_followup)
 
     def change_wire(self, wire: int):
         """

@@ -47,7 +47,8 @@ class MKOBKeyboard():
         self._enabled = False
         self._repeat = False
         self._last_send_pos = 1.0
-        self._waiting_for_sent_code = False
+        self._waiting_for_sent_code:threading.Event = threading.Event()
+        self._send_guard:threading.Lock = threading.Lock()
 
     @property
     def enabled(self) -> bool:
@@ -78,54 +79,71 @@ class MKOBKeyboard():
         self.original_delete = redirector.register("delete", self.on_delete)
         self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
         self.kw.keyboard_win.mark_gravity(MARK_SEND, "left")
+        self.ka.trigger_keyboard_send()
 
     def handle_clear(self, event_data=None):
         """
         Event handler to clear the Sender (keyboard) window.
         """
         self.kw.keyboard_win.delete('1.0', END)
-
-    def _keyboard_send_complete(self):
-        self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
-        self._last_send_pos = self.kw.keyboard_win.index(MARK_SEND)
-        new_pos = MARK_SEND + '+1c'
-        self.kw.keyboard_win.mark_set(MARK_SEND, new_pos)
-        if self.kw.keyboard_win.compare(MARK_SEND, '<', 'end-1c'):
-            self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
-        self._waiting_for_sent_code = False
         self.ka.trigger_keyboard_send()
 
-    def handle_keyboard_send(self, event_data):
+    def _keyboard_send_complete(self):
+        log.debug("mkkb._keyboard_send_complete", 3)
+        with self._send_guard:
+            self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
+            self._last_send_pos = self.kw.keyboard_win.index(MARK_SEND)
+            new_pos = MARK_SEND + '+1c'
+            self.kw.keyboard_win.mark_set(MARK_SEND, new_pos)
+            if self.kw.keyboard_win.compare(MARK_SEND, '<', 'end-1c'):
+                self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
+            self._waiting_for_sent_code.clear()
+        self.ka.trigger_keyboard_send()
+
+    def handle_keyboard_send(self, event_data=None):
         """
         Process a character out of the keyboard send window.
 
-        This handles an event posted from the keyboard-send thread.
+        This handles an event posted from a character being sent, a character
+        being added, the send position changing, the sender being enabled,
+        or repeat being enabled.
         """
-        log.debug("mkkb.handle_keyboard_send: Enabled:{} Waiting:{}".format(
-            self._enabled, self._waiting_for_sent_code), 4)
-        if self._enabled and not self._waiting_for_sent_code:
-            if self.kw.keyboard_win.compare(MARK_SEND, '==', 'end-1c'):
-                if not self.kw.keyboard_win.compare(MARK_SEND, '==', INSERT):
-                    self.kw.keyboard_win.mark_set(INSERT, MARK_SEND) # Move the cursor to the END
-                if self._repeat and not self.kw.keyboard_win.compare(MARK_SEND, '==', '1.0'):
-                    self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
-                else:
-                    # Remove the Send mark highlight
-                    self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
-            if self.kw.keyboard_win.compare(MARK_SEND, '<', 'end-1c'):
-                self._waiting_for_sent_code = True
-                self.kw.keyboard_win.see(MARK_SEND)
-                self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
-                c = self.kw.keyboard_win.get(MARK_SEND)
-                if c == '~':
-                    self.ka.trigger_circuit_open()
-                    self._keyboard_send_complete()
-                elif c == '+':
-                    self.ka.trigger_circuit_close()
-                    self._keyboard_send_complete()
-                else:
-                    code = self.km.Sender.encode(c)
-                    self.km.from_keyboard(code, self._keyboard_send_complete)
+        if self.km.internet_station_active:
+            self.km.tkroot.after(100, self.handle_keyboard_send)
+            return
+        
+        log.debug("mkkb.handle_keyboard_send: Enabled:{} Waiting on sent:{}".format(
+            self._enabled, self._waiting_for_sent_code.is_set()), 3)
+        c = None
+        with self._send_guard:
+            if self._enabled:
+                if not self._waiting_for_sent_code.is_set():
+                    if self.kw.keyboard_win.compare(MARK_SEND, '==', 'end-1c'):
+                        if not self.kw.keyboard_win.compare(MARK_SEND, '==', INSERT):
+                            self.kw.keyboard_win.mark_set(INSERT, MARK_SEND) # Move the cursor to the END
+                        if self._repeat and not self.kw.keyboard_win.compare(MARK_SEND, '==', '1.0'):
+                            self.kw.keyboard_win.mark_set(MARK_SEND, '1.0')
+                        else:
+                            # Remove the Send mark highlight
+                            self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
+                    if self.kw.keyboard_win.compare(MARK_SEND, '<', 'end-1c'):
+                        self._waiting_for_sent_code.set()
+                        self.kw.keyboard_win.see(MARK_SEND)
+                        self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
+                        c = self.kw.keyboard_win.get(MARK_SEND)
+                    pass
+                pass
+            pass
+        if c == '~':
+            self.ka.trigger_circuit_open()
+            self._keyboard_send_complete()
+        elif c == '+':
+            self.ka.trigger_circuit_close()
+            self._keyboard_send_complete()
+        elif c:
+            code = self.km.Sender.encode(c)
+            self.km.from_keyboard(code, self._keyboard_send_complete)
+        return
 
     def on_delete(self, *args):
         ip = self.kw.keyboard_win.index(INSERT)
@@ -179,7 +197,7 @@ class MKOBKeyboard():
         en = self._enabled
         log.debug("KB mark [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 3)
         if op == 'set' and mark == INSERT and not pos == MARK_SEND:
-            if (en and ((iline < sline) or (iline == sline and ichar < schar))) or (not en):
+            if (not en) or (en and ((iline < sline) or (iline == sline and ichar < schar))):
                 self.kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
                 self.kw.keyboard_win.mark_set(MARK_SEND, ip)
                 self.kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
