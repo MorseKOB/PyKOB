@@ -320,7 +320,6 @@ class PreferencesWindow:
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
 
         ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
-        # print("Setting text speed to", self._cfg.text_speed)
         self._textSpeed = tk.DoubleVar(value=self._cfg.text_speed)
         self._textSpeedControl = \
             ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,

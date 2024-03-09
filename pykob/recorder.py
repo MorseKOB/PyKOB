@@ -73,7 +73,7 @@ def get_timestamp() -> int:
     """
     ts = int(time.time() * 1000)
     return ts
-    
+
 def date_time_from_ts(ts: int) -> str:
     """
     Return a Date-Time string from a timestamp.
@@ -251,16 +251,16 @@ class Recorder:
         A recording must be playing or this method does nothing.
         """
         # ###
-        # This calculates a new file position using the current line number being played 
-        # and using the index to find the position to move forward or backward based on 
+        # This calculates a new file position using the current line number being played
+        # and using the index to find the position to move forward or backward based on
         # the requested change and the timestamps in the index.
         #
-        # The movement will be => than the request based on the timestamps for the lines 
+        # The movement will be => than the request based on the timestamps for the lines
         # in the recording.
         #
-        # This is done using the file-operation lock so the playback can't change while 
-        # the position is being changed. By using the index, this method doesn't take 
-        # long to change the position. Since the playback is going to change anyway, 
+        # This is done using the file-operation lock so the playback can't change while
+        # the position is being changed. By using the index, this method doesn't take
+        # long to change the position. Since the playback is going to change anyway,
         # the pause doesn't really matter.
         # ###
         if seconds == 0:
@@ -283,7 +283,7 @@ class Recorder:
                             if nts >= target_ts or i == indexlen - 1:
                                 # If we move one line and the timestamp is >= target, we are done
                                 new_pos = self._p_fpts_index[i][1] # An index entry is [ts,fpos,station-change]
-                                print(" Move forward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                log.debug(" Move forward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
                                     i, current_lineno, new_pos, current_pos, nts, current_ts))
                                 self._p_line_no = i
                                 self._p_fp.seek(new_pos)
@@ -296,7 +296,7 @@ class Recorder:
                             if nts <= target_ts or i == 0:
                                 # If we move one line and the timestamp is <= target, we are done
                                 new_pos = self._p_fpts_index[i][1] # An index entry is [ts,fpos,station-change]
-                                print(" Move backward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                                log.debug(" Move backward to line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
                                     i, current_lineno, new_pos, current_pos, nts, current_ts))
                                 self._p_line_no = i
                                 self._p_fp.seek(new_pos)
@@ -311,13 +311,13 @@ class Recorder:
         A recording must be playing or this method does nothing.
         """
         # ###
-        # This calculates a new file position using the current line number being played 
-        # and using the index to find the position to move backward to based on 
+        # This calculates a new file position using the current line number being played
+        # and using the index to find the position to move backward to based on
         # the sender/station change flag in the index.
         #
-        # This is done using the file-operation lock so the playback can't change while 
-        # the position is being changed. By using the index, this method doesn't take 
-        # long to change the position. Since the playback is going to change anyway, 
+        # This is done using the file-operation lock so the playback can't change while
+        # the position is being changed. By using the index, this method doesn't take
+        # long to change the position. Since the playback is going to change anyway,
         # the pause doesn't really matter.
         # ###
         with self._p_fileop_lock: # Lock out any other file access first
@@ -336,7 +336,7 @@ class Recorder:
                                 i -= 1
                             new_pos = self._p_fpts_index[i][1]
                             nts = self._p_fpts_index[i][0]
-                            print(" Move back to beginning of sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                            log.debug(" Move back to beginning of sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
                                 i, current_lineno, new_pos, current_pos, nts, current_ts))
                             self._p_line_no = i
                             self._p_fp.seek(new_pos)
@@ -351,13 +351,13 @@ class Recorder:
         A recording must be playing or this method does nothing.
         """
         # ###
-        # This calculates a new file position using the current line number being played 
-        # and using the index to find the position to move forward to based on 
+        # This calculates a new file position using the current line number being played
+        # and using the index to find the position to move forward to based on
         # the sender/station change flag in the index.
         #
-        # This is done using the file-operation lock so the playback can't change while 
-        # the position is being changed. By using the index, this method doesn't take 
-        # long to change the position. Since the playback is going to change anyway, 
+        # This is done using the file-operation lock so the playback can't change while
+        # the position is being changed. By using the index, this method doesn't take
+        # long to change the position. Since the playback is going to change anyway,
         # the pause doesn't really matter.
         # ###
         with self._p_fileop_lock: # Lock out any other file access first
@@ -376,7 +376,7 @@ class Recorder:
                                 i -= 1
                             new_pos = self._p_fpts_index[i][1]
                             nts = self._p_fpts_index[i][0]
-                            print(" Move forward to next sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
+                            log.debug(" Move forward to next sender. Line: {} From: {}  Pos: {} From: {}  Timestamp: {} From: {}".format(\
                                 i, current_lineno, new_pos, current_pos, nts, current_ts))
                             self._p_line_no = i
                             self._p_fp.seek(new_pos)
@@ -394,7 +394,7 @@ class Recorder:
         if self._playback_state == PlaybackState.paused:
             self._playback_state = PlaybackState.playing
             self._playback_resume_flag.set()
-    
+
     def playback_pause(self):
         """
         Pause a currently playing recording.
@@ -463,7 +463,7 @@ class Recorder:
                     station = data['s']
                     ts = data['ts']
                     station = data['s']
-                    # Store the file position and timestamp in the index to use 
+                    # Store the file position and timestamp in the index to use
                     # for seeking to a line based on time or line number
                     self._p_fpts_index.append((ts,fpos,station != previous_station))
                     previous_station = station
@@ -489,7 +489,14 @@ class Recorder:
             self._p_stations_thread.start()
         if self._list_data:
             # Print some values about the recording
-            print(" Lines: {}  Start: {}  End: {}  Duration: {}".format(self._p_lines, date_time_from_ts(self._p_fts), date_time_from_ts(self._p_lts), hms_from_ts(self._p_lts, self._p_fts)))
+            print(
+                " Lines: {}  Start: {}  End: {}  Duration: {}".format(
+                    self._p_lines,
+                    date_time_from_ts(self._p_fts),
+                    date_time_from_ts(self._p_lts),
+                    hms_from_ts(self._p_lts, self._p_fts),
+                )
+            )
 
     def callbackPlay(self):
         """
@@ -600,7 +607,6 @@ class Recorder:
             if self._list_data:
                 print("Playback done.")
 
-
     def callbackPlayStationList(self):
         """
         Called by the station list thread run method to update a station list 
@@ -639,4 +645,3 @@ if __name__ == "__main__":
     # Play the file
     myKOB = kob.KOB(portToUse=None, useAudio=True)
     myRecorder.playback(myKOB)
-

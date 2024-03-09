@@ -162,6 +162,7 @@ class Config:
             config._REMOTE_KEY: self._set_remote,
             config._SERVER_URL_KEY: self._set_server_url,
             config._SOUND_KEY: self._set_sound,
+            config._AUDIO_TYPE_KEY: self._set_audio_type,
             config._SOUNDER_KEY: self._set_sounder,
             config._STATION_KEY: self._set_station,
             config._WIRE_KEY: self._set_wire,
@@ -908,7 +909,10 @@ class Config:
                             if _PYKOB_CFG_VERSION_KEY == key:
                                 muted_cfg._version_loaded = value
                             else:
-                                muted_cfg._key_prop_setters[key](value)
+                                try:
+                                    muted_cfg._key_prop_setters[key](value)
+                                except KeyError as ke:
+                                    log.debug("Property setter for entry not found: {}".format(ke))
                         #
                         muted_cfg._filepath = filepath
             except JSONDecodeError as jde:

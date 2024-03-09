@@ -166,9 +166,12 @@ class KOB:
                 self._gpi = gpio_button(21, pull_up=True)  # GPIO21 is key input.
                 self._gpo = gpio_led(26)  # GPIO26 used to drive sounder.
                 self._hw_interface = HWInterface.gpio
-                print("The GPIO interface is available/active and will be used.")
+                self._gpo.on()  # Energize the sounder
+                self._sounder_energized = True
+                self._t_sounder_energized = time.time()
+                log.info("The GPIO interface is available/active and will be used.")
             except:
-                log.info(
+                log.warn(
                     "Interface for key and/or sounder on GPIO not available. GPIO key and sounder will not function."
                 )
         elif serial_module_available:
@@ -178,9 +181,12 @@ class KOB:
                 # Read the inputs to initialize them
                 self.__read_cts()
                 self.__read_dsr()
+                self._port.rts = True  # Energize the sounder
+                self._sounder_energized = True
+                self._t_sounder_energized = time.time()
                 # Check for loopback - The PyKOB interface loops-back data to identify itself. It uses CTS for the key.
                 self._key_read = self.__read_dsr  # Assume that we will use DSR to read the key
-                print("The serial interface is available/active and will be used.")
+                log.info("The serial interface is available/active and will be used.")
                 self._port.write(b"PyKOB\n")
                 time.sleep(0.5)
                 indata = self._port.readline()
@@ -191,7 +197,7 @@ class KOB:
                     log.info("KOB Serial Interface is 'L/C' type.")
                 self._hw_interface = HWInterface.serial
             except Exception as ex:
-                log.info(
+                log.warn(
                     "Interface for key and/or sounder on serial port '{}' not available. Key and sounder will not function.".format(self._port_to_use)
                 )
                 log.debug(ex)
@@ -204,6 +210,9 @@ class KOB:
                 from pykob import audio
 
                 self._audio = audio.Audio(self._audio_type)
+                if self._audio_type == AudioType.SOUNDER:
+                    self._audio.play(1)  # Energize the synth sounder
+                    self._synthsounder_energized = True
             except ModuleNotFoundError:
                 log.err(
                     "Audio module is not available. The synth sounder or tone cannot be used."
@@ -361,6 +370,12 @@ class KOB:
             self._energize_hw_sounder(open)
         if open:
             self.power_save(False)
+        else:
+            if self._use_audio and self._audio_type == AudioType.TONE:
+                # If the key is being closed and we are using TONE,
+                # silence the tone so it doesn't beep for 3 seconds.
+                self._audio.play(0)
+        pass  #
 
     def _set_virtual_closer_open(self, open: bool):
         """
@@ -370,6 +385,12 @@ class KOB:
         self._virtual_closer_is_open = open
         if open:
             self.power_save(False)
+        else:
+            if self._use_audio and self._audio_type == AudioType.TONE:
+                # If the key is being closed and we are using TONE,
+                # silence the tone so it doesn't beep for 3 seconds.
+                self._audio.play(0)
+        pass
 
     @property
     def recorder(self):
@@ -388,7 +409,7 @@ class KOB:
     def virtual_closer_is_open(self, open):
         self._set_virtual_closer_open(open)
 
-    def energize_sounder(self, energize: bool, from_key: bool = False):
+    def energize_sounder(self, energize: bool, from_key: bool = False, from_disconnect: bool = False):
         """
         Set the state of the sounder.
         True: Energized/Click
@@ -409,6 +430,8 @@ class KOB:
                 self._synthsounder_energized = energize
                 try:
                     if energize:
+                        if from_disconnect and self._audio_type == AudioType.TONE:
+                            return  # Don't sound tone on disconnect
                         self._audio.play(1)  # click
                     else:
                         self._audio.play(0)  # clack
@@ -417,6 +440,8 @@ class KOB:
                     log.err(
                         "System audio error playing sounder state. Disabling synth sounder."
                     )
+            pass
+        pass
 
     def exit(self):
         """

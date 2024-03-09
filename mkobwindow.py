@@ -339,6 +339,8 @@ class MKOBWindow:
         self._root.bind_all("<Key-Escape>", self._ka.handle_toggle_closer)
         self._root.bind_all("<Key-Pause>", self._ka.handle_toggle_code_sender)
         self._root.bind_all("<Key-F1>", self._ka.handle_toggle_code_sender)
+        self._root.bind_all("<Key-F2>", self._ka.doConnect)
+        ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
         self._root.bind_all("<Key-F11>", self._ka.handle_clear_reader_window)
@@ -758,7 +760,7 @@ class MKOBWindow:
     def _handle_morse_change(self, *args):
         if self._after_hmc:
             self._root.after_cancel(self._after_hmc)
-        self._after_hmc = self._root.after(1333, self._handle_morse_change_delayed)
+        self._after_hmc = self._root.after(1200, self._handle_morse_change_delayed)
 
     def _handle_wire_change_delayed(self, *args):
         self._after_hwc = None
@@ -777,7 +779,7 @@ class MKOBWindow:
     def _handle_wire_change(self, *args):
         if self._after_hwc:
             self._root.after_cancel(self._after_hwc)
-        self._after_hwc = self._root.after(1333, self._handle_wire_change_delayed)
+        self._after_hwc = self._root.after(1200, self._handle_wire_change_delayed)
 
     def _handle_text_speed_change_delayed(self, *args):
         self._after_tsc = None
@@ -971,8 +973,11 @@ class MKOBWindow:
         """
         Display help about the app and environment.
         """
-        msg = "{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
+        title = "About MKOB"
+        copy_license = "Copyright (c) 2020-24 PyKOB - MorseKOB in Python\nMIT License"
+        msg = "{}\n{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
             self.app_name_version,
+            copy_license,
             PKVERSION,
             sys.version,
             config.pyaudio_version,
@@ -980,7 +985,7 @@ class MKOBWindow:
             tk.TclVersion,
             tk.TkVersion,
         )
-        tk.messagebox.showinfo(title="About", message=msg)
+        tk.messagebox.showinfo(title=title, message=msg)
 
     def show_shortcuts(self):
         """

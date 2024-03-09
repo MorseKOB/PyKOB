@@ -107,9 +107,8 @@ class MKOBMain:
 
     def _create_kob(self, cfg:Config):
         was_connected = self._connected.is_set()
-        wire = None
         vcloser = False
-        if self._internet and self._internet.connected:
+        if self._internet and was_connected:
             self.disconnect()
         if self._kob:
             vcloser = self._kob.virtual_closer_is_open
@@ -437,9 +436,9 @@ class MKOBMain:
         self._ka.trigger_station_list_clear()
         self._ka.trigger_reader_append_text("\n#####\n")
         if not self._kob.virtual_closer_is_open:
-            self._kob.energize_sounder(
-                True
-            )  # Sounder should be energized when disconnected.
+            # Sounder should be energized when disconnected.
+            self._kob.energize_sounder(False)
+            self._kob.energize_sounder(True, from_disconnect=True)
 
     def _on_disconnect(self):
         # These should be false and blank from the 'disconnect', but make sure.
@@ -447,7 +446,7 @@ class MKOBMain:
         self._sender_ID = ""
         self._mreader.flush()
         if not self._odc_fu:
-            self._odc_fu = self._kw.root_win.after(1400, self._on_disconnect_followup)
+            self._odc_fu = self._kw.root_win.after(800, self._on_disconnect_followup)
 
     def change_wire(self, wire: int):
         """
@@ -579,7 +578,7 @@ class MKOBMain:
         )
         if pf:
             try:
-                print(" Load Config: ", pf)
+                log.debug(" Load Config: {}".format(pf))
                 self._cfg.load_config(pf)
                 self._cfg.clear_dirty()
                 self._update_from_config(self._cfg, config2.ChangeType.ANY)

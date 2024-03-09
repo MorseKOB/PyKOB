@@ -34,6 +34,7 @@ import time
 from pykob import VERSION, config2, log
 from pykob.config2 import Config
 from threading import Event, Thread
+from typing import Any, Callable, Optional
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
 PORT_DEFAULT = 7890
@@ -80,16 +81,15 @@ class Internet:
         self.sentSeqNo = 0
         self.rcvdSeqNo = -1
         self.tLastListener = 0.0
+        self._internetReadThread: Optional[Thread] = None
+        self._keepAliveThread:Optional[Thread] = None
         self.disconnect()  # to establish a UDP connection with the server
-        self.keepAliveThread = Thread(name='Internet-KeepAlive', daemon=True, target=self.keepAlive)
-        self.keepAliveThread.start()
         self._code_callback = code_callback
         self._packet_callback = pckt_callback
         self._record_callback = record_callback
         self.ID_callback = None
         self.sender_callback = None
         self._current_sender = None
-        self.internetReadThread = None
 
     @property
     def packet_callback(self):
@@ -98,6 +98,46 @@ class Internet:
     @packet_callback.setter
     def packet_callback(self, cb):
         self._packet_callback = cb
+
+    def _create_wire_threads(self):
+        if not self.threadStop.is_set():
+            if self._internetReadThread:
+                if self._internetReadThread.is_alive():
+                    pass
+                else:
+                    self._internetReadThread = None
+            if self._keepAliveThread:
+                if self._keepAliveThread.is_alive():
+                    pass
+                else:
+                    self._keepAliveThread = None
+            if not self._internetReadThread:
+                self._internetReadThread = Thread(
+                    name="Internet-DataRead", daemon=True, target=self.callbackRead
+                )
+                self._internetReadThread.start()
+            if not self._keepAliveThread:
+                self._keepAliveThread = Thread(
+                    name="Internet-KeepAlive", daemon=True, target=self.keepAlive
+                )
+                self._keepAliveThread.start()
+            while not (self._internetReadThread.is_alive() and self._keepAliveThread.is_alive()):
+                time.sleep(0.01)
+        pass  #
+
+    def _stop_dataread_thread(self):
+        self.threadStop.set()
+        try:
+            if (self._internetReadThread and self._internetReadThread.is_alive()) or (self._keepAliveThread and self._keepAliveThread.is_alive()):
+                    if self._internetReadThread:
+                        pass
+                    if self._keepAliveThread:
+                        pass
+                    time.sleep(0.01)
+        finally:
+            self._internetReadThread = None
+            self._keepAliveThread = None
+        pass
 
     def _get_address(self, renew=False):
         if not self.ip_address or renew:
@@ -119,12 +159,10 @@ class Internet:
         self.wireNo = wireNo
         if self.connected.is_set():
             self.disconnect()
+        self.threadStop.clear()
         self.connected.set()
         if self._code_callback or self._record_callback:
-            self.internetReadThread = Thread(
-                name="Internet-DataRead", daemon=True, target=self.callbackRead
-            )
-            self.internetReadThread.start()
+            self._create_wire_threads()
         self.sendID()
 
     def disconnect(self, on_disconnect=None):
@@ -135,8 +173,8 @@ class Internet:
         except:
             self._get_address(renew=True)
         finally:
+            self._stop_dataread_thread()
             self.connected.clear()
-            self.internetReadThread = None
             if on_disconnect:
                 on_disconnect()
 

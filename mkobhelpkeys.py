@@ -59,11 +59,12 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree.insert(
             "", tk.END, values=("F1", "Toggle keyboard code sender on/off")
         )
+        self._tree.insert("", tk.END, values=("F2", "Toggle connect/disconnect"))
         self._tree.insert("", tk.END, values=("F4", "Decrease speed"))
         self._tree.insert("", tk.END, values=("F5", "Increase speed"))
         self._tree.insert("", tk.END, values=("F11", "Clear code reader window"))
         self._tree.insert(
-            "", tk.END, values=("F12", "Clear connected offices/stations window")
+            "", tk.END, values=("F12", "Clear keyboard code sender window")
         )
         self._tree.insert("", tk.END, values=("Next (Pg-Down)", "Decrease speed"))
         self._tree.insert("", tk.END, values=("Prior (Pg-Up)", "Increase speed"))

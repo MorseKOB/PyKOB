@@ -204,5 +204,5 @@ class MKOBKeyboard():
             self.kw.keyboard_win.insert(INSERT, f.read())
         if send_at_eof:
             # The sender was at the end
-            print("File inserted with the sender at the end.")
+            log.debug("File inserted with the sender at the end.")
         self.kw.give_keyboard_focus()

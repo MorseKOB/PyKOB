@@ -59,17 +59,17 @@ class MKOBActions():
         self._kw.keyboard_win.delete('1.0', tk.END)
 
     def doFileOpen(self):
-        print("Open a file for sending...")
+        log.debug("Open a file for sending...")
         pf = fd.askopenfilename(title='Text File for Sending', filetypes=[('Text','*.txt'),('Markdown','*.md'),('Any','*.*')])
         if pf:
-            print(" Open: ", pf)
+            log.debug(" Open: {}".format(pf))
             self._kkb.load_file(pf)
 
     def doFilePlay(self):
-        print("Play a file...")
+        log.debug("Play a file...")
         pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
         if pf:
-            print(" Play: ", pf)
+            log.debug(" Play: {}".format(pf))
             self._km.disconnect()
             self._km.StationList.handle_clear_station_list(None) # okay to call directly as we are in a handler
             self._km.Recorder.source_file_path = pf
@@ -132,7 +132,7 @@ class MKOBActions():
 
     def doHelpShortcuts(self):
         self._kw.show_shortcuts()
-        
+
     ####
     #### Action handlers for control events
     ####
@@ -333,7 +333,7 @@ class MKOBActions():
         """
         Move the playback position back 15 seconds.
         """
-        print("Playback - move back 15 seconds...")
+        log.debug("Playback - move back 15 seconds...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
         self._km.Recorder.playback_move_seconds(-15)
@@ -342,7 +342,7 @@ class MKOBActions():
         """
         Move the playback position forward 15 seconds.
         """
-        print("Playback - move forward 15 seconds...")
+        log.debug("Playback - move forward 15 seconds...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
         self._km.Recorder.playback_move_seconds(15)
@@ -351,7 +351,7 @@ class MKOBActions():
         """
         Move the playback position to the start of the current sender.
         """
-        print("Playback - move to sender start...")
+        log.debug("Playback - move to sender start...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
         self._km.Recorder.playback_move_to_sender_begin()
@@ -360,7 +360,7 @@ class MKOBActions():
         """
         Move the playback position to the end of the current sender.
         """
-        print("Playback - move to next sender...")
+        log.debug("Playback - move to next sender...")
         if self._km.Reader:
             self._km.Reader.flush()  # Flush the Reader content before moving.
         self._km.Recorder.playback_move_to_sender_end()
