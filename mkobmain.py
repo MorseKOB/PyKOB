@@ -30,13 +30,15 @@ Handle the flow of Morse code throughout the program.
 import os
 import time
 from datetime import datetime
-from queue import Queue
+from queue import Empty, Queue
+import threading
 from threading import Event, Thread
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
 from typing import Optional
 
 from pykob import config, config2, kob, morse, internet, recorder, log
+from pykob.recorder import PlaybackState, Recorder
 from pykob.config2 import Config, ConfigLoadError
 from mkobkeytimewin import MKOBKeyTimeWin
 
@@ -51,8 +53,11 @@ class MKOBMain:
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
-        self._player: Optional[recorder.Recorder] = None
-        self._recorder: Optional[recorder.Recorder] = None
+        self._player: Optional[Recorder] = None
+        self._player_file_to_play: Optional[str] = None  # Used to hold the file name if we have to wait
+        self._player_fu = None
+        self._player_vco: bool = False
+        self._recorder: Optional[Recorder] = None
         self._cfg = cfg
         self._set_on_cfg:bool = False # Flag to control setting values on our config
         self._mreader = None  # Set by do_morse_change
@@ -77,9 +82,7 @@ class MKOBMain:
         # For emitting code
         self._emit_code_queue = Queue()
         self._threadStop: Event = Event()
-        self._emit_code_thread = Thread(
-            name="MKMain-EmitCode", target=self._emit_code_thread_run
-        )
+        self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
         self._internet = None
         self._kob = None
@@ -93,6 +96,7 @@ class MKOBMain:
                 "IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). "
                 + "To enable/disable this setting use `Configure --iki`."
             )
+        return
 
     def _create_internet(self, cfg:Config):
         was_connected = self._connected.is_set()
@@ -110,6 +114,7 @@ class MKOBMain:
         )
         if was_connected:
             self.toggle_connect()
+        return
 
     def _create_kob(self, cfg:Config):
         was_connected = self._connected.is_set()
@@ -135,9 +140,10 @@ class MKOBMain:
         self._kob.virtual_closer_is_open = vcloser
         if was_connected:
             self.toggle_connect()
+        return
 
     def _create_player(self):
-        self._player = recorder.Recorder(
+        self._player = Recorder(
             None,
             None,
             station_id=self._sender_ID,
@@ -146,7 +152,9 @@ class MKOBMain:
             play_sender_id_callback=self._ka.trigger_update_current_sender,
             play_station_list_callback=self._ka.trigger_update_station_active,
             play_wire_callback=self._ka.trigger_player_wire_change,
+            play_finished_callback=self._on_playback_finished
         )
+        return
 
     def _create_recorder(self):
         ts = recorder.get_timestamp()
@@ -156,7 +164,7 @@ class MKOBMain:
         )
         targetFileName = "Session-" + dateTimeStr + ".json"
         log.info("Recording to '{}'".format(targetFileName))
-        self._recorder = recorder.Recorder(
+        self._recorder = Recorder(
             targetFileName,
             None,
             station_id=self._sender_ID,
@@ -171,13 +179,15 @@ class MKOBMain:
     def _critical_msg_handler(self, msg:str) -> None:
         log.warn(msg)
         self._ka.trigger_reader_append_text(msg)
+        return
 
     def _emit_code_thread_run(self):
         while not self._threadStop.is_set():
             # Read from the emit code queue
-            emit_code_packet = (
-                self._emit_code_queue.get()
-            )  # Blocks until a packet is available
+            try:
+                emit_code_packet = self._emit_code_queue.get(True, 0.1)  # Blocks until packet available or 100ms (to check stop)
+            except Empty as ex:
+                continue  # Allow check of threadStop
             #
             code = emit_code_packet[0]
             code_source = emit_code_packet[1]
@@ -203,7 +213,7 @@ class MKOBMain:
             if done_callback:
                 self._tkroot.after(callback_delay, done_callback)
             pass
-        log.debug("Internet-Data-Read thread done.")
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def start(self):
@@ -254,13 +264,14 @@ class MKOBMain:
         Set whether to display the received and sent packets.
         """
         self._show_packets = b
+        return
 
     @property
     def Internet(self):
         return self._internet
 
     @property
-    def Player(self) -> Optional[recorder.Recorder]:
+    def Player(self) -> Optional[Recorder]:
         return self._player
 
     @property
@@ -268,7 +279,7 @@ class MKOBMain:
         return self._mreader
 
     @property
-    def Recorder(self) -> Optional[recorder.Recorder]:
+    def Recorder(self) -> Optional[Recorder]:
         return self._recorder
 
     @property
@@ -310,6 +321,7 @@ class MKOBMain:
         twpm = self._kw.twpm
         spacing = self._kw.spacing
         self.set_morse(code_type, cwpm, twpm, spacing)
+        return
 
     def emit_code(self, code, code_source, closer_open=True, done_callback=None):
         """
@@ -378,6 +390,7 @@ class MKOBMain:
                 self._key_graph_win.wire_code(code)
         else:
             self._internet_station_active = False
+        return
 
     def from_recorder(self, code, source=None):
         """
@@ -389,6 +402,7 @@ class MKOBMain:
         self._mreader.decode(code)
         if self.key_graph_is_active():
             self._key_graph_win.key_code(code)
+        return
 
     def set_virtual_closer_closed(self, closed):
         """
@@ -426,6 +440,7 @@ class MKOBMain:
                 self._key_graph_win.key_closed()
             else:
                 self._key_graph_win.key_opened()
+        return
 
     def set_morse(self, code_type:config.CodeType, cwpm:int, twpm:int, spacing:config.Spacing):
         if cwpm < 5:
@@ -465,6 +480,7 @@ class MKOBMain:
             self._kw.cwpm = cwpm
             self._kw.twpm = twpm
             self._kw.spacing = self._cfg.spacing
+        return
 
     def disconnect(self):
         """
@@ -472,6 +488,7 @@ class MKOBMain:
         """
         if self._connected.is_set():
             self.toggle_connect()
+        return
 
     def toggle_connect(self):
         """
@@ -497,6 +514,7 @@ class MKOBMain:
             self._internet.monitor_IDs(None)  # don't monitor stations
             self._internet.monitor_sender(None)  # don't monitor current sender
             self._internet.disconnect(self._on_disconnect)
+        return
 
     def _on_disconnect_followup(self, *args):
         log.debug("mkmain._on_disconnect_followup", 3)
@@ -508,6 +526,7 @@ class MKOBMain:
         if not self._kob.virtual_closer_is_open:
             # Sounder should be energized when disconnected.
             self._kob.energize_sounder(True, kob.CodeSource.local, from_disconnect=True)
+        return
 
     def _on_disconnect(self):
         # These should be false and blank from the 'disconnect', but make sure.
@@ -516,6 +535,19 @@ class MKOBMain:
         self._mreader.flush()
         if not self._odc_fu:
             self._odc_fu = self._tkroot.after(950, self._on_disconnect_followup)
+        return
+
+    def _op_playback_finished_fu(self):
+        if self._player:  # Should be True, but just in case...
+            file_path = self._player.source_file_path
+            dirpath, filename = os.path.split(file_path)
+            self._ka.handle_reader_append_text("\n\n[Done playing: {}]\n".format(filename))
+            self._kob.virtual_closer_is_open = self._player_vco
+
+    def _on_playback_finished(self):
+        # Called from the Player when playback is finished.
+        self._player_fu = self._tkroot.after(950, self._op_playback_finished_fu)
+        return
 
     # callback functions
 
@@ -525,6 +557,7 @@ class MKOBMain:
         """
         if self.show_packets:
             self._ka.trigger_reader_append_text(pckt_text)
+        return
 
     def _reader_callback(self, char, spacing):
         """display characters returned from the decoder"""
@@ -563,6 +596,7 @@ class MKOBMain:
             self._lastCharWasParagraph = False
         txt += char
         self._ka.trigger_reader_append_text(txt)
+        return
 
     def key_graph_is_active(self):
         """
@@ -601,6 +635,7 @@ class MKOBMain:
                 self._kob.use_sounder = cfg.sounder
         finally:
             self._set_on_cfg = True
+        return
 
     def preferences_closed(self, prefsDialog):
         """
@@ -616,6 +651,7 @@ class MKOBMain:
                 if prefsDialog.save_pressed:
                     self.preferences_save()
             self._kw.set_app_title()
+        return
 
     def preferences_load(self):
         """
@@ -637,8 +673,10 @@ class MKOBMain:
                 self._cfg.load_config(pf)
                 self._update_from_config(self._cfg, config2.ChangeType.ANY)
                 self._cfg.clear_dirty()
+                self._kw.set_app_title()
             except ConfigLoadError as err:
                 log.warn("Unable to load configuration: {}  Error: {}".format(pf, err))
+        return
 
     def preferences_opening(self) -> Config:
         """
@@ -661,6 +699,7 @@ class MKOBMain:
             self.preferences_save_as()
         else:
             self._cfg.save_config()
+        return
 
     def preferences_save_as(self):
         dir = self._cfg.get_directory()
@@ -677,6 +716,7 @@ class MKOBMain:
         if pf:
             self._cfg.set_using_global(False)
             self._cfg.save_config(pf)
+        return
 
     def record_end(self):
         return
@@ -701,23 +741,44 @@ class MKOBMain:
         mb.showinfo(title=self.app_ver, message=msg)
         return
 
-    def recording_play(self, file_path:str):
-        log.debug(" Play: {}".format(file_path))
-        if not self._player:
-            self._create_player()
+    def _recording_play_followup(self):
+        # Open the virtual closer to sound code
+        self._player_vco = self._kob.virtual_closer_is_open
+        self._kob.virtual_closer_is_open = True
+        self._player.playback_start(list_data=False, max_silence=5)  # Limit the silence to 5 seconds
+        return
+
+    def _recording_play_wait_stop(self):
+        if self._player and not self._player.playback_state == PlaybackState.idle:
+            self._player_fu = self._tkroot.after(500, self._recording_play_wait_stop)
+            return
+        else:
+            self._player = None
+        self._create_player()
         self.disconnect()
         self._ka.handle_clear_stations() # okay to call directly as we are in a handler
         self._ka.handle_clear_reader_window()
         self._sender_ID = None
-        dirpath, filename = os.path.split(file_path)
-        self._ka.handle_reader_append_text("[{}]\n".format(filename))
-        self._player.source_file_path = file_path
-        self._player.playback_start(list_data=False, max_silence=5)
+        dirpath, filename = os.path.split(self._player_file_to_play)
+        self._ka.handle_reader_append_text("[Playing: {}]\n".format(filename))
+        self._player.source_file_path = self._player_file_to_play
+        self._player_fu = self._tkroot.after(1500, self._recording_play_followup)
+        return
+
+    def recording_play(self, file_path:str):
+        log.debug(" Play: {}".format(file_path))
+        self._player_file_to_play = file_path
+        if self._player and not self._player.playback_state == PlaybackState.idle:
+            self._player.playback_stop()
+            self._player_fu = self._tkroot.after(1500, self._recording_play_wait_stop)
+        else:
+            self._recording_play_wait_stop()
         return
 
     def reset_wire_state(self):
         """regain control of the wire"""
         self._internet_station_active = False
+        return
 
     def show_key_graph(self):
         """
@@ -726,6 +787,7 @@ class MKOBMain:
         if not (self._key_graph_win and MKOBKeyTimeWin.active):
             self._key_graph_win = MKOBKeyTimeWin(self._cwpm)
         self._key_graph_win.focus()
+        return
 
     def update_sender(self, id):
         """display station ID in reader window when there's a new sender"""
@@ -736,3 +798,4 @@ class MKOBMain:
         ##        Reader = morse.Reader(
         ##                wpm=self._cfg.text_speed, codeType=self._cfg.code_type,
         ##                callback=readerCallback)  # reset to nominal code speed
+        return

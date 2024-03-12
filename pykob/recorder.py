@@ -606,20 +606,26 @@ class Recorder:
                 self._p_fp = None
             if self._list_data:
                 print("Playback done.")
+            log.debug("{} thread done.".format(threading.current_thread().name))
+        return
 
     def callbackPlayStationList(self):
         """
         Called by the station list thread run method to update a station list 
         via the registered callback. The station list is refreshed every 5 seconds.
         """
-        if not self._play_station_list_callback:
-            return
-        while True:
-            for stn in self._p_stations:
-                self._play_station_list_callback(stn)
-            stop = self._playback_stop_flag.wait(5.0) # Wait until 'stop' flag is set or 5 seconds
-            if stop:
-                return # Stop signalled - return from run method
+        try:
+            if not self._play_station_list_callback:
+                return
+            while True:
+                for stn in self._p_stations:
+                    self._play_station_list_callback(stn)
+                stop = self._playback_stop_flag.wait(5.0) # Wait until 'stop' flag is set or 5 seconds
+                if stop:
+                    return # Stop signalled - return from run method
+        finally:
+            log.debug("{} thread done.".format(threading.current_thread().name))
+        return
 
 """
 Test code

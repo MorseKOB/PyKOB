@@ -33,6 +33,7 @@ import struct
 import time
 from pykob import VERSION, config2, log
 from pykob.config2 import Config
+import threading
 from threading import Event, Lock, Thread
 from typing import Any, Callable, Optional
 
@@ -120,7 +121,7 @@ class Internet:
                     if self._record_callback:
                         self._record_callback(code)
             pass
-        log.debug("Internet-Data-Read thread done.")
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def _keep_alive_run(self):
@@ -133,7 +134,7 @@ class Internet:
                 self.sendID()
                 time.sleep(10.0)  # send another keepalive sequence every ten seconds
             pass
-        log.debug("Internet-Keep-Alive thread done.")
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def _close_socket(self):

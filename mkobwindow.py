@@ -305,6 +305,7 @@ class MKOBWindow:
         self._app_name_version = mkob_version_text
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
+        self._root.protocol("WM_DELETE_WINDOW", self._on_app_distroy)  # Handle user clicking [X]
         self.window = ttk.Frame(root)
 
         # Operational values (from config)
@@ -800,6 +801,14 @@ class MKOBWindow:
             self._root.after_cancel(self._after_tsc)
         self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
 
+    def _on_app_distroy(self) -> None:
+        """
+        Called when TK generates the WM_DELETE_WINDOW event due to user clicking 'X' on main window.
+        """
+        log.debug("MKOBWindow._on_app_distroy triggered.")
+        self.exit()
+        return
+
     @property
     def code_sender_enabled(self):
         """
@@ -932,15 +941,18 @@ class MKOBWindow:
         log.debug("=>Event generate: {}".format(event), 4)
         return self._root.event_generate(event, when=when, data=data)
 
-    def exit(self):
+    def exit(self, distroy_app:bool = True):
         """
         Exit the program by distroying the main window and quiting
         the message loop.
         """
         if self._km:
             self._km.exit()
-        self._root.destroy()
+            self._km = None
+        if distroy_app:
+            self._root.destroy()
         self._root.quit()
+        return
 
     def give_keyboard_focus(self):
         """

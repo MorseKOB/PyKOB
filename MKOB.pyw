@@ -43,6 +43,7 @@ print(" Python: " + sys.version + " on " + sys.platform)
 print(" pykob: " + PKVERSION)
 print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
+distroy_on_exit = True
 try:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
         parents= [
@@ -76,7 +77,7 @@ try:
 
     root.after(400, mkobwin.set_minimum_sizes)
     root.mainloop()
-
+    distroy_on_exit = False  # App is already distroyed at this point
 except KeyboardInterrupt:
     print()
     sys.exit(0)
@@ -85,7 +86,7 @@ except Exception as ex:
     sys.exit(1)
 finally:
     if mkobwin:
-        mkobwin.exit()
+        mkobwin.exit(distroy_on_exit)
     print("~73")
 sys.exit(0)
 

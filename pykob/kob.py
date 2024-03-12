@@ -40,6 +40,7 @@ import time
 from enum import Enum, IntEnum, unique
 from pykob import config, log
 from pykob.config import AudioType, InterfaceType
+import threading
 from threading import Event, RLock, Thread
 from typing import Any, Callable, Optional
 
@@ -277,14 +278,10 @@ class KOB:
             self._threadsStop.clear()
             if self._key_callback:
                 if not self._keyread_thread:
-                    self._keyread_thread = Thread(
-                        name="KOB-KeyRead", target=self.__thread_keyread_run
-                    )
+                    self._keyread_thread = Thread(name="KOB-KeyRead", target=self.__thread_keyread_run)
                     self._keyread_thread.start()
             if not self._powersave_thread:
-                self._powersave_thread = Thread(
-                    name="KOB-PowerSave", target=self.__thread_powersave_run
-                )
+                self._powersave_thread = Thread(name="KOB-PowerSave", target=self.__thread_powersave_run)
                 self._powersave_thread.start()
         return
 
@@ -309,9 +306,9 @@ class KOB:
                     self._set_key_closer_open(False)
                 elif code[-1] == 2: # special code for closer/circuit open
                     self._set_key_closer_open(True)
-                if self._key_callback:
+                if self._key_callback and not self._threadsStop.is_set():
                     self._key_callback(code)
-        log.debug("KOB-KeyRead thread done.")
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def __thread_powersave_run(self):
@@ -328,7 +325,7 @@ class KOB:
                 ):
                     self.power_save(True)
             time.sleep(0.5)
-        log.debug("KOB-PowerSave thread done.")
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def _energize_hw_sounder(self, energize: bool):
