@@ -307,8 +307,9 @@ class MKOBActions():
         It is converted to a list of integer values to emit.
         """
         data = event_data.strip(')(')
+        data = data.rstrip(',')
         if (data and (not data.isspace())):
-            code = tuple(map(int, data.split(', ')))
+            code = tuple(map(int, data.split(',')))
             self._km.emit_code(code, code_source)
         return
 

@@ -360,7 +360,8 @@ class Reader:
         self._flusher = None
         if f:
             f.cancel()
-            f.join(0.38)
+            if f.is_alive():
+                f.join(0.40)
             pass
         if self._mark > 0 or self._latched:
             spacing = self._spaceBuf[self._nChars]

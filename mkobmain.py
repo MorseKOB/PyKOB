@@ -129,6 +129,7 @@ class MKOBMain:
             invertKeyInput=cfg.invert_key_input,
             soundLocal=cfg.local,
             sounderPowerSaveSecs=cfg.sounder_power_save,
+            virtual_closer_in_use=True,
             keyCallback=self.from_key
         )
         self._kob.virtual_closer_is_open = vcloser
@@ -407,10 +408,8 @@ class MKOBMain:
         if not self._internet_station_active:
             if self._cfg.local:
                 if not closed:
-                    self._ka.handle_sender_update(
-                        self._cfg.station
-                    )  # Can call 'handle_' as this is run on the UI thread
-                self._kob.energize_sounder(closed)
+                    self._ka.handle_sender_update(self._cfg.station)  # Can call 'handle_' as this is run on the UI thread
+                self._kob.virtual_closer_is_open = not closed
                 self._mreader.decode(code)
             if self._recorder:
                 self._recorder.record(code, kob.CodeSource.local)
@@ -500,6 +499,7 @@ class MKOBMain:
             self._internet.disconnect(self._on_disconnect)
 
     def _on_disconnect_followup(self, *args):
+        log.debug("mkmain._on_disconnect_followup", 3)
         self._odc_fu = None
         self._mreader.decode(LATCH_CODE, use_flusher=False)
         self._mreader.flush()
@@ -507,8 +507,7 @@ class MKOBMain:
         self._ka.trigger_reader_append_text("\n#####\n")
         if not self._kob.virtual_closer_is_open:
             # Sounder should be energized when disconnected.
-            self._kob.energize_sounder(False)
-            self._kob.energize_sounder(True, from_disconnect=True)
+            self._kob.energize_sounder(True, kob.CodeSource.local, from_disconnect=True)
 
     def _on_disconnect(self):
         # These should be false and blank from the 'disconnect', but make sure.
@@ -516,7 +515,7 @@ class MKOBMain:
         self._sender_ID = ""
         self._mreader.flush()
         if not self._odc_fu:
-            self._odc_fu = self._tkroot.after(800, self._on_disconnect_followup)
+            self._odc_fu = self._tkroot.after(950, self._on_disconnect_followup)
 
     # callback functions
 
@@ -574,12 +573,7 @@ class MKOBMain:
     def _update_from_config(self, cfg:Config, ct:config2.ChangeType):
         try:
             self._set_on_cfg = False
-            new_kob_created = False
             log.set_debug_level(cfg.debug_level)
-            if ct & config2.ChangeType.HARDWARE:
-                # If the hardware changed, we need a new KOB instance.
-                self._create_kob(cfg)
-                new_kob_created = True
             if ct & config2.ChangeType.MORSE:
                 self._kw.spacing = cfg.spacing
                 self._kw.twpm = cfg.text_speed
@@ -594,11 +588,17 @@ class MKOBMain:
             if ct & config2.ChangeType.OPERATIONS:
                 self._kw.office_id = cfg.station
                 self._kw.wire_number = cfg.wire
-                if cfg.local_changed and not new_kob_created:
-                    self._create_kob(cfg)
                 if cfg.server_url_changed:
                     self._create_internet(cfg)
-            self._kw.set_app_title()
+            # Update KOB
+            self._kob.sound_local = cfg.local
+            self._kob.sounder_power_save_secs = cfg.sounder_power_save
+            if cfg.sound_changed or cfg.audio_type_changed:
+                self._kob.change_audio(cfg.sound, cfg.audio_type)
+            if cfg.interface_type_changed or cfg.serial_port_changed or cfg.gpio_changed:
+                self._kob.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder)
+            elif cfg.sounder_changed:
+                self._kob.use_sounder = cfg.sounder
         finally:
             self._set_on_cfg = True
 
@@ -615,7 +615,7 @@ class MKOBMain:
                 self._update_from_config(cfg_from_prefs, ct)
                 if prefsDialog.save_pressed:
                     self.preferences_save()
-                self._set_on_cfg = True
+            self._kw.set_app_title()
 
     def preferences_load(self):
         """

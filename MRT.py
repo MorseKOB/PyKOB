@@ -169,6 +169,7 @@ class Mrt:
             invertKeyInput=cfg.invert_key_input,
             soundLocal=cfg.local,
             sounderPowerSaveSecs=cfg.sounder_power_save,
+            virtual_closer_in_use=True,
             keyCallback=self._from_key
             )
         self._internet = internet.Internet(
@@ -268,7 +269,7 @@ class Mrt:
         False: Circuit Closer (physical and virtual) CLOSED
         """
         self._local_loop_active = active
-        self._kob.energize_sounder((not active))
+        self._kob.energize_sounder((not active), kob.CodeSource.local)
 
     def _set_virtual_closer_closed(self, closed):
         """

@@ -175,6 +175,7 @@ class Config:
         #
         # Listeners is a dictionary of Callable(int) keys and int (ChangeType...) values.
         self._change_listeners: dict[Callable[[int],None],int] = {}  # Start out empty
+        return
 
     def _notify_listeners(self):
         """
@@ -198,6 +199,7 @@ class Config:
                     # Call the listener with the change types
                     listener(ct)
         self.clear_pending_notifications()
+        return
 
     def _changed_hw(self):
         """
@@ -205,6 +207,7 @@ class Config:
         """
         self._hw_chng = True
         self._notify_listeners()
+        return
 
     def _changed_morse(self):
         """
@@ -212,6 +215,7 @@ class Config:
         """
         self._morse_chng = True
         self._notify_listeners()
+        return
 
     def _changed_ops(self):
         """
@@ -219,6 +223,7 @@ class Config:
         """
         self._ops_chng = True
         self._notify_listeners()
+        return
 
     # ########################################################################
     # Config (internal) Settings
@@ -246,10 +251,12 @@ class Config:
         self._audio_type = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_audio_type(self, v: str) -> None:
         o = config.audio_type_from_str(v)
         self.audio_type = o
+        return
 
     @property
     def audio_type_p(self) -> AudioType:
@@ -268,8 +275,10 @@ class Config:
         self._gpio = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_gpio(self, v: bool) -> None:
         self.gpio = v
+        return
 
     @property
     def gpio_p(self) -> bool:
@@ -287,9 +296,11 @@ class Config:
         self._interface_type = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_interface_type(self, v: str) -> None:
         o = config.interface_type_from_str(v)
         self.interface_type = o
+        return
 
     @property
     def interface_type_p(self) -> InterfaceType:
@@ -309,9 +320,11 @@ class Config:
         self._invert_key_input = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_invert_key_input(self, v: bool) -> None:
         self.invert_key_input = v
+        return
 
     @property
     def invert_key_input_p(self) -> bool:
@@ -330,8 +343,10 @@ class Config:
         self._serial_port = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_serial_port(self, v: str) -> None:
         self.serial_port = v
+        return
 
     @property
     def serial_port_p(self) -> str:
@@ -351,9 +366,11 @@ class Config:
         self._sound = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_sound(self, v: bool) -> None:
         self.sound = v
+        return
 
     @property
     def sound_p(self) -> bool:
@@ -373,9 +390,11 @@ class Config:
         self._sounder = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_sounder(self, v: bool) -> None:
         self.sounder = v
+        return
 
     @property
     def sounder_p(self) -> bool:
@@ -394,8 +413,10 @@ class Config:
         self._sounder_power_save = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_sounder_power_save(self, v: int) -> None:
         self.sounder_power_save = v
+        return
 
     @property
     def sounder_power_save_p(self) -> int:
@@ -418,9 +439,11 @@ class Config:
         self._code_type = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_code_type(self, v: str) -> None:
         o = config.code_type_from_str(v)
         self.code_type = o
+        return
 
     @property
     def code_type_p(self) -> CodeType:
@@ -439,8 +462,10 @@ class Config:
         self._min_char_speed = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_min_char_speed(self, v: int) -> None:
         self.min_char_speed = v
+        return
 
     @property
     def min_char_speed_p(self) -> int:
@@ -459,9 +484,11 @@ class Config:
         self._spacing = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_spacing(self, v: Spacing) -> None:
         o = config.spacing_from_str(v)
         self.spacing = o
+        return
 
     @property
     def spacing_p(self) -> Spacing:
@@ -480,8 +507,10 @@ class Config:
         self._text_speed = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_text_speed(self, v: CodeType) -> None:
         self.text_speed = v
+        return
 
     @property
     def text_speed_p(self) -> CodeType:
@@ -504,8 +533,10 @@ class Config:
         self._auto_connect = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_auto_connect(self, v: bool) -> None:
         self.auto_connect = v
+        return
 
     @property
     def auto_connect_p(self) -> bool:
@@ -526,9 +557,11 @@ class Config:
         if not v == x:
             log.set_debug_level(v)
             self._changed_ops()
+        return
 
     def _set_debug_level(self, v: int) -> None:
         self.debug_level = v
+        return
 
     @property
     def debug_level_p(self) -> int:
@@ -547,8 +580,10 @@ class Config:
         self._local = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_local(self, v: bool) -> None:
         self.local = v
+        return
 
     @property
     def local_p(self) -> bool:
@@ -567,8 +602,10 @@ class Config:
         self._remote = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_remote(self, v: bool) -> None:
         self.remote = v
+        return
 
     @property
     def remote_p(self) -> bool:
@@ -587,8 +624,10 @@ class Config:
         self._server_url = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_server_url(self, v: Optional[str]) -> None:
         self.server_url = v
+        return
 
     @property
     def server_url_p(self) -> Optional[str]:
@@ -607,8 +646,10 @@ class Config:
         self._station = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_station(self, v: str) -> None:
         self.station = v
+        return
 
     @property
     def station_p(self) -> str:
@@ -627,8 +668,10 @@ class Config:
         self._wire = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_wire(self, v: int) -> None:
         self.wire = v
+        return
 
     @property
     def wire_p(self) -> int:
@@ -648,6 +691,7 @@ class Config:
         self._morse_chng = False
         self._ops_chng = False
         self._saved_chng = False
+        return
 
     def clear_dirty(self):
         """
@@ -682,6 +726,7 @@ class Config:
         self._p_wire = self._wire
         # The override
         self._dirty = False
+        return
 
     def copy(self):
         cfg = Config()
@@ -716,12 +761,15 @@ class Config:
             muted_cfg.server_url = cfg_src._server_url
             muted_cfg.station = cfg_src._station
             muted_cfg.wire = cfg_src._wire
+        return
 
     def get_changes_types(self) -> int:
         """
         Get the combined types of all changes.
         """
         ct = 0
+        if self.audio_type_changed:
+            ct = ct | ChangeType.HARDWARE
         if self.gpio_changed:
             ct = ct | ChangeType.HARDWARE
         if self.serial_port_changed:
@@ -920,6 +968,7 @@ class Config:
                 raise ConfigLoadError(jde)
             except Exception as ex:
                 log.debug(ex)
+        return
 
     def load_from_global(self) -> None:
         """
@@ -953,6 +1002,7 @@ class Config:
         except Exception as ex:
             log.debug(ex)
             raise
+        return
 
     def load_to_global(self) -> None:
         """
@@ -983,6 +1033,7 @@ class Config:
             config.set_text_speed_int(self._text_speed)
         except Exception as ex:
             log.debug(ex)
+        return
 
     def notification_pauser(self) -> 'Config':
         """
@@ -1021,6 +1072,7 @@ class Config:
         print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
         print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
         print("Debug level: {}".format(self._debug_level), file=f)
+        return
 
     def register_listener(self, listener:Callable[[int],None], change_types: int) -> None:
         """
@@ -1039,10 +1091,12 @@ class Config:
             ct = self._change_listeners[listener]
         ct = ct | change_types  # Merge in the requested types
         self._change_listeners[listener] = ct
+        return
 
     def remove_listener(self, listener:Callable[[int],None]) -> None:
         if listener in self._change_listeners:
             del self._change_listeners[listener]
+        return
 
     def restore_config(self, clear_dirty:bool=True):
         # Hardware Settings
@@ -1070,6 +1124,7 @@ class Config:
         # The override
         if clear_dirty:
             self._dirty = False
+        return
 
     def save_config(self, filepath:Optional[str]=None):
         """
@@ -1102,6 +1157,7 @@ class Config:
             self._notify_listeners()
         except Exception as ex:
             log.debug(ex)
+        return
 
     def save_global(self) -> None:
         """
@@ -1109,6 +1165,7 @@ class Config:
         """
         self.load_to_global()
         config.save_config()
+        return
 
     def set_dirty(self):
         """
@@ -1120,16 +1177,19 @@ class Config:
         not dirty.
         """
         self._dirty = True
+        return
 
     def set_filepath(self, filepath:str):
         self._filepath = filepath
         if filepath:
             self._using_global = False
+        return
 
     def set_using_global(self, global_):
         self._using_global = global_
         if self._using_global:
             self._filepath = None
+        return
 
     def using_global(self) -> bool:
         return self._using_global
