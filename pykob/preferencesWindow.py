@@ -1,7 +1,7 @@
 # ============================================
 # Imports
 # ============================================
-from distutils.util import strtobool
+from pykob.util import strtobool
 import re  # RegEx
 from typing import Any, Callable, Optional
 

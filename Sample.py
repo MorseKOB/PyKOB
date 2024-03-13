@@ -41,7 +41,7 @@ import argparse
 import sys
 import time
 from pykob import config, kob, morse, log
-from distutils.util import strtobool
+from pykob.util import strtobool
 
 __description = "Sample to test/demonstrate some of the Morse PyKOB functionality and your external sounder, if connected."
 __short_QBF = "The quick brown fox"

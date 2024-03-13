@@ -41,7 +41,7 @@ from pykob.kob import CodeSource
 
 import argparse
 import codecs
-from distutils.util import strtobool
+from pykob.util import strtobool
 import sys
 from time import sleep
 

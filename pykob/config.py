@@ -49,7 +49,7 @@ import platform
 import pykob
 import socket
 import sys
-from distutils.util import strtobool
+from pykob.util import strtobool
 from enum import IntEnum, unique
 from pykob import log
 

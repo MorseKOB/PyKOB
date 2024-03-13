@@ -32,7 +32,7 @@ import sys
 import threading
 import time
 from pykob import config, kob, morse, log, recorder
-from distutils.util import strtobool
+from pykob.util import strtobool
 
 myKOB = None
 playback_finished = threading.Event()
