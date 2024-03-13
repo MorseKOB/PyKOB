@@ -396,6 +396,12 @@ class MKOBWindow:
         self._fileMenu.add_command(
             label="Save As...", command=self._ka.doFilePrefsSaveAs
         )
+        self._fileMenu.add_command(
+            label="Load Global", command=self._ka.doFilePrefsLoadGlobal
+        )
+        self._fileMenu.add_command(
+            label="Save Global", command=self._ka.doFilePrefsSaveGlobal
+        )
         self._fileMenu.add_separator()
         self._fileMenu.add_command(label="Exit", command=self._ka.doFileExit)
 
@@ -964,7 +970,10 @@ class MKOBWindow:
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
         # If our config has a filename, display it as part of our title
         name = self._cfg.get_name()
-        n = " - " + name if name and not name == "" else ""
+        if not self._cfg.using_global():
+            n = " - " + name
+        else:
+            n = " - Global"
         self._root.title(self._app_name_version + n + cfg_modified_attrib)
 
     def set_minimum_sizes(self):

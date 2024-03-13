@@ -78,6 +78,8 @@ def main(argv):
     #
     cfg:Config = Config()
     cfg.load_from_global()
+    cfg.set_using_global(True)
+    cfg.clear_dirty()
     original_cfg:Config = cfg.copy()
     try:
         arg_parser = argparse.ArgumentParser(prog="Configure",
@@ -103,7 +105,8 @@ def main(argv):
                     config2.code_type_override,
                     config2.min_char_speed_override,
                     config2.text_speed_override,
-                    config2.spacing_override
+                    config2.spacing_override,
+                    config2.debug_level_override
                 ])
         arg_parser.add_argument('--gload', dest="global_load", action='store_true',
                 help="Load configuration from the global store. " +
@@ -124,7 +127,11 @@ def main(argv):
                 help="PyKOB configuration file to save to. " +
                 "If specified, the configuration will be saved to this file rather than 'config-file'.")
 
-        args = arg_parser.parse_args()
+        try:
+            args = arg_parser.parse_args()
+        except Exception as ex:
+            print("Error parsing arguments: {}".format(ex), file=sys.stderr)
+            sys.exit(2)
 
         load_from_global = False
         save_to_global = False
@@ -156,22 +163,15 @@ def main(argv):
                 # That's okay if they want to create a new configuration, but
                 # if a 'save to' file was specified, it's an error.
                 if save_to_filepath:
-                    raise Exception("Configuration file specified does not exist: {}".format(file_path))
-                # Load the global config values to start with.
-                cfg.load_from_global()
+                    print("The source configuration file specified does not exist. File: '{}'".format(file_path), file=sys.stderr)
+                    sys.exit(1)
+                cfg.set_dirty()  # Mark as dirty so the file will be saved/created even if no changes are made.
         else:
             # They did not specify a config file, so they want to work with the global config
-            load_from_global = True
             save_to_global = True
 
-        if load_from_global:
-            cfg.load_from_global()
-            cfg.set_using_global(True)
-
-        if save_to_global:
-            cfg.set_dirty()  # Mark as dirty to assure it gets saved
-            if save_only_to_global:
-                cfg.set_filepath(None)  # Clear the filepath so is doesn't save there
+        if save_only_to_global:
+            cfg.set_filepath(None)  # Clear the filepath so is doesn't save there
 
         # Keep the original config at this point
         original_cfg.copy_from(cfg)

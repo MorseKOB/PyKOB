@@ -113,12 +113,20 @@ class MKOBActions():
         self._km.preferences_load()
         return
 
+    def doFilePrefsLoadGlobal(self):
+        self._km.preferences_load_global()
+        return
+
     def doFilePrefsSave(self):
         self._km.preferences_save()
         return
 
     def doFilePrefsSaveAs(self):
         self._km.preferences_save_as()
+        return
+
+    def doFilePrefsSaveGlobal(self):
+        self._km.preferences_save_global()
         return
 
     def doFileExit(self):

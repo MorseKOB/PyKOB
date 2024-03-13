@@ -276,6 +276,7 @@ class KOB:
         """
         if self._hw_is_available():
             self._threadsStop.clear()
+            self.power_save(False)
             if self._key_callback:
                 if not self._keyread_thread:
                     self._keyread_thread = Thread(name="KOB-KeyRead", target=self.__thread_keyread_run)
@@ -318,11 +319,7 @@ class KOB:
         while not self._threadsStop.is_set():
             now = time.time()
             if self._sounder_power_save_secs > 0 and not self._power_saving:
-                if (
-                    self._t_sounder_energized > 0
-                    and (now - self._t_sounder_energized)
-                    > self._sounder_power_save_secs
-                ):
+                if self._t_sounder_energized > 0 and (now - self._t_sounder_energized) > self._sounder_power_save_secs:
                     self.power_save(True)
             time.sleep(0.5)
         log.debug("{} thread done.".format(threading.current_thread().name))
@@ -683,19 +680,19 @@ class KOB:
         """
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         """
-        # Only enable power save if mode is sounding code.
-        if enable and not self._sounder_mode == SounderMode.SOUND_CODE:
+        # Only enable power save if mode is sounding remote code.
+        if enable and not self._sounder_mode == SounderMode.SRC:
             return
         if enable == self._power_saving:
             return  # Already correct
 
         if enable:
-            log.debug("Sounder power-save on", 2)
+            log.debug("KOB: Sounder power-save on", 2)
             self._ps_energize_sounder = self._sounder_energized
             self._energize_hw_sounder(False)
             self._power_saving = True
         else:  # disable power-save. restore the state of the sounder
-            log.debug("Sounder power-save off", 2)
+            log.debug("KOB: Sounder power-save off", 2)
             self._power_saving = False
             if self._ps_energize_sounder:
                 self._energize_hw_sounder(True)

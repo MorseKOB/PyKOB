@@ -33,8 +33,8 @@ from datetime import datetime
 from queue import Empty, Queue
 import threading
 from threading import Event, Thread
-import tkinter.filedialog as fd
-import tkinter.messagebox as mb
+import tkinter.filedialog as filedlg
+import tkinter.messagebox as msgbox
 from typing import Optional
 
 from pykob import config, config2, kob, morse, internet, recorder, log
@@ -506,6 +506,7 @@ class MKOBMain:
             self._internet.monitor_sender(
                 self._ka.trigger_update_current_sender
             )  # Set callback for monitoring current sender
+            self._kob.power_save(False)
             self._internet.connect(self._wire)
             self._connected.set()
         else:
@@ -533,6 +534,7 @@ class MKOBMain:
         self._internet_station_active = False
         self._sender_ID = ""
         self._mreader.flush()
+        self._kob.power_save(False)
         if not self._odc_fu:
             self._odc_fu = self._tkroot.after(950, self._on_disconnect_followup)
         return
@@ -605,6 +607,7 @@ class MKOBMain:
         return self._key_graph_win and MKOBKeyTimeWin.active
 
     def _update_from_config(self, cfg:Config, ct:config2.ChangeType):
+        log.debug("MKMain._update_from_config. CT:{}".format(ct), 2)
         try:
             self._set_on_cfg = False
             log.set_debug_level(cfg.debug_level)
@@ -641,10 +644,11 @@ class MKOBMain:
         """
         The preferences (config) window returned.
         """
+        log.debug("MKMain.preferences_closed.")
         if not prefsDialog.cancelled:
             cfg_from_prefs:Config = prefsDialog.cfg
             ct = cfg_from_prefs.get_changes_types()
-            log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct))
+            log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct), 1)
             if not ct == 0:
                 self._cfg.copy_from(cfg_from_prefs)
                 self._update_from_config(cfg_from_prefs, ct)
@@ -657,11 +661,12 @@ class MKOBMain:
         """
         Load a new configuration.
         """
+        log.debug("MKMain.preferences_load.")
         dir = self._cfg.get_directory()
         dir = dir if dir else ""
         name = self._cfg.get_name(True)
         name = name if name else ""
-        pf = fd.askopenfilename(
+        pf = filedlg.askopenfilename(
             title="Load Configuration",
             initialdir=dir,
             initialfile=name,
@@ -675,7 +680,26 @@ class MKOBMain:
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
             except ConfigLoadError as err:
-                log.warn("Unable to load configuration: {}  Error: {}".format(pf, err))
+                msg = "Unable to load configuration: {}".format(pf)
+                log.error("{}  Error: {}".format(msg, err))
+                msgbox.showerror(title=self.app_ver, message=msg)
+        return
+
+    def preferences_load_global(self):
+        """
+        Load the global configuration.
+        """
+        log.debug("MKMain.preferences_load_global.")
+        try:
+            self._cfg.set_using_global(True)
+            self._cfg.load_from_global()
+            self._update_from_config(self._cfg, config2.ChangeType.ANY)
+            self._cfg.clear_dirty()
+            self._kw.set_app_title()
+        except ConfigLoadError as err:
+                msg = "Unable to load Global configuration."
+                log.error("{}  Error: {}".format(msg, err))
+                msgbox.showerror(title=self.app_ver, message=msg)
         return
 
     def preferences_opening(self) -> Config:
@@ -684,6 +708,7 @@ class MKOBMain:
 
         Return a config for it to use.
         """
+        log.debug("MKMain.preferences_opening.")
         cfg_for_prefs = self._cfg.copy()
         if self._cfg.using_global():
             cfg_for_prefs.set_using_global(True)
@@ -693,20 +718,31 @@ class MKOBMain:
         return cfg_for_prefs
 
     def preferences_save(self):
-        if not self._cfg.get_filepath() and not self._cfg.load_from_global:
+        log.debug("MKMain.preferences_save.")
+        if not self._cfg.get_filepath() and not self._cfg.using_global():
             # The config doesn't have a file path and it isn't global
             # call the SaveAs
             self.preferences_save_as()
         else:
-            self._cfg.save_config()
+            try:
+                self._cfg.save_config()
+            except Exception as err:
+                msg = "Unable to save "
+                if self._cfg.using_global():
+                    msg += "Global configuration"
+                else:
+                    msg += "configuration: {}".format(self._cfg.get_filepath())
+                log.error("{}  Error: {}".format(msg, err))
+                msgbox.showerror(title=self.app_ver, message=msg)
         return
 
     def preferences_save_as(self):
+        log.debug("MKMain.preferences_save_as.")
         dir = self._cfg.get_directory()
         dir = dir if dir else ""
         name = self._cfg.get_name(True)
         name = name if name else ""
-        pf = fd.asksaveasfilename(
+        pf = filedlg.asksaveasfilename(
             title="Save As",
             initialdir=dir,
             initialfile=name,
@@ -714,11 +750,28 @@ class MKOBMain:
             filetypes=[("PyKOB Configuration", config2.PYKOB_CFG_EXT)],
         )
         if pf:
-            self._cfg.set_using_global(False)
-            self._cfg.save_config(pf)
+            try:
+                self._cfg.set_using_global(False)
+                self._cfg.save_config(pf)
+                self._cfg.clear_dirty()
+                self._kw.set_app_title()
+            except Exception as err:
+                msg = "Unable to save configuration: {}".format(pf)
+                log.error("{}  Error: {}".format(msg, err))
+                msgbox.showerror(title=self.app_ver, message=msg)
         return
 
-    def record_end(self):
+    def preferences_save_global(self):
+        log.debug("MKMain.preferences_save_global.")
+        try:
+            self._cfg.save_global()
+            if self._cfg.using_global():
+                self._cfg.clear_dirty()
+                self._kw.set_app_title()
+        except Exception as err:
+            msg = "Unable to save Global configuration."
+            log.error("{}  Error: {}".format(msg, err))
+            msgbox.showerror(title=self.app_ver, message=msg)
         return
 
     def record_session(self):
@@ -728,7 +781,7 @@ class MKOBMain:
         if not self._recorder:
             self._create_recorder()
         msg = "Recording session to: {}".format(self._recorder.target_file_path)
-        mb.showinfo(title=self.app_ver, message=msg)
+        msgbox.showinfo(title=self.app_ver, message=msg)
         return
 
     def recording_end(self):
@@ -738,7 +791,7 @@ class MKOBMain:
             self._recorder = None
             msg = "Session recorded to: {}".format(r.target_file_path)
             r.playback_stop()
-        mb.showinfo(title=self.app_ver, message=msg)
+        msgbox.showinfo(title=self.app_ver, message=msg)
         return
 
     def _recording_play_followup(self):

@@ -27,7 +27,7 @@ internet module
 
 Reads/writes code sequences from/to a KOB wire.
 """
-
+import re  # RegEx
 import socket
 import struct
 import time
@@ -47,6 +47,16 @@ DAT = 3  # Code or ID
 CON = 4  # Connect
 ACK = 5  # Ack
 
+
+"""
+:
+ : 
+abc.123
+456.xyz:
+:987
+efg.987:345
+ kxp.321
+"""
 shortPacketFormat = struct.Struct("<hh")  # cmd, wire
 idPacketFormat = struct.Struct("<hh 128s 4x i i 8x 208x 128s 8x")  # cmd, byts, id, seq, idflag, ver
 codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts, id, seq, code list, n, txt
@@ -62,14 +72,19 @@ class Internet:
         self._port = PORT_DEFAULT
         self._msg_receiver = msg_receiver  # Function that can take a string for important messages
         self._ip_address = None  # Set when a connection is made
-        s = server_url
-        if s:
-            # see if a port was included
-            # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
-            hp = s.split(':',1)
-            if len(hp) == 2:
-                self._port = hp[1]
-            self._host = hp[0]
+        s = None if not server_url else server_url.strip()
+        if s and len(s) > 0:
+            # Parse the URL into components
+            ex = re.compile("^([^: ]*)((:?)([0-9]*))$")
+            m = ex.match(s)
+            h = m.group(1)
+            cp = m.group(2)
+            c = m.group(3)
+            p = m.group(4)
+            if h and len(h) > 0:
+                self._host = h
+            if p and len(p) > 0:
+                self._port = p
         # Application name/version to register with on the server
         self._appver = None if appver == None or appver.strip() == "" else appver.strip()
         if appver:

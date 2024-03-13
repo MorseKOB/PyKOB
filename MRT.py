@@ -47,7 +47,7 @@ import argparse
 from pathlib import Path
 import platform
 import queue
-import re
+import re  # RegEx
 import sys
 from threading import Event, Thread
 from time import sleep

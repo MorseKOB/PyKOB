@@ -2,9 +2,11 @@
 # Imports
 # ============================================
 from distutils.util import strtobool
+import re  # RegEx
 from typing import Any, Callable, Optional
 
-from pykob import config, config2, log
+from pykob import config, log
+from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
 
 GUI = True                              # Hope for the best...
@@ -60,9 +62,6 @@ class PreferencesWindow:
         self.EQUIPMENT_TYPE_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
         self.DEFAULT_EQUIPMENT_TYPE = 1
 
-        HOST_DEFAULT = "mtc-kob.dyndns.org"
-        PORT_DEFAULT = 7890
-
         self.CHARACTER_SPACING_OPTIONS = ["None", "Between characters", "Between words"]
         self.CHARACTER_SPACING_SETTINGS = ['NONE', 'CHAR', 'WORD']
         self.CHARACTER_SPACING_NONE = 0
@@ -78,6 +77,8 @@ class PreferencesWindow:
         self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
         cfgname = "Global" if cfg.using_global() else cfg.get_name()
+        if not cfgname:
+            cfgname = ""
         self.root.title("Preferences - {}".format(cfgname))
 
         # validators
@@ -219,14 +220,22 @@ class PreferencesWindow:
         # Create a container frame to hold all internet connection-related widgets
         internetConnection = ttk.LabelFrame(advanced_prefs, text=" Internet Connection")
 
-        server_url = self._cfg.server_url if self._cfg.server_url else HOST_DEFAULT
+        s = self._cfg.server_url
+        s = s.strip() if s else ""
+        server_url = HOST_DEFAULT
         server_port = PORT_DEFAULT
-        # see if a port was included
-        # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
-        hp = server_url.split(':',1)
-        if len(hp) == 2:
-            server_port = hp[1]
-        server_url = hp[0]
+        if len(s) > 0:
+            # Parse the URL into components
+            ex = re.compile("^([^: ]*)((:?)([0-9]*))$")
+            m = ex.match(s)
+            h = m.group(1)
+            cp = m.group(2)
+            c = m.group(3)
+            p = m.group(4)
+            if h and len(h) > 0:
+                server_url = h
+            if p and len(p) > 0:
+                server_port = p
 
         # Create a label to pad the left side
         p0 = ttk.Label(internetConnection, text="")
@@ -530,7 +539,14 @@ class PreferencesWindow:
             muted_cfg.audio_type = self._audioType
             muted_cfg.sounder = self._useLocalSounder.get()
             muted_cfg.sounder_power_save = int(self._sounderPowerSave.get())
-            muted_cfg.server_url = self._serverUrl.get() + ":" + self._portNumber.get()
+            host = self._serverUrl.get().strip()
+            port = self._portNumber.get().strip()
+            if len(port) > 0:
+                port = ':' + port
+            surl = host + port
+            if len(surl) < 1:
+                surl = None
+            muted_cfg.server_url = surl
             muted_cfg.remote = self._transmitToRemoteStations.get()
             muted_cfg.station = self._stationID.get()
             muted_cfg.wire = int(self._wireNumber.get())
