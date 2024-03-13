@@ -510,7 +510,8 @@ if __name__ == "__main__":
     exit_status = 1
     try:
         # Main code
-        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
+        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
+            + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
             parents= [
                 config2.station_override,
                 config2.min_char_speed_override,

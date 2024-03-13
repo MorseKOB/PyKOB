@@ -45,8 +45,12 @@ print(" pykob: " + PKVERSION)
 print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 distroy_on_exit = True
+mkobwin: MKOBWindow = None
 try:
-    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
+    arg_parser = argparse.ArgumentParser(description="Morse KOB application. This provides a full graphical interface to "
+                                         + "send and receive Morse over the internet, "
+                                         + "as well as practice locally.\nFor a text-only (command line version), try 'MRT'. "
+                                         + "The Global Configuration is used unless a configuration file is specified.",
         parents= [
             config2.config_file_override,
             config2.debug_level_override
@@ -77,6 +81,8 @@ try:
         mkw.print_hierarchy(root)
 
     root.after(400, mkobwin.set_minimum_sizes)
+    root.after(800, mkobwin.give_keyboard_focus())
+
     root.mainloop()
     distroy_on_exit = False  # App is already distroyed at this point
 except KeyboardInterrupt:
