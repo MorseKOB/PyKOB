@@ -192,10 +192,12 @@ class Internet:
     def _get_address(self, renew=False):
         if not self._ip_address or renew:
             success = False
-            while not success:
+            while not success and not self._threadStop.is_set():
                 try:
+                    log.info("Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
                     success = True
+                    log.debug(" Received IP address:{}".format(self._ip_address))
                 except (OSError, socket.gaierror) as ex:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
