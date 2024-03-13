@@ -30,7 +30,7 @@ Configures system values and user preferences for the suite of PyKOB application
 Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
-from distutils.util import strtobool
+from pykob.util import strtobool
 import os.path
 import sys
 from typing import Optional

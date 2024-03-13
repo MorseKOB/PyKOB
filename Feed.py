@@ -96,7 +96,7 @@ import pykob
 import traceback
 from pathlib import Path
 from pykob import config, newsreader, morse, internet, kob, log, recorder
-from distutils.util import strtobool
+from pykob.util import strtobool
 
 
 VERSION     = '2.2'

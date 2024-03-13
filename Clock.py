@@ -35,7 +35,7 @@ import argparse
 import sys
 import time
 from pykob import config, kob, morse, log, recorder
-from distutils.util import strtobool
+from pykob.util import strtobool
 
 #
 # For numeric-to-text translation.  Note that "0" is only referneced for midnight, and then it's

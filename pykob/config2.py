@@ -37,7 +37,7 @@ A mechanism for change notification is available.
 
 """
 import argparse
-from distutils.util import strtobool
+from pykob.util import strtobool
 from enum import Flag, IntEnum, unique
 import json
 from json import JSONDecodeError
