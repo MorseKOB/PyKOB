@@ -36,7 +36,8 @@ from pykob import VERSION as PKVERSION
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
-VERSION = "4.1.4"
+__version__ = "4.2.1"
+VERSION = __version__
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
 print(" Python: " + sys.version + " on " + sys.platform)

@@ -53,7 +53,7 @@ from threading import Event, Thread
 from time import sleep
 from typing import Any, Callable, Optional
 
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)

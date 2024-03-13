@@ -801,8 +801,8 @@ def read_config():
         hostname = socket.gethostname()
 
         # User configuration file name
-        userConfigFileName = "config-{}.ini".format(user_name)
-        app_configFileName = "config_app.ini"
+        userConfigFileName = "config2-{}.ini".format(user_name)
+        app_configFileName = "config2_app.ini"
 
         # Create the user and application configuration paths
         if system_name == "Windows":
