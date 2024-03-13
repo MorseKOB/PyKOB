@@ -705,6 +705,7 @@ class MKOBMain:
         """
         log.debug("MKMain.preferences_load_global.")
         try:
+            self._cfg.clear_dirty()
             self._cfg.set_using_global(True)
             self._cfg.load_from_global()
             self._update_from_config(self._cfg, config2.ChangeType.ANY)
