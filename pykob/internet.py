@@ -194,10 +194,10 @@ class Internet:
             success = False
             while not success and not self._threadStop.is_set():
                 try:
-                    log.info("Connecting to host:{} port:{}".format(self._host, self._port))
+                    log.debug("Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
                     success = True
-                    log.debug(" Received IP address:{}".format(self._ip_address))
+                    log.debug(" Received IP address:{}".format(self._ip_address), 2)
                 except (OSError, socket.gaierror) as ex:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
