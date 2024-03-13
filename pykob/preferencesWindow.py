@@ -2,9 +2,11 @@
 # Imports
 # ============================================
 from distutils.util import strtobool
+import re  # RegEx
 from typing import Any, Callable, Optional
 
-from pykob import config, config2, log
+from pykob import config, log
+from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
 
 GUI = True                              # Hope for the best...
@@ -42,8 +44,12 @@ class PreferencesWindow:
 
         self._allowApply = allowApply  # If True, provide an 'Apply' button and change 'OK' to 'Save'
         self._saveIfRequested = saveIfRequested
+        self._apply_pressed = False
         self._save_pressed = False
+        self._cancelled = False
 
+        self.AUDIO_TYPES = ["Sounder", "Tone"]
+        self.AUDIO_TYPE_SETTINGS = [config.AudioType.SOUNDER, config.AudioType.TONE]
         self.HW_INTERFACE_TYPES = ["None", "Serial Port", "GPIO (Raspberry Pi)"]
         self.HW_INTERFACE_CONFIG_SETTINGS = ['None', 'SERIAL', 'GPIO']
         self.NONE_HW_INTERFACE = 0      # index of 'None' in list above
@@ -55,9 +61,6 @@ class PreferencesWindow:
                                 'Separate dot/dash paddle and sounder']
         self.EQUIPMENT_TYPE_SETTINGS = ["LOOP", "KEY_SOUNDER", "KEYER"]
         self.DEFAULT_EQUIPMENT_TYPE = 1
-
-        HOST_DEFAULT = "mtc-kob.dyndns.org"
-        PORT_DEFAULT = 7890
 
         self.CHARACTER_SPACING_OPTIONS = ["None", "Between characters", "Between words"]
         self.CHARACTER_SPACING_SETTINGS = ['NONE', 'CHAR', 'WORD']
@@ -73,7 +76,10 @@ class PreferencesWindow:
         self.root = tk.Toplevel()
         self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
-        self.root.title("Preferences")
+        cfgname = "Global" if cfg.using_global() else cfg.get_name()
+        if not cfgname:
+            cfgname = ""
+        self.root.title("Preferences - {}".format(cfgname))
 
         # validators
         self._digits_only_validator = self.root.register(self._validate_number_entry)
@@ -87,7 +93,7 @@ class PreferencesWindow:
         prefs_nb = ttk.Notebook(self.root)
         prefs_nb.pack(fill=tk.BOTH)
         basic_prefs = ttk.Frame(prefs_nb)
-        prefs_nb.add(basic_prefs, text="Basic")
+        prefs_nb.add(basic_prefs, text="Base")
         code_prefs = ttk.Frame(prefs_nb)
         prefs_nb.add(code_prefs, text="Morse Code")
         advanced_prefs = ttk.Frame(prefs_nb)
@@ -103,7 +109,7 @@ class PreferencesWindow:
         basiclocalInterface = ttk.LabelFrame(basic_prefs, text=" Local Interface")
         ttk.Label(basiclocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
         advancedlocalInterface = ttk.LabelFrame(advanced_prefs, text=" Local Interface")
-        ttk.Label(advancedlocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, sticky=tk.NW)
+        ttk.Label(advancedlocalInterface, text="Key and sounder interface:").grid(row=0, column=0, rowspan=6, padx=[12,0], sticky=tk.NW)
 
         # Create three Radiobuttons using one IntVar for the interface type
         self._interfaceType = tk.IntVar()
@@ -151,39 +157,56 @@ class PreferencesWindow:
         # Initialize the equipment type to its default value of 'Separate key and sounder':
         self._equipmentType.set(self.DEFAULT_EQUIPMENT_TYPE)
 
+        _row = 8
         for equipmentRadioButton in range(len(self.EQUIPMENT_TYPES)):
+            _row += equipmentRadioButton
             ttk.Radiobutton(basiclocalInterface, text=self.EQUIPMENT_TYPES[equipmentRadioButton],
                             variable=self._equipmentType,
                             state='enabled',
-                            value=equipmentRadioButton + 1).grid(row=8 + equipmentRadioButton,
-                                                             column=1, columnspan=2,
-                                                             sticky=tk.W)
+                            value=equipmentRadioButton + 1).grid(row=_row, column=1, columnspan=2, sticky=tk.W)
             # If current config matches this radio button, update the selected value
             if self._cfg.interface_type.name.upper() == self.EQUIPMENT_TYPE_SETTINGS[equipmentRadioButton]:
                 self._equipmentType.set(equipmentRadioButton + 1)
 
         # Add a checkbox for the 'Use system sound' option
         self._useSystemSound = tk.IntVar(value=self._cfg.sound)
+        _row += 1
         ttk.Checkbutton(basiclocalInterface,
                         text="Use system sound",
-                        variable=self._useSystemSound).grid(column=0, columnspan=6, sticky=tk.W)
+                        variable=self._useSystemSound).grid(row=_row, column=0, sticky=tk.W)
+        # Drop-down list of Audio Types
+        self._audioType = self._cfg.audio_type
+        audioTypeLabel = ttk.Label(basiclocalInterface, text="Type").grid(row=_row, column=1, sticky=tk.W)
+        self._audioTypeMenu = ttk.Combobox(basiclocalInterface, width=20, state='readonly')
+        self._audioTypeMenu.grid(row=_row, column=2, columnspan=2, sticky=tk.W)
+        self._audioTypeMenu["values"] = self.AUDIO_TYPES
+        self._audioTypeMenu.current(self.AUDIO_TYPE_SETTINGS.index(self._audioType))
+        self._audioTypeMenu.bind("<<ComboboxSelected>>", self._audioTypeSelected)
 
         # Add a checkbox for the 'Use local sounder' option
         self._useLocalSounder = tk.IntVar(value=self._cfg.sounder)
+        _row += 1
         ttk.Checkbutton(basiclocalInterface,
                         text="Use local sounder",
-                        variable=self._useLocalSounder).grid(column=0, columnspan=6,
-                                                            sticky=tk.W)
+                        variable=self._useLocalSounder).grid(row=_row, column=0, columnspan=6, sticky=tk.W)
 
         # Add a number field for the 'Sounder Power Save' time
         self._sounderPowerSave = tk.IntVar(value=self._cfg.sounder_power_save)
-        ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=(20,4), sticky=tk.W)
-        ttk.Entry(advancedlocalInterface, width=12, textvariable=self._sounderPowerSave).grid(row=6, column=2, sticky=tk.W)
+        ttk.Label(advancedlocalInterface, text="Sounder power save (seconds):").grid(row=6, column=0, columnspan=2, padx=(22,0), sticky=tk.W)
+        ttk.Entry(advancedlocalInterface, width=12, textvariable=self._sounderPowerSave).grid(row=6, column=2, padx=1, sticky=tk.W)
+
+        # Add a single checkbox for the sound local code option
+        self._soundLocalCode = tk.IntVar(value=self._cfg.local)
+        ttk.Checkbutton(
+            advancedlocalInterface,
+            text="Sound local code",
+            variable=self._soundLocalCode,
+        ).grid(row=7, column=0, padx=[22,0], sticky=tk.W)
 
         # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
         self._invertKeyInput = tk.IntVar(value=self._cfg.invert_key_input)
         ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
-                        variable=self._invertKeyInput).grid(row=7, column=0, padx=20, sticky=tk.W)
+                        variable=self._invertKeyInput).grid(row=8, column=0, padx=[22, 0], sticky=tk.W)
 
         basiclocalInterface.pack(fill=tk.BOTH)
         advancedlocalInterface.pack(fill=tk.BOTH)
@@ -196,50 +219,90 @@ class PreferencesWindow:
 
         # Create a container frame to hold all internet connection-related widgets
         internetConnection = ttk.LabelFrame(advanced_prefs, text=" Internet Connection")
-        # ttk.Label(internetConnection, text="Host Name").grid(row=0, column=0, sticky=tk.W)
 
-        server_url = self._cfg.server_url if self._cfg.server_url else HOST_DEFAULT
+        s = self._cfg.server_url
+        s = s.strip() if s else ""
+        server_url = HOST_DEFAULT
         server_port = PORT_DEFAULT
-        # see if a port was included
-        # ZZZ error checking - should have 0 or 1 ':' and if port is included it should be numeric
-        hp = server_url.split(':',1)
-        if len(hp) == 2:
-            server_port = hp[1]
-        server_url = hp[0]
+        if len(s) > 0:
+            # Parse the URL into components
+            ex = re.compile("^([^: ]*)((:?)([0-9]*))$")
+            m = ex.match(s)
+            h = m.group(1)
+            cp = m.group(2)
+            c = m.group(3)
+            p = m.group(4)
+            if h and len(h) > 0:
+                server_url = h
+            if p and len(p) > 0:
+                server_port = p
 
+        # Create a label to pad the left side
+        p0 = ttk.Label(internetConnection, text="")
         # Create and label an entry for the server URL:
         self._serverUrl = tk.StringVar(value=server_url)
-        ttk.Label(internetConnection, text="Server:").grid(row=0, column=0, sticky=tk.W)
-        ttk.Entry(internetConnection, width=30, textvariable=self._serverUrl).grid(row=0, column=1, sticky=tk.E)
-
+        lserver = ttk.Label(internetConnection, text="Server:")
+        fserver = ttk.Entry(internetConnection, width=40, textvariable=self._serverUrl)
         # Create and label an entry for the server port number:
         self._portNumber = tk.StringVar(value=server_port)
-        ttk.Label(internetConnection, text="Port number:").grid(row=0, column=2, sticky=tk.E)
-        ttk.Entry(internetConnection, width=12, textvariable=self._portNumber).grid(row=0, column=3, sticky=tk.E)
+        lport = ttk.Label(internetConnection, text="Port number:")
+        fport = ttk.Entry(internetConnection, width=8, textvariable=self._portNumber)
 
+        # Create a label to pad the left side
+        p1 = ttk.Label(internetConnection, text="")
         # Add a checkbox for the 'Transmit to remote stations' option
         self._transmitToRemoteStations = tk.IntVar(value=self._cfg.remote)
-        ttk.Checkbutton(internetConnection,
-                        text="Transmit to remote stations",
-                        variable=self._transmitToRemoteStations).grid(row=1, column=0, columnspan=4, sticky=tk.W)
+        btrans = ttk.Checkbutton(
+            internetConnection,
+            text="Transmit to wire (to remote stations)",
+            variable=self._transmitToRemoteStations,
+        )
 
-        # Create and label an entry for the station ID:
-        self._stationID = tk.StringVar(value=self._cfg.station)
-        ttk.Label(internetConnection, text="Station ID:").grid(row=2, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=55, textvariable=self._stationID).grid(row=2, column=1, columnspan=3, sticky=tk.W)
-
+        # Create a label to pad the left side
+        p2 = ttk.Label(internetConnection, text="")
         # Create and label an entry for the wire number:
         self._wireNumber = tk.StringVar(value=self._cfg.wire)
-        ttk.Label(internetConnection, text="Wire number:").grid(row=3, column=0, sticky=tk.E)
-        ttk.Entry(internetConnection, width=5, textvariable=self._wireNumber).grid(row=3, column=1, sticky=tk.W)
+        lwire = ttk.Label(internetConnection, text="Wire number:")
+        fwire = ttk.Entry(internetConnection, width=5, textvariable=self._wireNumber)
 
+        # Create a label to pad the left side
+        p3 = ttk.Label(internetConnection, text="")
+        # Create and label an entry for the station ID:
+        self._stationID = tk.StringVar(value=self._cfg.station)
+        loffice = ttk.Label(internetConnection, text="Office/Station ID:")
+        foffice= ttk.Entry(internetConnection, width=52, textvariable=self._stationID)
+
+        # Create a label to pad the left side
+        p4 = ttk.Label(internetConnection, text="")
         # Add a checkbox for the 'Automatically connect at startup' option
         self._autoConnectAtStartup = tk.IntVar(value=self._cfg.auto_connect)
-        ttk.Checkbutton(internetConnection,
-                        text="Automatically connect at startup",
-                        variable=self._autoConnectAtStartup).grid(row=4, column=0, columnspan=2, padx=20, sticky=tk.W)
+        bconnect = ttk.Checkbutton(
+            internetConnection,
+            text="Automatically connect at startup",
+            variable=self._autoConnectAtStartup,
+        )
 
         # internetConnection.grid(row=1, column=0, columnspan=5, pady=6, sticky=tk.W)
+        p0.grid(row=0, column=0, padx=[20, 0])
+        lserver.grid(row=0, column=1, columnspan=1, padx=0, sticky=tk.W)
+        fserver.grid(row=0, column=2, columnspan=7, padx=1, sticky=[tk.W, tk.E])
+        lport.grid(row=0, column=10, columnspan=2, padx=1, sticky=tk.W)
+        fport.grid(row=0, column=12, columnspan=1, padx=1, sticky=[tk.W])
+        #
+        p2.grid(row=1, column=0, padx=[20, 0])
+        lwire.grid(row=1, column=1, columnspan=2, padx=0, sticky=tk.W)
+        fwire.grid(row=1, column=3, columnspan=10, padx=1, sticky=tk.W)
+        #
+        p3.grid(row=2, column=0, padx=[20, 0])
+        loffice.grid(row=2, column=1, columnspan=3, padx=0, sticky=tk.W)
+        foffice.grid(row=2, column=4, columnspan=9, padx=1, sticky=[tk.W, tk.E])
+        #
+        p4.grid(row=3, column=0, padx=[20, 0])
+        bconnect.grid(row=3, column=1, columnspan=12, padx=1, sticky=tk.W)
+        #
+        p1.grid(row=4, column=0, padx=[20, 0])
+        btrans.grid(row=4, column=1, columnspan=12, padx=0, sticky=tk.W)
+        #
         internetConnection.pack(fill=tk.BOTH)
 
         #######################################################################
@@ -266,7 +329,6 @@ class PreferencesWindow:
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
 
         ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
-        # print("Setting text speed to", self._cfg.text_speed)
         self._textSpeed = tk.DoubleVar(value=self._cfg.text_speed)
         self._textSpeedControl = \
             ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,
@@ -319,7 +381,7 @@ class PreferencesWindow:
         #
         #######################################################################
         advancedDebugOptions = ttk.LabelFrame(advanced_prefs, text=" Debug Options")
-        ttk.Label(advancedDebugOptions, text="Level:").grid(row=0, column=0)
+        ttk.Label(advancedDebugOptions, text="Level:").grid(row=0, column=0, padx=[24, 0], sticky=tk.W)
         self._varDBLevel = tk.StringVar()
         ldl = log.get_debug_level()
         cdl = self._cfg.debug_level
@@ -338,7 +400,7 @@ class PreferencesWindow:
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varDBLevel,
-        ).grid(row=0, column=1)
+        ).grid(row=0, column=1, padx=1)
         advancedDebugOptions.pack(fill=tk.BOTH)
 
         #######################################################################
@@ -394,9 +456,18 @@ class PreferencesWindow:
         # left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
         # top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
         # self.root.geometry('+%d+%d' % (left_offset, top_offset))
+        self.root.geometry("+36+36")
         self.root.state("normal")
 
     # #############################################################################################
+
+    def _audioTypeSelected(self, *args):
+        #
+        # Audio type was selected.
+        #
+        selidx = self._audioTypeMenu.current()
+        self._audioType = self.AUDIO_TYPE_SETTINGS[selidx]
+        self._audioTypeMenu.selection_clear()
 
     def _codeSpeedChange(self):
         #
@@ -442,10 +513,7 @@ class PreferencesWindow:
         p_is_ok = P.isdigit() or P == ""
         return p_is_ok
 
-    def _clickCancel(self):
-        self.dismiss()
-
-    def _clickApply(self, dismiss=True):
+    def _apply(self):
         with self._cfg.notification_pauser() as muted_cfg:
             ndl = self._varDBLevel.get()
             if ndl:
@@ -465,38 +533,41 @@ class PreferencesWindow:
                 muted_cfg.serial_port = sp
             # Config 'interface_type' is the 'equipment type' here (Loop, Key&Sounder, keyer)
             muted_cfg.interface_type = config.interface_type_from_str(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
-            # print("Invert key input: ", self._invertKeyInput.get())
+            muted_cfg.local = self._soundLocalCode.get()
             muted_cfg.invert_key_input = self._invertKeyInput.get()
-            # print("Use system sound: ", self._useSystemSound.get())
             muted_cfg.sound = self._useSystemSound.get()
-            # print("Use local sounder: ", self._useLocalSounder.get())
+            muted_cfg.audio_type = self._audioType
             muted_cfg.sounder = self._useLocalSounder.get()
-            # print("Sounder Power Save: ", self._sounderPowerSave.get())
             muted_cfg.sounder_power_save = int(self._sounderPowerSave.get())
-            # print("Server URL: {}".format(self._serverUrl.get() + ":" + self._portNumber.get()))
-            muted_cfg.server_url = self._serverUrl.get() + ":" + self._portNumber.get()
-            # print("Transmit to remote stations: ", self._transmitToRemoteStations.get())
+            host = self._serverUrl.get().strip()
+            port = self._portNumber.get().strip()
+            if len(port) > 0:
+                port = ':' + port
+            surl = host + port
+            if len(surl) < 1:
+                surl = None
+            muted_cfg.server_url = surl
             muted_cfg.remote = self._transmitToRemoteStations.get()
-            # print("Station ID:", self._stationID.get())
             muted_cfg.station = self._stationID.get()
-            # print("Wire number:", self._wireNumber.get())
             muted_cfg.wire = int(self._wireNumber.get())
-            # print("Auto-connect at startup:", self._autoConnectAtStartup.get())
             muted_cfg.auto_connect = self._autoConnectAtStartup.get()
-            # print("Code speed:", self._codeSpeed.get())
             muted_cfg.text_speed = int(self._textSpeed.get())
-            # print("Character rate:", self._dotSpeed.get())
             muted_cfg.min_char_speed = int(self._dotSpeed.get())
-            # print("Character spacing:", self.CHARACTER_SPACING_OPTIONS[self._characterSpacing.get() - 1])
             muted_cfg.spacing = config.spacing_from_str(self.CHARACTER_SPACING_SETTINGS[self._characterSpacing.get() - 1])
-            # print("Code type:", self.CODE_TYPES[self._codeType.get() - 1])
             muted_cfg.code_type = config.codeTypeFromString(self.CODE_TYPE_SETTINGS[self._codeType.get() - 1])
-        if dismiss:
-            self.dismiss()
+
+    def _clickCancel(self):
+        self._cancelled = True
+        self.dismiss()
+
+    def _clickApply(self):
+        self._apply_pressed = True
+        self._apply()
+        self.dismiss()
 
     def _clickOK(self):
         self._save_pressed = True
-        self._clickApply(dismiss=False)
+        self._apply()
         if self._saveIfRequested and self._cfg.is_dirty():
             if self._cfg.get_filepath():
                 self._cfg.save_config()
@@ -505,6 +576,14 @@ class PreferencesWindow:
                 self._cfg.save_global()
                 self._cfg.clear_dirty()
         self.dismiss()
+
+    @property
+    def apply_pressed(self) -> bool:
+        return self._apply_pressed
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
 
     @property
     def cfg(self) -> Config:

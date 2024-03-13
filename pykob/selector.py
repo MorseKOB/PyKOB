@@ -34,6 +34,7 @@ from enum import Enum, IntEnum, unique
 import sys
 import time
 import log
+import threading
 from threading import Event, Thread
 
 serialModuleAvailable = False
@@ -70,66 +71,68 @@ class Selector:
         self._t_last_change = time.time()
         #
         self._threadsStop = Event()
-        self._thread_port_checker = Thread(name='Selector-PortReader',
-                                          daemon=True, target=self._thread_port_checker_run)
+        self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_run)
 
     def _thread_port_checker_run(self):
         """
         Called by the Port Checker thread `run` to read the handshake values from the port.
         """
-        values_need_updating = False
-        oof_changed = False
-        binary_changed = False
-        while not self._threadsStop.is_set():
-            b0 = 1 if self._port.cts else 0
-            b1 = 2 if self._port.dsr else 0
-            b2 = 4 if self._port.cd else 0
-            b3 = 8 if self._port.ri else 0
-            rval = (b3+b2+b1+b0)
-            if not rval == self._raw_value:
-                self._raw_value = rval
-                values_need_updating = True
-                self._t_last_change = time.time()
-            else:
-                # The value read is the same as last time
-                # see if enough time has passed to record it.
-                now = time.time()
-                if (now - self._t_last_change) >= self._steady_time:
-                    if values_need_updating:
-                        if not self._binary_value == rval:
-                            self._binary_value = rval
-                            binary_changed = True
-                        # 1 of 4 only if a single bit is set
-                        oof = 0
-                        if rval == 1:
-                            oof = 1
-                        elif rval == 2:
-                            oof = 2
-                        elif rval == 4:
-                            oof = 3
-                        elif rval == 8:
-                            oof = 4
-                        if not oof == self._one_of_four:
-                            self._one_of_four = oof
-                            oof_changed = True
-                        # Call On-Change?
-                        if self._on_change:
-                            if (oof_changed and self._mode == SelectorMode.OneOfFour):
-                                self._on_change(SelectorChange.OneOfFour)
-                            else:
-                                change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
-                                    (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
-                                if (binary_changed and self._mode == SelectorMode.Binary):
-                                    self._on_change(change)
+        try:
+            values_need_updating = False
+            oof_changed = False
+            binary_changed = False
+            while not self._threadsStop.is_set():
+                b0 = 1 if self._port.cts else 0
+                b1 = 2 if self._port.dsr else 0
+                b2 = 4 if self._port.cd else 0
+                b3 = 8 if self._port.ri else 0
+                rval = (b3+b2+b1+b0)
+                if not rval == self._raw_value:
+                    self._raw_value = rval
+                    values_need_updating = True
+                    self._t_last_change = time.time()
+                else:
+                    # The value read is the same as last time
+                    # see if enough time has passed to record it.
+                    now = time.time()
+                    if (now - self._t_last_change) >= self._steady_time:
+                        if values_need_updating:
+                            if not self._binary_value == rval:
+                                self._binary_value = rval
+                                binary_changed = True
+                            # 1 of 4 only if a single bit is set
+                            oof = 0
+                            if rval == 1:
+                                oof = 1
+                            elif rval == 2:
+                                oof = 2
+                            elif rval == 4:
+                                oof = 3
+                            elif rval == 8:
+                                oof = 4
+                            if not oof == self._one_of_four:
+                                self._one_of_four = oof
+                                oof_changed = True
+                            # Call On-Change?
+                            if self._on_change:
+                                if (oof_changed and self._mode == SelectorMode.OneOfFour):
+                                    self._on_change(SelectorChange.OneOfFour)
                                 else:
-                                    self._on_change(change)
-                        # Clear the flags
-                        values_need_updating = False
-                        oof_changed = False
-                        binary_changed = False
-            time.sleep(self._pole_cycle_time)
-
-
+                                    change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
+                                        (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
+                                    if (binary_changed and self._mode == SelectorMode.Binary):
+                                        self._on_change(change)
+                                    else:
+                                        self._on_change(change)
+                            # Clear the flags
+                            values_need_updating = False
+                            oof_changed = False
+                            binary_changed = False
+                time.sleep(self._pole_cycle_time)
+        finally:
+            log.debug("{} thread done.".format(threading.current_thread().name))
+        return
+    
     @property
     def binary_value(self):
         return self._binary_value

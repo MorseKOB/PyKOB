@@ -1,7 +1,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,13 +40,14 @@ import argparse
 from distutils.util import strtobool
 from enum import Flag, IntEnum, unique
 import json
+from json import JSONDecodeError
 import os.path
 from pathlib import Path
 import sys
 from typing import Any, Callable, Optional
 
 from pykob import config, log
-from pykob.config import CodeType, InterfaceType, Spacing
+from pykob.config import AudioType, CodeType, InterfaceType, Spacing
 
 PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
@@ -67,6 +68,8 @@ class ChangeType(IntEnum):
     SAVE            = 0x80
     ANY             = 0xFF
 
+class ConfigLoadError(Exception):
+    pass
 
 class Config:
     def __enter__(self) -> 'Config':
@@ -94,6 +97,8 @@ class Config:
         self._version: str = VERSION
         self._version_loaded: Optional[str] = None
         # Hardware Settings
+        self._audio_type: AudioType = AudioType.SOUNDER
+        self._p_audio_type: AudioType = AudioType.SOUNDER
         self._gpio: bool = False
         self._p_gpio: bool = False
         self._serial_port: Optional[str] = None
@@ -120,6 +125,8 @@ class Config:
         # Operational Settings
         self._auto_connect: bool = False
         self._p_auto_connect: bool = False
+        self._debug_level: int = 0
+        self._p_debug_level: int = 0
         self._local: bool = True
         self._p_local: bool = True
         self._remote: bool = True
@@ -130,8 +137,6 @@ class Config:
         self._p_station: str = ""
         self._wire: int = 0
         self._p_wire: int = 0
-        self._debug_level: int = 0
-        self._p_debug_level: int = 0
         #
         # Change tracking
         self._hw_chng: bool = False
@@ -143,7 +148,7 @@ class Config:
         # Our operational values
         self._dirty = False
         self._filepath: Optional[str] = None  # The path used to load or last saved to
-        self._use_global: bool = False
+        self._using_global: bool = False
         #
         # Key to property setter dictionary
         self._key_prop_setters: dict[str,Any] = {
@@ -157,6 +162,7 @@ class Config:
             config._REMOTE_KEY: self._set_remote,
             config._SERVER_URL_KEY: self._set_server_url,
             config._SOUND_KEY: self._set_sound,
+            config._AUDIO_TYPE_KEY: self._set_audio_type,
             config._SOUNDER_KEY: self._set_sounder,
             config._STATION_KEY: self._set_station,
             config._WIRE_KEY: self._set_wire,
@@ -169,6 +175,7 @@ class Config:
         #
         # Listeners is a dictionary of Callable(int) keys and int (ChangeType...) values.
         self._change_listeners: dict[Callable[[int],None],int] = {}  # Start out empty
+        return
 
     def _notify_listeners(self):
         """
@@ -192,6 +199,7 @@ class Config:
                     # Call the listener with the change types
                     listener(ct)
         self.clear_pending_notifications()
+        return
 
     def _changed_hw(self):
         """
@@ -199,6 +207,7 @@ class Config:
         """
         self._hw_chng = True
         self._notify_listeners()
+        return
 
     def _changed_morse(self):
         """
@@ -206,6 +215,7 @@ class Config:
         """
         self._morse_chng = True
         self._notify_listeners()
+        return
 
     def _changed_ops(self):
         """
@@ -213,6 +223,7 @@ class Config:
         """
         self._ops_chng = True
         self._notify_listeners()
+        return
 
     # ########################################################################
     # Config (internal) Settings
@@ -231,6 +242,31 @@ class Config:
     #
 
     @property
+    def audio_type(self) -> AudioType:
+        return self._audio_type
+
+    @audio_type.setter
+    def audio_type(self, v: AudioType) -> None:
+        x = self._audio_type
+        self._audio_type = v
+        if not v == x:
+            self._changed_hw()
+        return
+
+    def _set_audio_type(self, v: str) -> None:
+        o = config.audio_type_from_str(v)
+        self.audio_type = o
+        return
+
+    @property
+    def audio_type_p(self) -> AudioType:
+        return self._p_audio_type
+
+    @property
+    def audio_type_changed(self) -> bool:
+        return not self._audio_type == self._p_audio_type
+
+    @property
     def gpio(self) -> bool:
         return self._gpio
     @gpio.setter
@@ -239,8 +275,10 @@ class Config:
         self._gpio = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_gpio(self, v: bool) -> None:
         self.gpio = v
+        return
 
     @property
     def gpio_p(self) -> bool:
@@ -258,9 +296,11 @@ class Config:
         self._interface_type = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_interface_type(self, v: str) -> None:
         o = config.interface_type_from_str(v)
         self.interface_type = o
+        return
 
     @property
     def interface_type_p(self) -> InterfaceType:
@@ -280,9 +320,11 @@ class Config:
         self._invert_key_input = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_invert_key_input(self, v: bool) -> None:
         self.invert_key_input = v
+        return
 
     @property
     def invert_key_input_p(self) -> bool:
@@ -301,8 +343,10 @@ class Config:
         self._serial_port = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_serial_port(self, v: str) -> None:
         self.serial_port = v
+        return
 
     @property
     def serial_port_p(self) -> str:
@@ -322,9 +366,11 @@ class Config:
         self._sound = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_sound(self, v: bool) -> None:
         self.sound = v
+        return
 
     @property
     def sound_p(self) -> bool:
@@ -344,9 +390,11 @@ class Config:
         self._sounder = v
         if not v == x:
             self._changed_hw()
+        return
 
     def _set_sounder(self, v: bool) -> None:
         self.sounder = v
+        return
 
     @property
     def sounder_p(self) -> bool:
@@ -365,8 +413,10 @@ class Config:
         self._sounder_power_save = v
         if not v == x:
             self._changed_hw()
+        return
     def _set_sounder_power_save(self, v: int) -> None:
         self.sounder_power_save = v
+        return
 
     @property
     def sounder_power_save_p(self) -> int:
@@ -389,9 +439,11 @@ class Config:
         self._code_type = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_code_type(self, v: str) -> None:
         o = config.code_type_from_str(v)
         self.code_type = o
+        return
 
     @property
     def code_type_p(self) -> CodeType:
@@ -410,8 +462,10 @@ class Config:
         self._min_char_speed = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_min_char_speed(self, v: int) -> None:
         self.min_char_speed = v
+        return
 
     @property
     def min_char_speed_p(self) -> int:
@@ -430,9 +484,11 @@ class Config:
         self._spacing = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_spacing(self, v: Spacing) -> None:
         o = config.spacing_from_str(v)
         self.spacing = o
+        return
 
     @property
     def spacing_p(self) -> Spacing:
@@ -451,8 +507,10 @@ class Config:
         self._text_speed = v
         if not v == x:
             self._changed_morse()
+        return
     def _set_text_speed(self, v: CodeType) -> None:
         self.text_speed = v
+        return
 
     @property
     def text_speed_p(self) -> CodeType:
@@ -475,8 +533,10 @@ class Config:
         self._auto_connect = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_auto_connect(self, v: bool) -> None:
         self.auto_connect = v
+        return
 
     @property
     def auto_connect_p(self) -> bool:
@@ -487,6 +547,31 @@ class Config:
         return not self._auto_connect == self._p_auto_connect
 
     @property
+    def debug_level(self) -> int:
+        return self._debug_level
+
+    @debug_level.setter
+    def debug_level(self, v: int) -> None:
+        x = self._debug_level
+        self._debug_level = v
+        if not v == x:
+            log.set_debug_level(v)
+            self._changed_ops()
+        return
+
+    def _set_debug_level(self, v: int) -> None:
+        self.debug_level = v
+        return
+
+    @property
+    def debug_level_p(self) -> int:
+        return self._p_debug_level
+
+    @property
+    def debug_level_changed(self) -> bool:
+        return not self._debug_level == self._p_debug_level
+
+    @property
     def local(self) -> bool:
         return self._local
     @local.setter
@@ -495,8 +580,10 @@ class Config:
         self._local = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_local(self, v: bool) -> None:
         self.local = v
+        return
 
     @property
     def local_p(self) -> bool:
@@ -515,8 +602,10 @@ class Config:
         self._remote = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_remote(self, v: bool) -> None:
         self.remote = v
+        return
 
     @property
     def remote_p(self) -> bool:
@@ -535,8 +624,10 @@ class Config:
         self._server_url = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_server_url(self, v: Optional[str]) -> None:
         self.server_url = v
+        return
 
     @property
     def server_url_p(self) -> Optional[str]:
@@ -555,8 +646,10 @@ class Config:
         self._station = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_station(self, v: str) -> None:
         self.station = v
+        return
 
     @property
     def station_p(self) -> str:
@@ -575,8 +668,10 @@ class Config:
         self._wire = v
         if not v == x:
             self._changed_ops()
+        return
     def _set_wire(self, v: int) -> None:
         self.wire = v
+        return
 
     @property
     def wire_p(self) -> int:
@@ -585,27 +680,6 @@ class Config:
     @property
     def wire_changed(self) -> bool:
         return not self._wire == self._p_wire
-
-    @property
-    def debug_level(self) -> int:
-        return self._debug_level
-    @debug_level.setter
-    def debug_level(self, v: int) -> None:
-        x = self._debug_level
-        self._debug_level = v
-        if not v == x:
-            log.set_debug_level(v)
-            self._changed_ops()
-    def _set_debug_level(self, v: int) -> None:
-        self.debug_level = v
-
-    @property
-    def debug_level_p(self) -> int:
-        return self._p_debug_level
-
-    @property
-    def debug_level_changed(self) -> bool:
-        return not self._debug_level == self._p_debug_level
 
     # ########################################################################
 
@@ -617,6 +691,7 @@ class Config:
         self._morse_chng = False
         self._ops_chng = False
         self._saved_chng = False
+        return
 
     def clear_dirty(self):
         """
@@ -628,6 +703,7 @@ class Config:
         not dirty.
         """
         # Hardware Settings
+        self._p_audio_type = self._audio_type
         self._p_gpio = self._gpio
         self._p_serial_port = self._serial_port
         self._p_interface_type = self._interface_type
@@ -642,14 +718,15 @@ class Config:
         self._p_text_speed = self._text_speed
         # Operational Settings
         self._p_auto_connect = self._auto_connect
+        self._p_debug_level = self._debug_level
         self._p_local = self._local
         self._p_remote = self._remote
         self._p_server_url = self._server_url
         self._p_station = self._station
         self._p_wire = self._wire
-        self._p_debug_level = self._debug_level
         # The override
         self._dirty = False
+        return
 
     def copy(self):
         cfg = Config()
@@ -663,6 +740,7 @@ class Config:
         with self.notification_pauser() as muted_cfg:
             # Use the 'properties' to set the values in order to properly flag changes
             # Hardware Settings
+            muted_cfg.audio_type = cfg_src._audio_type
             muted_cfg.gpio = cfg_src._gpio
             muted_cfg.serial_port = cfg_src._serial_port
             muted_cfg.interface_type = cfg_src._interface_type
@@ -677,18 +755,21 @@ class Config:
             muted_cfg.text_speed = cfg_src._text_speed
             # App Operation Settings
             muted_cfg.auto_connect = cfg_src._auto_connect
+            muted_cfg.debug_level = cfg_src._debug_level
             muted_cfg.local = cfg_src._local
             muted_cfg.remote = cfg_src._remote
             muted_cfg.server_url = cfg_src._server_url
             muted_cfg.station = cfg_src._station
             muted_cfg.wire = cfg_src._wire
-            muted_cfg.debug_level = cfg_src._debug_level
+        return
 
     def get_changes_types(self) -> int:
         """
         Get the combined types of all changes.
         """
         ct = 0
+        if self.audio_type_changed:
+            ct = ct | ChangeType.HARDWARE
         if self.gpio_changed:
             ct = ct | ChangeType.HARDWARE
         if self.serial_port_changed:
@@ -733,12 +814,14 @@ class Config:
         """
         data = {
             _PYKOB_CFG_VERSION_KEY: self._version,
+            config._AUDIO_TYPE_KEY: self._audio_type.name.upper(),
             config._GPIO_KEY: self._gpio,
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
             config._INVERT_KEY_INPUT_KEY: self._invert_key_input,
             config._SOUNDER_POWER_SAVE_KEY: self._sounder_power_save,
             config._AUTO_CONNECT_KEY: self._auto_connect,
+            config._DEBUG_LEVEL_KEY: self._debug_level,
             config._LOCAL_KEY: self._local,
             config._REMOTE_KEY: self._remote,
             config._SERVER_URL_KEY: self._server_url,
@@ -783,7 +866,7 @@ class Config:
         include_ext: Set to True to include the file extension
         """
         name = None
-        if self._filepath:
+        if self._filepath and not self._filepath.strip() == "":
             p = Path(self._filepath)
             n = p.name
             if not include_ext:
@@ -799,6 +882,8 @@ class Config:
         if self._dirty:
             return True
         # Hardware Settings
+        if not self._p_audio_type == self._audio_type:
+            return True
         if  not self._p_gpio == self._gpio:
             return True
         if  not self._p_serial_port == self._serial_port:
@@ -825,7 +910,9 @@ class Config:
         # Operational Settings
         if  not self._p_auto_connect == self._auto_connect:
             return True
-        if  not self._p_local == self._local:
+        if not self._p_debug_level == self._debug_level:
+            return True
+        if not self._p_local == self._local:
             return True
         if  not self._p_remote == self._remote:
             return True
@@ -834,8 +921,6 @@ class Config:
         if  not self._p_station == self._station:
             return True
         if  not self._p_wire == self._wire:
-            return True
-        if  not self._p_debug_level == self._debug_level:
             return True
         return False
 
@@ -850,83 +935,107 @@ class Config:
         Raises: FileNotFoundError if a path hasn't been established.
                 System may throw other file related exceptions.
         """
-        if not filepath and not self._filepath and not self._use_global:
+        if not filepath and not self._filepath and not self._using_global:
             e = FileNotFoundError("File path not yet established")
             raise e
         elif not filepath:
             filepath = self._filepath
 
-        if filepath:
-            data: dict[str:Any]
-            with open(filepath, 'r', encoding="utf-8") as fp:
-                data = json.load(fp)
-            if data:
-                # Disable change notifications until we are complete
-                with self.notification_pauser() as muted_cfg:
-                    # Use the 'properties' to set the values in order to properly flag changes
-                    muted_cfg._version_loaded = None
-                    for key, value in data.items():
-                        if _PYKOB_CFG_VERSION_KEY == key:
-                            muted_cfg._version_loaded = value
-                        else:
-                            muted_cfg._key_prop_setters[key](value)
-                    #
-                    muted_cfg._filepath = filepath
-        else:
+        if not filepath:
             self.load_from_global()
+        else:
+            try:
+                data: dict[str:Any]
+                with open(filepath, 'r', encoding="utf-8") as fp:
+                    data = json.load(fp)
+                if data:
+                    # Disable change notifications until we are complete
+                    with self.notification_pauser() as muted_cfg:
+                        # Use the 'properties' to set the values in order to properly flag changes
+                        muted_cfg._version_loaded = None
+                        for key, value in data.items():
+                            if _PYKOB_CFG_VERSION_KEY == key:
+                                muted_cfg._version_loaded = value
+                            else:
+                                try:
+                                    muted_cfg._key_prop_setters[key](value)
+                                except KeyError as ke:
+                                    log.debug("Property setter for entry not found: {}".format(ke))
+                        #
+                        muted_cfg.set_filepath(filepath)
+            except JSONDecodeError as jde:
+                log.debug(jde)
+                raise ConfigLoadError(jde)
+            except Exception as ex:
+                log.debug(ex)
+        return
 
     def load_from_global(self) -> None:
         """
         Load this config instance from the Global Config.
         """
-        # Disable change notifications until we are complete
-        with self.notification_pauser() as muted_cfg:
-            # Use the 'properties' to set the values in order to properly flag changes
-            # Hardware Settings
-            muted_cfg.gpio = config.gpio
-            muted_cfg.serial_port = config.serial_port
-            muted_cfg.interface_type = config.interface_type
-            muted_cfg.invert_key_input = config.invert_key_input
-            muted_cfg.sound = config.sound
-            muted_cfg.sounder = config.sounder
-            muted_cfg.sounder_power_save = config.sounder_power_save
-            # Morse Settings
-            muted_cfg.code_type = config.code_type
-            muted_cfg.min_char_speed = config.min_char_speed
-            muted_cfg.spacing = config.spacing
-            muted_cfg.text_speed = config.text_speed
-            # App Operation Settings
-            muted_cfg.auto_connect = config.auto_connect
-            muted_cfg.local = config.local
-            muted_cfg.remote = config.remote
-            muted_cfg.server_url = config.server_url
-            muted_cfg.station = config.station
-            muted_cfg.wire = config.wire
+        try:
+            config.read_config()  # Re-read the stored configuration values
+            # Disable change notifications until we are complete
+            with self.notification_pauser() as muted_cfg:
+                # Use the 'properties' to set the values in order to properly flag changes
+                # Hardware Settings
+                muted_cfg.gpio = config.gpio
+                muted_cfg.serial_port = config.serial_port
+                muted_cfg.interface_type = config.interface_type
+                muted_cfg.invert_key_input = config.invert_key_input
+                muted_cfg.sound = config.sound
+                muted_cfg.audio_type = config.audio_type
+                muted_cfg.sounder = config.sounder
+                muted_cfg.sounder_power_save = config.sounder_power_save
+                # Morse Settings
+                muted_cfg.code_type = config.code_type
+                muted_cfg.min_char_speed = config.min_char_speed
+                muted_cfg.spacing = config.spacing
+                muted_cfg.text_speed = config.text_speed
+                # App Operation Settings
+                muted_cfg.auto_connect = config.auto_connect
+                muted_cfg.debug_level = config.debug_level
+                muted_cfg.local = config.local
+                muted_cfg.remote = config.remote
+                muted_cfg.server_url = config.server_url
+                muted_cfg.station = config.station
+                muted_cfg.wire = config.wire
+        except Exception as ex:
+            log.debug(ex)
+            raise
+        return
 
     def load_to_global(self) -> None:
         """
         Load this config instance into the Global Config
         """
-        # Hardware Settings
-        config.set_gpio(self._gpio)
-        config.set_serial_port(self._serial_port)
-        config.set_interface_type(self._interface_type.name)
-        config.set_invert_key_input(self._invert_key_input)
-        config.set_sound(self._sound)
-        config.set_sounder(self._sounder)
-        config.set_sounder_power_save(str(self._sounder_power_save))
-        # App Operation Settings
-        config.set_auto_connect(self._auto_connect)
-        config.set_local(self._local)
-        config.set_remote(self._remote)
-        config.set_server_url(self._server_url)
-        config.set_station(self._station)
-        config.set_wire_int(self._wire)
-        # Morse Settings
-        config.set_code_type(self._code_type.name)
-        config.set_min_char_speed_int(self._min_char_speed)
-        config.set_spacing(self._spacing.name)
-        config.set_text_speed_int(self._text_speed)
+        try:
+            # Hardware Settings
+            config.set_audio_type(self._audio_type.name)
+            config.set_gpio(self._gpio)
+            config.set_serial_port(self._serial_port)
+            config.set_interface_type(self._interface_type.name)
+            config.set_invert_key_input(self._invert_key_input)
+            config.set_sound(self._sound)
+            config.set_sounder(self._sounder)
+            config.set_sounder_power_save(str(self._sounder_power_save))
+            # App Operation Settings
+            config.set_auto_connect(self._auto_connect)
+            config.set_debug_level_int(self._debug_level)
+            config.set_local(self._local)
+            config.set_remote(self._remote)
+            config.set_server_url(self._server_url)
+            config.set_station(self._station)
+            config.set_wire_int(self._wire)
+            # Morse Settings
+            config.set_code_type(self._code_type.name)
+            config.set_min_char_speed_int(self._min_char_speed)
+            config.set_spacing(self._spacing.name)
+            config.set_text_speed_int(self._text_speed)
+        except Exception as ex:
+            log.debug(ex)
+        return
 
     def notification_pauser(self) -> 'Config':
         """
@@ -947,9 +1056,8 @@ class Config:
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(config.onOffFromBool(self._invert_key_input)), file=f)
-        print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
-        print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
         print("Sound: {}".format(config.onOffFromBool(self._sound)), file=f)
+        print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
         print("Sounder: {}".format(config.onOffFromBool(self._sounder)), file=f)
         print("Sounder Power Save (seconds): {}".format(self._sounder_power_save), file=f)
         print("--------------------", file=f)
@@ -962,6 +1070,11 @@ class Config:
         print("Character speed: {}".format(self._min_char_speed), file=f)
         print("Words per min speed: {}".format(self._text_speed), file=f)
         print("Spacing: {}".format(self._spacing.name.upper()), file=f)
+        print("--------------------", file=f)
+        print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
+        print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
+        print("Debug level: {}".format(self._debug_level), file=f)
+        return
 
     def register_listener(self, listener:Callable[[int],None], change_types: int) -> None:
         """
@@ -980,13 +1093,16 @@ class Config:
             ct = self._change_listeners[listener]
         ct = ct | change_types  # Merge in the requested types
         self._change_listeners[listener] = ct
+        return
 
     def remove_listener(self, listener:Callable[[int],None]) -> None:
         if listener in self._change_listeners:
             del self._change_listeners[listener]
+        return
 
     def restore_config(self, clear_dirty:bool=True):
         # Hardware Settings
+        self._audio_type = self._p_audio_type
         self._gpio = self._p_gpio
         self._serial_port = self._p_serial_port
         self._interface_type = self._p_interface_type
@@ -1001,44 +1117,50 @@ class Config:
         self._text_speed = self._p_text_speed
         # Operational Settings
         self._auto_connect = self._p_auto_connect
+        self._debug_level = self._p_debug_level
         self._local = self._p_local
         self._remote = self._p_remote
         self._server_url = self._p_server_url
         self._station = self._p_station
         self._wire = self._p_wire
-        self._debug_level = self._p_debug_level
         # The override
         if clear_dirty:
             self._dirty = False
+        return
 
     def save_config(self, filepath:Optional[str]=None):
         """
         Save this configuration.
 
         filepath: File path to use. If 'None', use the path loaded from or last saved to.
-                If 'None' is supplied, and a path hasn't been established, and 'use_global'
+                If 'None' is supplied, and a path hasn't been established, and 'using_global'
                 has not been set, raise a FileNotFoundError exception.
 
         Raises: FileNotFoundError if a path hasn't been established and not using global.
                 System may throw other file related exceptions.
         """
-        if self._use_global:
-            self.save_global()
-        else:
-            if not filepath and not self._filepath:
+        try:
+            if not filepath:
+                if self._using_global:
+                    self.save_global()
+                if self._filepath:
+                    filepath = self._filepath
+            if not filepath and not self._using_global:
                 e = FileNotFoundError("File path not yet established")
                 raise e
-            elif not filepath:
-                filepath = self._filepath
 
-            data = self.get_data()
-            with open(filepath, 'w', encoding="utf-8") as fp:
-                json.dump(data, fp)
-                fp.write('\n')
-            self._filepath = filepath
+            if filepath:
+                data = self.get_data()
+                with open(filepath, 'w', encoding="utf-8") as fp:
+                    json.dump(data, fp)
+                    fp.write('\n')
+            self.set_filepath(filepath)
             self._saved_chng = True
             self.clear_dirty()
             self._notify_listeners()
+        except Exception as ex:
+            log.debug(ex)
+        return
 
     def save_global(self) -> None:
         """
@@ -1046,6 +1168,7 @@ class Config:
         """
         self.load_to_global()
         config.save_config()
+        return
 
     def set_dirty(self):
         """
@@ -1057,19 +1180,22 @@ class Config:
         not dirty.
         """
         self._dirty = True
+        return
 
     def set_filepath(self, filepath:str):
         self._filepath = filepath
         if filepath:
-            self._use_global = False
+            self._using_global = False
+        return
 
-    def use_global(self, global_):
-        self._use_global = global_
-        if self._use_global:
+    def set_using_global(self, global_):
+        self._using_global = global_
+        if self._using_global:
             self._filepath = None
+        return
 
     def using_global(self) -> bool:
-        return self._use_global
+        return self._using_global
 
 # ########################################################################
 # Arg Parse parsers for each of the configuration values.
@@ -1086,9 +1212,21 @@ config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg
     help="Configuration file to use. If not specified, the global configuration is used.")
 
 debug_level_override = argparse.ArgumentParser(add_help=False)
-debug_level_override.add_argument("--debug-level", metavar="debug-level", dest="debug_level",
-    type=int, default=0,
+debug_level_override.add_argument(
+    "--debug-level",
+    metavar="debug-level",
+    dest="debug_level",
+    type=int,
     help="Debug logging level. A value of '0' disables output, higher values enable more output.")
+
+audio_type_override = argparse.ArgumentParser(add_help=False)
+audio_type_override.add_argument(
+    "-Z",
+    "--audiotype",
+    metavar="audio-type",
+    dest="audio_type",
+    help="The audio type (SOUNDER|TONE) to use.",
+)
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
 auto_connect_override.add_argument("-C", "--autoconnect", metavar="auto-connect", dest="auto_connect",
@@ -1109,15 +1247,20 @@ invert_key_input_override.add_argument("-M", "--iki", metavar="invert-key-input"
 
 local_override = argparse.ArgumentParser(add_help=False)
 local_override.add_argument("-L", "--local", metavar="local-copy", dest="local",
-    help="True/False to Enable/Disable local copy of transmitted code.")
+    help="'ON' or 'OFF' to Enable/Disable sounding of local code.")
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", metavar="wpm", dest="min_char_speed", type=int,
     help="The minimum character speed to use in words per minute.")
 
 remote_override = argparse.ArgumentParser(add_help=False)
-remote_override.add_argument("-R", "--remote", metavar="remote-send", dest="remote",
-    help="True/False to Enable/Disable transmission over the internet on the specified wire.")
+remote_override.add_argument(
+    "-R",
+    "--remote",
+    metavar="remote-send",
+    dest="remote",
+    help="'ON' or 'OFF' to Enable/Disable sending code to the connected wire (internet).",
+)
 
 server_url_override = argparse.ArgumentParser(add_help=False)
 server_url_override.add_argument("-U", "--url", metavar="url", dest="server_url",
@@ -1131,21 +1274,39 @@ gpio_override = argparse.ArgumentParser(add_help=False)
 gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="gpio",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
     help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used." +
-        "GPIO takes priority over the serial interface.")
+        "GPIO takes priority over the serial interface if both are specified.")
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", metavar="sound", dest="sound",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether computer audio should be used to simulate a sounder.")
+    help="'ON' or 'OFF' to indicate whether computer audio should be used to sound code.")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
-sounder_override.add_argument("-A", "--sounder", metavar="sounder", dest="sounder",
-    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether to use sounder if `port` is configured.")
+sounder_override.add_argument(
+    "-A",
+    "--sounder",
+    metavar="sounder",
+    dest="sounder",
+    choices=[
+        "ON",
+        "On",
+        "on",
+        "YES",
+        "Yes",
+        "yes",
+        "OFF",
+        "Off",
+        "off",
+        "NO",
+        "No",
+        "no",
+    ],
+    help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.",
+)
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
 sounder_pwrsv_override.add_argument("-P", "--pwrsv", metavar="seconds", dest="sounder_power_save", type=int,
-    help="The sounder power-save delay in seconds, or '0' to disable.")
+    help="The sounder power-save delay in seconds, or '0' to disable power-save.")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
 spacing_override.add_argument("-s", "--spacing", metavar="spacing", dest="spacing",
@@ -1188,11 +1349,11 @@ def process_config_arg(args) -> Config:
             if not os.path.isfile(file_path):
                 raise FileNotFoundError("Configuration file '{}' does not exist.".format(file_path))
             cfg.load_config(file_path)
-            cfg.use_global(False)
+            cfg.set_using_global(False)
             return cfg
     #
     cfg.load_from_global()
-    cfg.use_global(True)
+    cfg.set_using_global(True)
     return cfg
 
 def process_config_args(args, cfg:Config=None) -> Config:
@@ -1206,26 +1367,30 @@ def process_config_args(args, cfg:Config=None) -> Config:
     Raises: Various Exceptions from processing the arguments.
     """
     if not cfg:
+        # Get a Config instance to use as a base
         cfg = process_config_arg(args)
     # Set config values if they were specified
     if hasattr(args, "debug_level"):
-        if args.debug_level:
+        if not args.debug_level is None:
             n = args.debug_level
             cfg.debug_level = n if n >= 0 else 0
+    if hasattr(args, "audio_type"):
+        if not args.audio_type is None:
+            cfg.audio_type = config.audio_type_from_str(args.audio_type)
     if hasattr(args, "auto_connect"):
-        if args.auto_connect:
+        if not args.auto_connect is None:
             cfg.auto_connect = strtobool(args.auto_connect)
     if hasattr(args, "code_type"):
-        if args.code_type:
+        if not args.code_type is None:
             cfg.code_type = config.codeTypeFromString(args.code_type)
     if hasattr(args, "interface_type"):
-        if args.interface_type:
+        if not args.interface_type is None:
             cfg.interface_type = config.interface_type_from_str(args.interface_type)
     if hasattr(args, "invert_key_input"):
-        if args.invert_key_input:
+        if not args.invert_key_input is None:
             cfg.invert_key_input = strtobool(args.invert_key_input)
     if hasattr(args, "min_char_speed"):
-        if args.min_char_speed:
+        if not args.min_char_speed is None:
             n = args.min_char_speed
             if n < 5:
                 n = 5
@@ -1233,49 +1398,49 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 n = 50
             cfg.min_char_speed = n
     if hasattr(args, "local"):
-        if args.local:
+        if not args.local is None:
             cfg.local = strtobool(args.local)
     if hasattr(args, "remote"):
-        if args.remote:
+        if not args.remote is None:
             cfg.remote = strtobool(args.remote)
     if hasattr(args, "serial_port"):
-        if args.serial_port:
+        if not args.serial_port is None:
             s = config.noneOrValueFromStr(args.serial_port)
             if not s or s.strip().upper() == 'NONE':
                 cfg.serial_port = None
             else:
                 cfg.serial_port = s.strip()
     if hasattr(args, "gpio"):
-        if args.gpio:
+        if not args.gpio is None:
             cfg.gpio = strtobool(args.gpio)
     if hasattr(args, "server_url"):
-        if args.server_url:
+        if not args.server_url is None:
             s = config.noneOrValueFromStr(args.server_url)
             if not s or s.strip().upper() == 'DEFAULT' or s.strip().upper() == 'NONE':
                 cfg.server_url = None
             else:
                 cfg.server_url = s.strip()
     if hasattr(args, "sound"):
-        if args.sound:
+        if not args.sound is None:
             cfg.sound = strtobool(args.sound)
     if hasattr(args, "sounder"):
-        if args.sounder:
+        if not args.sounder is None:
             cfg.sounder = strtobool(args.sounder)
     if hasattr(args, "sounder_power_save"):
-        if args.sounder_power_save:
+        if not args.sounder_power_save is None:
             n = args.sounder_power_save
             if n < 0:
                 n = 0
             cfg.sounder_power_save = n
     if hasattr(args, "spacing"):
-        if args.spacing:
+        if not args.spacing is None:
             cfg.spacing = config.spacing_from_str(args.spacing)
     if hasattr(args, "station"):
-        if args.station:
+        if not args.station is None:
             s = args.station.strip()
             cfg.station = s
     if hasattr(args, "text_speed"):
-        if args.text_speed:
+        if not args.text_speed is None:
             n = args.text_speed
             if n < 5:
                 n = 5
@@ -1283,7 +1448,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 n = 50
             cfg.text_speed = n
     if hasattr(args, "wire"):
-        if args.wire:
+        if not args.wire is None:
             n = args.wire
             if n < 0:
                 n = 0

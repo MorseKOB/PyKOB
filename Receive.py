@@ -2,7 +2,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,7 @@ Example:
 """
 
 from pykob import VERSION, config, log, kob, internet, morse
+from pykob.kob import CodeSource
 
 import argparse
 import codecs
@@ -115,7 +116,7 @@ try:
     while True:
         code = myInternet.read()
         myReader.decode(code)
-        myKOB.soundCode(code)
+        myKOB.soundCode(code, code_source=CodeSource.wire)
 except KeyboardInterrupt:
     print()
     print()

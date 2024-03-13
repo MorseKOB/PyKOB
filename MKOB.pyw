@@ -39,10 +39,11 @@ from mkobwindow import MKOBWindow
 VERSION = "4.1.4"
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
-print(" Python " + sys.version + " on " + sys.platform)
-print(" PyKOB " + PKVERSION)
-print(" Tcl/Tk {}/{}".format(tk.TclVersion, tk.TkVersion))
+print(" Python: " + sys.version + " on " + sys.platform)
+print(" pykob: " + PKVERSION)
+print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
+distroy_on_exit = True
 try:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). Receive from wire and send from key.\nThe configuration is used except as overridden by optional arguments.",
         parents= [
@@ -66,9 +67,7 @@ try:
 
     # Set a minsize for the window, and place it in the middle
     root.update()
-    x_cordinate = int((root.winfo_screenwidth() / 2) - (root.winfo_width() / 2))
-    y_cordinate = int((root.winfo_screenheight() / 2) - (root.winfo_height() / 2))
-    root.geometry("+{}+{}".format(x_cordinate, y_cordinate-20))
+    root.geometry("+30+30")
     root.state('normal')
 
     mkobwin.start()
@@ -78,7 +77,7 @@ try:
 
     root.after(400, mkobwin.set_minimum_sizes)
     root.mainloop()
-
+    distroy_on_exit = False  # App is already distroyed at this point
 except KeyboardInterrupt:
     print()
     sys.exit(0)
@@ -86,6 +85,8 @@ except Exception as ex:
     print("Error: {}".format(ex))
     sys.exit(1)
 finally:
+    if mkobwin:
+        mkobwin.exit(distroy_on_exit)
     print("~73")
 sys.exit(0)
 

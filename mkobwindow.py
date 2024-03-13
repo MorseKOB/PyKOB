@@ -1,7 +1,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,14 +28,17 @@ kobwindow.py
 Create the main window for MKOB and lay out its widgets (controls).
 """
 from mkobactions import MKOBActions
+from mkobhelpkeys import MKOBHelpKeys
 from mkobkeyboard import MKOBKeyboard
 from mkobmain import MKOBMain
 from mkobreader import MKOBReader
 from mkobstationlist import MKOBStationList
 from pykob import config, config2, log
+from pykob import VERSION as PKVERSION
 from pykob.config2 import Config
 import mkobevents
 
+import sys
 from tkinter import N, S, W, E
 import tkinter as tk
 from tkinter import ttk
@@ -132,7 +135,7 @@ class SenderControls:
         self._input_validator = input_validator
         self._farns_change_callback = farns_change_callback
         self._text_change_callback = text_change_callback
-        self._lbl_code_sender = ttk.Label(self.window, text="Code Sender:")
+        self._lbl_code_sender = ttk.Label(self.window, text="Keyboard Code Sender:")
         self._varCodeSenderOn = tk.IntVar()
         self._chkCodeSenderOn = ttk.Checkbutton(
             self.window, text="Enable", variable=self._varCodeSenderOn
@@ -302,6 +305,7 @@ class MKOBWindow:
         self._app_name_version = mkob_version_text
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
+        self._root.protocol("WM_DELETE_WINDOW", self._on_app_distroy)  # Handle user clicking [X]
         self.window = ttk.Frame(root)
 
         # Operational values (from config)
@@ -317,6 +321,7 @@ class MKOBWindow:
         self._ksl = MKOBStationList(self)
         self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
         self._kkb = MKOBKeyboard(self._ka, self)
+        self._shortcuts_win = None
 
         # validators
         self._digits_only_validator = root.register(self._validate_number_entry)
@@ -335,6 +340,8 @@ class MKOBWindow:
         self._root.bind_all("<Key-Escape>", self._ka.handle_toggle_closer)
         self._root.bind_all("<Key-Pause>", self._ka.handle_toggle_code_sender)
         self._root.bind_all("<Key-F1>", self._ka.handle_toggle_code_sender)
+        self._root.bind_all("<Key-F2>", self._ka.doConnect)
+        ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
         self._root.bind_all("<Key-F11>", self._ka.handle_clear_reader_window)
@@ -373,6 +380,8 @@ class MKOBWindow:
         self._fileMenu.add_command(label="New", command=self._ka.doFileNew)
         self._fileMenu.add_command(label="Open...", command=self._ka.doFileOpen)
         self._fileMenu.add_separator()
+        self._fileMenu.add_command(label="Record", command=self._ka.doFileRecord)
+        self._fileMenu.add_command(label="End Recording", command=self._ka.doFileRecordEnd)
         self._fileMenu.add_command(label="Play...", command=self._ka.doFilePlay)
         self._fileMenu.add_separator()
         self._fileMenu.add_command(
@@ -386,6 +395,12 @@ class MKOBWindow:
         )
         self._fileMenu.add_command(
             label="Save As...", command=self._ka.doFilePrefsSaveAs
+        )
+        self._fileMenu.add_command(
+            label="Load Global", command=self._ka.doFilePrefsLoadGlobal
+        )
+        self._fileMenu.add_command(
+            label="Save Global", command=self._ka.doFilePrefsSaveGlobal
         )
         self._fileMenu.add_separator()
         self._fileMenu.add_command(label="Exit", command=self._ka.doFileExit)
@@ -406,6 +421,8 @@ class MKOBWindow:
         # Help menu
         self._helpMenu = tk.Menu(self._menu)
         self._menu.add_cascade(label="Help", menu=self._helpMenu)
+        self._helpMenu.add_command(label="Keyboard Shortcuts", command=self._ka.doHelpShortcuts)
+        self._helpMenu.add_separator()
         self._helpMenu.add_command(label="About", command=self._ka.doHelpAbout)
 
         # Paned/Splitter windows
@@ -516,7 +533,7 @@ class MKOBWindow:
         ## Wire
         self._lbl_wire = ttk.Label(fm_wire_connect, text="Wire:")
         self._varWireNo = tk.StringVar()
-        self._varWireNo.set(cfg.wire)
+        self._varWireNo.set(str(cfg.wire))
         self._varWireNo.trace_add("write", self._handle_wire_change)
         self._spnWireNo = ttk.Spinbox(
             fm_wire_connect,
@@ -675,14 +692,14 @@ class MKOBWindow:
         self._fm_sndr_controls.code_sender_repeat = False
 
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._app_name_version, self._ka, self, cfg)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, cfg)
         self._ka.start(self._km, self._kkb)
 
         # Make sure window size reflects all widgets
-        self._set_app_title()
+        self.set_app_title()
         self._root.update()
         self._cfg.register_listener(
-            self._config_changed_handler, config2.ChangeType.ANY
+            self._config_changed_listener, config2.ChangeType.ANY
         )
 
         #### Keyboard event for the code send window (this must go after the 'root.update')
@@ -694,8 +711,11 @@ class MKOBWindow:
         # Finish up...
         self._ka.doMorseChange()
 
-    def _config_changed_handler(self, ct: int):
-        self._set_app_title()
+    def _config_changed_listener(self, ct: int):
+        """
+        Called by the Config instance when a change is made.
+        """
+        self.set_app_title()
 
     def _validate_number_entry(self, P):
         """
@@ -749,7 +769,7 @@ class MKOBWindow:
     def _handle_morse_change(self, *args):
         if self._after_hmc:
             self._root.after_cancel(self._after_hmc)
-        self._after_hmc = self._root.after(1333, self._handle_morse_change_delayed)
+        self._after_hmc = self._root.after(1200, self._handle_morse_change_delayed)
 
     def _handle_wire_change_delayed(self, *args):
         self._after_hwc = None
@@ -761,12 +781,14 @@ class MKOBWindow:
                 new_wire = 0
             elif new_wire > 32000:
                 new_wire = 32000
+            if not str(new_wire) == wstr:
+                self._varWireNo.set(str(new_wire))
             self._ka.doWireNo()
 
     def _handle_wire_change(self, *args):
         if self._after_hwc:
             self._root.after_cancel(self._after_hwc)
-        self._after_hwc = self._root.after(1333, self._handle_wire_change_delayed)
+        self._after_hwc = self._root.after(1200, self._handle_wire_change_delayed)
 
     def _handle_text_speed_change_delayed(self, *args):
         self._after_tsc = None
@@ -785,12 +807,13 @@ class MKOBWindow:
             self._root.after_cancel(self._after_tsc)
         self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
 
-    def _set_app_title(self):
-        cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
-        # If our config has a filename, display it as part of our title
-        name = self._cfg.get_name()
-        n = " - " + name if name and not name == '' else ''
-        self._root.title(self._app_name_version + n + cfg_modified_attrib)
+    def _on_app_distroy(self) -> None:
+        """
+        Called when TK generates the WM_DELETE_WINDOW event due to user clicking 'X' on main window.
+        """
+        log.debug("MKOBWindow._on_app_distroy triggered.")
+        self.exit()
+        return
 
     @property
     def code_sender_enabled(self):
@@ -905,10 +928,10 @@ class MKOBWindow:
         return -1
 
     @wire_number.setter
-    def wire_number(self, v):
+    def wire_number(self, v:int):
         w = self._varWireNo.get()
-        if not v == w:
-            self._varWireNo.set(v)
+        if not str(v) == w:
+            self._varWireNo.set(str(v))
 
     def connected(self, connected):
         """
@@ -924,19 +947,34 @@ class MKOBWindow:
         log.debug("=>Event generate: {}".format(event), 4)
         return self._root.event_generate(event, when=when, data=data)
 
-    def exit(self):
+    def exit(self, distroy_app:bool = True):
         """
         Exit the program by distroying the main window and quiting
         the message loop.
         """
-        self._root.destroy()
+        if self._km:
+            self._km.exit()
+            self._km = None
+        if distroy_app:
+            self._root.destroy()
         self._root.quit()
+        return
 
     def give_keyboard_focus(self):
         """
         Make the keyboard window the active (focused) window.
         """
         self._txtKeyboard.focus_set()
+
+    def set_app_title(self):
+        cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
+        # If our config has a filename, display it as part of our title
+        name = self._cfg.get_name()
+        if not self._cfg.using_global():
+            n = " - " + name
+        else:
+            n = " - Global"
+        self._root.title(self._app_name_version + n + cfg_modified_attrib)
 
     def set_minimum_sizes(self):
         """
@@ -955,6 +993,32 @@ class MKOBWindow:
             self._fm_right, minsize=w
         )
         self._root.minsize(self._root.winfo_width(), int(self._root.winfo_height() * 0.666))
+
+    def show_help_about(self):
+        """
+        Display help about the app and environment.
+        """
+        title = "About MKOB"
+        copy_license = "Copyright (c) 2020-24 PyKOB - MorseKOB in Python\nMIT License"
+        msg = "{}\n{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
+            self.app_name_version,
+            copy_license,
+            PKVERSION,
+            sys.version,
+            config.pyaudio_version,
+            config.pyserial_version,
+            tk.TclVersion,
+            tk.TkVersion,
+        )
+        tk.messagebox.showinfo(title=title, message=msg)
+
+    def show_shortcuts(self):
+        """
+        Display the Keyboard Shortcuts window.
+        """
+        if not (self._shortcuts_win and MKOBHelpKeys.active):
+            self._shortcuts_win = MKOBHelpKeys()
+        self._shortcuts_win.focus()
 
     def start(self):
         self._kkb.start(self._km)

@@ -3,7 +3,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,10 @@ Waits for a station to send a message ending in WX XXXX, where XXXX is the
 with the current weather conditions and short term forecast for that area.
 
 Change history:
+
+1.0.8  2024-03-13
+- Create Internet instance with all parameters needed to adapt to new config usage
+  (modules don't read directly from config)
 
 1.0.7  2020-05-28
 - changed header to `#!/usr/bin/env python3`
@@ -62,17 +66,20 @@ from urllib.request import Request, urlopen
 import re
 import sys
 import time
-from pykob import internet, morse, kob, log
+from pykob import config, internet, morse, kob, log
 import pykob  # to access PyKOB version number
 
-VERSION = '1.0.7'
+VERSION = '1.0.8'
 WIRE    = 106
 IDTEXT  = 'KOB Weather Service, AC'
 WPM     = 20  # initial guess at received Morse speed
 #DEBUG   = '~IACWXKSEA+'  # run locally, don't connect to wire
 DEBUG   = ''  # run normally
 
-log.log('Starting Weather ' + VERSION)
+global app_ver
+app_ver = "Weather {}".format(VERSION)
+
+log.log('Starting {}'.format(app_ver))
 log.log('PyKOB version ' + pykob.VERSION)
 
 def readerCallback(char, spacing):
@@ -102,7 +109,7 @@ def readerCallback(char, spacing):
         sendForecast(msg)
         myReader.setWPM(WPM)
         msg = ''
-    
+
 FLAGS = re.IGNORECASE + re.DOTALL
 
 def sendForecast(msg):
@@ -213,7 +220,7 @@ try:
         sendForecast(DEBUG)
         exit()
 
-    myInternet = internet.Internet(IDTEXT)
+    myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
     myInternet.connect(WIRE)
     myReader = morse.Reader(callback=readerCallback)
     mySender = morse.Sender(WPM)

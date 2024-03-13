@@ -1,7 +1,7 @@
 """
 MIT License
 
-Copyright (c) 2020 PyKOB - MorseKOB in Python
+Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -360,7 +360,8 @@ class Reader:
         self._flusher = None
         if f:
             f.cancel()
-            f.join(0.38)
+            if f.is_alive():
+                f.join(0.40)
             pass
         if self._mark > 0 or self._latched:
             spacing = self._spaceBuf[self._nChars]
