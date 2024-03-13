@@ -89,7 +89,7 @@ class KOB:
     def __init__(
             self, interfaceType:InterfaceType=InterfaceType.loop, portToUse:Optional[str]=None,
             useGpio:bool=False, useAudio:bool=False, audioType:AudioType=AudioType.SOUNDER, useSounder:bool=False, invertKeyInput:bool=False, soundLocal:bool=True, sounderPowerSaveSecs:int=0,
-                    virtual_closer_in_use: bool = False, keyCallback=None):
+                    virtual_closer_in_use: bool = False, err_msg_hndlr=None, keyCallback=None):
         """
         When code is not running, the physical sounder (if connected) is not enabled, so
         set the initial state flags accordingly.
@@ -98,6 +98,7 @@ class KOB:
         """
         self._interface_type:InterfaceType = interfaceType
         self._invert_key_input:bool = invertKeyInput
+        self._err_msg_hndlr = err_msg_hndlr if err_msg_hndlr else log.warn  # Function that can take a string
         self._port_to_use:str = portToUse
         self._sound_local:bool = soundLocal
         self._sounder_power_save_secs: float = sounderPowerSaveSecs
@@ -162,8 +163,8 @@ class KOB:
                     from pykob import audio
                     self._audio = audio.Audio(self._audio_type)
                 except ModuleNotFoundError:
-                    log.err(
-                        "Audio module is not available. The synth sounder or tone cannot be used."
+                    self._err_msg_hndlr(
+                        "Audio module is not available. The synth sounder and tone cannot be used."
                     )
                     self._use_audio = False
         return
@@ -186,8 +187,8 @@ class KOB:
                     gpio_led = LED
                     gpio_button = Button
                 except:
-                    log.err(
-                        "Module 'gpiozero' is not available. GPIO interface cannot be used."
+                    self._err_msg_hndlr(
+                        "Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder."
                     )
             if self._port_to_use and not gpio_module_available:
                 try:
@@ -195,8 +196,8 @@ class KOB:
 
                     serial_module_available = True
                 except:
-                    log.err(
-                        "Module pySerial is not available. Serial interface cannot be used."
+                    self._err_msg_hndlr(
+                        "Module pySerial is not available. Serial interface cannot be used for a key/sounder."
                     )
             #
             # At this point, we have either the GPIO or the Serial module available, or none.
@@ -209,8 +210,8 @@ class KOB:
                     log.info("The GPIO interface is available/active and will be used.")
                 except:
                     self._hw_interface = HWInterface.NONE
-                    log.warn(
-                        "Interface for key and/or sounder on GPIO not available. GPIO key and sounder will not function."
+                    self._err_msg_hndlr(
+                        "Interface for key and/or sounder on GPIO not available. GPIO key/sounder will not function."
                     )
             elif serial_module_available:
                 try:
@@ -233,8 +234,8 @@ class KOB:
                         log.info("KOB Serial Interface is 'full' type (key on DSR).")
                 except Exception as ex:
                     self._hw_interface = HWInterface.NONE
-                    log.warn(
-                        "Interface for key and/or sounder on serial port '{}' not available. Key and sounder will not function.".format(self._port_to_use)
+                    self._err_msg_hndlr(
+                        "Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use)
                     )
                     log.debug(ex)
             # Update closers states based on state of key
@@ -342,7 +343,7 @@ class KOB:
                         self._gpio_sndr_drive.off()  # Pin goes low and deenergizes sounder
                 except OSError:
                     self._hw_interface = HWInterface.NONE
-                    log.err("GPIO output error setting sounder state. Disabling GPIO.")
+                    self._err_msg_hndlr("GPIO output error setting sounder state. Disabling interface.")
             elif self._hw_interface == HWInterface.SERIAL:
                 try:
                     if self._port:
@@ -352,7 +353,7 @@ class KOB:
                             self._port.rts = False
                 except OSError:
                     self._hw_interface = HWInterface.NONE
-                    log.err("Serial RTS error setting sounder state. Disabling Serial.")
+                    self._err_msg_hndlr("Serial RTS error setting sounder state. Disabling interface.")
         return
 
     def _energize_synth(self, energize: bool, no_tone: bool):
@@ -367,7 +368,7 @@ class KOB:
                     self._play_clack_silence()
             except:
                 self._use_audio = False
-                log.err(
+                self._err_msg_hndlr(
                     "System audio error playing sounder state. Disabling synth sounder."
                 )
         return
@@ -386,14 +387,14 @@ class KOB:
                 pass
             except:
                 self._hw_interface = HWInterface.NONE
-                log.err("GPIO key interface read error. Disabling GPIO.")
+                self._err_msg_hndlr("GPIO interface read error. Disabling interface.")
         elif self._hw_interface == HWInterface.SERIAL:
             try:
                 kc = self._serial_key_read()
                 pass
             except:
                 self._hw_interface = HWInterface.NONE
-                log.err("Serial key interface read error. Disabling Serial.")
+                self._err_msg_hndlr("Serial interface read error. Disabling interface.")
         # Invert key state if configured to do so (ex: input is from a modem)
         if self._invert_key_input:
             kc = not kc
@@ -520,6 +521,14 @@ class KOB:
     # #############################################################################################
     # Public Interface
     # #############################################################################################
+
+    @property
+    def message_receiver(self):
+        return self._err_msg_hndlr
+
+    @message_receiver.setter
+    def message_receiver(self, f):
+        self._err_msg_hndlr = f if not f is None else log.warn
 
     @property
     def sound_local(self) -> bool:

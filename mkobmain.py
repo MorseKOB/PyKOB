@@ -72,8 +72,9 @@ class MKOBMain:
         self._wire = self._cfg.wire
         self._connected = Event()
         self._odc_fu = None
-        self._show_packets = False
-        self._lastCharWasParagraph = False
+        self._show_packets: bool = False
+        self._lastCharWasParagraph: bool = False
+        self._wire_data_received: bool = False
 
         self._internet_station_active = False  # True if a remote station is sending
 
@@ -110,7 +111,7 @@ class MKOBMain:
             pckt_callback=self._packet_callback,
             appver=self.app_ver,
             server_url=cfg.server_url,
-            msg_receiver=self._critical_msg_handler
+            err_msg_hndlr=self._net_err_msg_hndlr
         )
         if was_connected:
             self.toggle_connect()
@@ -135,6 +136,7 @@ class MKOBMain:
             soundLocal=cfg.local,
             sounderPowerSaveSecs=cfg.sounder_power_save,
             virtual_closer_in_use=True,
+            err_msg_hndlr=self._kob_err_msg_hndlr,
             keyCallback=self.from_key
         )
         self._kob.virtual_closer_is_open = vcloser
@@ -176,11 +178,6 @@ class MKOBMain:
         )
         return
 
-    def _critical_msg_handler(self, msg:str) -> None:
-        log.warn(msg)
-        self._ka.trigger_reader_append_text(msg)
-        return
-
     def _emit_code_thread_run(self):
         while not self._threadStop.is_set():
             # Read from the emit code queue
@@ -214,6 +211,16 @@ class MKOBMain:
                 self._tkroot.after(callback_delay, done_callback)
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
+        return
+
+    def _kob_err_msg_hndlr(self, msg:str) -> None:
+        log.warn(msg)
+        msgbox.showwarning(title=self.app_ver, message=msg)
+        return
+
+    def _net_err_msg_hndlr(self, msg:str) -> None:
+        log.warn(msg)
+        self._ka.trigger_reader_append_text("\n{}\n".format(msg))
         return
 
     def start(self):
@@ -378,6 +385,7 @@ class MKOBMain:
     def from_internet(self, code):
         """handle inputs received from the internet"""
         if self._connected.is_set():
+            self._wire_data_received = True
             self._kob.soundCode(code, kob.CodeSource.wire)
             self._mreader.decode(code)
             if self._recorder:
@@ -499,6 +507,7 @@ class MKOBMain:
         if not self._connected.is_set():
             # Connect
             self._sender_ID = ""
+            self._wire_data_received = False
             self._ka.handle_clear_stations()
             self._internet.monitor_IDs(
                 self._ka.trigger_update_station_active
@@ -520,10 +529,12 @@ class MKOBMain:
     def _on_disconnect_followup(self, *args):
         log.debug("mkmain._on_disconnect_followup", 3)
         self._odc_fu = None
-        self._mreader.decode(LATCH_CODE, use_flusher=False)
-        self._mreader.flush()
+        if self._wire_data_received:
+            self._mreader.decode(LATCH_CODE, use_flusher=False)
+            self._mreader.flush()
+            self._ka.trigger_reader_append_text("\n#####\n")
         self._ka.trigger_station_list_clear()
-        self._ka.trigger_reader_append_text("\n#####\n")
+        self._wire_data_received = False
         if not self._kob.virtual_closer_is_open:
             # Sounder should be energized when disconnected.
             self._kob.energize_sounder(True, kob.CodeSource.local, from_disconnect=True)
@@ -533,7 +544,8 @@ class MKOBMain:
         # These should be false and blank from the 'disconnect', but make sure.
         self._internet_station_active = False
         self._sender_ID = ""
-        self._mreader.flush()
+        if self._wire_data_received:
+            self._mreader.flush()
         self._kob.power_save(False)
         if not self._odc_fu:
             self._odc_fu = self._tkroot.after(950, self._on_disconnect_followup)
@@ -627,6 +639,8 @@ class MKOBMain:
                 self._kw.wire_number = cfg.wire
                 if cfg.server_url_changed:
                     self._create_internet(cfg)
+                elif cfg.station_changed:
+                    self._internet.set_officeID(cfg.station)
             # Update KOB
             self._kob.sound_local = cfg.local
             self._kob.sounder_power_save_secs = cfg.sounder_power_save

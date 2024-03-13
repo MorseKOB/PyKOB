@@ -177,7 +177,7 @@ class Mrt:
             code_callback=self._from_internet,
             appver=self._app_name_version,
             server_url=cfg.server_url,
-            msg_receiver=log.warn
+            err_msg_hndlr=log.warn
         )
         self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
         self._reader = morse.Reader(

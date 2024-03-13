@@ -50,7 +50,7 @@ ACK = 5  # Ack
 
 """
 :
- : 
+ :
 abc.123
 456.xyz:
 :987
@@ -67,10 +67,10 @@ def _emptyOrValueFromStr(s:str) -> str:
     return s if s else ""
 
 class Internet:
-    def __init__(self, officeID='', code_callback=None, record_callback=None, pckt_callback=None, appver=None, server_url=None, msg_receiver=None):
+    def __init__(self, officeID='', code_callback=None, record_callback=None, pckt_callback=None, appver=None, server_url=None, err_msg_hndlr=None):
         self._host = HOST_DEFAULT
         self._port = PORT_DEFAULT
-        self._msg_receiver = msg_receiver  # Function that can take a string for important messages
+        self._err_msg_hndlr = err_msg_hndlr if err_msg_hndlr else log.warn  # Function that can take a string
         self._ip_address = None  # Set when a connection is made
         s = None if not server_url else server_url.strip()
         if s and len(s) > 0:
@@ -114,6 +114,14 @@ class Internet:
     @property
     def connected(self) -> bool:
         return self._connected.is_set()
+
+    @property
+    def err_msg_hndlr(self):
+        return self._err_msg_hndlr
+
+    @err_msg_hndlr.setter
+    def err_msg_hndlr(self, f):
+        self._err_msg_hndlr = f if not f is None else log.warn
 
     @property
     def packet_callback(self):
@@ -190,10 +198,8 @@ class Internet:
                     success = True
                 except (OSError, socket.gaierror) as ex:
                     # Network error
-                    s = "Network error ({}) - Retrying in 5 seconds".format(ex)
-                    log.warn(s)
-                    if self._msg_receiver:
-                        self._msg_receiver("{}\n".format(s))
+                    s = "Network error: {} (Retrying in 5 seconds)".format(ex)
+                    self._err_msg_hndlr("{}".format(s))
                     time.sleep(5.0)
         return self._ip_address
 
@@ -261,12 +267,12 @@ class Internet:
                             return None  # Socket closed
                         if ex.errno == 22:
                             return None  # Socket not ready
+                        if ex.errno == 9:
+                            return None  # Socket closed
                         pass
                     # Network error
-                    s = "Network error ({}) - Retrying in 5 seconds".format(ex)
-                    log.warn(s)
-                    if self._msg_receiver:
-                        self._msg_receiver("{}\n".format(s))
+                    s = "Network error during read: {} (Retrying in 5 seconds)".format(ex)
+                    self._err_msg_hndlr("{}".format(s))
                     time.sleep(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
