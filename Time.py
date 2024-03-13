@@ -44,9 +44,13 @@ Serial port and audio preferences should be specified by running the
 
 Examples:
     python Time.py
-    python Time.py d 102 "Time signals, AC" 
+    python Time.py d 102 "Time signals, AC"
 
 Change history:
+
+Time 1.6  2024-03-13
+- Create Internet instance with all parameters needed to adapt to new config usage
+  (modules don't read directly from config)
 
 Time 1.5  2020-05-28
 - changed header to `#!/usr/bin/env python3`
@@ -79,7 +83,9 @@ try:
     NOTICK  = 5 * (-200, +2)
     MARK    = (-1, +1) + 9 * (-200, +1) + (-200, +2)
 
-    log.log('Starting Time {0}'.format(VERSION))
+    global app_ver
+    app_ver = "Time {0}".format(VERSION)
+    log.log('Starting ' + app_ver)
 
     nargs = len(sys.argv)
     mode = sys.argv[1][0] if nargs > 1 else 'c'
@@ -92,14 +98,14 @@ try:
     myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
 
     if wire:
-        myInternet = internet.Internet(idText)
+        myInternet = internet.Internet(idText, appver=app_ver, server_url=config.server_url)
         myInternet.connect(wire)
         time.sleep(1)
 
         def checkForListener():
             while True:
                 myInternet.read()  # activate the reader to get tLastListener updates
-            
+
         listenerThread = threading.Thread(target=checkForListener)
         listenerThread.daemon = True
         listenerThread.start()

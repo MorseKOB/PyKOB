@@ -58,6 +58,10 @@ Examples:
 
 Change history:
 
+Feed 2.2  2024-03-13
+- Create Internet instance with all parameters needed to adapt to new config usage
+  (modules don't read directly from config)
+
 Feed 2.1  2024-02-21
 - Send text character along with the code for compatibility with CWCOM clients
 
@@ -95,7 +99,7 @@ from pykob import config, newsreader, morse, internet, kob, log, recorder
 from distutils.util import strtobool
 
 
-VERSION     = '2.1'
+VERSION     = '2.2'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
@@ -244,10 +248,12 @@ global idText
 global uri
 global wait
 
-log.log('Starting Feed {0}'.format(VERSION))
+global app_ver
+app_ver = "Feed {0}".format(VERSION)
+log.log('Starting ' + app_ver)
 
 try:
-    arg_parser = argparse.ArgumentParser(description="Morse wire feed", 
+    arg_parser = argparse.ArgumentParser(description="Morse wire feed",
         parents= [
             config.serial_port_override,
             config.code_type_override,
@@ -320,7 +326,7 @@ try:
     playback_last_sender = None
 
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
-    myInternet = internet.Internet(idText)
+    myInternet = internet.Internet(idText, appver=app_ver, server_url=config.server_url)
     audio_setting = strtobool(str(args.sound))
     myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, useAudio=audio_setting)
 

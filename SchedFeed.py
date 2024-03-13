@@ -33,6 +33,10 @@ Serial port, code speed, and audio preferences should be specified by running th
 
 Change history:
 
+SchedFeed 1.4  2024-03-13
+- add additional parameters when creating Intenet object to handle modules no
+  longer reading directly from the config.
+
 SchedFeed 1.3  2016-02-04
 - display each character as it's sent
 
@@ -49,11 +53,13 @@ SchedFeed 1.0  2015-12-28
 import time
 from pykob import config, kob, internet, morse, log
 
-log.log('SchedFeed 1.3')
+VERSION = "1.4"
+app_ver = "SchedFeed {}".format(VERSION)
+log.log(app_ver)
 
 PORT = config.serial_port # serial port for KOB interface
 USEGPIO = config.gpio # use the GPIO on a Raspberry Pi
-WPM = config.words_per_min_speed  # code speed (words per minute)
+WPM = config.min_char_speed  # code speed (words per minute)
 SOUND = config.sound # whether to enable computer sound for sounder
 WIRE    = 199  # 0 for no feed to internet
 IDTEXT  = 'Test feed, XX'  # text to identify your feed, with office call
@@ -69,10 +75,10 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
         msgs[i+1] = (msgs[i][0] + 1, msgs[i+1][1])
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
-    
+
 myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
 if WIRE:
-    myInternet = internet.Internet(IDTEXT)
+    myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
     myInternet.connect(WIRE)
 mySender = morse.Sender(WPM)
 
