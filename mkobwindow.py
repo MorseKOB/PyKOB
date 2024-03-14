@@ -301,6 +301,7 @@ class SenderControls:
 class MKOBWindow:
     def __init__(self, root, mkob_version_text, cfg: Config) -> None:
 
+        self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
         self._app_name_version = mkob_version_text
         # Hide the window from view until its content can be fully initialized
@@ -691,10 +692,6 @@ class MKOBWindow:
         self._fm_sndr_controls.code_sender_enabled = True
         self._fm_sndr_controls.code_sender_repeat = False
 
-        # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, cfg)
-        self._ka.start(self._km, self._kkb)
-
         # Make sure window size reflects all widgets
         self.set_app_title()
         self._root.update()
@@ -706,10 +703,7 @@ class MKOBWindow:
         self._root.bind(
             mkobevents.EVENT_KB_PROCESS_SEND, self._kkb.handle_keyboard_send
         )
-        # Set to disconnected state
-        self.connected(False)
-        # Finish up...
-        self._ka.doMorseChange()
+        return
 
     def _config_changed_listener(self, ct: int):
         """
@@ -813,6 +807,22 @@ class MKOBWindow:
         """
         log.debug("MKOBWindow._on_app_distroy triggered.")
         self.exit()
+        return
+
+    def on_app_started(self) -> None:
+        """
+        Called by MKOB via a tk.after when the main loop has been started.
+        """
+        self._app_started = True
+        # Now that the windows and controls are initialized, create our MKOBMain.
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg)
+        self._ka.start(self._km, self._kkb)
+        self._kkb.start(self._km)
+        self._km.start()
+        # Set to disconnected state
+        self.connected(False)
+        # Finish up...
+        self._ka.doMorseChange()
         return
 
     @property
@@ -1019,7 +1029,3 @@ class MKOBWindow:
         if not (self._shortcuts_win and MKOBHelpKeys.active):
             self._shortcuts_win = MKOBHelpKeys()
         self._shortcuts_win.focus()
-
-    def start(self):
-        self._kkb.start(self._km)
-        self._km.start()

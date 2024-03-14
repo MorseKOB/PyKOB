@@ -50,6 +50,7 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 class MKOBMain:
     def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config) -> None:
         self.app_ver = app_ver
+        self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow

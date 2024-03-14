@@ -26,7 +26,8 @@ SOFTWARE.
 """
 MKOB.pyw
 
-Python version of MorseKOB 2.5
+Python Morse Code Sending, Receiving, and Learning/Training application
+influenced by the MorseKOB 2.5 application by Les Kerr.
 """
 import argparse
 import tkinter as tk
@@ -75,14 +76,13 @@ try:
     root.geometry("+30+30")
     root.state('normal')
 
-    mkobwin.start()
-
-    if log.get_debug_level() > 10:
+    if cfg.debug_level > 9:
         mkw.print_hierarchy(root)
 
-    root.after(400, mkobwin.set_minimum_sizes)
-    root.after(800, mkobwin.give_keyboard_focus())
-
+    # Schedule a couple things to run after we have entered the main loop.
+    root.after(300, mkobwin.set_minimum_sizes)
+    root.after(600, mkobwin.on_app_started)
+    #
     root.mainloop()
     distroy_on_exit = False  # App is already distroyed at this point
 except KeyboardInterrupt:
