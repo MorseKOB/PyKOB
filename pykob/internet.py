@@ -213,9 +213,9 @@ class Internet:
                 self._close_socket()
             finally:
                 if self._internetReadThread.is_alive():
-                    self._internetReadThread.join()
+                    self._internetReadThread.join(timeout=2.0)
                 if self._keepAliveThread.is_alive():
-                    self._keepAliveThread.join()
+                    self._keepAliveThread.join(timeout=2.0)
             pass
         return
 

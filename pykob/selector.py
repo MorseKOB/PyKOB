@@ -35,7 +35,7 @@ import sys
 import time
 import log
 import threading
-from threading import Event, Thread
+from threading import Condition, Event, Thread
 
 serialModuleAvailable = False
 try:
@@ -43,6 +43,9 @@ try:
     serialModuleAvailable = True
 except:
     log.err("Module pySerial is not available. Selector cannot be used.")
+
+global
+POLE_CYCLE_TIME_MIN = 0.01
 
 @unique
 class SelectorMode(IntEnum):
@@ -62,7 +65,7 @@ class Selector:
         self._portToUse = portToUse
         self._port = None
         self._mode = mode
-        self._pole_cycle_time = pole_cycle_time
+        self._pole_cycle_time = pole_cycle_time if pole_cycle_time >= POLE_CYCLE_TIME_MIN else POLE_CYCLE_TIME_MIN
         self._steady_time = steady_time
         self._on_change = on_change
         self._one_of_four = 0
@@ -70,6 +73,7 @@ class Selector:
         self._raw_value = 0
         self._t_last_change = time.time()
         #
+        self._threadPauser = Condition()
         self._threadsStop = Event()
         self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_run)
 
@@ -150,6 +154,7 @@ class Selector:
         Stop the threads and exit.
         """
         self._threadsStop.set()
+        self._threadPauser.notify_all()
         self._thread_port_checker.join(timeout=2.0)
 
     def start(self):
@@ -158,7 +163,7 @@ class Selector:
             self._thread_port_checker.start()
             log.debug("The UART '{}' for the Selector is available.".format(self._portToUse))
         except Exception as ex:
-            log.info("The Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
+            log.info("Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
             log.debug("Selector exception: {}".format(ex))
 
 """

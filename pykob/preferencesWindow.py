@@ -377,31 +377,30 @@ class PreferencesWindow:
 
         #######################################################################
         #
-        #   Debug Options
+        #   Logging Options
         #
         #######################################################################
-        advancedDebugOptions = ttk.LabelFrame(advanced_prefs, text=" Debug Options")
-        ttk.Label(advancedDebugOptions, text="Level:").grid(row=0, column=0, padx=[24, 0], sticky=tk.W)
-        self._varDBLevel = tk.StringVar()
-        ldl = log.get_debug_level()
-        cdl = self._cfg.debug_level
-        dl = max(ldl, cdl)
-        if not ldl == cdl:
-            self._cfg.debug_level = dl
-        self._varDBLevel.set(dl)
-        self._spnDBLevel = ttk.Spinbox(
-            advancedDebugOptions,
+        loggingOptions = ttk.LabelFrame(advanced_prefs, text=" Logging")
+        ttk.Label(loggingOptions, text="Level:").grid(row=0, column=0, padx=[24, 0], sticky=tk.W)
+        self._varLoggingLevel = tk.StringVar()
+        lll = log.get_logging_level()
+        cll = self._cfg.logging_level
+        ll = max(lll, cll)
+        if not lll == cll:
+            self._cfg.logging_level = ll
+        self._varLoggingLevel.set(ll)
+        self._spnLogLevel = ttk.Spinbox(
+            loggingOptions,
             style="MK.TSpinbox",
-            from_=1,
+            from_=log.LOGGING_MIN_LEVEL,
             to=99999,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
             validate="key",
-            validatecommand=(self._digits_only_validator, "%P"),
-            textvariable=self._varDBLevel,
+            textvariable=self._varLoggingLevel,
         ).grid(row=0, column=1, padx=1)
-        advancedDebugOptions.pack(fill=tk.BOTH)
+        loggingOptions.pack(fill=tk.BOTH)
 
         #######################################################################
         #
@@ -515,10 +514,14 @@ class PreferencesWindow:
 
     def _apply(self):
         with self._cfg.notification_pauser() as muted_cfg:
-            ndl = self._varDBLevel.get()
+            ndl = self._varLoggingLevel.get()
             if ndl:
-                dlv = int(ndl)
-                muted_cfg.debug_level = dlv
+                lv = log.INFO_LEVEL
+                try:
+                    lv = int(ndl)
+                except Exception:
+                    pass
+                muted_cfg.logging_level = lv
             log.debug("Interface type: {}  Equipment type: {}".format(self.HW_INTERFACE_TYPES[self._interfaceType.get() - 1],
                 self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
             it = self._interfaceType.get() - 1

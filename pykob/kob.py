@@ -290,9 +290,9 @@ class KOB:
     def __stop_hw_processing(self) -> None:
         self._threadsStop.set()
         if self._keyread_thread and self._keyread_thread.is_alive():
-            self._keyread_thread.join()
+            self._keyread_thread.join(timeout=2.0)
         if self._powersave_thread and self._powersave_thread.is_alive():
-            self._powersave_thread.join()
+            self._powersave_thread.join(timeout=2.0)
         self._keyread_thread = None
         self._powersave_thread = None
         return

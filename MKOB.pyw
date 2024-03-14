@@ -54,14 +54,14 @@ try:
                                          + "The Global Configuration is used unless a configuration file is specified.",
         parents= [
             config2.config_file_override,
-            config2.debug_level_override
+            config2.logging_level_override
         ]
     )
     args = arg_parser.parse_args()
     cfg = config2.process_config_args(args)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
 
-    log.set_debug_level(cfg.debug_level)
+    log.set_logging_level(cfg.logging_level)
 
     root = tk.Tk(className="MKOB")
     icon = tk.PhotoImage(file="resources/mkob-icon_64.png")
@@ -76,7 +76,7 @@ try:
     root.geometry("+30+30")
     root.state('normal')
 
-    if cfg.debug_level > 9:
+    if cfg.logging_level > 9:
         mkw.print_hierarchy(root)
 
     # Schedule a couple things to run after we have entered the main loop.

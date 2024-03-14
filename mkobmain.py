@@ -245,7 +245,7 @@ class MKOBMain:
         if self._internet:
             self._internet.exit()
         if self._emit_code_thread and self._emit_code_thread.is_alive():
-            self._emit_code_thread.join()
+            self._emit_code_thread.join(timeout=2.0)
         return
 
     @property
@@ -623,7 +623,7 @@ class MKOBMain:
         log.debug("MKMain._update_from_config. CT:{}".format(ct), 2)
         try:
             self._set_on_cfg = False
-            log.set_debug_level(cfg.debug_level)
+            log.set_logging_level(cfg.logging_level)
             if ct & config2.ChangeType.MORSE:
                 self._kw.spacing = cfg.spacing
                 self._kw.twpm = cfg.text_speed

@@ -517,7 +517,7 @@ if __name__ == "__main__":
                 config2.min_char_speed_override,
                 config2.text_speed_override,
                 config2.config_file_override,
-                config2.debug_level_override
+                config2.logging_level_override
             ]
         )
         arg_parser.add_argument(
@@ -533,7 +533,7 @@ if __name__ == "__main__":
         args = arg_parser.parse_args()
         cfg = config2.process_config_args(args)
         wire = args.wire if args.wire else cfg.wire
-        log.set_debug_level(cfg.debug_level)
+        log.set_logging_level(cfg.logging_level)
 
         print(MRT_VERSION_TEXT)
         print("Python: " + sys.version + " on " + sys.platform)
