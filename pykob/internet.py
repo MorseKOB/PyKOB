@@ -95,7 +95,7 @@ class Internet:
         self._wireNo = 0
         self._socketGuard: Lock = Lock()
         self._threadGuard: Lock = Lock()
-        self._threadStop: Event = Event()
+        self._threadsStop: Event = Event()
         self._connected: Event = Event()
         self._sentSeqNo = 0
         self._rcvdSeqNo = -1
@@ -135,7 +135,7 @@ class Internet:
         """
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
-        while not self._threadStop.is_set():
+        while not self._threadsStop.is_set():
             if self._connected.wait(0.1):
                 code = self.read()
                 if code and self._connected.is_set():
@@ -151,12 +151,13 @@ class Internet:
         """
         Called by the Keep Alive thread `run` to send our ID to the internet connection.
         """
-        while not self._threadStop.is_set():
-            if self._connected.wait(1.5):
+        while not self._threadsStop.is_set():
+            if self._connected.is_set():
                 self._current_sender = None  # clear the current sender so it will update
                 self.sendID()
-                time.sleep(10.0)  # send another keepalive sequence every ten seconds
-            pass
+                self._threadsStop.wait(10.0)  # send another keepalive sequence every ten seconds
+            self._threadsStop.wait(0.1)  # don't hog CPU when we aren't connected
+
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
@@ -179,20 +180,20 @@ class Internet:
 
     def _start_wire_threads(self):
         with self._threadGuard:
-            if not self._threadStop.is_set():
+            if not self._threadsStop.is_set():
                 if not self._internetReadThread.is_alive():
                     self._internetReadThread.start()
                 if not self._keepAliveThread.is_alive():
                     self._keepAliveThread.start()
                 while not (self._internetReadThread.is_alive() and self._keepAliveThread.is_alive()):
-                    time.sleep(0.01)
+                    self._threadsStop.wait(0.01)
             pass  #
         return
 
     def _get_address(self, renew=False):
         if not self._ip_address or renew:
             success = False
-            while not success and not self._threadStop.is_set():
+            while not success and not self._threadsStop.is_set():
                 try:
                     log.debug("Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
@@ -202,14 +203,14 @@ class Internet:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))
-                    time.sleep(5.0)
+                    self._threadsStop.wait(5.0)
         return self._ip_address
 
     def _stop_internet_threads(self):
         with self._threadGuard:
             try:
                 self._connected.clear()
-                self._threadStop.set()
+                self._threadsStop.set()
                 self._close_socket()
             finally:
                 if self._internetReadThread.is_alive():
@@ -249,15 +250,15 @@ class Internet:
         self._stop_internet_threads()
 
     def read(self):
-        while self._connected.is_set() and not self._threadStop.is_set():
+        while self._connected.is_set() and not self._threadsStop.is_set():
             success = False
             buf = None
             nBytes = 0
             code = None
-            while self._connected.is_set() and not success and not self._threadStop.is_set():
+            while self._connected.is_set() and not success and not self._threadsStop.is_set():
                 try:
                     buf = self._socket.recv(500)
-                    if not self._connected.is_set() or self._threadStop.is_set():
+                    if not self._connected.is_set() or self._threadsStop.is_set():
                         return code
                     nBytes = len(buf)
                     if nBytes == 0:
@@ -275,7 +276,7 @@ class Internet:
                     # Network error
                     s = "Network error during read: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))
-                    time.sleep(5.0)
+                    self._threadsStop.wait(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
                 if self._packet_callback:
@@ -304,8 +305,9 @@ class Internet:
                     if self._packet_callback:
                         self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
-            else:
+            elif not self._threadsStop.is_set():
                 log.warn("PyKOB.internet received invalid record length: {0}".format(nBytes))
+            return
 
     def write(self, code, txt=""):
         if self._connected.is_set():

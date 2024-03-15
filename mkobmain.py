@@ -83,7 +83,7 @@ class MKOBMain:
 
         # For emitting code
         self._emit_code_queue = Queue()
-        self._threadStop: Event = Event()
+        self._threadsStop: Event = Event()
         self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
         self._internet = None
@@ -180,7 +180,7 @@ class MKOBMain:
         return
 
     def _emit_code_thread_run(self):
-        while not self._threadStop.is_set():
+        while not self._threadsStop.is_set():
             # Read from the emit code queue
             try:
                 emit_code_packet = self._emit_code_queue.get(True, 0.1)  # Blocks until packet available or 100ms (to check stop)
@@ -239,7 +239,7 @@ class MKOBMain:
         return
 
     def exit(self):
-        self._threadStop.set()
+        self._threadsStop.set()
         if self._kob:
             self._kob.exit()
         if self._internet:
@@ -316,7 +316,7 @@ class MKOBMain:
             if self._recorder:
                 self._recorder.wire = wire
             if was_connected:
-                time.sleep(0.50)  # Needed to allow UTP packets to clear
+                self._threadsStop.wait(0.50)  # Needed to allow UTP packets to clear
                 self.toggle_connect()
         return
 

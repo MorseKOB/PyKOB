@@ -44,7 +44,7 @@ try:
 except:
     log.err("Module pySerial is not available. Selector cannot be used.")
 
-global
+global POLE_CYCLE_TIME_MIN
 POLE_CYCLE_TIME_MIN = 0.01
 
 @unique
@@ -73,7 +73,6 @@ class Selector:
         self._raw_value = 0
         self._t_last_change = time.time()
         #
-        self._threadPauser = Condition()
         self._threadsStop = Event()
         self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_run)
 
@@ -132,7 +131,7 @@ class Selector:
                             values_need_updating = False
                             oof_changed = False
                             binary_changed = False
-                time.sleep(self._pole_cycle_time)
+                    self._threadsStop.wait(self._pole_cycle_time)
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -154,7 +153,6 @@ class Selector:
         Stop the threads and exit.
         """
         self._threadsStop.set()
-        self._threadPauser.notify_all()
         self._thread_port_checker.join(timeout=2.0)
 
     def start(self):
@@ -180,6 +178,7 @@ if __name__ == "__main__":
         print(" 1 of 4: {}".format(__test_selector.one_of_four))
 
     try:
+        log.set_logging_level(log.DEBUG_MIN_LEVEL)
         port = sys.argv[1] if len(sys.argv) == 2 else 'COM6'
         __test_selector = Selector(port, SelectorMode.OneOfFour, on_change=__test_on_change)
         __test_selector.start()
