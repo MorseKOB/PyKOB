@@ -672,11 +672,9 @@ class KOB:
                     return code
                 else:
                     code += (dt,)
-            if not kc and code and \
-                    t > self._t_key_last_change + CODESPACE:
+            if not kc and code and t > self._t_key_last_change + CODESPACE:
                 return code
-            if kc and not self._circuit_is_closed and \
-                    t > self._t_key_last_change + CKTCLOSE:
+            if kc and not self._circuit_is_closed and t > self._t_key_last_change + CKTCLOSE:
                 code += (+1,)  # latch circuit closed
                 self._circuit_is_closed = True
                 return code

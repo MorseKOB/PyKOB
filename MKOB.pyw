@@ -62,7 +62,8 @@ try:
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
 
     log.set_logging_level(cfg.logging_level)
-
+    log.debug("MKOB: Logging level: {}".format(cfg.logging_level))
+    
     root = tk.Tk(className="MKOB")
     icon = tk.PhotoImage(file="resources/mkob-icon_64.png")
     root.iconphoto(True, icon)

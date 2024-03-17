@@ -84,7 +84,11 @@ class Internet:
             if h and len(h) > 0:
                 self._host = h
             if p and len(p) > 0:
-                self._port = p
+                try:
+                    self._port = int(p)
+                except ValueError:
+                    self._err_msg_hndlr("Invalid port value '{}'. Using default {}".format(p, PORT_DEFAULT))
+                    self._port = PORT_DEFAULT
         # Application name/version to register with on the server
         self._appver = None if appver == None or appver.strip() == "" else appver.strip()
         if appver:
@@ -119,6 +123,13 @@ class Internet:
     def err_msg_hndlr(self):
         return self._err_msg_hndlr
 
+    @property
+    def host(self) -> str:
+        """
+        The host address being used.
+        """
+        return self._host
+
     @err_msg_hndlr.setter
     def err_msg_hndlr(self, f):
         self._err_msg_hndlr = f if not f is None else log.warn
@@ -130,6 +141,13 @@ class Internet:
     @packet_callback.setter
     def packet_callback(self, cb):
         self._packet_callback = cb
+
+    @property
+    def port(self) -> int:
+        """
+        The host port being used.
+        """
+        return self._port
 
     def _data_read_run(self):
         """
@@ -230,7 +248,6 @@ class Internet:
 
     def disconnect(self, on_disconnect=None):
         if self._connected.is_set():
-            self._connected.clear()
             self._wireNo = 0
             shortPacket = shortPacketFormat.pack(DIS, 0)
             try:
@@ -239,6 +256,7 @@ class Internet:
                 self._get_address(renew=True)
             finally:
                 self._close_socket()
+            self._connected.clear()
         if on_disconnect:
             on_disconnect()
 

@@ -87,7 +87,7 @@ class MKOBMain:
         self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
         self._internet = None
-        self._kob = None
+        self._kob: Optional[kob.KOB] = None
         self._create_internet(self._cfg)
         self._create_kob(self._cfg)
         self.do_morse_change()
@@ -189,8 +189,9 @@ class MKOBMain:
             #
             code = emit_code_packet[0]
             code_source = emit_code_packet[1]
-            closer_open = emit_code_packet[2]
-            done_callback = emit_code_packet[3]
+            sound_it = emit_code_packet[2]
+            closer_open = emit_code_packet[3]
+            done_callback = emit_code_packet[4]
 
             callback_delay = 30
             if not self._internet_station_active:
@@ -207,7 +208,8 @@ class MKOBMain:
                 if self._cfg.local and not code_source == kob.CodeSource.key:
                     # Don't call if from key. Local sounder handled in key processing.
                     # Call even if closer closed in order to take the appropriate amount of time.
-                    self._kob.soundCode(code, code_source, closer_open)
+                    sound = sound_it and closer_open
+                    self._kob.soundCode(code, code_source, sound)
             if done_callback:
                 self._tkroot.after(callback_delay, done_callback)
             pass
@@ -279,6 +281,10 @@ class MKOBMain:
         return self._internet
 
     @property
+    def Kob(self) -> Optional[kob.KOB]:
+        return self._kob
+
+    @property
     def Player(self) -> Optional[Recorder]:
         return self._player
 
@@ -331,7 +337,7 @@ class MKOBMain:
         self.set_morse(code_type, cwpm, twpm, spacing)
         return
 
-    def emit_code(self, code, code_source, closer_open=True, done_callback=None):
+    def emit_code(self, code, code_source, sound_it=True, closer_open=True, done_callback=None):
         """
         Emit local code. That involves:
         1. Record code if recording is enabled
@@ -343,7 +349,7 @@ class MKOBMain:
         It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' message,
         or from the keyboard sender.
         """
-        emit_code_packet = [code, code_source, closer_open, done_callback]
+        emit_code_packet = [code, code_source, sound_it, closer_open, done_callback]
         self._emit_code_queue.put(emit_code_packet)
         return
 
@@ -378,6 +384,17 @@ class MKOBMain:
         self.emit_code(
             code,
             kob.CodeSource.keyboard,
+            True,  # Sound the code
+            self._kob.virtual_closer_is_open,
+            finished_callback
+        )
+        return
+
+    def from_keyboard_vkey(self, code, sound_it, finished_callback=None):
+        self.emit_code(
+            code,
+            kob.CodeSource.keyboard,
+            sound_it,
             self._kob.virtual_closer_is_open,
             finished_callback
         )
@@ -426,7 +443,7 @@ class MKOBMain:
         """
         code = LATCH_CODE if closed else UNLATCH_CODE
         # Set the Circuit Closer checkbox appropriately
-        self._kw.circuit_closer = 1 if closed else 0
+        self._kw.vkey_closed = 1 if closed else 0
         self._kob.virtual_closer_is_open = not closed
         if not self._internet_station_active:
             if self._cfg.local:

@@ -164,7 +164,7 @@ class MKOBActions():
         return
 
     def doCircuitCloser(self, event=None, *args):
-        self._km.set_virtual_closer_closed(self._kw.circuit_closer == 1)
+        self._km.set_virtual_closer_closed(self._kw.vkey_closed == 1)
         return
 
     def doMorseChange(self, event=None, *args):
@@ -325,7 +325,7 @@ class MKOBActions():
         """
         toggle Circuit Closer and regain control of the wire
         """
-        self._kw.circuit_closer = not self._kw.circuit_closer
+        self._kw.vkey_closed = not self._kw.vkey_closed
         self.doCircuitCloser()
         self._km.reset_wire_state()  # regain control of the wire
         return "break"

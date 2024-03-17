@@ -225,7 +225,7 @@ class Reader:
         self._mark      = 0            # accumulates the length of a mark as positive code elements are received
         self._space     = 1            # accumulates the length of a space as negative code elements are received
         # Detected code speed values. Start with the configured speed and calculated values
-        self._d_wpm = self._wpm
+        self._d_wpm:int = self._wpm
         self._d_dotLen = self._dotLen
         self._d_truDot = self._truDot
 
@@ -268,6 +268,10 @@ class Reader:
     @property
     def char_space_max(self):
         return (self._dotLen * MAXMORSESPACE)
+
+    @property
+    def detected_wpm(self) -> int:
+        return self._d_wpm
 
     def decode(self, codeSeq, use_flusher=True):
         # Code received - cancel an existing 'flusher'
@@ -338,16 +342,25 @@ class Reader:
         self._truDot    = self._dotLen  # actual length of typical dot (ms)
 
     def updateDWPM(self, codeSeq):
+        """
+        Update the detected WPM value from the incoming code.
+        """
         for i in range(1, len(codeSeq) - 2, 2):
             minDotLen = int(0.5 * self._d_dotLen)
             maxDotLen = int(1.5 * self._d_dotLen)
-            if codeSeq[i] > minDotLen and codeSeq[i] < maxDotLen and \
-                    codeSeq[i] - codeSeq[i+1] < 2 * maxDotLen and \
-                    codeSeq[i+2] < maxDotLen:
-                dotLen = (codeSeq[i] - codeSeq[i+1]) / 2
-                self._d_truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self._d_truDot)
+            c1 = codeSeq[i]
+            c2 = codeSeq[i+1]
+            c3 = codeSeq[i+2]
+            du_len = c1 - c2
+            if ((c1 > minDotLen)
+                and (c1 < maxDotLen)
+                and (du_len < (2 * maxDotLen))
+                and (c3 < maxDotLen)
+            ):
+                dotLen = du_len / 2
+                self._d_truDot = int(ALPHA * c1 + (1 - ALPHA) * self._d_truDot)
                 self._d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self._d_dotLen)
-                self._d_wpm = 1200. / self._d_dotLen
+                self._d_wpm = int(1200.0 / self._d_dotLen)
 
     def _flushHandler(self):
         f = self._flusher
