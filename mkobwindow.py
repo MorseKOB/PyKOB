@@ -40,7 +40,7 @@ from pykob.internet import PORT_DEFAULT
 import mkobevents
 
 import sys
-from tkinter import N, S, W, E
+from tkinter import N, S, W, E, VERTICAL
 import tkinter as tk
 from tkinter import ttk
 import tkinter.scrolledtext as tkst
@@ -338,8 +338,8 @@ class StatusBar:
         mkwin,   # MKOBWindow (class) object
         width=100,
         height=20,
-        borderwidth=3,
-        relief="groove",
+        borderwidth=2,
+        relief="solid",
     ):
         self._mkwin: MKOBWindow = mkwin
         self._mkm: Optional[MKOBMain] = None
@@ -350,9 +350,12 @@ class StatusBar:
         )
         self._lbl_d_speed = ttk.Label(self.window, text="Detected Speed:")
         self._d_speed = ttk.Label(self.window, text="", width=3)
-        self._fill = ttk.Label(self.window, text=" ")
         self._lbl_server = ttk.Label(self.window, text="Server:")
-        self._server = ttk.Label(self.window, text="", width=30)
+        self._server = ttk.Label(self.window, text="")
+        self._status_msg = ttk.Label(self.window, text=" ")
+        #
+        self._sep1 = ttk.Separator(self.window, orient=VERTICAL)
+        self._sep2 = ttk.Separator(self.window, orient=VERTICAL)
         return
 
     def _update_values(self) -> None:
@@ -374,9 +377,22 @@ class StatusBar:
         else:
             self._d_speed[TEXT] = ""
             self._server[TEXT] = ""
+        self._server.update()
+        self.window.update()
         #
         # Schedule an update
         self._tkroot.after(1000, self._update_values)
+        return
+
+    @property
+    def status_msg(self) -> str:
+        return self._status_msg[TEXT]
+    
+    @status_msg.setter
+    def status_msg(self, msg:str):
+        self._status_msg[TEXT] = msg
+        self._status_msg.update()
+        self.window.update()
         return
 
     def get_minimum_width(self) -> int:
@@ -386,7 +402,7 @@ class StatusBar:
         w = 0
         w += self._lbl_d_speed.winfo_width()
         w += self._d_speed.winfo_width()
-        w += self._fill.winfo_width()
+        w += self._status_msg.winfo_width()
         w += self._lbl_server.winfo_width()
         w += self._server()
         w += 12  # Some padding
@@ -396,24 +412,28 @@ class StatusBar:
         """
         Layout the frame.
         """
-        self.window.rowconfigure(0, minsize=22, weight=0)
-        # Left
-        self.window.columnconfigure(0, weight=0)
-        self.window.columnconfigure(1, weight=0)
-        # Center
-        self.window.columnconfigure(2, weight=1)
-        # Right
-        self.window.columnconfigure(3, weight=0)
-        self.window.columnconfigure(4, weight=0)
+        self.window.rowconfigure(0, minsize=22, pad=1, weight=0)
+        # Left (detected speed)
+        self.window.columnconfigure(0, weight=0)  # Speed label
+        self.window.columnconfigure(1, weight=0)  # Speed
+        # Center (status)
+        self.window.columnconfigure(2, weight=0)  # separator
+        self.window.columnconfigure(3, weight=1)  # Status
+        self.window.columnconfigure(4, weight=0)  # separator
+        # Right (server address)
+        self.window.columnconfigure(5, weight=0)  # Server label
+        self.window.columnconfigure(6, weight=0)  # Server Address
 
-        # Left (Detected Speed)
-        self._lbl_d_speed.grid(row=0, column=0, sticky=(W), padx=(0, 2))
-        self._d_speed.grid(row=0, column=1, sticky=(W))
-        # Center (Fill)
-        self._fill.grid(row=0, column=2, sticky=(W,E), padx=(2, 2))
-        # Right (Server Address)
-        self._lbl_server.grid(row=0, column=3, sticky=(W), padx=(0, 2))
-        self._server.grid(row=0, column=4, sticky=(W), padx=(0, 2))
+        # Left (detected speed)
+        self._lbl_d_speed.grid(row=0, column=0, padx=(0, 2), sticky=(E))
+        self._d_speed.grid(row=0, column=1, padx=(0, 0), sticky=(W))
+        # Center (status)
+        self._sep1.grid(row=0, column=2, padx=(1, 1))
+        self._status_msg.grid(row=0, column=3, sticky=(W,E), padx=(0, 0))
+        self._sep2.grid(row=0, column=4, padx=(1, 1))
+        # Right (server address)
+        self._lbl_server.grid(row=0, column=5, padx=(0, 2), sticky=(E))
+        self._server.grid(row=0, column=6, padx=(0, 0), sticky=(W))
         return
 
     def start(self, mkmain:MKOBMain) -> None:
@@ -692,7 +712,7 @@ class MKOBWindow:
         self._window.columnconfigure(0, weight=1)
         self._window.columnconfigure(1, weight=0)
         ## Status Bar (across the bottom)
-        self._status_bar.window.grid(row=1, column=0, columnspan=2, sticky=(N, S, E, W))
+        self._status_bar.window.grid(row=1, column=0, columnspan=2, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
         self._status_bar.layout()
         ## Reader (top)
         fm_reader.rowconfigure(0, weight=1, minsize=20, pad=2)
@@ -1006,6 +1026,7 @@ class MKOBWindow:
         self._ignore_morse_setting_change = True
         self._varCWPM.set(speed)
         self._ignore_morse_setting_change = False
+        return
 
     @property
     def keyboard_win(self):
@@ -1020,12 +1041,22 @@ class MKOBWindow:
         return self._txtStnList
 
     @property
+    def status_msg(self) -> str:
+        return self._status_bar.status_msg
+
+    @status_msg.setter
+    def status_msg(self, msg:str):
+        self._status_bar.status_msg = msg
+        return
+
+    @property
     def office_id(self):
         return self._varOfficeID.get()
 
     @office_id.setter
     def office_id(self, v):
         self._varOfficeID.set(v)
+        return
 
     @property
     def reader_win(self):
@@ -1048,6 +1079,7 @@ class MKOBWindow:
         self._spacing = sp
         self._fm_sndr_controls.farnsworth_spacing = sp
         self._ignore_morse_setting_change = False
+        return
 
     @property
     def tkroot(self):
@@ -1066,6 +1098,7 @@ class MKOBWindow:
         self._twpm = speed
         self._fm_sndr_controls.text_speed = speed
         self._ignore_morse_setting_change = False
+        return
 
     @property
     def vkey_closed(self):
@@ -1074,6 +1107,7 @@ class MKOBWindow:
     @vkey_closed.setter
     def vkey_closed(self, v):
         self._varVKeyClosed.set(v)
+        return
 
     @property
     def wire_number(self) -> int:
@@ -1092,6 +1126,14 @@ class MKOBWindow:
         w = self._varWireNo.get()
         if not str(v) == w:
             self._varWireNo.set(str(v))
+        return
+
+    def clear_status_msg(self):
+        """
+        Clear the status message portion of the Status Bar.
+        """
+        self.status_msg = ""
+        return
 
     def connected(self, connected):
         """
@@ -1099,6 +1141,7 @@ class MKOBWindow:
         """
         self._connect_indicator.connected = connected
         self._btnConnect[TEXT] = "Disconnect" if connected else "Connect"
+        return
 
     def event_generate(self, event, when="tail", data=None):
         """
@@ -1127,6 +1170,7 @@ class MKOBWindow:
         Make the keyboard window the active (focused) window.
         """
         self._txtKeyboard.focus_set()
+        return
 
     def set_app_title(self):
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
@@ -1137,6 +1181,7 @@ class MKOBWindow:
         else:
             n = " - Global"
         self._root.title(self._app_name_version + n + cfg_modified_attrib)
+        return
 
     def set_minimum_sizes(self):
         """
@@ -1155,6 +1200,7 @@ class MKOBWindow:
             self._fm_right, minsize=w
         )
         self._root.minsize(self._root.winfo_width(), int(self._root.winfo_height() * 0.666))
+        return
 
     def show_help_about(self):
         """
@@ -1173,6 +1219,7 @@ class MKOBWindow:
             tk.TkVersion,
         )
         tk.messagebox.showinfo(title=title, message=msg)
+        return
 
     def show_shortcuts(self):
         """
@@ -1181,3 +1228,4 @@ class MKOBWindow:
         if not (self._shortcuts_win and MKOBHelpKeys.active):
             self._shortcuts_win = MKOBHelpKeys()
         self._shortcuts_win.focus()
+        return

@@ -30,12 +30,13 @@ Reads/writes code sequences from/to a KOB wire.
 import re  # RegEx
 import socket
 import struct
-import time
-from pykob import VERSION, config2, log
-from pykob.config2 import Config
 import threading
 from threading import Event, Lock, Thread
+import time
 from typing import Any, Callable, Optional
+
+from pykob import VERSION, config2, log
+from pykob.config2 import Config
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
 PORT_DEFAULT = 7890
@@ -104,7 +105,8 @@ class Internet:
         self._sentSeqNo = 0
         self._rcvdSeqNo = -1
         self._tLastListener = 0.0
-        self._socket = None
+        self._socket: Optional[socket.socket] = None
+        socket.setdefaulttimeout(3.0)
         self._internetReadThread: Thread = Thread(name="Internet-Data-Read", target=self._data_read_run)
         self._keepAliveThread: Thread = Thread(name="Internet-Keep-Alive", target=self._keep_alive_run)
         self._get_address(renew=True)
@@ -114,6 +116,9 @@ class Internet:
         self._ID_callback = None
         self._sender_callback = None
         self._current_sender = None
+        self._inet_available_check_time = 0
+        self._internet_available = self.check_internet_available()
+        return
 
     @property
     def connected(self) -> bool:
@@ -129,6 +134,12 @@ class Internet:
         The host address being used.
         """
         return self._host
+
+    @property
+    def internet_available(self) -> bool:
+        if int(time.time() - self._inet_available_check_time) > 60:
+            self.check_internet_available()
+        return self._internet_available
 
     @err_msg_hndlr.setter
     def err_msg_hndlr(self, f):
@@ -267,6 +278,25 @@ class Internet:
         self.disconnect()
         self._stop_internet_threads()
 
+    def check_internet_available(self, testhost="8.8.8.8", port=53):
+        """
+        Host: 8.8.8.8 (google-public-dns-a.google.com)
+        OpenPort: 53/tcp
+        Service: domain (DNS/TCP)
+        """
+        skt = None
+        self._internet_available = False
+        try:
+            skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            skt.connect((testhost, port))
+            skt.close()
+            self._internet_available = True
+        except socket.error as ex:
+            pass
+        finally:
+            self._inet_available_check_time = time.time()
+        return self._internet_available
+
     def read(self):
         while self._connected.is_set() and not self._threadsStop.is_set():
             success = False
@@ -282,15 +312,18 @@ class Internet:
                     if nBytes == 0:
                         continue
                     success = True
-                except (OSError, socket.gaierror) as ex:
-                    if isinstance(ex, OSError):
-                        if ex.errno == 10038:
-                            return None  # Socket closed
-                        if ex.errno == 22:
-                            return None  # Socket not ready
-                        if ex.errno == 9:
-                            return None  # Socket closed
-                        pass
+                except (TimeoutError) as toe:
+                    # On timeout, just continue so we can check our flags
+                    continue
+                except (OSError) as ex1:
+                    if ex1.errno == 10038:
+                        return None  # Socket closed
+                    if ex1.errno == 22:
+                        return None  # Socket not ready
+                    if ex1.errno == 9:
+                        return None  # Socket closed
+                    pass
+                except Exception as ex2:
                     # Network error
                     s = "Network error during read: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))

@@ -114,6 +114,8 @@ class MKOBMain:
             server_url=cfg.server_url,
             err_msg_hndlr=self._net_err_msg_hndlr
         )
+        # See if we have internet - that will update the status bar
+        self._check_internet_available()
         if was_connected:
             self.toggle_connect()
         return
@@ -215,6 +217,19 @@ class MKOBMain:
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
+
+    def _check_internet_available(self) -> bool:
+        """
+        Use the internet object to check if internet is available.
+        Update the status bar message and return the availability.
+        """
+        hi = self._internet.internet_available
+        if not hi:
+            self._kw.status_msg = "Internet not available"
+            self._kw.tkroot.after(20000, self._check_internet_available)
+        else:
+            self._kw.clear_status_msg()
+        return hi
 
     def _kob_err_msg_hndlr(self, msg:str) -> None:
         log.warn(msg)
@@ -527,15 +542,21 @@ class MKOBMain:
             self._sender_ID = ""
             self._wire_data_received = False
             self._ka.handle_clear_stations()
-            self._internet.monitor_IDs(
-                self._ka.trigger_update_station_active
-            )  # Set callback for monitoring stations
-            self._internet.monitor_sender(
-                self._ka.trigger_update_current_sender
-            )  # Set callback for monitoring current sender
-            self._kob.power_save(False)
-            self._internet.connect(self._wire)
-            self._connected.set()
+            inet_available = self._check_internet_available()
+            if inet_available:
+                self._internet.monitor_IDs(
+                    self._ka.trigger_update_station_active
+                )  # Set callback for monitoring stations
+                self._internet.monitor_sender(
+                    self._ka.trigger_update_current_sender
+                )  # Set callback for monitoring current sender
+                self._kob.power_save(False)
+                self._internet.connect(self._wire)
+                self._connected.set()
+            else:
+                msg = "Internet not available. Unable to connect at this time."
+                log.info("{}".format(msg))
+                msgbox.showinfo(title=self.app_ver, message=msg)
         else:
             # Disconnect
             self._connected.clear()
