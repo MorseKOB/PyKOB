@@ -377,8 +377,6 @@ class StatusBar:
         else:
             self._d_speed[TEXT] = ""
             self._server[TEXT] = ""
-        self._server.update()
-        self.window.update()
         #
         # Schedule an update
         self._tkroot.after(1000, self._update_values)
@@ -391,8 +389,6 @@ class StatusBar:
     @status_msg.setter
     def status_msg(self, msg:str):
         self._status_msg[TEXT] = msg
-        self._status_msg.update()
-        self.window.update()
         return
 
     def get_minimum_width(self) -> int:
