@@ -979,14 +979,14 @@ class MKOBWindow:
         Called by MKOB via a tk.after when the main loop has been started.
         """
         self._app_started = True
+        # Set to disconnected state
+        self.connected(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
         self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()
         self._status_bar.start(self._km)
-        # Set to disconnected state
-        self.connected(False)
         # Finish up...
         self._ka.doMorseChange()
         return

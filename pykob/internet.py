@@ -109,7 +109,6 @@ class Internet:
         socket.setdefaulttimeout(3.0)
         self._internetReadThread: Thread = Thread(name="Internet-Data-Read", target=self._data_read_run)
         self._keepAliveThread: Thread = Thread(name="Internet-Keep-Alive", target=self._keep_alive_run)
-        self._get_address(renew=True)
         self._code_callback = code_callback
         self._packet_callback = pckt_callback
         self._record_callback = record_callback
