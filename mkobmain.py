@@ -50,6 +50,7 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 class MKOBMain:
     def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config) -> None:
         self.app_ver = app_ver
+        self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
@@ -82,11 +83,11 @@ class MKOBMain:
 
         # For emitting code
         self._emit_code_queue = Queue()
-        self._threadStop: Event = Event()
+        self._threadsStop: Event = Event()
         self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
         self._internet = None
-        self._kob = None
+        self._kob: Optional[kob.KOB] = None
         self._create_internet(self._cfg)
         self._create_kob(self._cfg)
         self.do_morse_change()
@@ -113,6 +114,8 @@ class MKOBMain:
             server_url=cfg.server_url,
             err_msg_hndlr=self._net_err_msg_hndlr
         )
+        # See if we have internet - that will update the status bar
+        self._check_internet_available()
         if was_connected:
             self.toggle_connect()
         return
@@ -179,7 +182,7 @@ class MKOBMain:
         return
 
     def _emit_code_thread_run(self):
-        while not self._threadStop.is_set():
+        while not self._threadsStop.is_set():
             # Read from the emit code queue
             try:
                 emit_code_packet = self._emit_code_queue.get(True, 0.1)  # Blocks until packet available or 100ms (to check stop)
@@ -188,8 +191,9 @@ class MKOBMain:
             #
             code = emit_code_packet[0]
             code_source = emit_code_packet[1]
-            closer_open = emit_code_packet[2]
-            done_callback = emit_code_packet[3]
+            sound_it = emit_code_packet[2]
+            closer_open = emit_code_packet[3]
+            done_callback = emit_code_packet[4]
 
             callback_delay = 30
             if not self._internet_station_active:
@@ -206,12 +210,26 @@ class MKOBMain:
                 if self._cfg.local and not code_source == kob.CodeSource.key:
                     # Don't call if from key. Local sounder handled in key processing.
                     # Call even if closer closed in order to take the appropriate amount of time.
-                    self._kob.soundCode(code, code_source, closer_open)
+                    sound = sound_it and closer_open
+                    self._kob.soundCode(code, code_source, sound)
             if done_callback:
                 self._tkroot.after(callback_delay, done_callback)
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
+
+    def _check_internet_available(self) -> bool:
+        """
+        Use the internet object to check if internet is available.
+        Update the status bar message and return the availability.
+        """
+        hi = self._internet.internet_available
+        if not hi:
+            self._kw.status_msg = "Internet not available"
+            self._kw.tkroot.after(20000, self._check_internet_available)
+        else:
+            self._kw.clear_status_msg()
+        return hi
 
     def _kob_err_msg_hndlr(self, msg:str) -> None:
         log.warn(msg)
@@ -238,13 +256,13 @@ class MKOBMain:
         return
 
     def exit(self):
-        self._threadStop.set()
+        self._threadsStop.set()
         if self._kob:
             self._kob.exit()
         if self._internet:
             self._internet.exit()
         if self._emit_code_thread and self._emit_code_thread.is_alive():
-            self._emit_code_thread.join()
+            self._emit_code_thread.join(timeout=2.0)
         return
 
     @property
@@ -276,6 +294,10 @@ class MKOBMain:
     @property
     def Internet(self):
         return self._internet
+
+    @property
+    def Kob(self) -> Optional[kob.KOB]:
+        return self._kob
 
     @property
     def Player(self) -> Optional[Recorder]:
@@ -315,7 +337,7 @@ class MKOBMain:
             if self._recorder:
                 self._recorder.wire = wire
             if was_connected:
-                time.sleep(0.50)  # Needed to allow UTP packets to clear
+                self._threadsStop.wait(0.50)  # Needed to allow UTP packets to clear
                 self.toggle_connect()
         return
 
@@ -330,7 +352,7 @@ class MKOBMain:
         self.set_morse(code_type, cwpm, twpm, spacing)
         return
 
-    def emit_code(self, code, code_source, closer_open=True, done_callback=None):
+    def emit_code(self, code, code_source, sound_it=True, closer_open=True, done_callback=None):
         """
         Emit local code. That involves:
         1. Record code if recording is enabled
@@ -342,7 +364,7 @@ class MKOBMain:
         It should be called by an event handler in response to a 'EVENT_EMIT_KEY_CODE' message,
         or from the keyboard sender.
         """
-        emit_code_packet = [code, code_source, closer_open, done_callback]
+        emit_code_packet = [code, code_source, sound_it, closer_open, done_callback]
         self._emit_code_queue.put(emit_code_packet)
         return
 
@@ -377,6 +399,17 @@ class MKOBMain:
         self.emit_code(
             code,
             kob.CodeSource.keyboard,
+            True,  # Sound the code
+            self._kob.virtual_closer_is_open,
+            finished_callback
+        )
+        return
+
+    def from_keyboard_vkey(self, code, sound_it, finished_callback=None):
+        self.emit_code(
+            code,
+            kob.CodeSource.keyboard,
+            sound_it,
             self._kob.virtual_closer_is_open,
             finished_callback
         )
@@ -425,7 +458,7 @@ class MKOBMain:
         """
         code = LATCH_CODE if closed else UNLATCH_CODE
         # Set the Circuit Closer checkbox appropriately
-        self._kw.circuit_closer = 1 if closed else 0
+        self._kw.vkey_closed = 1 if closed else 0
         self._kob.virtual_closer_is_open = not closed
         if not self._internet_station_active:
             if self._cfg.local:
@@ -509,15 +542,21 @@ class MKOBMain:
             self._sender_ID = ""
             self._wire_data_received = False
             self._ka.handle_clear_stations()
-            self._internet.monitor_IDs(
-                self._ka.trigger_update_station_active
-            )  # Set callback for monitoring stations
-            self._internet.monitor_sender(
-                self._ka.trigger_update_current_sender
-            )  # Set callback for monitoring current sender
-            self._kob.power_save(False)
-            self._internet.connect(self._wire)
-            self._connected.set()
+            inet_available = self._check_internet_available()
+            if inet_available:
+                self._internet.monitor_IDs(
+                    self._ka.trigger_update_station_active
+                )  # Set callback for monitoring stations
+                self._internet.monitor_sender(
+                    self._ka.trigger_update_current_sender
+                )  # Set callback for monitoring current sender
+                self._kob.power_save(False)
+                self._internet.connect(self._wire)
+                self._connected.set()
+            else:
+                msg = "Internet not available. Unable to connect at this time."
+                log.info("{}".format(msg))
+                msgbox.showinfo(title=self.app_ver, message=msg)
         else:
             # Disconnect
             self._connected.clear()
@@ -622,7 +661,7 @@ class MKOBMain:
         log.debug("MKMain._update_from_config. CT:{}".format(ct), 2)
         try:
             self._set_on_cfg = False
-            log.set_debug_level(cfg.debug_level)
+            log.set_logging_level(cfg.logging_level)
             if ct & config2.ChangeType.MORSE:
                 self._kw.spacing = cfg.spacing
                 self._kw.twpm = cfg.text_speed

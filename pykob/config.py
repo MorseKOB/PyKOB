@@ -86,7 +86,7 @@ _GPIO_KEY = "GPIO"
 _AUDIO_TYPE_KEY = "AUDIO_TYPE"
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
 _CODE_TYPE_KEY = "CODE_TYPE"
-_DEBUG_LEVEL_KEY = "DEBUG_LEVEL"
+_LOGGING_LEVEL_KEY = "LOGGING_LEVEL"
 _INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 _LOCAL_KEY = "LOCAL"
@@ -131,7 +131,7 @@ gpio = False
 audio_type = AudioType.SOUNDER
 auto_connect = False
 code_type = CodeType.american
-debug_level = 0
+logging_level = log.INFO_LEVEL
 interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
@@ -301,7 +301,7 @@ def set_code_type(s):
     code_type = code_type_from_str(s)
     user_config.set(_CONFIG_SECTION, _CODE_TYPE_KEY, code_type.name.upper())
 
-def set_debug_level(s: str):
+def set_logging_level(s: str):
     """Sets the debug level (0-...)
 
     Parameters
@@ -312,7 +312,7 @@ def set_debug_level(s: str):
 
     try:
         _l = int(s)
-        set_debug_level_int(_l)
+        set_logging_level_int(_l)
     except ValueError as ex:
         log.err(
             "Debug Level value '{}' is not a valid integer value.".format(ex.args[0])
@@ -320,10 +320,10 @@ def set_debug_level(s: str):
         raise
 
 
-def set_debug_level_int(l: int):
-    global debug_level
-    debug_level = l if l >=0 else 0
-    user_config.set(_CONFIG_SECTION, _DEBUG_LEVEL_KEY, str(debug_level))
+def set_logging_level_int(level: int):
+    global logging_level
+    logging_level = level if level >=log.LOGGING_MIN_LEVEL else log.LOGGING_MIN_LEVEL
+    user_config.set(_CONFIG_SECTION, _LOGGING_LEVEL_KEY, str(logging_level))
 
 
 def interface_type_from_str(s):
@@ -724,7 +724,7 @@ def print_config():
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
     print()
-    print("Debug level:", debug_level)
+    print("Debug level:", logging_level)
 
 def save_config():
     """Save (write) the configuration values out to the user and
@@ -763,7 +763,7 @@ def read_config():
     global audio_type
     global auto_connect
     global code_type
-    global debug_level
+    global logging_level
     global interface_type
     global invert_key_input
     global local
@@ -825,7 +825,7 @@ def read_config():
         _AUDIO_TYPE_KEY:"SOUNDER",
         _AUTO_CONNECT_KEY:"OFF",
         _CODE_TYPE_KEY:"AMERICAN",
-        _DEBUG_LEVEL_KEY:"0",
+        _LOGGING_LEVEL_KEY:"0",
         _INTERFACE_TYPE_KEY:"LOOP",
         _INVERT_KEY_INPUT_KEY:"OFF",
         _LOCAL_KEY:"ON",
@@ -886,8 +886,8 @@ def read_config():
         else:
             raise ValueError(_code_type)
         __option = "Debug Level"
-        __key = _DEBUG_LEVEL_KEY
-        debug_level = user_config.getint(_CONFIG_SECTION, __key)
+        __key = _LOGGING_LEVEL_KEY
+        logging_level = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Interface type"
         __key = _INTERFACE_TYPE_KEY
         _interface_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
@@ -983,14 +983,13 @@ code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
 
-debug_level_override = argparse.ArgumentParser(add_help=False)
-debug_level_override.add_argument(
-    "--debug-level",
-    metavar="debug-level",
-    dest="debug_level",
+logging_level_override = argparse.ArgumentParser(add_help=False)
+logging_level_override.add_argument(
+    "--logging-level",
+    metavar="logging-level",
+    dest="logging_level",
     type=int,
-    default=0,
-    help="Debug logging level. A value of '0' disables output, higher values enable more output.",
+    help="Logging level. A value of '0' disables DEBUG output, '-1' disables INFO, '-2' disables WARN, '-3' disables ERROR. Higher values above '0' enable more DEBUG output."
 )
 
 interface_type_override = argparse.ArgumentParser(add_help=False)

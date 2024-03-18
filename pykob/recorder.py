@@ -580,7 +580,7 @@ class Recorder:
                                     if self._list_data:
                                         print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self._max_silence))
                                     pause = self._max_silence
-                                time.sleep(pause)
+                                self._playback_stop_flag.wait(pause)
                         if not self._speed_factor == 100:
                             sf = 1.0 / (self._speed_factor / 100.0)
                             code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]

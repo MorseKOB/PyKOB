@@ -35,7 +35,7 @@ import sys
 import time
 import log
 import threading
-from threading import Event, Thread
+from threading import Condition, Event, Thread
 
 serialModuleAvailable = False
 try:
@@ -43,6 +43,9 @@ try:
     serialModuleAvailable = True
 except:
     log.err("Module pySerial is not available. Selector cannot be used.")
+
+global POLE_CYCLE_TIME_MIN
+POLE_CYCLE_TIME_MIN = 0.01
 
 @unique
 class SelectorMode(IntEnum):
@@ -62,7 +65,7 @@ class Selector:
         self._portToUse = portToUse
         self._port = None
         self._mode = mode
-        self._pole_cycle_time = pole_cycle_time
+        self._pole_cycle_time = pole_cycle_time if pole_cycle_time >= POLE_CYCLE_TIME_MIN else POLE_CYCLE_TIME_MIN
         self._steady_time = steady_time
         self._on_change = on_change
         self._one_of_four = 0
@@ -128,7 +131,7 @@ class Selector:
                             values_need_updating = False
                             oof_changed = False
                             binary_changed = False
-                time.sleep(self._pole_cycle_time)
+                    self._threadsStop.wait(self._pole_cycle_time)
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -158,7 +161,7 @@ class Selector:
             self._thread_port_checker.start()
             log.debug("The UART '{}' for the Selector is available.".format(self._portToUse))
         except Exception as ex:
-            log.info("The Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
+            log.info("Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
             log.debug("Selector exception: {}".format(ex))
 
 """
@@ -175,6 +178,7 @@ if __name__ == "__main__":
         print(" 1 of 4: {}".format(__test_selector.one_of_four))
 
     try:
+        log.set_logging_level(log.DEBUG_MIN_LEVEL)
         port = sys.argv[1] if len(sys.argv) == 2 else 'COM6'
         __test_selector = Selector(port, SelectorMode.OneOfFour, on_change=__test_on_change)
         __test_selector.start()

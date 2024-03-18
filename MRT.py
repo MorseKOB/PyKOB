@@ -208,7 +208,7 @@ class Mrt:
         if self._internet:
             if self._connected:
                 self._internet.disconnect()
-                sleep(0.8)
+                sleep(0.5)
             self._internet.exit()
         if self._reader:
             self._reader.exit()
@@ -220,12 +220,12 @@ class Mrt:
         if not self._wire == 0:
             self._internet.connect(self._wire)
             self._connected = True
-        sleep(0.5)
+        self._threadsStop.wait(0.5)
         try:
             if self._fsndthread:
                 self._fsndthread.start()
             while not self._threadsStop.is_set() and not self._control_c_pressed.is_set():
-                sleep(0.1)  # Loop while background threads take care of 'stuff'
+                self._threadsStop.wait(0.2)  # Loop while background threads take care of 'stuff'
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
         except KeyboardInterrupt:
@@ -485,7 +485,7 @@ class Mrt:
                         self._kb_queue.put(ch)
                     else:
                         print('\x07', end='', flush=True) # Ring the bell to let them know we are full
-                sleep(0.01)
+                self._threadsStop.wait(0.01)
             except Exception as ex:
                 print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
                 self._threadsStop.set()
@@ -517,7 +517,7 @@ if __name__ == "__main__":
                 config2.min_char_speed_override,
                 config2.text_speed_override,
                 config2.config_file_override,
-                config2.debug_level_override
+                config2.logging_level_override
             ]
         )
         arg_parser.add_argument(
@@ -533,7 +533,7 @@ if __name__ == "__main__":
         args = arg_parser.parse_args()
         cfg = config2.process_config_args(args)
         wire = args.wire if args.wire else cfg.wire
-        log.set_debug_level(cfg.debug_level)
+        log.set_logging_level(cfg.logging_level)
 
         print(MRT_VERSION_TEXT)
         print("Python: " + sys.version + " on " + sys.platform)

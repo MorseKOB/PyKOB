@@ -30,12 +30,13 @@ Reads/writes code sequences from/to a KOB wire.
 import re  # RegEx
 import socket
 import struct
-import time
-from pykob import VERSION, config2, log
-from pykob.config2 import Config
 import threading
 from threading import Event, Lock, Thread
+import time
 from typing import Any, Callable, Optional
+
+from pykob import VERSION, config2, log
+from pykob.config2 import Config
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
 PORT_DEFAULT = 7890
@@ -84,7 +85,11 @@ class Internet:
             if h and len(h) > 0:
                 self._host = h
             if p and len(p) > 0:
-                self._port = p
+                try:
+                    self._port = int(p)
+                except ValueError:
+                    self._err_msg_hndlr("Invalid port value '{}'. Using default {}".format(p, PORT_DEFAULT))
+                    self._port = PORT_DEFAULT
         # Application name/version to register with on the server
         self._appver = None if appver == None or appver.strip() == "" else appver.strip()
         if appver:
@@ -95,12 +100,13 @@ class Internet:
         self._wireNo = 0
         self._socketGuard: Lock = Lock()
         self._threadGuard: Lock = Lock()
-        self._threadStop: Event = Event()
+        self._threadsStop: Event = Event()
         self._connected: Event = Event()
         self._sentSeqNo = 0
         self._rcvdSeqNo = -1
         self._tLastListener = 0.0
-        self._socket = None
+        self._socket: Optional[socket.socket] = None
+        socket.setdefaulttimeout(3.0)
         self._internetReadThread: Thread = Thread(name="Internet-Data-Read", target=self._data_read_run)
         self._keepAliveThread: Thread = Thread(name="Internet-Keep-Alive", target=self._keep_alive_run)
         self._get_address(renew=True)
@@ -110,6 +116,9 @@ class Internet:
         self._ID_callback = None
         self._sender_callback = None
         self._current_sender = None
+        self._inet_available_check_time = 0
+        self._internet_available = self.check_internet_available()
+        return
 
     @property
     def connected(self) -> bool:
@@ -118,6 +127,19 @@ class Internet:
     @property
     def err_msg_hndlr(self):
         return self._err_msg_hndlr
+
+    @property
+    def host(self) -> str:
+        """
+        The host address being used.
+        """
+        return self._host
+
+    @property
+    def internet_available(self) -> bool:
+        if int(time.time() - self._inet_available_check_time) > 60:
+            self.check_internet_available()
+        return self._internet_available
 
     @err_msg_hndlr.setter
     def err_msg_hndlr(self, f):
@@ -131,11 +153,18 @@ class Internet:
     def packet_callback(self, cb):
         self._packet_callback = cb
 
+    @property
+    def port(self) -> int:
+        """
+        The host port being used.
+        """
+        return self._port
+
     def _data_read_run(self):
         """
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
-        while not self._threadStop.is_set():
+        while not self._threadsStop.is_set():
             if self._connected.wait(0.1):
                 code = self.read()
                 if code and self._connected.is_set():
@@ -151,12 +180,13 @@ class Internet:
         """
         Called by the Keep Alive thread `run` to send our ID to the internet connection.
         """
-        while not self._threadStop.is_set():
-            if self._connected.wait(1.5):
+        while not self._threadsStop.is_set():
+            if self._connected.is_set():
                 self._current_sender = None  # clear the current sender so it will update
                 self.sendID()
-                time.sleep(10.0)  # send another keepalive sequence every ten seconds
-            pass
+                self._threadsStop.wait(10.0)  # send another keepalive sequence every ten seconds
+            self._threadsStop.wait(0.1)  # don't hog CPU when we aren't connected
+
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
@@ -179,20 +209,20 @@ class Internet:
 
     def _start_wire_threads(self):
         with self._threadGuard:
-            if not self._threadStop.is_set():
+            if not self._threadsStop.is_set():
                 if not self._internetReadThread.is_alive():
                     self._internetReadThread.start()
                 if not self._keepAliveThread.is_alive():
                     self._keepAliveThread.start()
                 while not (self._internetReadThread.is_alive() and self._keepAliveThread.is_alive()):
-                    time.sleep(0.01)
+                    self._threadsStop.wait(0.01)
             pass  #
         return
 
     def _get_address(self, renew=False):
         if not self._ip_address or renew:
             success = False
-            while not success and not self._threadStop.is_set():
+            while not success and not self._threadsStop.is_set():
                 try:
                     log.debug("Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
@@ -202,20 +232,20 @@ class Internet:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))
-                    time.sleep(5.0)
+                    self._threadsStop.wait(5.0)
         return self._ip_address
 
     def _stop_internet_threads(self):
         with self._threadGuard:
             try:
                 self._connected.clear()
-                self._threadStop.set()
+                self._threadsStop.set()
                 self._close_socket()
             finally:
                 if self._internetReadThread.is_alive():
-                    self._internetReadThread.join()
+                    self._internetReadThread.join(timeout=2.0)
                 if self._keepAliveThread.is_alive():
-                    self._keepAliveThread.join()
+                    self._keepAliveThread.join(timeout=2.0)
             pass
         return
 
@@ -229,7 +259,6 @@ class Internet:
 
     def disconnect(self, on_disconnect=None):
         if self._connected.is_set():
-            self._connected.clear()
             self._wireNo = 0
             shortPacket = shortPacketFormat.pack(DIS, 0)
             try:
@@ -238,6 +267,7 @@ class Internet:
                 self._get_address(renew=True)
             finally:
                 self._close_socket()
+            self._connected.clear()
         if on_disconnect:
             on_disconnect()
 
@@ -248,34 +278,56 @@ class Internet:
         self.disconnect()
         self._stop_internet_threads()
 
+    def check_internet_available(self, testhost="8.8.8.8", port=53):
+        """
+        Host: 8.8.8.8 (google-public-dns-a.google.com)
+        OpenPort: 53/tcp
+        Service: domain (DNS/TCP)
+        """
+        skt = None
+        self._internet_available = False
+        try:
+            skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            skt.connect((testhost, port))
+            skt.close()
+            self._internet_available = True
+        except socket.error as ex:
+            pass
+        finally:
+            self._inet_available_check_time = time.time()
+        return self._internet_available
+
     def read(self):
-        while self._connected.is_set() and not self._threadStop.is_set():
+        while self._connected.is_set() and not self._threadsStop.is_set():
             success = False
             buf = None
             nBytes = 0
             code = None
-            while self._connected.is_set() and not success and not self._threadStop.is_set():
+            while self._connected.is_set() and not success and not self._threadsStop.is_set():
                 try:
                     buf = self._socket.recv(500)
-                    if not self._connected.is_set() or self._threadStop.is_set():
+                    if not self._connected.is_set() or self._threadsStop.is_set():
                         return code
                     nBytes = len(buf)
                     if nBytes == 0:
                         continue
                     success = True
-                except (OSError, socket.gaierror) as ex:
-                    if isinstance(ex, OSError):
-                        if ex.errno == 10038:
-                            return None  # Socket closed
-                        if ex.errno == 22:
-                            return None  # Socket not ready
-                        if ex.errno == 9:
-                            return None  # Socket closed
-                        pass
+                except (TimeoutError) as toe:
+                    # On timeout, just continue so we can check our flags
+                    continue
+                except (OSError) as ex1:
+                    if ex1.errno == 10038:
+                        return None  # Socket closed
+                    if ex1.errno == 22:
+                        return None  # Socket not ready
+                    if ex1.errno == 9:
+                        return None  # Socket closed
+                    pass
+                except Exception as ex2:
                     # Network error
                     s = "Network error during read: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))
-                    time.sleep(5.0)
+                    self._threadsStop.wait(5.0)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
                 if self._packet_callback:
@@ -304,8 +356,9 @@ class Internet:
                     if self._packet_callback:
                         self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
-            else:
+            elif not self._threadsStop.is_set():
                 log.warn("PyKOB.internet received invalid record length: {0}".format(nBytes))
+            return
 
     def write(self, code, txt=""):
         if self._connected.is_set():

@@ -106,7 +106,7 @@ def main(argv):
                     config2.min_char_speed_override,
                     config2.text_speed_override,
                     config2.spacing_override,
-                    config2.debug_level_override
+                    config2.logging_level_override
                 ])
         arg_parser.add_argument('--gload', dest="global_load", action='store_true',
                 help="Load configuration from the global store. " +

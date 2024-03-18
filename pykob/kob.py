@@ -225,7 +225,7 @@ class KOB:
                     self._hw_interface = HWInterface.SERIAL
                     log.info("The serial interface is available/active and will be used.")
                     self._port.write(b"PyKOB\n")
-                    time.sleep(0.5)
+                    self._threadsStop.wait(0.5)
                     indata = self._port.readline()
                     if indata == b"PyKOB\n":
                         self._serial_key_read = self.__read_cts  # Use CTS to read the key
@@ -290,9 +290,9 @@ class KOB:
     def __stop_hw_processing(self) -> None:
         self._threadsStop.set()
         if self._keyread_thread and self._keyread_thread.is_alive():
-            self._keyread_thread.join()
+            self._keyread_thread.join(timeout=2.0)
         if self._powersave_thread and self._powersave_thread.is_alive():
-            self._powersave_thread.join()
+            self._powersave_thread.join(timeout=2.0)
         self._keyread_thread = None
         self._powersave_thread = None
         return
@@ -322,7 +322,7 @@ class KOB:
             if self._sounder_power_save_secs > 0 and not self._power_saving:
                 if self._t_sounder_energized > 0 and (now - self._t_sounder_energized) > self._sounder_power_save_secs:
                     self.power_save(True)
-            time.sleep(0.5)
+            self._threadsStop.wait(0.5)
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
@@ -663,7 +663,7 @@ class KOB:
                 #
                 if self._sounder_mode == SounderMode.FOLLOW_KEY or self._synth_mode == SynthMode.FOLLOW_KEY:
                     self.energize_sounder(kc, CodeSource.key)
-                time.sleep(DEBOUNCE)
+                self._threadsStop.wait(DEBOUNCE)
                 if kc:
                     code += (-dt,)
                 elif self._circuit_is_closed:
@@ -672,17 +672,15 @@ class KOB:
                     return code
                 else:
                     code += (dt,)
-            if not kc and code and \
-                    t > self._t_key_last_change + CODESPACE:
+            if not kc and code and t > self._t_key_last_change + CODESPACE:
                 return code
-            if kc and not self._circuit_is_closed and \
-                    t > self._t_key_last_change + CKTCLOSE:
+            if kc and not self._circuit_is_closed and t > self._t_key_last_change + CKTCLOSE:
                 code += (+1,)  # latch circuit closed
                 self._circuit_is_closed = True
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
-            time.sleep(0.005)
+            self._threadsStop.wait(0.005)
         return code
 
     def power_save(self, enable: bool):
@@ -730,7 +728,7 @@ class KOB:
                 self._t_soundcode_last_change = t
             else:
                 self._t_soundcode_last_change = tNext
-                time.sleep(dt)
+                self._threadsStop.wait(dt)
             if c > 1:  # end of (nonlatching) mark
                 if sound:
                     self.energize_sounder(False, code_source)

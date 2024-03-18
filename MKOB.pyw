@@ -26,7 +26,8 @@ SOFTWARE.
 """
 MKOB.pyw
 
-Python version of MorseKOB 2.5
+Python Morse Code Sending, Receiving, and Learning/Training application
+influenced by the MorseKOB 2.5 application by Les Kerr.
 """
 import argparse
 import tkinter as tk
@@ -53,15 +54,16 @@ try:
                                          + "The Global Configuration is used unless a configuration file is specified.",
         parents= [
             config2.config_file_override,
-            config2.debug_level_override
+            config2.logging_level_override
         ]
     )
     args = arg_parser.parse_args()
     cfg = config2.process_config_args(args)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
 
-    log.set_debug_level(cfg.debug_level)
-
+    log.set_logging_level(cfg.logging_level)
+    log.debug("MKOB: Logging level: {}".format(cfg.logging_level))
+    
     root = tk.Tk(className="MKOB")
     icon = tk.PhotoImage(file="resources/mkob-icon_64.png")
     root.iconphoto(True, icon)
@@ -75,14 +77,13 @@ try:
     root.geometry("+30+30")
     root.state('normal')
 
-    mkobwin.start()
-
-    if log.get_debug_level() > 10:
+    if cfg.logging_level > 9:
         mkw.print_hierarchy(root)
 
-    root.after(400, mkobwin.set_minimum_sizes)
-    root.after(800, mkobwin.give_keyboard_focus())
-
+    # Schedule a couple things to run after we have entered the main loop.
+    root.after(300, mkobwin.set_minimum_sizes)
+    root.after(600, mkobwin.on_app_started)
+    #
     root.mainloop()
     distroy_on_exit = False  # App is already distroyed at this point
 except KeyboardInterrupt:
