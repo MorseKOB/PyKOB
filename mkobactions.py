@@ -130,7 +130,7 @@ class MKOBActions():
         return
 
     def doFileExit(self):
-        self._kw.exit()
+        self._kw.exit(destroy_app=True)
         return
 
     # Tools menu

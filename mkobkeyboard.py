@@ -100,6 +100,7 @@ class MKOBKeyboard():
         Dits Sender Thread - Run routine
         """
         while not self._threadsStop.is_set():
+            self._threadsStop.wait(0.01)
             pass
         return
 

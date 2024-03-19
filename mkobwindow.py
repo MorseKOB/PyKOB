@@ -445,7 +445,7 @@ class MKOBWindow:
         self._app_name_version = mkob_version_text
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
-        self._root.protocol("WM_DELETE_WINDOW", self._on_app_distroy)  # Handle user clicking [X]
+        self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
         # The main (visible) window
         self._window = ttk.Frame(root)
 
@@ -966,12 +966,12 @@ class MKOBWindow:
         self.give_keyboard_focus()
         return
 
-    def _on_app_distroy(self) -> None:
+    def _on_app_destoy(self) -> None:
         """
         Called when TK generates the WM_DELETE_WINDOW event due to user clicking 'X' on main window.
         """
-        log.debug("MKOBWindow._on_app_distroy triggered.")
-        self.exit()
+        log.debug("MKOBWindow._on_app_destoy triggered.")
+        self.exit(destroy_app=True)
         return
 
     def on_app_started(self) -> None:
@@ -979,14 +979,14 @@ class MKOBWindow:
         Called by MKOB via a tk.after when the main loop has been started.
         """
         self._app_started = True
+        # Set to disconnected state
+        self.connected(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
         self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()
         self._status_bar.start(self._km)
-        # Set to disconnected state
-        self.connected(False)
         # Finish up...
         self._ka.doMorseChange()
         return
@@ -1146,17 +1146,18 @@ class MKOBWindow:
         log.debug("=>Event generate: {}".format(event), 4)
         return self._root.event_generate(event, when=when, data=data)
 
-    def exit(self, distroy_app:bool = True):
+    def exit(self, destroy_app:bool):
         """
-        Exit the program by distroying the main window and quiting
+        Exit the program by destoying the main window and quiting
         the message loop.
         """
         if self._kkb:
             self._kkb.exit()
+            self._kkb = None
         if self._km:
             self._km.exit()
             self._km = None
-        if distroy_app:
+        if destroy_app:
             self._root.destroy()
         self._root.quit()
         return
