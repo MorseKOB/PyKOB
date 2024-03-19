@@ -31,7 +31,7 @@ Provides classes for sending and reading American and International Morse code.
 import sys
 import codecs
 from pathlib import Path
-from threading import current_thread, Timer
+from threading import current_thread, Event, Timer
 import traceback
 from pykob import config, log
 
@@ -148,6 +148,12 @@ class Sender:
             self._space = self._charSpace
         return code
 
+    def exit(self):
+        """
+        Exit this instance.
+        """
+        return
+
     def setWPM(self, wpm, cwpm=0):
         if cwpm == 0:
             cwpm = wpm  # adjust for legacy clients
@@ -225,6 +231,7 @@ class Reader:
         self._markBuf   = [0, 0]       # length of last dot or dash in character
         self._nChars    = 0            # number of complete characters in buffer
         self._callback  = callback     # function to call when character decoded
+        self._threadsStop = Event()    # Used to cancel running threads
         self._flusher   = None         # holds Timer (thread) to call flush if no code received
         self._latched   = False        # True if cicuit has been latched closed by a +1 code element
         self._mark      = 0            # accumulates the length of a mark as positive code elements are received
@@ -326,7 +333,7 @@ class Reader:
                     self._space = 0
                 elif self._mark > 0:  # continuation of mark
                     self._mark += c
-        if use_flusher:
+        if use_flusher and not self._threadsStop.is_set():
             self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self._flushHandler)  # if idle call `flush`
             self._flusher.setName("Reader-Flusher <:{}".format(current_thread().name))
             self._flusher.start()
@@ -338,11 +345,12 @@ class Reader:
         """
         Cancel the flusher (if it exists) and exit.
         """
+        self._threadsStop.set()
         f = self._flusher
         self._flusher = None
-        if f:
+        if f and f.is_alive():
             f.cancel()
-            f.join(0.5)
+            f.join()
         return
 
     def setWPM(self, wpm, cwpm=0):

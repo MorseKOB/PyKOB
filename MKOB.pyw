@@ -45,7 +45,7 @@ print(" Python: " + sys.version + " on " + sys.platform)
 print(" pykob: " + PKVERSION)
 print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
-distroy_on_exit = True
+destoy_on_exit = True
 mkobwin: MKOBWindow = None
 try:
     arg_parser = argparse.ArgumentParser(description="Morse KOB application. This provides a full graphical interface to "
@@ -63,7 +63,7 @@ try:
 
     log.set_logging_level(cfg.logging_level)
     log.debug("MKOB: Logging level: {}".format(cfg.logging_level))
-    
+
     root = tk.Tk(className="MKOB")
     icon = tk.PhotoImage(file="resources/mkob-icon_64.png")
     root.iconphoto(True, icon)
@@ -85,7 +85,7 @@ try:
     root.after(600, mkobwin.on_app_started)
     #
     root.mainloop()
-    distroy_on_exit = False  # App is already distroyed at this point
+    destoy_on_exit = False  # App is already destoyed at this point
 except KeyboardInterrupt:
     print()
     sys.exit(0)
@@ -94,7 +94,7 @@ except Exception as ex:
     sys.exit(1)
 finally:
     if mkobwin:
-        mkobwin.exit(distroy_on_exit)
+        mkobwin.exit(destoy_on_exit)
     print("~73")
 sys.exit(0)
 

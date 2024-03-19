@@ -256,13 +256,34 @@ class MKOBMain:
         return
 
     def exit(self):
-        self._threadsStop.set()
-        if self._kob:
-            self._kob.exit()
-        if self._internet:
-            self._internet.exit()
-        if self._emit_code_thread and self._emit_code_thread.is_alive():
-            self._emit_code_thread.join(timeout=2.0)
+        """
+        Exit all of the modules.
+        """
+        try:
+            self._threadsStop.set()
+            if self._kob:
+                self._kob.exit()
+                self._kob = None
+            if self._player:
+                self._player.exit()
+                self._player = None
+            if self._recorder:
+                self._recorder.exit()
+                self._recorder = None
+            if self._mreader:
+                self._mreader.exit()
+                self._mreader = None
+            if self._msender:
+                self._msender.exit()
+                self._msender = None
+            if self._internet:
+                self._internet.exit()
+                self._internet = None
+            if self._emit_code_thread and self._emit_code_thread.is_alive():
+                self._emit_code_thread.join(timeout=2.0)
+                self._emit_code_thread = None
+        finally:
+            log.debug("MKOBMain - Done")
         return
 
     @property
