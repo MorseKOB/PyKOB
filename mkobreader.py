@@ -30,6 +30,7 @@ Manage the reader window.
 Calls to the 'handle_' methods should be made on the main GUI thread as a result of the GUI handling
 message events.
 """
+from pykob import log
 
 class MKOBReader():
     """
@@ -47,6 +48,7 @@ class MKOBReader():
         Event handler to append text to the window.
         """
         text = event_data
+        log.debug("mkrdr.handle_append_text - [{}]".format(text), 5)
         self.kw.reader_win.insert('end', text)
         self.kw.reader_win.see('end')
 
@@ -54,4 +56,5 @@ class MKOBReader():
         """
         Event handler to clear the contents.
         """
+        log.debug("mkrdr.handle_clear", 5)
         self.kw.reader_win.delete('1.0', 'end')

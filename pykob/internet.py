@@ -99,7 +99,8 @@ class Internet:
             self._app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
         self._officeID = _emptyOrValueFromStr(officeID)
         self._wireNo = 0
-        self._socketGuard: Lock = Lock()
+        self._socketRDGuard: Lock = Lock()  # Guard for reading from the socket (get RD then WR for both)
+        self._socketWRGuard: Lock = Lock()  # Guard for writing to the socket (get RD then WR for both)
         self._threadGuard: Lock = Lock()
         self._threadsStop: Event = Event()
         self._connected: Event = Event()
@@ -193,20 +194,26 @@ class Internet:
         return
 
     def _close_socket(self):
-        with self._socketGuard:
-            if self._socket:
-                self._socket.close()
-                self._socket = None
-            pass
+        log.debug("internet._close_socket - Getting socketGuards", 7)
+        with self._socketRDGuard:
+            with self._socketWRGuard:
+                log.debug("internet._close_socket -  socketGuard-ed", 7)
+                if self._socket:
+                    self._socket.close()
+                    self._socket = None
+                log.debug("internet._close_socket -   socketGuards-release", 7)
         return
 
     def _create_socket(self):
-        with self._socketGuard:
-            if not self._socket:
-                self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._socket.setblocking(False)
-                self._socket.settimeout(0.8)
-            pass
+        log.debug("internet._create_socket - Getting socketGuards", 7)
+        with self._socketRDGuard:
+            with self._socketWRGuard:
+                log.debug("internet._create_socket -  socketGuard-ed", 7)
+                if not self._socket:
+                    self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    self._socket.setblocking(True)
+                    # self._socket.settimeout(0.8)
+                log.debug("internet._create_socket -   socketGuards-release", 7)
         self._get_address(renew=True)
         self.sendID()
         return
@@ -228,10 +235,10 @@ class Internet:
             success = False
             while not success and not self._threadsStop.is_set():
                 try:
-                    log.debug("Connecting to host:{} port:{}".format(self._host, self._port))
+                    log.debug("internet._get_address - Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
                     success = True
-                    log.debug(" Received IP address:{}".format(self._ip_address), 2)
+                    log.debug("internet._get_address - Received IP address:{}".format(self._ip_address), 2)
                 except (OSError, socket.gaierror) as ex:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
@@ -268,9 +275,12 @@ class Internet:
             self._wireNo = 0
             shortPacket = shortPacketFormat.pack(DIS, 0)
             try:
-                with self._socketGuard:
+                log.debug("internet.disconnect - Getting socketWRGuard", 7)
+                with self._socketWRGuard:
+                    log.debug("internet.disconnect -  socketWRGuard-ed", 7)
                     if self._socket:
                         self._socket.sendto(shortPacket, self._get_address())
+                log.debug("internet.disconnect -   socketWRGuard-release", 7)
             except:
                 self._get_address(renew=True)
             finally:
@@ -316,7 +326,9 @@ class Internet:
             code = None
             while self._socket and self._connected.is_set() and not success and not self._threadsStop.is_set():
                 try:
-                    with self._socketGuard:
+                    log.debug("internet.read - Getting socketRDGuard", 7)
+                    with self._socketRDGuard:
+                        log.debug("internet.read -  socketRDGuard-ed", 7)
                         if self._socket:
                             data_ready = select.select([self._socket], [], [], 1.0)
                             if data_ready:
@@ -329,6 +341,7 @@ class Internet:
                                 success = True
                             else:
                                 pass
+                        log.debug("internet.read -   socketRDGuard-release", 7)
                 except (TimeoutError) as toe:
                     # On timeout, just continue so we can check our flags
                     continue
@@ -349,6 +362,7 @@ class Internet:
                 #     self._err_msg_hndlr("{}".format(s))
                 #     self._threadsStop.wait(5.0)
                 #     continue
+            log.debug("internet.read - recv:[{}]".format(buf), 6)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
                 if self._packet_callback:
@@ -395,11 +409,16 @@ class Internet:
             codePacket = codePacketFormat.pack(
                     DAT, 492, self._officeID.encode('latin-1'),
                     self._sentSeqNo, *codeBuf)
-            for i in range(2):
+            for i in range(2):  # Retry once if we get an error trying to send.
                 try:
-                    with self._socketGuard:
+                    log.debug("internet.write - Getting socketWRGuard", 7)
+                    with self._socketWRGuard:
+                        log.debug("internet.write -  socketWRGuard-ed", 7)
                         if self._socket:
+                            log.debug("internet.write - sendto:[{}]".format(codePacket), 6)
                             self._socket.sendto(codePacket, self._get_address())
+                    log.debug("internet.write -   socketWRGuard-release", 7)
+                    break
                 except:
                     self._get_address(renew=True)
             # Write packet info if requested
@@ -410,7 +429,9 @@ class Internet:
     def sendID(self):
         if self._connected.is_set():
             try:
-                with self._socketGuard:
+                log.debug("internet.sendID - Getting socketWRGuard", 7)
+                with self._socketWRGuard:
+                    log.debug("internet.sendID -  socketWRGuard-ed", 7)
                     if self._socket:
                         shortPacket = shortPacketFormat.pack(CON, self._wireNo)
                         self._socket.sendto(shortPacket, self._get_address())
@@ -418,10 +439,11 @@ class Internet:
                         idPacket = idPacketFormat.pack(DAT, 492, self._officeID.encode('latin-1'),
                                 self._sentSeqNo, 1, self._app)
                         self._socket.sendto(idPacket, self._ip_address)
-                        if self._packet_callback:
-                            self._packet_callback("\n<sent: {}>".format(DAT))
-                        if self._ID_callback:
-                            self._ID_callback(self._officeID)
+                    log.debug("internet.sendID -   socketWRGuard-release", 7)
+                if self._packet_callback:
+                    self._packet_callback("\n<sent: {}>".format(DAT))
+                if self._ID_callback:
+                    self._ID_callback(self._officeID)
             except (OSError, socket.gaierror) as ex:
                 self._get_address(renew=True)
         return
