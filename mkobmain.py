@@ -74,7 +74,7 @@ class MKOBMain:
         self._connected = Event()
         self._odc_fu = None
         self._show_packets: bool = False
-        self._lastCharWasParagraph: bool = False
+        self._last_char_was_para: bool = False
         self._wire_data_received: bool = False
 
         self._internet_station_active = False  # True if a remote station is sending
@@ -86,18 +86,12 @@ class MKOBMain:
         self._threadsStop: Event = Event()
         self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
-        self._internet = None
+        self._internet: Optional[internet.Internet] = None
         self._kob: Optional[kob.KOB] = None
         self._create_internet(self._cfg)
         self._create_kob(self._cfg)
         self.do_morse_change()
 
-        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
-        if self._cfg.invert_key_input:
-            log.warn(
-                "IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). "
-                + "To enable/disable this setting use `Configure --iki`."
-            )
         return
 
     def _create_internet(self, cfg:Config):
@@ -565,6 +559,8 @@ class MKOBMain:
             self._ka.handle_clear_stations()
             inet_available = self._check_internet_available()
             if inet_available:
+                # Close the key when connecting to avoid breaking into an active sender (if any).
+                self.set_virtual_closer_closed(True)
                 self._internet.monitor_IDs(
                     self._ka.trigger_update_station_active
                 )  # Set callback for monitoring stations
@@ -593,11 +589,14 @@ class MKOBMain:
             self._mreader.decode(LATCH_CODE, use_flusher=False)
             self._mreader.flush()
             self._ka.trigger_reader_append_text("\n#####\n")
+        # Sounder should be energized when disconnected.
+        self._kob.energize_sounder(True, kob.CodeSource.local, from_disconnect=True)
         self._ka.trigger_station_list_clear()
+        if self._kob.virtual_closer_is_open:
+            # If the closer is open, Sounder should not be energized.
+            self._kob.energize_sounder(False, kob.CodeSource.local, from_disconnect=True)
         self._wire_data_received = False
-        if not self._kob.virtual_closer_is_open:
-            # Sounder should be energized when disconnected.
-            self._kob.energize_sounder(True, kob.CodeSource.local, from_disconnect=True)
+        self._internet_station_active = False
         return
 
     def _on_disconnect(self):
@@ -664,11 +663,11 @@ class MKOBMain:
             n = int(sp + 0.5)
             txt = n * " "
         if char == "=":
-            self._lastCharWasParagraph = True
+            self._last_char_was_para = True
         else:
-            if self._lastCharWasParagraph:
+            if self._last_char_was_para:
                 txt += "\n"
-            self._lastCharWasParagraph = False
+            self._last_char_was_para = False
         txt += char
         self._ka.trigger_reader_append_text(txt)
         return

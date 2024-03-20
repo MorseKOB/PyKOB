@@ -49,14 +49,6 @@ global LOGGING_MIN_LEVEL
 """ Minimum logging level. This disables all logging. """
 LOGGING_MIN_LEVEL = -3
 
-def get_logging_level():
-    global __logging_level
-    return __logging_level
-
-def set_logging_level(level):
-    global __logging_level
-    __logging_level = level if level >= LOGGING_MIN_LEVEL else INFO_LEVEL
-
 def log(msg, type="", dt=None, level_threshold=ERROR_LEVEL):
     global __logging_level
     if __logging_level >= level_threshold:
@@ -64,6 +56,7 @@ def log(msg, type="", dt=None, level_threshold=ERROR_LEVEL):
         typestr = " {0}".format(type) if type else ""
         sys.stdout.write('{0}{1}: \t{2}\n'.format(dtl, typestr, msg))
         sys.stdout.flush()
+    return
 
 def logErr(msg):
     global __logging_level
@@ -73,21 +66,38 @@ def logErr(msg):
         log(msg, type=typestr, dt=dtstr) # Output to the normal output
         sys.stderr.write('{0} {1}:\t{2}\n'.format(dtstr, typestr, msg))
         sys.stderr.flush()
+    return
 
 def debug(msg, level=DEBUG_MIN_LEVEL):
     global __logging_level
-    log(msg, type="DEBUG", level_threshold=level)
+    if __logging_level >= level:
+        log(msg, type="DEBUG[{}]".format(level), level_threshold=level)
+    return
 
 def err(msg):
     typ, val, trc = sys.exc_info()
     logErr("{0}\n{1}".format(msg, val))
+    return
 
 def error(msg):
     typ, val, trc = sys.exc_info()
     logErr("{0}\n{1}".format(msg, val))
+    return
 
 def info(msg):
     log(msg, type="INFO", level_threshold=INFO_LEVEL)
+    return
 
 def warn(msg):
     log(msg, type="WARN", level_threshold=WARN_LEVEL)
+    return
+
+def get_logging_level():
+    global __logging_level
+    return __logging_level
+
+def set_logging_level(level):
+    global __logging_level
+    __logging_level = level if level >= LOGGING_MIN_LEVEL else INFO_LEVEL
+    debug("log.set_logging_level - " + str(level))
+    return

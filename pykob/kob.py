@@ -457,7 +457,7 @@ class KOB:
         m2s = False  # True once Synth Mode has been set
         sounder_mode_was = self._sounder_mode
         synth_mode_was = self._synth_mode
-        log.debug("kob._update_modes: is {}:{}".format(sounder_mode_was.name, synth_mode_was.name), 2)
+        log.debug("kob._update_modes: was {}:{}".format(sounder_mode_was.name, synth_mode_was.name), 2)
         with self._audio_guard:
             with self._sounder_guard:
                 if not self._use_sounder or self._hw_interface == HWInterface.NONE:

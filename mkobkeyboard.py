@@ -166,7 +166,7 @@ class MKOBKeyboard():
     def _on_delete(self, *args):
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB delete: {}:{} {}".format(ip, ms, args), 3)
+        log.debug("KB delete: {}:{} {}".format(ip, ms, args), 4)
         r = None
         try:
             r = self.original_delete(*args)
@@ -175,13 +175,13 @@ class MKOBKeyboard():
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
         self._ka.trigger_keyboard_send()
-        log.debug("KB delete end insert/send point: {}:{}".format(ip, ms), 3)
+        log.debug("KB delete end insert/send point: {}:{}".format(ip, ms), 4)
         return r
 
     def _on_insert(self, *args):
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB insert: {}:{} {}".format(ip, ms, args), 3)
+        log.debug("KB insert: {}:{} {}".format(ip, ms, args), 4)
         s = args[1]
         r = None
         try:
@@ -191,7 +191,7 @@ class MKOBKeyboard():
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
         self._ka.trigger_keyboard_send()
-        log.debug("KB insert end [i:s]: {}:{}".format(ip, ms), 3)
+        log.debug("KB insert end [i:s]: {}:{}".format(ip, ms), 4)
         return r
 
     def _on_mark(self, *args):
@@ -212,7 +212,7 @@ class MKOBKeyboard():
         sline = int(msl[0])
         schar = int(msl[1])
         en = self._enabled
-        log.debug("KB mark [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 3)
+        log.debug("KB mark [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 4)
         if op == 'set' and mark == INSERT and not pos == MARK_SEND:
             if (not en) or (en and ((iline < sline) or (iline == sline and ichar < schar))):
                 self._kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
@@ -227,11 +227,11 @@ class MKOBKeyboard():
                 self._kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
                 ms = self._kw.keyboard_win.index(MARK_SEND)
                 self._ka.trigger_keyboard_send()
-        log.debug("KB mark end [i:s]: {}:{}".format(ip, ms), 3)
+        log.debug("KB mark end [i:s]: {}:{}".format(ip, ms), 4)
         return r
 
     def _on_right_click(self, event):
-        log.debug("KB mrc: {}".format(event), 3)
+        log.debug("KB mrc: {}".format(event), 4)
         pos = "@{},{}".format(event.x, event.y)
         self._kw.keyboard_win.mark_set(MARK_SEND, pos)
         return
@@ -275,12 +275,14 @@ class MKOBKeyboard():
         being added, the send position changing, the sender being enabled,
         or repeat being enabled.
         """
-        if self._km.internet_station_active:
-            self._km.tkroot.after(100, self.handle_keyboard_send)
+        km_isa = self._km.internet_station_active
+        log.debug("mkkb.handle_keyboard_send: KM.ISA:{} Enabled:{} Waiting on sent:{}".format(
+            km_isa, self._enabled, self._waiting_for_sent_code.is_set()), 3)
+        
+        if km_isa:
+            self._km.tkroot.after(800, self.handle_keyboard_send)
             return
 
-        log.debug("mkkb.handle_keyboard_send: Enabled:{} Waiting on sent:{}".format(
-            self._enabled, self._waiting_for_sent_code.is_set()), 3)
         c = None
         with self._send_guard:
             if self._enabled:
