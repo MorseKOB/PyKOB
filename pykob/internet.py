@@ -99,8 +99,6 @@ class Internet:
             self._app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
         self._officeID = _emptyOrValueFromStr(officeID)
         self._wireNo = 0
-        self._socketRDGuard: Lock = Lock()  # Guard for reading from the socket (get RD then WR for both)
-        self._socketWRGuard: Lock = Lock()  # Guard for writing to the socket (get RD then WR for both)
         self._threadGuard: Lock = Lock()
         self._threadsStop: Event = Event()
         self._connected: Event = Event()
@@ -109,6 +107,8 @@ class Internet:
         self._tLastListener = 0.0
         self._socket: Optional[socket.socket] = None
         socket.setdefaulttimeout(3.0)
+        self._socketRDGuard: Lock = Lock()  # Guard for reading from the socket (get RD then WR for both)
+        self._socketWRGuard: Lock = Lock()  # Guard for writing to the socket (get RD then WR for both)
         self._internetReadThread: Thread = Thread(name="Internet-Data-Read", target=self._data_read_body)
         self._keepAliveThread: Thread = Thread(name="Internet-Keep-Alive", target=self._keep_alive_body)
         self._code_callback = code_callback
@@ -138,7 +138,7 @@ class Internet:
 
     @property
     def internet_available(self) -> bool:
-        if int(time.time() - self._inet_available_check_time) > 60:
+        if int(time.time() - self._inet_available_check_time) > 10:
             self.check_internet_available()
         return self._internet_available
 
@@ -211,8 +211,8 @@ class Internet:
                 log.debug("internet._create_socket -  socketGuard-ed", 7)
                 if not self._socket:
                     self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    self._socket.setblocking(True)
-                    # self._socket.settimeout(0.8)
+                    self._socket.setblocking(False)
+                    self._socket.settimeout(0)
                 log.debug("internet._create_socket -   socketGuards-release", 7)
         self._get_address(renew=True)
         self.sendID()
@@ -326,12 +326,12 @@ class Internet:
             code = None
             while self._socket and self._connected.is_set() and not success and not self._threadsStop.is_set():
                 try:
-                    log.debug("internet.read - Getting socketRDGuard", 7)
+                    # log.debug("internet.read - Getting socketRDGuard", 7)
                     with self._socketRDGuard:
-                        log.debug("internet.read -  socketRDGuard-ed", 7)
+                        # log.debug("internet.read -  socketRDGuard-ed", 7)
                         if self._socket:
-                            data_ready = select.select([self._socket], [], [], 1.0)
-                            if data_ready:
+                            data_ready = select.select([self._socket], [], [], 0)  # Check readability and never block
+                            if len(data_ready[0]) > 0:
                                 buf = self._socket.recv(500)
                                 if not self._connected.is_set() or self._threadsStop.is_set():
                                     return code
@@ -340,8 +340,8 @@ class Internet:
                                     continue
                                 success = True
                             else:
-                                pass
-                        log.debug("internet.read -   socketRDGuard-release", 7)
+                                self._threadsStop.wait(0.01)
+                        # log.debug("internet.read -   socketRDGuard-release", 7)
                 except (TimeoutError) as toe:
                     # On timeout, just continue so we can check our flags
                     continue
@@ -352,7 +352,7 @@ class Internet:
                         return None  # Socket not ready
                     if ex1.errno == 9:
                         return None  # Socket closed
-                    s = "Network error during read: {} (Retrying in 5 seconds)".format(ex2)
+                    s = "Network error during read: {} (Retrying in 5 seconds)".format(ex1)
                     self._err_msg_hndlr("{}".format(s))
                     self._threadsStop.wait(5.0)
                     continue

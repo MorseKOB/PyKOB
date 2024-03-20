@@ -87,6 +87,8 @@ class MKOBMain:
         self._emit_code_thread = Thread(name="MKMain-EmitCode", target=self._emit_code_thread_run)
 
         self._internet: Optional[internet.Internet] = None
+        self._after_iac = None  # Internet available check - after ID
+        self._inet_was_availabe: bool = False
         self._kob: Optional[kob.KOB] = None
         self._create_internet(self._cfg)
         self._create_kob(self._cfg)
@@ -212,17 +214,35 @@ class MKOBMain:
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
-    def _check_internet_available(self) -> bool:
+    def _check_internet_available(self, realtime:bool=False) -> bool:
         """
         Use the internet object to check if internet is available.
         Update the status bar message and return the availability.
+
+        realtime: True will get realtime status from Internet, else use cached value.
         """
-        hi = self._internet.internet_available
-        if not hi:
-            self._kw.status_msg = "Internet not available"
-            self._kw.tkroot.after(20000, self._check_internet_available)
+        hi:bool
+        if self._after_iac:
+            self._kw.tkroot.after_cancel(self._after_iac)
+            self._after_iac = None
+        if realtime:
+            hi = self._internet.check_internet_available()
+            if not hi:
+                self._kw.status_msg = "Internet not available"
+            else:
+                self._kw.clear_status_msg()
         else:
-            self._kw.clear_status_msg()
+            hi = self._internet.internet_available
+            if not hi and self._inet_was_availabe:
+                self._kw.status_msg = "Internet not available"
+            if hi and not self._inet_was_availabe:
+                self._kw.clear_status_msg()
+
+        if not hi:
+            self._after_iac = self._kw.tkroot.after(2000, self._check_internet_available)
+        else:
+            self._after_iac = self._kw.tkroot.after(5000, self._check_internet_available)
+        self._inet_was_availabe = hi
         return hi
 
     def _kob_err_msg_hndlr(self, msg:str) -> None:
@@ -557,7 +577,7 @@ class MKOBMain:
             self._sender_ID = ""
             self._wire_data_received = False
             self._ka.handle_clear_stations()
-            inet_available = self._check_internet_available()
+            inet_available = self._check_internet_available(True)  # Use method, rather than property, to get realtime status.
             if inet_available:
                 # Close the key when connecting to avoid breaking into an active sender (if any).
                 self.set_virtual_closer_closed(True)
