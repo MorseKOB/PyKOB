@@ -77,7 +77,7 @@ class MKOBMain:
         self._last_char_was_para: bool = False
         self._wire_data_received: bool = False
 
-        self._internet_station_active = False  # True if a remote station is sending
+        self._internet_station_active = False  # True if connected and a remote station is sending
 
         self._sender_ID = ""
 
@@ -138,6 +138,9 @@ class MKOBMain:
         self._kob.virtual_closer_is_open = vcloser
         if was_connected:
             self.toggle_connect()
+        else:
+            self._kob.internet_circuit_closed = not self._internet_station_active
+            self._kob.wire_connected = False
         return
 
     def _create_player(self):
@@ -250,6 +253,12 @@ class MKOBMain:
     def _net_err_msg_hndlr(self, msg:str) -> None:
         log.warn(msg)
         self._ka.trigger_reader_append_text("\n{}\n".format(msg))
+        return
+
+    def _set_internet_station_active(self, active:bool) -> None:
+        self._internet_station_active = active
+        if self._kob:
+            self._kob.internet_circuit_closed = not active
         return
 
     def start(self):
@@ -466,13 +475,13 @@ class MKOBMain:
             if self._recorder:
                 self._recorder.record(code, kob.CodeSource.wire)
             if len(code) > 0 and code[-1] == +1:
-                self._internet_station_active = False
+                self._set_internet_station_active(False)
             else:
-                self._internet_station_active = True
+                self._set_internet_station_active(True)
             if self.key_graph_is_active():
                 self._key_graph_win.wire_code(code)
         else:
-            self._internet_station_active = False
+            self._set_internet_station_active(False)
         return
 
     def from_recorder(self, code, source=None):
@@ -504,7 +513,7 @@ class MKOBMain:
         self._kob.virtual_closer_is_open = not closed
         if not self._internet_station_active:
             if self._cfg.local:
-                if not closed:
+                if not closed and self._connected.is_set():
                     self._ka.handle_sender_update(self._cfg.station)  # Can call 'handle_' as this is run on the UI thread
                 self._mreader.decode(code)
             if self._recorder:
@@ -597,6 +606,8 @@ class MKOBMain:
                     self._ka.trigger_update_current_sender
                 )  # Set callback for monitoring current sender
                 self._kob.power_save(False)
+                self._set_internet_station_active(False)
+                self._kob.wire_connected = True
                 self._internet.connect(self._wire)
                 self._connected.set()
             else:
@@ -610,6 +621,7 @@ class MKOBMain:
             self._internet.monitor_IDs(None)  # don't monitor stations
             self._internet.monitor_sender(None)  # don't monitor current sender
             self._internet.disconnect(self._on_disconnect)
+            self._kob.wire_connected = False
         return
 
     def _on_disconnect_followup(self, *args):
@@ -623,13 +635,13 @@ class MKOBMain:
         self._kob.energize_sounder(not self._kob.virtual_closer_is_open, kob.CodeSource.local, from_disconnect=True)
         self._ka.trigger_station_list_clear()
         self._wire_data_received = False
-        self._internet_station_active = False
+        self._set_internet_station_active(False)
         return
 
     def _on_disconnect(self):
         # These should be false and blank from the 'disconnect', but make sure.
         log.debug("mkmain._on_disconnect", 3)
-        self._internet_station_active = False
+        self._set_internet_station_active(False)
         self._sender_ID = ""
         if self._wire_data_received:
             self._mreader.flush()
@@ -935,7 +947,7 @@ class MKOBMain:
 
     def reset_wire_state(self):
         """regain control of the wire"""
-        self._internet_station_active = False
+        self._set_internet_station_active(False)
         return
 
     def show_key_graph(self):
