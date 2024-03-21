@@ -132,14 +132,14 @@ class KOB:
         #
         self._key_callback = None # Set to the passed in value once we establish an interface
         #
-        self._keyread_thread = None
-        self._powersave_thread = None
+        self._thread_keyread = None
+        self._thread_powersave = None
         self._threadsStop: Event = Event()
         #
         self._key_state_last_closed = False
         #
+        self.__init_audio()  # Do this first so it doesn't get an error when HW energizes the sounder.
         self.__init_hw_interface()
-        self.__init_audio()
         self._update_modes()
         #
         self._key_callback = keyCallback
@@ -243,10 +243,10 @@ class KOB:
             if not self._hw_interface == HWInterface.NONE:
                 # Read the key
                 key_closed = self._key_is_closed()
+            self._circuit_is_closed = key_closed
             self._t_key_last_change = time.time()  # time of last key transition
             self._set_key_closer_open(not key_closed)
             self._set_virtual_closer_open(not key_closed)
-            self._circuit_is_closed = key_closed
         return
 
     def __read_cts(self) -> bool:
@@ -279,25 +279,25 @@ class KOB:
             self._threadsStop.clear()
             self.power_save(False)
             if self._key_callback:
-                if not self._keyread_thread:
-                    self._keyread_thread = Thread(name="KOB-KeyRead", target=self.__thread_keyread_run)
-                    self._keyread_thread.start()
-            if not self._powersave_thread:
-                self._powersave_thread = Thread(name="KOB-PowerSave", target=self.__thread_powersave_run)
-                self._powersave_thread.start()
+                if not self._thread_keyread:
+                    self._thread_keyread = Thread(name="KOB-KeyRead", target=self._thread_keyread_body)
+                    self._thread_keyread.start()
+            if not self._thread_powersave:
+                self._thread_powersave = Thread(name="KOB-PowerSave", target=self._thread_powersave_body)
+                self._thread_powersave.start()
         return
 
     def __stop_hw_processing(self) -> None:
         self._threadsStop.set()
-        if self._keyread_thread and self._keyread_thread.is_alive():
-            self._keyread_thread.join(timeout=2.0)
-        if self._powersave_thread and self._powersave_thread.is_alive():
-            self._powersave_thread.join(timeout=2.0)
-        self._keyread_thread = None
-        self._powersave_thread = None
+        if self._thread_keyread and self._thread_keyread.is_alive():
+            self._thread_keyread.join(timeout=2.0)
+        if self._thread_powersave and self._thread_powersave.is_alive():
+            self._thread_powersave.join(timeout=2.0)
+        self._thread_keyread = None
+        self._thread_powersave = None
         return
 
-    def __thread_keyread_run(self):
+    def _thread_keyread_body(self):
         """
         Called by the KeyRead thread `run` to read code from the key.
         """
@@ -313,7 +313,7 @@ class KOB:
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
-    def __thread_powersave_run(self):
+    def _thread_powersave_body(self):
         """
         Called by the PowerSave thread 'run' to control the power save (sounder energize)
         """
@@ -401,6 +401,7 @@ class KOB:
         return kc
 
     def _play_clack_silence(self):
+        log.debug("kob._play_clack_silence - requested", 5)
         if self._use_audio and self._synth_energized:
             log.debug("kob._play_clack_silence", 3)
             self._audio.play(0)  # clack/silence
@@ -408,6 +409,7 @@ class KOB:
         return
 
     def _play_click(self):
+        log.debug("kob._play_click - requested", 5)
         if (self._use_audio and self._audio_type == AudioType.SOUNDER and not self._synth_energized):
             log.debug("kob._play_click", 3)
             self._audio.play(1)  # click
@@ -415,6 +417,7 @@ class KOB:
         return
 
     def _play_click_tone(self):
+        log.debug("kob._play_click_tone - requested", 5)
         if self._use_audio and not self._synth_energized:
             log.debug("kob._play_click_tone", 3)
             self._audio.play(1)  # click/tone

@@ -32,6 +32,53 @@ Some portions, are copied from 'distutils', those functions have a comment
 indicating such.
 
 """
+from typing import Optional
+
+def on_off_from_bool(b:bool) -> str:
+    """
+    Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
+
+    Parameters
+    ----------
+    b : boolean
+        The value to evaluate
+    Return
+    ------
+        'ON' for `True`, 'OFF' for `False`
+    """
+    #print(b)
+    r = "ON" if b else "OFF"
+    return r
+
+def str_empty_or_value(s:str) -> str:
+    """
+    Return an empty string ("") if `s` is None or the string value otherwise.
+
+    Parameters
+    ----------
+    s : str
+        The string value to evaluate
+    Return
+    ------
+        "" or the string value
+    """
+    return s if not s is None else ""
+
+def str_none_or_value(s:str) -> Optional[str]:
+    """
+    Return `None` if `s` is None, empty, or the value 'NONE', else the string value.
+
+    Parameters
+    ----------
+    s : str
+        The string value to evaluate
+    Return
+    ------
+        `None` or the string value
+    """
+    r = None if not s or not s.strip() or s.upper() == 'NONE' else s
+    return r
+
 
 def strtobool (val):
     """

@@ -51,7 +51,7 @@ import socket
 import sys
 from pykob.util import strtobool
 from enum import IntEnum, unique
-from pykob import log
+from pykob import log, util
 
 @unique
 class Spacing(IntEnum):
@@ -146,35 +146,6 @@ wire = 0
 min_char_speed = 18
 text_speed = 18
 
-def onOffFromBool(b):
-    """Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
-
-    Parameters
-    ----------
-    b : boolean
-        The value to evaluate
-    Return
-    ------
-        'ON' for `True`, 'OFF' for `False`
-    """
-    #print(b)
-    r = "ON" if b else "OFF"
-    return r
-
-def noneOrValueFromStr(s):
-    """Return `None` if `s` is '' and the string value otherwise
-
-    Parameters
-    ----------
-    s : str
-        The string value to evaluate
-    Return
-    ------
-        `None` or the string value
-"""
-    r = None if not s or not s.strip() or s.upper() == 'NONE' else s
-    return r
-
 def codeTypeFromString(s):
     """Return the CodeType for a string (A:AMERICAN|I:INTERNATIONAL). Raises a ValueError if not valid"""
     s = s.upper()
@@ -262,7 +233,7 @@ def set_auto_connect(s):
     global auto_connect
     try:
         auto_connect = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+        user_config.set(_CONFIG_SECTION, _AUTO_CONNECT_KEY, util.on_off_from_bool(auto_connect))
     except ValueError as ex:
         log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -382,7 +353,7 @@ def set_invert_key_input(b):
     global invert_key_input
     try:
         invert_key_input = strtobool(str(b))
-        user_config.set(_CONFIG_SECTION, _INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
+        user_config.set(_CONFIG_SECTION, _INVERT_KEY_INPUT_KEY, util.on_off_from_bool(invert_key_input))
     except ValueError as ex:
         log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -403,7 +374,7 @@ def set_local(l):
     global local
     try:
         local = strtobool(str(l))
-        user_config.set(_CONFIG_SECTION, _LOCAL_KEY, onOffFromBool(local))
+        user_config.set(_CONFIG_SECTION, _LOCAL_KEY, util.on_off_from_bool(local))
     except ValueError as ex:
         log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -424,7 +395,7 @@ def set_remote(r):
     global remote
     try:
         remote = strtobool(str(r))
-        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, onOffFromBool(remote))
+        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, util.on_off_from_bool(remote))
     except ValueError as ex:
         log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -468,7 +439,7 @@ def set_serial_port(p):
     """
 
     global serial_port
-    serial_port = noneOrValueFromStr(p)
+    serial_port = util.str_none_or_value(p)
     app_config.set(_CONFIG_SECTION, _SERIAL_PORT_KEY, serial_port)
 
 def set_gpio(s):
@@ -488,7 +459,7 @@ def set_gpio(s):
     global gpio
     try:
         gpio = strtobool(str(s))
-        app_config.set(_CONFIG_SECTION, _GPIO_KEY, onOffFromBool(gpio))
+        app_config.set(_CONFIG_SECTION, _GPIO_KEY, util.on_off_from_bool(gpio))
     except ValueError as ex:
         log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -503,7 +474,7 @@ def set_server_url(s):
     """
 
     global server_url
-    server_url = noneOrValueFromStr(s)
+    server_url = util.str_none_or_value(s)
     if server_url and server_url.upper() == 'DEFAULT':
         server_url = None
     user_config.set(_CONFIG_SECTION, _SERVER_URL_KEY, server_url)
@@ -524,7 +495,7 @@ def set_sound(s):
     global sound
     try:
         sound = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _SOUND_KEY, onOffFromBool(sound))
+        user_config.set(_CONFIG_SECTION, _SOUND_KEY, util.on_off_from_bool(sound))
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -546,7 +517,7 @@ def set_sounder(s):
     global sounder
     try:
         sounder = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _SOUNDER_KEY, onOffFromBool(sounder))
+        user_config.set(_CONFIG_SECTION, _SOUNDER_KEY, util.on_off_from_bool(sounder))
     except ValueError as ex:
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -629,7 +600,7 @@ def set_station(s):
     """
 
     global station
-    station = noneOrValueFromStr(s)
+    station = util.str_none_or_value(s)
     user_config.set(_CONFIG_SECTION, _STATION_KEY, station)
 
 def set_wire(w: str):
@@ -701,25 +672,25 @@ def print_system_info():
 def print_config():
     """Print the PyKOB configuration
     """
-    url = noneOrValueFromStr(server_url)
+    url = util.str_none_or_value(server_url)
     url = url if url else ''
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
-    print("GPIO interface (Raspberry Pi):", onOffFromBool(gpio))
+    print("GPIO interface (Raspberry Pi):", util.on_off_from_bool(gpio))
     print("--------------------------------------")
     print("Audio type:", audio_type.name.upper())
-    print("Auto Connect to Wire:", onOffFromBool(auto_connect))
+    print("Auto Connect to Wire:", util.on_off_from_bool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
-    print("Invert key input:", onOffFromBool(invert_key_input))
-    print("Local copy:", onOffFromBool(local))
-    print("Remote send:", onOffFromBool(remote))
+    print("Invert key input:", util.on_off_from_bool(invert_key_input))
+    print("Local copy:", util.on_off_from_bool(local))
+    print("Remote send:", util.on_off_from_bool(remote))
     print("KOB Server URL:", url)
-    print("Sound:", onOffFromBool(sound))
-    print("Sounder:", onOffFromBool(sounder))
+    print("Sound:", util.on_off_from_bool(sound))
+    print("Sounder:", util.on_off_from_bool(sounder))
     print("Sounder Power Save (seconds):", sounder_power_save)
     print("Spacing:", spacing.name.upper())
-    print("Station: '{}'".format(noneOrValueFromStr(station)))
+    print("Station: '{}'".format(util.str_none_or_value(station)))
     print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)

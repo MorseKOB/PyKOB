@@ -37,7 +37,6 @@ A mechanism for change notification is available.
 
 """
 import argparse
-from pykob.util import strtobool
 from enum import Flag, IntEnum, unique
 import json
 from json import JSONDecodeError
@@ -46,8 +45,9 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, Optional
 
-from pykob import config, log
+from pykob import config, log, util
 from pykob.config import AudioType, CodeType, InterfaceType, Spacing
+from pykob.util import strtobool
 
 PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
@@ -1046,7 +1046,7 @@ class Config:
         """
         Print this configuration
         """
-        url = config.noneOrValueFromStr(self._server_url)
+        url = util.str_none_or_value(self._server_url)
         url = url if url else ''
         f = file
         print("======================================", file=f)
@@ -1063,7 +1063,7 @@ class Config:
         print("KOB Server URL: {}".format(url), file=f)
         print("Auto Connect to Wire: {}".format(config.onOffFromBool(self._auto_connect)), file=f)
         print("Wire: {}".format(self._wire), file=f)
-        print("Station: '{}'".format(config.noneOrValueFromStr(self._station)), file=f)
+        print("Station: '{}'".format(util.str_none_or_value(self._station)), file=f)
         print("--------------------", file=f)
         print("Code type: {}".format(self._code_type.name.upper()), file=f)
         print("Character speed: {}".format(self._min_char_speed), file=f)
@@ -1342,7 +1342,7 @@ def process_config_arg(args) -> Config:
     """
     cfg = Config()
     if hasattr(args, "pkcfg_filepath"):
-        file_path = config.noneOrValueFromStr(args.pkcfg_filepath)
+        file_path = util.str_none_or_value(args.pkcfg_filepath)
         if file_path:
             file_path = file_path.strip()
             file_path = add_ext_if_needed(file_path)
@@ -1405,7 +1405,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.remote = strtobool(args.remote)
     if hasattr(args, "serial_port"):
         if not args.serial_port is None:
-            s = config.noneOrValueFromStr(args.serial_port)
+            s = util.str_none_or_value(args.serial_port)
             if not s or s.strip().upper() == 'NONE':
                 cfg.serial_port = None
             else:
@@ -1415,7 +1415,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.gpio = strtobool(args.gpio)
     if hasattr(args, "server_url"):
         if not args.server_url is None:
-            s = config.noneOrValueFromStr(args.server_url)
+            s = util.str_none_or_value(args.server_url)
             if not s or s.strip().upper() == 'DEFAULT' or s.strip().upper() == 'NONE':
                 cfg.server_url = None
             else:

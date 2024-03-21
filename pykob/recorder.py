@@ -498,10 +498,10 @@ class Recorder:
                     log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self._source_file_path, self._p_line_no, ex))
                     return
         # Calculate recording file values to aid playback functions
-        self._thread_playback = Thread(name='Recorder-Playback-Play', daemon=True, target=self.thread_play_body)
+        self._thread_playback = Thread(name='Recorder-Playback-Play', daemon=True, target=self._thread_playback_body)
         self._thread_playback.start()
         if self._play_station_list_callback:
-            self._thread_pb_stations = Thread(name='Recorder-Playback-StationList', daemon=True, target=self.thread_stationlist_body)
+            self._thread_pb_stations = Thread(name='Recorder-Playback-StationList', daemon=True, target=self._thread_pb_stations_body)
             self._thread_pb_stations.start()
         if self._list_data:
             # Print some values about the recording
@@ -514,7 +514,7 @@ class Recorder:
                 )
             )
 
-    def thread_play_body(self):
+    def _thread_playback_body(self):
         """
         Called by the playback thread `run` to playback recorded code.
         """
@@ -625,7 +625,7 @@ class Recorder:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
-    def thread_stationlist_body(self):
+    def _thread_pb_stations_body(self):
         """
         Called by the station list thread run method to update a station list 
         via the registered callback. The station list is refreshed every 5 seconds.
