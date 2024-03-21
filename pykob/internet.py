@@ -36,7 +36,7 @@ from threading import Event, Lock, Thread
 import time
 from typing import Any, Callable, Optional
 
-from pykob import VERSION, config2, log
+from pykob import VERSION, config2, log, util
 from pykob.config2 import Config
 
 HOST_DEFAULT = "mtc-kob.dyndns.org"
@@ -65,8 +65,6 @@ codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts
 
 NUL = '\x00'
 
-def _emptyOrValueFromStr(s:str) -> str:
-    return s if s else ""
 
 class Internet:
     def __init__(self, officeID='', code_callback=None, record_callback=None, pckt_callback=None, appver=None, server_url=None, err_msg_hndlr=None):
@@ -97,20 +95,20 @@ class Internet:
             self._app = "{} (PK-{})".format(appver, VERSION).encode(encoding='latin-1')
         else:
             self._app = "PyKOB {}".format(VERSION).encode(encoding='latin-1')
-        self._officeID = _emptyOrValueFromStr(officeID)
-        self._wireNo = 0
-        self._threadGuard: Lock = Lock()
+        self._office_id = util.str_empty_or_value(officeID)
+        self._wire_no = 0
+        self._threadsGuard: Lock = Lock()
         self._threadsStop: Event = Event()
         self._connected: Event = Event()
-        self._sentSeqNo = 0
-        self._rcvdSeqNo = -1
-        self._tLastListener = 0.0
+        self._sent_seq_no = 0
+        self._rcvd_seq_no = -1
+        self._t_last_listener = 0.0
         self._socket: Optional[socket.socket] = None
         socket.setdefaulttimeout(3.0)
         self._socketRDGuard: Lock = Lock()  # Guard for reading from the socket (get RD then WR for both)
         self._socketWRGuard: Lock = Lock()  # Guard for writing to the socket (get RD then WR for both)
-        self._internetReadThread: Thread = Thread(name="Internet-Data-Read", target=self._data_read_body)
-        self._keepAliveThread: Thread = Thread(name="Internet-Keep-Alive", target=self._keep_alive_body)
+        self._thread_inet_read: Thread = Thread(name="Internet-Data-Read", target=self._thread_inet_read_body)
+        self._thread_keep_alive: Thread = Thread(name="Internet-Keep-Alive", target=self._thread_keep_alive_body)
         self._code_callback = code_callback
         self._packet_callback = pckt_callback
         self._record_callback = record_callback
@@ -161,7 +159,7 @@ class Internet:
         """
         return self._port
 
-    def _data_read_body(self):
+    def _thread_inet_read_body(self):
         """
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
@@ -179,7 +177,7 @@ class Internet:
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
-    def _keep_alive_body(self):
+    def _thread_keep_alive_body(self):
         """
         Called by the Keep Alive thread `run` to send our ID to the internet connection.
         """
@@ -219,13 +217,13 @@ class Internet:
         return
 
     def _start_wire_threads(self):
-        with self._threadGuard:
+        with self._threadsGuard:
             if not self._threadsStop.is_set():
-                if not self._internetReadThread.is_alive():
-                    self._internetReadThread.start()
-                if not self._keepAliveThread.is_alive():
-                    self._keepAliveThread.start()
-                while not (self._internetReadThread.is_alive() and self._keepAliveThread.is_alive()):
+                if not self._thread_inet_read.is_alive():
+                    self._thread_inet_read.start()
+                if not self._thread_keep_alive.is_alive():
+                    self._thread_keep_alive.start()
+                while not (self._thread_inet_read.is_alive() and self._thread_keep_alive.is_alive()):
                     self._threadsStop.wait(0.01)
             pass  #
         return
@@ -247,24 +245,24 @@ class Internet:
         return self._ip_address
 
     def _stop_internet_threads(self):
-        with self._threadGuard:
+        with self._threadsGuard:
             try:
                 self._connected.clear()
                 self._threadsStop.set()
                 self._close_socket()
             finally:
-                if self._keepAliveThread and self._keepAliveThread.is_alive():
-                    self._keepAliveThread.join()
-                    self._keepAliveThread = None
-                if self._internetReadThread and self._internetReadThread.is_alive():
-                    self._internetReadThread.join()
-                    self._internetReadThread = None
+                if self._thread_keep_alive and self._thread_keep_alive.is_alive():
+                    self._thread_keep_alive.join()
+                    self._thread_keep_alive = None
+                if self._thread_inet_read and self._thread_inet_read.is_alive():
+                    self._thread_inet_read.join()
+                    self._thread_inet_read = None
             pass
         return
 
     def connect(self, wireNo):
         self.disconnect()
-        self._wireNo = wireNo
+        self._wire_no = wireNo
         self._create_socket()
         self.sendID()
         self._connected.set()
@@ -272,7 +270,7 @@ class Internet:
 
     def disconnect(self, on_disconnect=None):
         if self._connected.is_set():
-            self._wireNo = 0
+            self._wire_no = 0
             shortPacket = shortPacketFormat.pack(DIS, 0)
             try:
                 log.debug("internet.disconnect - Getting socketWRGuard", 7)
@@ -368,7 +366,7 @@ class Internet:
                 if self._packet_callback:
                     self._packet_callback("\n<rcvd: {}>".format(ACK))
             elif nBytes == 496:  # code or ID packet
-                self._tLastListener = time.time()
+                self._t_last_listener = time.time()
                 cp = codePacketFormat.unpack(buf)
                 cmd, byts, stnID, seqNo, code = cp[0], cp[1], cp[2], cp[3], cp[4:]
                 stnID, sep, fill = stnID.decode(encoding='latin-1').partition(NUL)
@@ -376,23 +374,23 @@ class Internet:
                 if n == 0:  # ID packet
                     if self._ID_callback:
                         self._ID_callback(stnID)
-                    if seqNo == self._rcvdSeqNo + 2:
-                        self._rcvdSeqNo = seqNo  # update sender's seq no, ignore others
-                elif n > 0 and seqNo != self._rcvdSeqNo:  # code packet
+                    if seqNo == self._rcvd_seq_no + 2:
+                        self._rcvd_seq_no = seqNo  # update sender's seq no, ignore others
+                elif n > 0 and seqNo != self._rcvd_seq_no:  # code packet
                     if self._sender_callback:
                         if not self._current_sender or not self._current_sender == stnID:
                             self._current_sender = stnID
                             self._sender_callback(self._current_sender)
-                    if seqNo != self._rcvdSeqNo + 1:  # sequence break
+                    if seqNo != self._rcvd_seq_no + 1:  # sequence break
                         code = (-0x7fff,) + code[1:n]
                     else:
                         code = code[:n]
-                    self._rcvdSeqNo = seqNo
+                    self._rcvd_seq_no = seqNo
                     if self._packet_callback:
                         self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
-            elif not self._threadsStop.is_set():
-                log.warn("PyKOB.internet received invalid record length: {0}".format(nBytes))
+            elif not self._threadsStop.is_set() and self._connected.is_set():
+                log.warn("pykob.internet received invalid record length: {0}".format(nBytes))
             return
         return
 
@@ -405,10 +403,10 @@ class Internet:
                 log.warn("PyKOB.internet: code sequence too long: {0}".format(n))
                 return
             codeBuf = code + (51-n)*(0,) + (n, txt.encode(encoding='latin-1'))
-            self._sentSeqNo += 1
+            self._sent_seq_no += 1
             codePacket = codePacketFormat.pack(
-                    DAT, 492, self._officeID.encode('latin-1'),
-                    self._sentSeqNo, *codeBuf)
+                    DAT, 492, self._office_id.encode('latin-1'),
+                    self._sent_seq_no, *codeBuf)
             for i in range(2):  # Retry once if we get an error trying to send.
                 try:
                     log.debug("internet.write - Getting socketWRGuard", 7)
@@ -433,24 +431,24 @@ class Internet:
                 with self._socketWRGuard:
                     log.debug("internet.sendID -  socketWRGuard-ed", 7)
                     if self._socket:
-                        shortPacket = shortPacketFormat.pack(CON, self._wireNo)
+                        shortPacket = shortPacketFormat.pack(CON, self._wire_no)
                         self._socket.sendto(shortPacket, self._get_address())
-                        self._sentSeqNo += 2
-                        idPacket = idPacketFormat.pack(DAT, 492, self._officeID.encode('latin-1'),
-                                self._sentSeqNo, 1, self._app)
+                        self._sent_seq_no += 2
+                        idPacket = idPacketFormat.pack(DAT, 492, self._office_id.encode('latin-1'),
+                                self._sent_seq_no, 1, self._app)
                         self._socket.sendto(idPacket, self._ip_address)
                     log.debug("internet.sendID -   socketWRGuard-release", 7)
                 if self._packet_callback:
                     self._packet_callback("\n<sent: {}>".format(DAT))
                 if self._ID_callback:
-                    self._ID_callback(self._officeID)
+                    self._ID_callback(self._office_id)
             except (OSError, socket.gaierror) as ex:
                 self._get_address(renew=True)
         return
 
     def set_officeID(self, officeID):
         """Sets the office/station ID for use on a connected wire"""
-        self._officeID = _emptyOrValueFromStr(officeID)
+        self._office_id = util.str_empty_or_value(officeID)
 
     def monitor_IDs(self, ID_callback):
         """start monitoring incoming and outgoing station IDs"""

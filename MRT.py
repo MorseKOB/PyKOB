@@ -195,11 +195,11 @@ class Mrt:
 
         # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
         self._kb_queue = queue.Queue(128)
-        self._kbrthread = Thread(name="Keyboard-read-thread", daemon=True, target=self._thread_kbreader_run)
-        self._kbsthread = Thread(name="Keyboard-send-thread", daemon=True, target=self._thread_kbsender_run)
-        self._fsndthread = None
+        self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
+        self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
+        self._thread_fsender = None
         if self._send_file_path:
-            self._fsndthread = Thread(name="File-send-thread", daemon=True, target=self._thread_fsender_run)
+            self._thread_fsender = Thread(name="File-send-thread", daemon=False, target=self._thread_fsender_body)
 
     def exit(self):
         print("\nClosing...")
@@ -222,8 +222,8 @@ class Mrt:
             self._connected = True
         self._threadsStop.wait(0.5)
         try:
-            if self._fsndthread:
-                self._fsndthread.start()
+            if self._thread_fsender:
+                self._thread_fsender.start()
             while not self._threadsStop.is_set() and not self._control_c_pressed.is_set():
                 self._threadsStop.wait(0.2)  # Loop while background threads take care of 'stuff'
                 if self._control_c_pressed.is_set():
@@ -232,8 +232,8 @@ class Mrt:
             self.exit()
 
     def start(self):
-        self._kbrthread.start()
-        self._kbsthread.start()
+        self._thread_kbreader.start()
+        self._thread_kbsender.start()
 
     def _handle_sender_update(self, sender):
         """
@@ -405,7 +405,7 @@ class Mrt:
         if char == '_':
             print()
 
-    def _thread_fsender_run(self):
+    def _thread_fsender_body(self):
         done_sending = False
         while not done_sending and not self._threadsStop.is_set():
             try:
@@ -459,7 +459,7 @@ class Mrt:
                 self._set_virtual_closer_closed(True)
         log.debug("MRT-File Sender thread done.")
 
-    def _thread_kbreader_run(self):
+    def _thread_kbreader_body(self):
         kbrd_char = _Getch()
         while not self._threadsStop.is_set():
             try:
@@ -491,7 +491,7 @@ class Mrt:
                 self._threadsStop.set()
         log.debug("MRT-KB Reader thread done.")
 
-    def _thread_kbsender_run(self):
+    def _thread_kbsender_body(self):
         while not self._threadsStop.is_set():
             try:
                 ch = self._kb_queue.get()

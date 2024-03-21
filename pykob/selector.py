@@ -74,9 +74,9 @@ class Selector:
         self._t_last_change = time.time()
         #
         self._threadsStop = Event()
-        self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_run)
+        self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_body)
 
-    def _thread_port_checker_run(self):
+    def _thread_port_checker_body(self):
         """
         Called by the Port Checker thread `run` to read the handshake values from the port.
         """
@@ -135,7 +135,7 @@ class Selector:
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
-    
+
     @property
     def binary_value(self):
         return self._binary_value

@@ -114,7 +114,7 @@ def checkForActivity():
         time.sleep(0.1)
 
 def activeListener():
-    return time.time() < myInternet._tLastListener + TIMEOUT
+    return time.time() < myInternet._t_last_listener + TIMEOUT
 
 def activeSender():
     global wait
