@@ -40,6 +40,7 @@ from pykob.internet import PORT_DEFAULT
 import mkobevents
 
 import sys
+from threading import Event
 from tkinter import N, S, W, E, VERTICAL
 import tkinter as tk
 from tkinter import ttk
@@ -130,6 +131,7 @@ class SenderControls:
         borderwidth=3,
         relief="groove",
     ):
+        self._shutdown: Event = Event()
         self.window = ttk.Frame(
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
         )
@@ -205,6 +207,8 @@ class SenderControls:
         return
 
     def _adjust_text_speed_enable(self, v: config.Spacing):
+        if self._shutdown.is_set():
+            return
         if v == config.Spacing.none:
             # Farnsworth spacing has been turned off - disable the 'Text Speed' control:
             if str(self._spnTWPM.cget("state")) == tk.NORMAL:
@@ -216,22 +220,30 @@ class SenderControls:
         return
 
     def _handle_enable_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._mkkbd.enabled = self._varCodeSenderOn.get()
         self._mkwin.give_keyboard_focus()
         return
 
     def _handle_repeat_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._mkkbd.repeat = self._varCodeSenderRepeat.get()
         self._mkwin.give_keyboard_focus()
         return
 
     def _handle_sender_clear(self, *args):
+        if self._shutdown.is_set():
+            return
         self._mkkbd.handle_clear()
         self._mkwin.give_keyboard_focus()
         return
 
 
     def _handle_spacing_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._adjust_text_speed_enable(self._farnsworthSpacing.get() - 1)
         if self._farns_change_callback:
             self._farns_change_callback()
@@ -239,6 +251,8 @@ class SenderControls:
         return
 
     def _handle_txtspeed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._text_change_callback:
             self._text_change_callback()
         return
@@ -280,6 +294,10 @@ class SenderControls:
     @text_speed.setter
     def text_speed(self, v: int) -> None:
         self._varTWPM.set(str(v))
+        return
+
+    def exit(self):
+        self.shutdown()
         return
 
     def get_minimum_width(self):
@@ -325,6 +343,15 @@ class SenderControls:
             row=0, column=3, columnspan=3, sticky=(E), padx=(0, 2)
         )
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
+
+
 
 class StatusBar:
     """
@@ -344,6 +371,7 @@ class StatusBar:
         self._mkwin: MKOBWindow = mkwin
         self._mkm: Optional[MKOBMain] = None
         self._tkroot = self._mkwin.tkroot
+        self._shutdown: Event = Event()
 
         self.window = ttk.Frame(
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
@@ -359,6 +387,8 @@ class StatusBar:
         return
 
     def _update_values(self) -> None:
+        if self._shutdown.is_set():
+            return
         if not self._mkm is None:
             if not self._mkm.Reader is None:
                 dspeed = self._mkm.Reader.detected_wpm
@@ -385,10 +415,14 @@ class StatusBar:
     @property
     def status_msg(self) -> str:
         return self._status_msg[TEXT]
-    
+
     @status_msg.setter
     def status_msg(self, msg:str):
         self._status_msg[TEXT] = msg
+        return
+
+    def exit(self):
+        self.shutdown()
         return
 
     def get_minimum_width(self) -> int:
@@ -432,7 +466,17 @@ class StatusBar:
         self._server.grid(row=0, column=6, padx=(0, 0), sticky=(W))
         return
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
+
     def start(self, mkmain:MKOBMain) -> None:
+        if self._shutdown.is_set():
+            return
         self._mkm = mkmain
         self._tkroot.after(1000, self._update_values)
         return
@@ -443,9 +487,12 @@ class MKOBWindow:
         self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
         self._app_name_version = mkob_version_text
+        self._shutdown: Event = Event()
+
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
         self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
+
         # The main (visible) window
         self._window = ttk.Frame(root)
 
@@ -485,8 +532,8 @@ class MKOBWindow:
         ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
-        self._root.bind_all("<Key-F11>", self._ka.handle_clear_reader_window)
-        self._root.bind_all("<Key-F12>", self._ka.handle_clear_sender_window)
+        self._root.bind_all("<Key-F11>", self._ka.handle_reader_clear_fk)
+        self._root.bind_all("<Key-F12>", self._ka.handle_sender_clear_fk)
         self._root.bind_all("<Key-Next>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-Prior>", self._ka.handle_increase_wpm)
         #
@@ -817,7 +864,7 @@ class MKOBWindow:
         cmd = self._root.register(self._ka.handle_emit_kb_code)
         self._root.tk.call("bind", root, mkobevents.EVENT_EMIT_KB_CODE, cmd + " %d")
         #### Current Sender and Station List
-        self._root.bind(mkobevents.EVENT_STATIONS_CLEAR, self._ka.handle_clear_stations)
+        self._root.bind(mkobevents.EVENT_STATIONS_CLEAR, self._ka.handle_stations_clear)
         ### self._root.bind(mkobevents.EVENT_CURRENT_SENDER, self._ka.handle_sender_update)
         cmd = self._root.register(self._ka.handle_sender_update)
         self._root.tk.call("bind", root, mkobevents.EVENT_CURRENT_SENDER, cmd + " %d")
@@ -829,9 +876,13 @@ class MKOBWindow:
         self._root.bind(mkobevents.EVENT_READER_CLEAR, self._ka.handle_reader_clear)
         ### self._root.bind(mkobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
         cmd = self._root.register(self._ka.handle_reader_append_text)
-        self._root.tk.call(
-            "bind", root, mkobevents.EVENT_READER_APPEND_TEXT, cmd + " %d"
-        )
+        self._root.tk.call("bind", root, mkobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
+
+        #### Status Bar Message
+        self._root.bind(mkobevents.EVENT_STATUS_MSG_CLEAR, self._ka.handle_status_msg_clear)
+        ### self._root.bind(mkobevents.EVENT_STATUS_MSG_SET, ka.handle_status_msg_set(message))
+        cmd = self._root.register(self._ka.handle_status_msg_set)
+        self._root.tk.call("bind", root, mkobevents.EVENT_STATUS_MSG_SET, cmd + " %d")
 
         # set option values
         self._varVKeyClosed.set(True)
@@ -855,7 +906,10 @@ class MKOBWindow:
         """
         Called by the Config instance when a change is made.
         """
+        if self._shutdown.is_set():
+            return
         self.set_app_title()
+        return
 
     def _validate_number_entry(self, P):
         """
@@ -865,6 +919,8 @@ class MKOBWindow:
         return p_is_ok
 
     def _handle_char_speed_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_csc = None
         cwpmstr = self._varCWPM.get().strip()
         new_cwpm = self._cwpm
@@ -878,17 +934,23 @@ class MKOBWindow:
         return
 
     def _handle_char_speed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_csc:
             self._root.after_cancel(self._after_csc)
         self._after_csc = self._root.after(800, self._handle_char_speed_change_delayed)
         return
 
     def _handle_connect_pressed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._ka.doConnect()
         self.give_keyboard_focus()
         return
 
     def _handle_morse_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_hmc = None
         fspacing = self._fm_sndr_controls.farnsworth_spacing
         cwpmstr = self._varCWPM.get().strip()
@@ -915,12 +977,16 @@ class MKOBWindow:
         return
 
     def _handle_morse_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_hmc:
             self._root.after_cancel(self._after_hmc)
         self._after_hmc = self._root.after(1200, self._handle_morse_change_delayed)
         return
 
     def _handle_wire_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_hwc = None
         log.debug("_handle_wire_change")
         wstr = self._varWireNo.get().strip()
@@ -936,12 +1002,16 @@ class MKOBWindow:
         return
 
     def _handle_wire_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_hwc:
             self._root.after_cancel(self._after_hwc)
         self._after_hwc = self._root.after(1200, self._handle_wire_change_delayed)
         return
 
     def _handle_text_speed_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_tsc = None
         twpmstr = self._fm_sndr_controls.text_speed
         new_twpm = self._twpm
@@ -955,6 +1025,8 @@ class MKOBWindow:
         return
 
     def _handle_text_speed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_tsc:
             self._root.after_cancel(self._after_tsc)
         self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
@@ -962,6 +1034,8 @@ class MKOBWindow:
         return
 
     def _handle_vkey_closed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._ka.doCircuitCloser()
         self.give_keyboard_focus()
         return
@@ -971,6 +1045,7 @@ class MKOBWindow:
         Called when TK generates the WM_DELETE_WINDOW event due to user clicking 'X' on main window.
         """
         log.debug("MKOBWindow._on_app_destoy triggered.")
+        self.shutdown()
         self.exit(destroy_app=True)
         return
 
@@ -979,6 +1054,8 @@ class MKOBWindow:
         Called by MKOB via a tk.after when the main loop has been started.
         """
         self._app_started = True
+        if self._shutdown.is_set():
+            return
         # Set to disconnected state
         self.connected(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
@@ -1135,6 +1212,8 @@ class MKOBWindow:
         """
         Fill the connected indicator and change the button label based on state.
         """
+        if self._shutdown.is_set():
+            return
         self._connect_indicator.connected = connected
         self._btnConnect[TEXT] = "Disconnect" if connected else "Connect"
         return
@@ -1143,6 +1222,8 @@ class MKOBWindow:
         """
         Generate a main message loop event.
         """
+        if self._shutdown.is_set():
+            return
         log.debug("=>Event generate: {}".format(event), 4)
         return self._root.event_generate(event, when=when, data=data)
 
@@ -1151,10 +1232,29 @@ class MKOBWindow:
         Exit the program by destoying the main window and quiting
         the message loop.
         """
+        self.shutdown()
         if self._kkb:
+            self._kkb.shutdown()
             self._kkb.exit()
             self._kkb = None
+        if self._krdr:
+            self._krdr.shutdown()
+            self._krdr.exit()
+            self._krdr = None
+        if self._ksl:
+            self._ksl.shutdown()
+            self._ksl.exit()
+            self._ksl = None
+        if self._status_bar:
+            self._status_bar.shutdown()
+            self._status_bar.exit()
+            self._status_bar = None
+        if self._fm_sndr_controls:
+            self._fm_sndr_controls.shutdown()
+            self._fm_sndr_controls.exit()
+            self._fm_sndr_controls = None
         if self._km:
+            self._km.shutdown()
             self._km.exit()
             self._km = None
         if destroy_app:
@@ -1166,10 +1266,13 @@ class MKOBWindow:
         """
         Make the keyboard window the active (focused) window.
         """
-        self._txtKeyboard.focus_set()
+        if not self._shutdown.is_set():
+            self._txtKeyboard.focus_set()
         return
 
     def set_app_title(self):
+        if self._shutdown.is_set():
+            return
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
         # If our config has a filename, display it as part of our title
         name = self._cfg.get_name()
@@ -1203,6 +1306,8 @@ class MKOBWindow:
         """
         Display help about the app and environment.
         """
+        if self._shutdown.is_set():
+            return
         title = "About MKOB"
         copy_license = "Copyright (c) 2020-24 PyKOB - MorseKOB in Python\nMIT License"
         msg = "{}\n{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
@@ -1222,7 +1327,17 @@ class MKOBWindow:
         """
         Display the Keyboard Shortcuts window.
         """
+        if self._shutdown.is_set():
+            return
         if not (self._shortcuts_win and MKOBHelpKeys.active):
             self._shortcuts_win = MKOBHelpKeys()
         self._shortcuts_win.focus()
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
         return

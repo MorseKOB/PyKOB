@@ -1050,18 +1050,18 @@ class Config:
         url = url if url else ''
         f = file
         print("======================================", file=f)
-        print("GPIO interface (Raspberry Pi): {}".format(config.onOffFromBool(self._gpio)), file=f)
+        print("GPIO interface (Raspberry Pi): {}".format(util.on_off_from_bool(self._gpio)), file=f)
         print("Serial serial_port: '{}'".format(self._serial_port), file=f)
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
-        print("Invert key input: {}".format(config.onOffFromBool(self._invert_key_input)), file=f)
-        print("Sound: {}".format(config.onOffFromBool(self._sound)), file=f)
+        print("Invert key input: {}".format(util.on_off_from_bool(self._invert_key_input)), file=f)
+        print("Sound: {}".format(util.on_off_from_bool(self._sound)), file=f)
         print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
-        print("Sounder: {}".format(config.onOffFromBool(self._sounder)), file=f)
+        print("Sounder: {}".format(util.on_off_from_bool(self._sounder)), file=f)
         print("Sounder Power Save (seconds): {}".format(self._sounder_power_save), file=f)
         print("--------------------", file=f)
         print("KOB Server URL: {}".format(url), file=f)
-        print("Auto Connect to Wire: {}".format(config.onOffFromBool(self._auto_connect)), file=f)
+        print("Auto Connect to Wire: {}".format(util.on_off_from_bool(self._auto_connect)), file=f)
         print("Wire: {}".format(self._wire), file=f)
         print("Station: '{}'".format(util.str_none_or_value(self._station)), file=f)
         print("--------------------", file=f)
@@ -1070,9 +1070,9 @@ class Config:
         print("Words per min speed: {}".format(self._text_speed), file=f)
         print("Spacing: {}".format(self._spacing.name.upper()), file=f)
         print("--------------------", file=f)
-        print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
-        print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
-        print("Debug level: {}".format(self._logging_level), file=f)
+        print("Local copy: {}".format(util.on_off_from_bool(self._local)), file=f)
+        print("Remote send: {}".format(util.on_off_from_bool(self._remote)), file=f)
+        print("Logging level: {}".format(self._logging_level), file=f)
         return
 
     def register_listener(self, listener:Callable[[int],None], change_types: int) -> None:

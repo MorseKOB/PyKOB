@@ -45,3 +45,5 @@ EVENT_READER_APPEND_TEXT = "<<Reader_Append_Text>>" # Append text to the reader 
 EVENT_READER_CLEAR = "<<Clear_Reader>>" # Clear the reader window
 EVENT_STATION_ACTIVE = "<<Station_Active>>" # A station has indicated that it is still listening
 EVENT_STATIONS_CLEAR = "<<Clear_Stations>>" # Clear the station window and station list
+EVENT_STATUS_MSG_CLEAR = "<<Clear_Status_Msg>>" # Clear the status message in the main window
+EVENT_STATUS_MSG_SET = "<<Set_Status_Msg>>" # Set the status message in the main window

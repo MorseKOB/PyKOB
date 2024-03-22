@@ -158,6 +158,7 @@ class KOB:
         self._use_sounder:bool = useSounder
         self._virtual_closer_in_use: bool = virtual_closer_in_use  # The owning code will drive the VC
         #
+        self._shutdown: Event = Event()
         self._hw_interface:HWInterface = HWInterface.NONE
         self._gpio_key_read = None
         self._gpio_sndr_drive = None
@@ -205,6 +206,8 @@ class KOB:
         #
         # Load the audio module if they want the synth sounder
         #
+        if self._shutdown.is_set():
+            return
         with self._audio_guard:
             if self._audio:
                 self._audio.exit()
@@ -226,6 +229,8 @@ class KOB:
         Conditionally load GPIO or Serial library if requested.
         GPIO takes priority if both are requested.
         """
+        if self._shutdown.is_set():
+            return
         with self._sounder_guard:
             gpio_module_available = False
             gpio_led = None
@@ -318,7 +323,7 @@ class KOB:
         """
         Restart processing due to hardware changes.
         """
-        if self._hw_is_available():
+        if not self._shutdown.is_set() and self._hw_is_available():
             self.__start_hw_processing()
         elif self._threadsStop.is_set() or not self._hw_is_available():
             self.__stop_hw_processing()
@@ -328,7 +333,7 @@ class KOB:
         """
         Start our processing threads if needed.
         """
-        if self._hw_is_available():
+        if not self._shutdown.is_set() and self._hw_is_available():
             self._threadsStop.clear()
             self.power_save(False)
             if self._key_callback:
@@ -354,7 +359,7 @@ class KOB:
         """
         Called by the KeyRead thread `run` to read code from the key.
         """
-        while not self._threadsStop.is_set() and self._hw_is_available():
+        while not self._threadsStop.is_set() and self._hw_is_available() and not self._shutdown.is_set():
             code = self.key()
             if len(code) > 0:
                 if code[-1] == 1: # special code for closer/circuit closed
@@ -370,7 +375,7 @@ class KOB:
         """
         Called by the PowerSave thread 'run' to control the power save (sounder energize)
         """
-        while not self._threadsStop.is_set():
+        while not self._threadsStop.is_set() and not self._shutdown.is_set():
             now = time.time()
             if self._sounder_power_save_secs > 0 and not self._power_saving:
                 if self._t_sounder_energized > 0 and (now - self._t_sounder_energized) > self._sounder_power_save_secs:
@@ -380,6 +385,8 @@ class KOB:
         return
 
     def _energize_hw_sounder(self, energize: bool):
+        if self._shutdown.is_set():
+            return
         with self._sounder_guard:
             hw_energize = energize and self._use_sounder
             log.debug("kob._energize_hw_sounder: {}:{}".format(energize, hw_energize), 3)
@@ -414,6 +421,8 @@ class KOB:
         return
 
     def _energize_synth(self, energize: bool, no_tone: bool):
+        if self._shutdown.is_set():
+            return
         with self._audio_guard:
             try:
                 if energize:
@@ -437,6 +446,8 @@ class KOB:
         """
         Check the state of the key and return True if it is closed.
         """
+        if self._shutdown.is_set():
+            return True
         kc = True
         if self._hw_interface == HWInterface.GPIO:
             try:
@@ -458,6 +469,8 @@ class KOB:
         return kc
 
     def _play_clack_silence(self):
+        if self._shutdown.is_set():
+            return
         log.debug("kob._play_clack_silence - requested", 5)
         if self._use_audio and self._synth_energized:
             log.debug("kob._play_clack_silence", 3)
@@ -466,6 +479,8 @@ class KOB:
         return
 
     def _play_click(self):
+        if self._shutdown.is_set():
+            return
         log.debug("kob._play_click - requested", 5)
         if (self._use_audio and self._audio_type == AudioType.SOUNDER and not self._synth_energized):
             log.debug("kob._play_click", 3)
@@ -474,6 +489,8 @@ class KOB:
         return
 
     def _play_click_tone(self):
+        if self._shutdown.is_set():
+            return
         log.debug("kob._play_click_tone - requested", 5)
         if self._use_audio and not self._synth_energized:
             log.debug("kob._play_click_tone", 3)
@@ -516,6 +533,8 @@ class KOB:
 
         @SEE: Table in docs for states/modes
         """
+        if self._shutdown.is_set():
+            return
         sounder_mode_was = self._sounder_mode
         synth_mode_was = self._synth_mode
         log.debug("kob._update_modes: was {}:{}".format(sounder_mode_was.name, synth_mode_was.name), 2)
@@ -623,6 +642,8 @@ class KOB:
         """
         Change the audio settings from what they were at initialization.
         """
+        if self._shutdown.is_set():
+            return
         if not (self._use_audio == use_audio and self._audio_type == audio_type):
             self._use_audio = use_audio
             self._audio_type = audio_type
@@ -634,6 +655,8 @@ class KOB:
         """
         Change the hardware from what it was at initialization
         """
+        if self._shutdown.is_set():
+            return
         if not (
                 self._interface_type == interface_type and
                 self._port_to_use == port_to_use and
@@ -659,6 +682,8 @@ class KOB:
         False: De-Energized/Clack/Silence
         """
         # On Mode-Change, set the correct states
+        if self._shutdown.is_set():
+            return
         if not code_source == CodeSource.mode_change:
             local_source = not code_source == CodeSource.wire
             if not (self._sounder_mode == SounderMode.DIS or self._sounder_mode == SounderMode.EFK):
@@ -679,7 +704,7 @@ class KOB:
         """
         Stop the threads and exit.
         """
-        self.__stop_hw_processing()
+        self.shutdown()
         if self._audio:
             self._audio.exit()
         if self._port and not self._port.closed:
@@ -695,6 +720,8 @@ class KOB:
         '''
         Process input from the key and return a code sequence.
         '''
+        if self._shutdown.is_set():
+            return
         code = ()  # Start with empty sequence
         while not self._threadsStop.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
@@ -740,6 +767,8 @@ class KOB:
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
         """
         # Only enable power save if mode is sounding remote code or a recording.
+        if self._shutdown.is_set():
+            return
         if enable and (
             self._sounder_mode == SounderMode.DIS or 
             self._sounder_mode == SounderMode.EFK or 
@@ -761,10 +790,23 @@ class KOB:
             self._ps_energize_sounder = False
         return
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        self._threadsStop.set()
+        self.__stop_hw_processing()
+        self._key_callback = None
+        return
+
     def soundCode(self, code, code_source: CodeSource = CodeSource.local, sound: bool = True):
         '''
         Process the code and sound it.
         '''
+        if self._shutdown.is_set():
+            return
         if sound:
             self.power_save(False)
         for c in code:

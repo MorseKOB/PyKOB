@@ -71,7 +71,7 @@ class MKOBKeyboard():
         self._waiting_for_sent_code:Event = Event()
         self._send_guard:Lock = Lock()
         self._dit_sender_thread:Thread = Thread(name="MKKeyboard-DitSender", target=self._dits_sender_run)
-        self._threadsStop: Event = Event()
+        self._shutdown: Event = Event()
         return
 
     def _dit_send_complete(self):
@@ -99,8 +99,8 @@ class MKOBKeyboard():
         """
         Dits Sender Thread - Run routine
         """
-        while not self._threadsStop.is_set():
-            self._threadsStop.wait(0.01)
+        while not self._shutdown.is_set():
+            self._shutdown.wait(0.01)
             pass
         return
 
@@ -255,7 +255,7 @@ class MKOBKeyboard():
             self._ka.trigger_keyboard_send()
 
     def exit(self):
-        self._threadsStop.set()
+        self.shutdown()
         if self._dit_sender_thread.is_alive():
             self._dit_sender_thread.join()
         return
@@ -278,7 +278,7 @@ class MKOBKeyboard():
         km_isa = self._km.internet_station_active
         log.debug("mkkb.handle_keyboard_send: KM.ISA:{} Enabled:{} Waiting on sent:{}".format(
             km_isa, self._enabled, self._waiting_for_sent_code.is_set()), 3)
-        
+
         if km_isa:
             self._km.tkroot.after(800, self.handle_keyboard_send)
             return
@@ -329,6 +329,13 @@ class MKOBKeyboard():
         self._kw.give_keyboard_focus()
         return
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
 
     def start(self, mkmain):
         self._km = mkmain
