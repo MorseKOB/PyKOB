@@ -73,7 +73,7 @@ class Selector:
         self._raw_value = 0
         self._t_last_change = time.time()
         #
-        self._threadsStop = Event()
+        self._shutdown = Event()
         self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_body)
 
     def _thread_port_checker_body(self):
@@ -84,7 +84,7 @@ class Selector:
             values_need_updating = False
             oof_changed = False
             binary_changed = False
-            while not self._threadsStop.is_set():
+            while not self._shutdown.is_set():
                 b0 = 1 if self._port.cts else 0
                 b1 = 2 if self._port.dsr else 0
                 b2 = 4 if self._port.cd else 0
@@ -131,7 +131,7 @@ class Selector:
                             values_need_updating = False
                             oof_changed = False
                             binary_changed = False
-                    self._threadsStop.wait(self._pole_cycle_time)
+                    self._shutdown.wait(self._pole_cycle_time)
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -152,8 +152,16 @@ class Selector:
         """
         Stop the threads and exit.
         """
-        self._threadsStop.set()
+        self.shutdown()
         self._thread_port_checker.join(timeout=2.0)
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
 
     def start(self):
         try:

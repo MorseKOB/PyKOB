@@ -132,6 +132,14 @@ class Audio:
             self._iFrame[snd] = 0
             self._sound = snd
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
+
 class Audio2:
 
     def __init__(self, audio_type: AudioType = AudioType.SOUNDER):
@@ -185,3 +193,11 @@ class Audio2:
                 self._playing.stop()
                 self._playing = None
             self._playing = self._sounds[snd].play()
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return

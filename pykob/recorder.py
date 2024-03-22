@@ -51,7 +51,7 @@ import time
 from datetime import datetime, timedelta
 from enum import Enum, IntEnum, unique
 from pykob import kob, log
-from threading import Event, Lock, RLock, Thread
+from threading import Event, Lock, Thread
 
 @unique
 class PlaybackState(IntEnum):
@@ -135,7 +135,7 @@ class Recorder:
 
         self._playback_state = PlaybackState.idle
 
-        self._threadsStop = Event()
+        self._shutdown = Event()
         self._thread_playback = None
         self._thread_pb_stations = None
 
@@ -232,13 +232,19 @@ class Recorder:
         """
         Exit this instance.
         """
-        self._threadsStop.set()
+        log.debug("recorder.exit - 1", 3)
+        self.shutdown()
         # Wait on our threads.
+        log.debug("recorder.exit - 2", 3)
         if self._thread_pb_stations and self._thread_pb_stations.is_alive():
+            log.debug("recorder.exit - 3a", 3)
             self._thread_pb_stations.join()
+            log.debug("recorder.exit - 3b", 3)
             self._thread_pb_stations = None
         if self._thread_playback and self._thread_playback.is_alive():
+            log.debug("recorder.exit - 4a", 3)
             self._thread_playback.join()
+            log.debug("recorder.exit - 4b", 3)
             self._thread_playback = None
         return
 
@@ -434,16 +440,6 @@ class Recorder:
         else:
             self.playback_resume()
 
-    def playback_stop(self):
-        """
-        Stop playback and clear the playback state
-        """
-        if self._thread_playback:
-            pt = self._thread_playback
-            self._thread_playback = None
-            self._playback_stop_flag.set()
-            self._playback_resume_flag.set() # Set resume flag incase playback was paused
-
     def playback_start(self, list_data=False, max_silence=0, speed_factor=100):
         """
         Play a recording to the configured sounder.
@@ -513,6 +509,30 @@ class Recorder:
                     hms_from_ts(self._p_lts, self._p_fts),
                 )
             )
+        return
+
+    def playback_stop(self):
+        """
+        Stop playback and clear the playback state
+        """
+        pt = self._thread_playback
+        if pt:
+            self._thread_playback = None
+            self._playback_stop_flag.set()
+            self._playback_resume_flag.set() # Set resume flag incase playback was paused
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        log.debug("recorder.shutdown - 1", 3)
+        self._shutdown.set()
+        log.debug("recorder.shutdown - 2", 3)
+        self.playback_stop()
+        log.debug("recorder.shutdown - 3", 3)
+        return
 
     def _thread_playback_body(self):
         """
@@ -540,13 +560,13 @@ class Recorder:
                     # NOTE: Can't iterate over the file lines as it disables `tell()` and `seek()`.
                     line = self._p_fp.readline()
                     self._p_line_no += 1
-                while line and not self._threadsStop.is_set():
+                while line and not self._shutdown.is_set():
                     # Get the file lock and read the contents of the line
                     with self._p_fileop_lock:
                         while self._playback_state == PlaybackState.paused:
                             self._playback_resume_flag.wait() # Wait for playback to be resumed
                             self._playback_state = PlaybackState.playing
-                        if self._playback_stop_flag.is_set():
+                        if self._playback_stop_flag.is_set() or self._shutdown.is_set():
                             # Playback stop was requested
                             self._playback_state = PlaybackState.idle
                             self._playback_resume_flag.clear()
@@ -633,12 +653,13 @@ class Recorder:
         try:
             if not self._play_station_list_callback:
                 return
-            while not self._threadsStop.is_set():
+            while not self._shutdown.is_set():
                 for stn in self._p_stations:
                     self._play_station_list_callback(stn)
-                stop = self._playback_stop_flag.wait(5.0) # Wait until 'stop' flag is set or 5 seconds
+                stop = self._playback_stop_flag.is_set() # Wait until 'stop' flag is set or 5 seconds
                 if stop:
                     return # Stop signalled - return from run method
+                self._shutdown.wait(5.0)
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return

@@ -42,28 +42,16 @@ from pykob.config2 import Config
 HOST_DEFAULT = "mtc-kob.dyndns.org"
 PORT_DEFAULT = 7890
 
-MSG_DONTWAIT = 0x40
-
 DIS = 2  # Disconnect
 DAT = 3  # Code or ID
 CON = 4  # Connect
 ACK = 5  # Ack
 
+NUL = '\x00'
 
-"""
-:
- :
-abc.123
-456.xyz:
-:987
-efg.987:345
- kxp.321
-"""
 shortPacketFormat = struct.Struct("<hh")  # cmd, wire
 idPacketFormat = struct.Struct("<hh 128s 4x i i 8x 208x 128s 8x")  # cmd, byts, id, seq, idflag, ver
 codePacketFormat = struct.Struct("<hh 128s 4x i 12x 51i i 128s 8x")  # cmd, byts, id, seq, code list, n, txt
-
-NUL = '\x00'
 
 
 class Internet:
@@ -98,7 +86,7 @@ class Internet:
         self._office_id = util.str_empty_or_value(officeID)
         self._wire_no = 0
         self._threadsGuard: Lock = Lock()
-        self._threadsStop: Event = Event()
+        self._shutdown: Event = Event()
         self._connected: Event = Event()
         self._sent_seq_no = 0
         self._rcvd_seq_no = -1
@@ -163,10 +151,10 @@ class Internet:
         """
         Called by the Internet Read thread `run` to read code from the internet connection.
         """
-        while not self._threadsStop.is_set():
-            if self._connected.wait(0.1):
+        while not self._shutdown.is_set():
+            if self._connected.wait(0.01):
                 code = self.read()
-                if code and self._connected.is_set() and not self._threadsStop.is_set():
+                if code and len(code) > 0 and self._connected.is_set() and not self._shutdown.is_set():
                     if self._code_callback:
                         self._code_callback(code)
                     if self._record_callback:
@@ -181,12 +169,12 @@ class Internet:
         """
         Called by the Keep Alive thread `run` to send our ID to the internet connection.
         """
-        while not self._threadsStop.is_set():
+        while not self._shutdown.is_set():
             if self._connected.is_set():
                 self._current_sender = None  # clear the current sender so it will update
                 self.sendID()
-                self._threadsStop.wait(10.0)  # send another keepalive sequence every ten seconds
-            self._threadsStop.wait(0.1)  # don't hog CPU when we aren't connected
+                self._shutdown.wait(10.0)  # send another keepalive sequence every ten seconds
+            self._shutdown.wait(1.0)  # don't hog CPU when we aren't connected
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -197,12 +185,15 @@ class Internet:
             with self._socketWRGuard:
                 log.debug("internet._close_socket -  socketGuard-ed", 7)
                 if self._socket:
+                    self._socket.shutdown(socket.SHUT_RDWR)
                     self._socket.close()
                     self._socket = None
                 log.debug("internet._close_socket -   socketGuards-release", 7)
         return
 
     def _create_socket(self):
+        if self._shutdown.is_set():
+            return
         log.debug("internet._create_socket - Getting socketGuards", 7)
         with self._socketRDGuard:
             with self._socketWRGuard:
@@ -210,28 +201,30 @@ class Internet:
                 if not self._socket:
                     self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     self._socket.setblocking(False)
-                    self._socket.settimeout(0)
+                    self._socket.settimeout(0.001)
                 log.debug("internet._create_socket -   socketGuards-release", 7)
         self._get_address(renew=True)
         self.sendID()
         return
 
     def _start_wire_threads(self):
+        if self._shutdown.is_set():
+            return
         with self._threadsGuard:
-            if not self._threadsStop.is_set():
+            if not self._shutdown.is_set():
                 if not self._thread_inet_read.is_alive():
                     self._thread_inet_read.start()
                 if not self._thread_keep_alive.is_alive():
                     self._thread_keep_alive.start()
                 while not (self._thread_inet_read.is_alive() and self._thread_keep_alive.is_alive()):
-                    self._threadsStop.wait(0.01)
+                    self._shutdown.wait(0.01)
             pass  #
         return
 
     def _get_address(self, renew=False):
         if not self._ip_address or renew:
             success = False
-            while not success and not self._threadsStop.is_set():
+            while not success and not self._shutdown.is_set():
                 try:
                     log.debug("internet._get_address - Connecting to host:{} port:{}".format(self._host, self._port))
                     self._ip_address = socket.getaddrinfo(self._host, self._port, socket.AF_INET, socket.SOCK_DGRAM)[0][4]
@@ -241,14 +234,14 @@ class Internet:
                     # Network error
                     s = "Network error: {} (Retrying in 5 seconds)".format(ex)
                     self._err_msg_hndlr("{}".format(s))
-                    self._threadsStop.wait(5.0)
+                    self._shutdown.wait(5.0)
         return self._ip_address
 
     def _stop_internet_threads(self):
         with self._threadsGuard:
             try:
                 self._connected.clear()
-                self._threadsStop.set()
+                self._shutdown.set()
                 self._close_socket()
             finally:
                 if self._thread_keep_alive and self._thread_keep_alive.is_alive():
@@ -262,6 +255,8 @@ class Internet:
 
     def connect(self, wireNo):
         self.disconnect()
+        if self._shutdown.is_set():
+            return
         self._wire_no = wireNo
         self._create_socket()
         self.sendID()
@@ -293,7 +288,7 @@ class Internet:
         """
         Stop the threads and exit.
         """
-        self.disconnect()
+        self.shutdown()
         self._stop_internet_threads()
         return
 
@@ -303,6 +298,8 @@ class Internet:
         OpenPort: 53/tcp
         Service: domain (DNS/TCP)
         """
+        if self._shutdown.is_set():
+            return False
         skt = None
         self._internet_available = False
         try:
@@ -317,12 +314,12 @@ class Internet:
         return self._internet_available
 
     def read(self):
-        while self._socket and self._connected.is_set() and not self._threadsStop.is_set():
+        while self._socket and self._connected.is_set() and not self._shutdown.is_set():
             success = False
             buf = None
             nBytes = 0
             code = None
-            while self._socket and self._connected.is_set() and not success and not self._threadsStop.is_set():
+            while self._socket and self._connected.is_set() and not success and not self._shutdown.is_set():
                 try:
                     # log.debug("internet.read - Getting socketRDGuard", 7)
                     with self._socketRDGuard:
@@ -331,14 +328,14 @@ class Internet:
                             data_ready = select.select([self._socket], [], [], 0)  # Check readability and never block
                             if len(data_ready[0]) > 0:
                                 buf = self._socket.recv(500)
-                                if not self._connected.is_set() or self._threadsStop.is_set():
+                                if not self._connected.is_set() or self._shutdown.is_set():
                                     return code
                                 nBytes = len(buf)
                                 if nBytes == 0:
                                     continue
                                 success = True
                             else:
-                                self._threadsStop.wait(0.01)
+                                self._shutdown.wait(0.01)
                         # log.debug("internet.read -   socketRDGuard-release", 7)
                 except (TimeoutError) as toe:
                     # On timeout, just continue so we can check our flags
@@ -352,14 +349,8 @@ class Internet:
                         return None  # Socket closed
                     s = "Network error during read: {} (Retrying in 5 seconds)".format(ex1)
                     self._err_msg_hndlr("{}".format(s))
-                    self._threadsStop.wait(5.0)
+                    self._shutdown.wait(5.0)
                     continue
-                # except Exception as ex2:
-                #     # Network error
-                #     s = "Network error during read: {} (Retrying in 5 seconds)".format(ex2)
-                #     self._err_msg_hndlr("{}".format(s))
-                #     self._threadsStop.wait(5.0)
-                #     continue
             log.debug("internet.read - recv:[{}]".format(buf), 6)
             if nBytes == 2:
                 # ignore Ack packet, but indicate that it was received
@@ -389,13 +380,13 @@ class Internet:
                     if self._packet_callback:
                         self._packet_callback("\n<rcvd: {}:{}>".format(DAT, code))
                     return code
-            elif not self._threadsStop.is_set() and self._connected.is_set():
+            elif not self._shutdown.is_set() and self._connected.is_set():
                 log.warn("pykob.internet received invalid record length: {0}".format(nBytes))
             return
         return
 
     def write(self, code, txt=""):
-        if self._connected.is_set():
+        if self._connected.is_set() and not self._shutdown.is_set():
             n = len(code)
             if n == 0:
                 return
@@ -425,7 +416,7 @@ class Internet:
         return
 
     def sendID(self):
-        if self._connected.is_set():
+        if self._connected.is_set() and not self._shutdown.is_set():
             try:
                 log.debug("internet.sendID - Getting socketWRGuard", 7)
                 with self._socketWRGuard:
@@ -462,3 +453,15 @@ class Internet:
     def record_code(self, record_callback):
         """Start recording code received and sent"""
         self._record_callback = record_callback
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self.disconnect()
+        self._shutdown.set()
+        self._ID_callback = None
+        self._sender_callback = None
+        self._record_callback = None
+        return

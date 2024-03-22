@@ -47,6 +47,7 @@ import argparse
 from pathlib import Path
 import platform
 import queue
+from queue import Empty, Queue
 import re  # RegEx
 import sys
 from threading import Event, Thread
@@ -131,9 +132,9 @@ class Mrt:
         self._app_name_version = app_name_version
         self._wire = wire
         self._cfg = cfg
-        self._kb_queue = None
-        self._threadsStop = Event()
+        self._shutdown = Event()
         self._control_c_pressed = Event()
+        self._kb_queue = Queue(128)
 
         self._send_file_path = None
         self._send_repeat_count = -1  # -1 is flag to indicate that a repeat hasn't been set
@@ -144,11 +145,12 @@ class Mrt:
             if not p.is_file():
                 print("File to send not found. '{}'".format(self._send_file_path))
                 self._send_file_path = None
+
+        self._internet = None
         self._kob = None
-        self._sender = None
         self._reader = None
         self._recorder = None
-        self._internet = None
+        self._sender = None
 
         self._connected = False
         self._internet_station_active = False  # True if a remote station is sending
@@ -194,7 +196,6 @@ class Mrt:
             )
 
         # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
-        self._kb_queue = queue.Queue(128)
         self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
         self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
         self._thread_fsender = None
@@ -203,37 +204,93 @@ class Mrt:
 
     def exit(self):
         print("\nClosing...")
-        self._threadsStop.set()
+        self._shutdown.set()
         sleep(0.3)
-        if self._internet:
-            if self._connected:
-                self._internet.disconnect()
-                sleep(0.5)
-            self._internet.exit()
-        if self._reader:
-            self._reader.exit()
-        if self._kob:
-            self._kob.exit()
+        log.debug("MRT.exit - 1", 3)
+        self.shutdown()
+        log.debug("MRT.exit - 2", 3)
+        kob_ = self._kob
+        if kob_:
+            log.debug("MRT.exit - 3a", 3)
+            kob_.exit()
+            log.debug("MRT.exit - 3b", 3)
+        inet = self._internet
+        if inet:
+            log.debug("MRT.exit - 4a", 3)
+            inet.exit()
+            log.debug("MRT.exit - 4b", 3)
+        rdr = self._reader
+        if rdr:
+            log.debug("MRT.exit - 5a", 3)
+            rdr.exit()
+            log.debug("MRT.exit - 5b", 3)
+        rec = self._recorder
+        if rec:
+            log.debug("MRT.exit - 6a", 3)
+            rec.exit()
+            log.debug("MRT.exit - 6b", 3)
+        sndr = self._sender
+        if sndr:
+            log.debug("MRT.exit - 7a", 3)
+            sndr.exit()
+            log.debug("MRT.exit - 7b", 3)
+        return
 
     def main_loop(self):
         self._print_start_info()
         if not self._wire == 0:
             self._internet.connect(self._wire)
             self._connected = True
-        self._threadsStop.wait(0.5)
+            kob_ = self._kob
+            if kob_:
+                kob_.internet_circuit_closed = not self._internet_station_active
+                kob_.wire_connected = self._connected
+        self._shutdown.wait(0.5)
         try:
             if self._thread_fsender:
                 self._thread_fsender.start()
-            while not self._threadsStop.is_set() and not self._control_c_pressed.is_set():
-                self._threadsStop.wait(0.2)  # Loop while background threads take care of 'stuff'
+            while not self._shutdown.is_set() and not self._control_c_pressed.is_set():
+                self._shutdown.wait(0.02)  # Loop while background threads take care of 'stuff'
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
         except KeyboardInterrupt:
             self.exit()
 
+    def shutdown(self):
+        log.debug("MRT.shutdown - 1", 3)
+        self._shutdown.set()
+        log.debug("MRT.shutdown - 2", 3)
+        kob_ = self._kob
+        if kob_:
+            log.debug("MRT.shutdown - 3a", 3)
+            kob_.shutdown()
+            log.debug("MRT.shutdown - 3b", 3)
+        inet = self._internet
+        if inet:
+            log.debug("MRT.shutdown - 4a", 3)
+            inet.shutdown()
+            log.debug("MRT.shutdown - 4b", 3)
+        rdr = self._reader
+        if rdr:
+            log.debug("MRT.shutdown - 5a", 3)
+            rdr.shutdown()
+            log.debug("MRT.shutdown - 5b", 3)
+        rec = self._recorder
+        if rec:
+            log.debug("MRT.shutdown - 6a", 3)
+            rec.shutdown()
+            log.debug("MRT.shutdown - 6b", 3)
+        sndr = self._sender
+        if sndr:
+            log.debug("MRT.shutdown - 7a", 3)
+            sndr.shutdown()
+            log.debug("MRT.shutdown - 7b", 3)
+        return
+
     def start(self):
         self._thread_kbreader.start()
         self._thread_kbsender.start()
+        return
 
     def _handle_sender_update(self, sender):
         """
@@ -244,6 +301,7 @@ class Mrt:
             self._sender_current = sender
             print()
             print(f'<<{self._sender_current}>>')
+        return
 
     def _print_start_info(self):
         cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
@@ -260,6 +318,7 @@ class Mrt:
         if self._send_file_path:
             print("Sending text from file: {}".format(self._send_file_path))
         print("[Use CTRL+Z for keyboard help.]", flush=True)
+        return
 
     def _set_local_loop_active(self, active):
         """
@@ -270,6 +329,7 @@ class Mrt:
         """
         self._local_loop_active = active
         self._kob.energize_sounder((not active), kob.CodeSource.local)
+        return
 
     def _set_virtual_closer_closed(self, closed):
         """
@@ -298,6 +358,7 @@ class Mrt:
             elif code[-1] == 2:
                 # Latch (Key open)
                 self._set_local_loop_active(True)
+        return
 
     def _emit_local_code(self, code, code_source):
         """
@@ -316,6 +377,7 @@ class Mrt:
             self._internet.write(code)
         if code_source == kob.CodeSource.keyboard:
             self._kob.soundCode(code, code_source)
+        return
 
     def _from_file(self, code):
         """
@@ -333,6 +395,7 @@ class Mrt:
                 return
         if not self._internet_station_active and self._local_loop_active:
             self._emit_local_code(code, kob.CodeSource.keyboard) # Say that it' from the keyboard
+        return
 
     def _from_key(self, code):
         """
@@ -350,6 +413,7 @@ class Mrt:
                 return
         if not self._internet_station_active and self._local_loop_active:
             self._emit_local_code(code, kob.CodeSource.key)
+        return
 
     def _from_keyboard(self, code):
         """
@@ -369,6 +433,7 @@ class Mrt:
                 return
         if not self._internet_station_active and self._local_loop_active:
             self._emit_local_code(code, kob.CodeSource.keyboard)
+        return
 
     def _from_internet(self, code):
         """handle inputs received from the internet"""
@@ -382,6 +447,8 @@ class Mrt:
                 self._internet_station_active = False
             else:
                 self._internet_station_active = True
+            self._kob.internet_circuit_closed = not self._internet_station_active
+        return
 
     def _reader_callback(self, char, spacing):
         if not char == '=':
@@ -404,18 +471,19 @@ class Mrt:
         print(char, end='', flush=True)
         if char == '_':
             print()
+        return
 
     def _thread_fsender_body(self):
         done_sending = False
-        while not done_sending and not self._threadsStop.is_set():
+        while not done_sending and not self._shutdown.is_set():
             try:
                 self._set_virtual_closer_closed(False)
                 while (
                     not self._send_repeat_count == 0
-                    and not self._threadsStop.is_set()
+                    and not self._shutdown.is_set()
                     ):
                     with open(self._send_file_path, "r") as fp:
-                        while not self._threadsStop.is_set():
+                        while not self._shutdown.is_set():
                             ch = fp.read(1)
                             if not ch:
                                 # at the end, adjust repeat count
@@ -454,18 +522,19 @@ class Mrt:
                 print(
                     "<<< File sender encountered an error and will stop running. Exception: {}"
                 ).format(ex)
-                self._threadsStop.set()
+                self._shutdown.set()
             finally:
                 self._set_virtual_closer_closed(True)
         log.debug("MRT-File Sender thread done.")
+        return
 
     def _thread_kbreader_body(self):
         kbrd_char = _Getch()
-        while not self._threadsStop.is_set():
+        while not self._shutdown.is_set():
             try:
                 ch = kbrd_char()
                 if ch == '\x03': # They pressed ^C
-                    self._threadsStop.set()
+                    self._shutdown.set()
                     self._control_c_pressed.set()
                     return # We are done
                 if ch == '\x1a': # CTRL-Z, help...
@@ -485,22 +554,27 @@ class Mrt:
                         self._kb_queue.put(ch)
                     else:
                         print('\x07', end='', flush=True) # Ring the bell to let them know we are full
-                self._threadsStop.wait(0.01)
+                self._shutdown.wait(0.008)
             except Exception as ex:
                 print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
-                self._threadsStop.set()
+                self._shutdown.set()
         log.debug("MRT-KB Reader thread done.")
+        return
 
     def _thread_kbsender_body(self):
-        while not self._threadsStop.is_set():
+        while not self._shutdown.is_set():
             try:
-                ch = self._kb_queue.get()
+                ch = self._kb_queue.get(block=False)
                 code = self._sender.encode(ch)
                 self._from_keyboard(code)
+            except Empty:
+                # The queue was empty. Wait a bit, then try again.
+                self._shutdown.wait(0.001)
             except Exception as ex:
                 print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
-                self._threadsStop.set()
+                self._shutdown.set()
         log.debug("MRT-KB Sender thread done.")
+        return
 
 """
 Main code

@@ -286,7 +286,7 @@ def set_logging_level(s: str):
         set_logging_level_int(_l)
     except ValueError as ex:
         log.err(
-            "Debug Level value '{}' is not a valid integer value.".format(ex.args[0])
+            "Logging Level value '{}' is not a valid integer value.".format(ex.args[0])
         )
         raise
 
@@ -695,7 +695,7 @@ def print_config():
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
     print()
-    print("Debug level:", logging_level)
+    print("Logging level:", logging_level)
 
 def save_config():
     """Save (write) the configuration values out to the user and
@@ -856,7 +856,7 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
-        __option = "Debug Level"
+        __option = "Logging Level"
         __key = _LOGGING_LEVEL_KEY
         logging_level = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Interface type"

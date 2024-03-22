@@ -32,6 +32,7 @@ message events.
 """
 
 from re import L
+from threading import Event
 import time
 import mkobevents as ke
 
@@ -57,14 +58,68 @@ class MKOBStationList:
         self._active_stations = [] # List of lists with [station ID, time initially connected, time received from, ping time]
         self._last_sender = "" # Keep last sender to know when a sender changes
         self.kw = kw
+        self._shutdown: Event = Event()
+        return
+
+
+    def _trim_station_list(self) -> bool:
+        """
+        Check the timestamp of the stations and remove old ones.
+
+        Return: True is a station was removed from the list
+        """
+        if self._shutdown.is_set():
+            return
+        now = time.time()
+        # find and purge inactive stations
+        ## keep stations with ping time (element 3) within the last 2/3rds a minute
+        new_station_list = [row for row in self._active_stations if row[3] > now - 40]
+        station_removed = len(new_station_list) < len(self._active_stations)
+        if station_removed:
+            last_sender_found = False
+            # If the last sender was removed, clear __last_sender
+            for station_info in new_station_list:
+                if station_info[0] == self._last_sender:
+                    last_sender_found = True
+                    break
+                if not last_sender_found:
+                    self._last_sender = ''
+        self._active_stations = new_station_list
+        return station_removed
+
+    def _display_station_list(self):
+        """
+        Display the updated station list
+        ordered by last send time (new sender at the top, then most recent at the bottom).
+        For stations that have only connected and not sent, order them by time connected.
+        """
+        if self._shutdown.is_set():
+            return
+        # Delete the current window contents
+        self.kw.station_list_win.delete('1.0', 'end')
+        for i in range(0, len(self._active_stations)):
+            station_info = self._active_stations[i]
+            indent = "    " if station_info[2] < 0 else ""
+            self.kw.station_list_win.insert('end', "{}{}\n".format(indent, station_info[0]))
+            if i == 0 and len(self._active_stations) > 1 and self._last_sender:
+                # Insert a line of dashes (-----------------)
+                self.kw.station_list_win.insert('end', "------------------------\n")
+        return
+
+    def exit(self):
+        self.shutdown()
+        return
 
     def handle_clear_station_list(self, event=None):
         """
         reset the station list
         """
+        if self._shutdown.is_set():
+            return
         self._active_stations = []
         self._last_sender = ""
         self.kw.station_list_win.delete('1.0', 'end')
+        return
 
     def handle_update_current_sender(self, station_name: str):
         """
@@ -81,8 +136,9 @@ class MKOBStationList:
         etc.
         Most recent sender -or- new station
         """
+        if self._shutdown.is_set():
+            return
         now = time.time()
-
         existing_entry_updated = False
         sender_changed = False
         for i in range(0, len(self._active_stations)): # better way to do this?
@@ -109,6 +165,7 @@ class MKOBStationList:
         if self._trim_station_list() or (not existing_entry_updated) or sender_changed:
             self._last_sender = station_name
             self._display_station_list()
+        return
 
     def handle_update_station_active(self, station_name: str):
         """
@@ -116,8 +173,9 @@ class MKOBStationList:
         Add the [station_name,connected_time,received_time,ping_time] if it doesn't exist
         (connected_time is now).
         """
+        if self._shutdown.is_set():
+            return
         now = time.time()
-
         existing_entry_updated = False
         for i in range(0, len(self._active_stations)): # is there a better way to do this?
             station_info = self._active_stations[i]
@@ -135,44 +193,13 @@ class MKOBStationList:
                 self._active_stations.append(station_info)
         if  self._trim_station_list() or not existing_entry_updated:
             self._display_station_list()
+        return
 
-    def _trim_station_list(self) -> bool:
+    def shutdown(self):
         """
-        Check the timestamp of the stations and remove old ones.
-
-        Return: True is a station was removed from the list
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
         """
-        now = time.time()
-
-        # find and purge inactive stations
-        ## keep stations with ping time (element 3) within the last 2/3rds a minute
-        new_station_list = [row for row in self._active_stations if row[3] > now - 40]
-        station_removed = len(new_station_list) < len(self._active_stations)
-        if station_removed:
-            last_sender_found = False
-            # If the last sender was removed, clear __last_sender
-            for station_info in new_station_list:
-                if station_info[0] == self._last_sender:
-                    last_sender_found = True
-                    break
-                if not last_sender_found:
-                    self._last_sender = ''
-        self._active_stations = new_station_list
-        return station_removed
-
-    def _display_station_list(self):
-        """
-        Display the updated station list
-        ordered by last send time (new sender at the top, then most recent at the bottom).
-        For stations that have only connected and not sent, order them by time connected.
-        """
-        # Delete the current window contents
-        self.kw.station_list_win.delete('1.0', 'end')
-        for i in range(0, len(self._active_stations)):
-            station_info = self._active_stations[i]
-            indent = "    " if station_info[2] < 0 else ""
-            self.kw.station_list_win.insert('end', "{}{}\n".format(indent, station_info[0]))
-            if i == 0 and len(self._active_stations) > 1 and self._last_sender:
-                # Insert a line of dashes (-----------------)
-                self.kw.station_list_win.insert('end', "------------------------\n")
+        self._shutdown.set()
+        return
 

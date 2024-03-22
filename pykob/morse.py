@@ -35,8 +35,7 @@ from threading import current_thread, Event, Timer
 import traceback
 from pykob import config, log
 
-DOTSPERWORD = 45     # dot units per word, including all spaces
-                     #   (MORSE is 43, PARIS is 47)
+DOTSPERWORD = 45     # dot units per word, including all spaces (MORSE is 43, PARIS is 47)
 MAXINT = sys.maxsize # a very large integer
 
 """
@@ -71,6 +70,7 @@ class Sender:
         self._spacing = spacing
         self.setWPM(wpm, cwpm)
         self._space = self._wordSpace  # delay before next code element (ms)
+        self._shutdown: Event = Event()
         return
 
     @property
@@ -152,6 +152,7 @@ class Sender:
         """
         Exit this instance.
         """
+        self.shutdown()
         return
 
     def setWPM(self, wpm, cwpm=0):
@@ -176,6 +177,14 @@ class Sender:
             self._wordSpace += int(delta / 3)
         elif self._spacing == config.Spacing.word:
             self._wordSpace += int(delta)
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
         return
 
 
@@ -230,8 +239,8 @@ class Reader:
         self._spaceBuf  = [0, 0]       # space before each character
         self._markBuf   = [0, 0]       # length of last dot or dash in character
         self._nChars    = 0            # number of complete characters in buffer
-        self._callback  = callback     # function to call when character decoded
-        self._threadsStop = Event()    # Used to cancel running threads
+        self._char_callback  = callback     # function to call when character decoded
+        self._shutdown  = Event()      # Used to cancel running threads and shutdown operations
         self._flusher   = None         # holds Timer (thread) to call flush if no code received
         self._latched   = False        # True if cicuit has been latched closed by a +1 code element
         self._mark      = 0            # accumulates the length of a mark as positive code elements are received
@@ -333,7 +342,7 @@ class Reader:
                     self._space = 0
                 elif self._mark > 0:  # continuation of mark
                     self._mark += c
-        if use_flusher and not self._threadsStop.is_set():
+        if use_flusher and not self._shutdown.is_set():
             self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self._flushHandler)  # if idle call `flush`
             self._flusher.setName("Reader-Flusher <:{}".format(current_thread().name))
             self._flusher.start()
@@ -345,7 +354,7 @@ class Reader:
         """
         Cancel the flusher (if it exists) and exit.
         """
-        self._threadsStop.set()
+        self.shutdown()
         f = self._flusher
         self._flusher = None
         if f and f.is_alive():
@@ -428,8 +437,9 @@ class Reader:
             self._spaceBuf = [0, 0]
             self._markBuf = [0, 0]
             self._nChars = 0
-            if self._latched:
-                self._callback('_', float(spacing) / (3 * self._truDot) - 1)
+            cb = self._char_callback
+            if self._latched and cb:
+                cb('_', float(spacing) / (3 * self._truDot) - 1)
         return
 
     def decodeChar(self, nextSpace):
@@ -484,8 +494,9 @@ class Reader:
         self._spaceBuf[self._nChars] = nextSpace
         if code != '' and s == '':
             s = '[' + code + ']'
-        if s != '':
-            self._callback(s, float(sp1) / (3 * self._truDot) - 1)
+        cb = self._char_callback
+        if s != '' and cb:
+            cb(s, float(sp1) / (3 * self._truDot) - 1)
         return
 
     def lookupChar(self, code):
@@ -494,6 +505,18 @@ class Reader:
             return(decodeTable[codeTableIndex][code])
         else:
             return('')
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        self._char_callback = None
+        f = self._flusher
+        if not f is None and f.is_alive():
+            f.cancel()
+        return
 
     def displayBuffers(self, text):
         """Display the code buffer and other information for troubleshooting"""
