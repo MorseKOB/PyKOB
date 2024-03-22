@@ -60,12 +60,15 @@ MRT_VERSION_TEXT = "MRT " + __version__
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
-class _Getch:
+class RawTerm:
     """
-    Gets a single character from standard input.  Does not echo to the screen.
+    Sets the terminal to Raw Mode (but still w/CRNL on output) and provides a method to 
+    gets a single character.  Does not echo to the screen.
 
     This uses native calls on Windows and *nix (Linux and MacOS), and relies on
     the Subclasses for each platform.
+
+    Call `exit` when done using, to restore settings.
     """
     def __init__(self):
         self.impl = None
@@ -85,42 +88,59 @@ class _Getch:
                 self.impl = _GetchUnix()
             except Exception as ex:
                 log.error("unable to get direct keyboard access (Linux:{})".format(ex))
+        return
 
-    def __call__(self): return self.impl()
+    def getch(self) -> str: 
+        return self.impl._getch()
 
+    def exit(self) -> None:
+        self.impl._exit()
+        return
 class _GetchUnix:
     """
     Get a single character from the standard input on *nix
 
-    Used by `_Getch`
+    Used by `RawTerm`
     """
     def __init__(self):
-        import tty, sys
-
-    def __call__(self):
-        import sys, tty, termios
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        import tty, sys, termios
+        self.fd = sys.stdin.fileno()
+        self.original_settings = termios.tcgetattr(self.fd)
         try:
             tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            attrs = termios.tcgetattr(self.fd)
+            attrs[1] |= termios.OPOST
+            termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
+        except Exception as ex:
+            log.warn("GetchUnix - Error setting terminal attributes: {}".format(ex))
+            # try to put the original back
+            termios.tcsetattr(self.fd, termios.TCSANOW, self.original_settings)
+        return
+
+    def _getch(self) -> str:
+        ch = sys.stdin.read(1)
         return ch
+
+    def _exit(self):
+        import termios
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
 
 class _GetchWindows:
     """
     Get a single character from the standard input on Windows
 
-    Used by `_Getch`
+    Used by `RawTerm`
     """
     def __init__(self):
         import msvcrt
+        pass
 
-    def __call__(self):
+    def _getch(self) -> str:
         import msvcrt
         return msvcrt.getch().decode("utf-8")
 
+    def _exit(self):
+        return
 class Mrt:
 
     def __init__(
@@ -255,6 +275,7 @@ class Mrt:
                     raise KeyboardInterrupt
         except KeyboardInterrupt:
             self.exit()
+        return
 
     def shutdown(self):
         log.debug("MRT.shutdown - 1", 3)
@@ -529,36 +550,39 @@ class Mrt:
         return
 
     def _thread_kbreader_body(self):
-        kbrd_char = _Getch()
-        while not self._shutdown.is_set():
-            try:
-                ch = kbrd_char()
-                if ch == '\x03': # They pressed ^C
+        rawterm = RawTerm()
+        try:
+            while not self._shutdown.is_set():
+                try:
+                    ch = rawterm.getch()
+                    if ch == '\x03': # They pressed ^C
+                        self._shutdown.set()
+                        self._control_c_pressed.set()
+                        return # We are done
+                    if ch == '\x1a': # CTRL-Z, help...
+                        print("\n['~' to open the key]\n['+' to close the key]\n[^C to exit]", flush=True)
+                        continue
+                    if not self._local_loop_active and not ch == '~':
+                        # The local loop needs to be active
+                        print('\x07[~ to open key (Ctrl-Z=Help)]', flush=True) # Ring the bell to let them know we are full
+                        continue
+                    if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
+                        # See if there is room in the keyboard queue
+                        if self._kb_queue.not_full:
+                            # Since this is from the keyboard, print it so it can be seen.
+                            nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
+                            print(ch, end=nl, flush=True)
+                            # Put it in our queue
+                            self._kb_queue.put(ch)
+                        else:
+                            print('\x07', end='', flush=True) # Ring the bell to let them know we are full
+                    self._shutdown.wait(0.008)
+                except Exception as ex:
+                    print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
                     self._shutdown.set()
-                    self._control_c_pressed.set()
-                    return # We are done
-                if ch == '\x1a': # CTRL-Z, help...
-                    print("\n['~' to open the key]\n['+' to close the key]\n[^C to exit]", flush=True)
-                    continue
-                if not self._local_loop_active and not ch == '~':
-                    # The local loop needs to be active
-                    print('\x07[~ to open key (Ctrl-Z=Help)]', flush=True) # Ring the bell to let them know we are full
-                    continue
-                if ch >= ' ' or ch == '\x0A' or ch == '\x0D':
-                    # See if there is room in the keyboard queue
-                    if self._kb_queue.not_full:
-                        # Since this is from the keyboard, print it so it can be seen.
-                        nl = '\r\n' if ch == '=' or ch == '\x0A' or ch == '\x0D' else ''
-                        print(ch, end=nl, flush=True)
-                        # Put it in our queue
-                        self._kb_queue.put(ch)
-                    else:
-                        print('\x07', end='', flush=True) # Ring the bell to let them know we are full
-                self._shutdown.wait(0.008)
-            except Exception as ex:
-                print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
-                self._shutdown.set()
-        log.debug("MRT-KB Reader thread done.")
+        finally:
+            rawterm.exit()
+            log.debug("MRT-KB Reader thread done.")
         return
 
     def _thread_kbsender_body(self):
