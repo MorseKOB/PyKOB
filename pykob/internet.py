@@ -185,7 +185,9 @@ class Internet:
             with self._socketWRGuard:
                 log.debug("internet._close_socket -  socketGuard-ed", 7)
                 if self._socket:
-                    self._socket.shutdown(socket.SHUT_RDWR)
+                    # On Mac/Linux calling shutdown if the socket isn't connected is an error.
+                    if self._connected.is_set():
+                        self._socket.shutdown(socket.SHUT_RDWR)
                     self._socket.close()
                     self._socket = None
                 log.debug("internet._close_socket -   socketGuards-release", 7)
@@ -335,7 +337,10 @@ class Internet:
                                     continue
                                 success = True
                             else:
-                                self._shutdown.wait(0.01)
+                                if self._shutdown.wait(0.005):
+                                    break
+                                else:
+                                    continue
                         # log.debug("internet.read -   socketRDGuard-release", 7)
                 except (TimeoutError) as toe:
                     # On timeout, just continue so we can check our flags
