@@ -185,9 +185,6 @@ class Internet:
             with self._socketWRGuard:
                 log.debug("internet._close_socket -  socketGuard-ed", 7)
                 if self._socket:
-                    # On Mac/Linux calling shutdown if the socket isn't connected is an error.
-                    if self._connected.is_set():
-                        self._socket.shutdown(socket.SHUT_RDWR)
                     self._socket.close()
                     self._socket = None
                 log.debug("internet._close_socket -   socketGuards-release", 7)
@@ -261,12 +258,13 @@ class Internet:
             return
         self._wire_no = wireNo
         self._create_socket()
-        self.sendID()
         self._connected.set()
+        self.sendID()
         self._start_wire_threads()
 
     def disconnect(self, on_disconnect=None):
         if self._connected.is_set():
+            self._connected.clear()
             self._wire_no = 0
             shortPacket = shortPacketFormat.pack(DIS, 0)
             try:
@@ -275,13 +273,19 @@ class Internet:
                     log.debug("internet.disconnect -  socketWRGuard-ed", 7)
                     if self._socket:
                         self._socket.sendto(shortPacket, self._get_address())
+                        try:
+                            self._socket.shutdown(socket.SHUT_RDWR)
+                        except OSError as oe:
+                            if oe.errno == 57:
+                                # Generated on shutdown if the socket isn't connected
+                                pass
+                            else:
+                                raise oe
+                        pass
                 log.debug("internet.disconnect -   socketWRGuard-release", 7)
-            except:
-                self._get_address(renew=True)
             finally:
                 self._close_socket()
                 pass
-            self._connected.clear()
         if on_disconnect:
             on_disconnect()
         return
@@ -307,10 +311,14 @@ class Internet:
         try:
             skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             skt.connect((testhost, port))
+            skt.shutdown(socket.SHUT_RDWR)
             skt.close()
             self._internet_available = True
-        except socket.error as ex:
+        except socket.error as se:
+            log.debug("internet.check_internet_available - socket.error", 10)
             pass
+        except Exception as ex:
+            self._err_msg_hndlr("Check internet available error: {}".format(ex))
         finally:
             self._inet_available_check_time = time.time()
         return self._internet_available
