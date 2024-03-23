@@ -306,7 +306,7 @@ try:
     elif args_code_type == "I" or args_code_type =="INTERNATIONAL":
         code_type = config.CodeType.international
     else:
-        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(args_code_type)
         log.err(msg)
         raise ValueError(msg)
 

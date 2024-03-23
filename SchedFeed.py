@@ -24,7 +24,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""SchedFeed.py
+"""
+SchedFeed.py
 
 Sends messages according to a time schedule.
 
@@ -49,7 +50,7 @@ SchedFeed 1.1  2015-12-30
 SchedFeed 1.0  2015-12-28
 - initial release
 """
-
+import sys
 import time
 from pykob import config, kob, internet, morse, log
 
@@ -58,9 +59,13 @@ app_ver = "SchedFeed {}".format(VERSION)
 log.log(app_ver)
 
 PORT = config.serial_port # serial port for KOB interface
-USEGPIO = config.gpio # use the GPIO on a Raspberry Pi
-WPM = config.min_char_speed  # code speed (words per minute)
-SOUND = config.sound # whether to enable computer sound for sounder
+USEGPIO = config.gpio
+USESOUNDER = config.sounder
+USESOUND = config.sound # whether to enable computer sound for sounder
+AUDIOTYPE = config.audio_type
+HWTYPE = config.interface_type
+WPM = config.text_speed  # code speed (words per minute)
+CWPM     = config.min_char_speed  # minimum character speed
 WIRE    = 199  # 0 for no feed to internet
 IDTEXT  = 'Test feed, XX'  # text to identify your feed, with office call
 msgs = [  # 24-hour clock, no leading zeros
@@ -76,11 +81,11 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
 
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
 if WIRE:
     myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
     myInternet.connect(WIRE)
-mySender = morse.Sender(WPM)
+mySender = morse.Sender(WPM, CWPM)
 
 try:
     while True:

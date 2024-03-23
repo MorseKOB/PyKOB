@@ -329,27 +329,26 @@ class Internet:
             buf = None
             nBytes = 0
             code = None
-            while self._socket and self._connected.is_set() and not success and not self._shutdown.is_set():
+            while not success and self._socket and self._connected.is_set() and not self._shutdown.is_set():
+                nBytes = 0
                 try:
                     # log.debug("internet.read - Getting socketRDGuard", 7)
                     with self._socketRDGuard:
                         # log.debug("internet.read -  socketRDGuard-ed", 7)
                         if self._socket:
                             data_ready = select.select([self._socket], [], [], 0)  # Check readability and never block
-                            if len(data_ready[0]) > 0:
+                            if len(data_ready[0]) > 0:  # Simple check since we only have our single socket registered
                                 buf = self._socket.recv(500)
                                 if not self._connected.is_set() or self._shutdown.is_set():
                                     return code
                                 nBytes = len(buf)
-                                if nBytes == 0:
-                                    continue
-                                success = True
-                            else:
-                                if self._shutdown.wait(0.005):
+                                if nBytes > 0:
+                                    success = True
                                     break
-                                else:
-                                    continue
+                            pass  # No data ready. Pause outside of socketRDGuard and continue
                         # log.debug("internet.read -   socketRDGuard-release", 7)
+                        pass
+                    self._shutdown.wait(0.005)  # Pause a bit to not hog the CPU
                 except (TimeoutError) as toe:
                     # On timeout, just continue so we can check our flags
                     continue
@@ -395,7 +394,7 @@ class Internet:
                     return code
             elif not self._shutdown.is_set() and self._connected.is_set():
                 log.warn("pykob.internet received invalid record length: {0}".format(nBytes))
-            return
+            pass
         return
 
     def write(self, code, txt=""):
