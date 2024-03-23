@@ -433,6 +433,7 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 return
         if not self._internet_station_active and self._local_loop_active:
+            self._reader.decode(code)
             self._emit_local_code(code, kob.CodeSource.key)
         return
 
