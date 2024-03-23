@@ -181,7 +181,7 @@ class Sender:
 
     def shutdown(self):
         """
-        Initiate shutdown of our operations (and don't start anything new), 
+        Initiate shutdown of our operations (and don't start anything new),
         but DO NOT BLOCK.
         """
         self._shutdown.set()
@@ -253,16 +253,8 @@ class Reader:
         return
 
     @property
-    def wpm(self):
-        return self._wpm
-
-    @property
-    def dot_len(self):
-        return self._dotLen
-
-    @property
-    def dot_len_max(self):
-        return ((self._dotLen * MINDASHLEN) - 0.1)
+    def char_space_max(self):
+        return (self._dotLen * MAXMORSESPACE)
 
     @property
     def dash_len_min(self):
@@ -281,6 +273,30 @@ class Reader:
         return (self._dotLen * MAXDASHLEN)
 
     @property
+    def detected_dot_len(self) -> int:
+        return self._d_dotLen
+
+    @property
+    def detected_dot_tru(self) -> int:
+        return self._d_truDot
+
+    @property
+    def detected_wpm(self) -> int:
+        return self._d_wpm
+
+    @property
+    def dot_len(self):
+        return self._dotLen
+
+    @property
+    def dot_len_max(self):
+        return ((self._dotLen * MINDASHLEN) - 0.1)
+
+    @property
+    def dot_tru(self):
+        return self._truDot
+
+    @property
     def intra_char_space_min(self):
         return (self._dotLen * 1.45)
 
@@ -289,12 +305,8 @@ class Reader:
         return ((self._dotLen + (self._dotLen * MINCHARSPACE)) - 0.1)
 
     @property
-    def char_space_max(self):
-        return (self._dotLen * MAXMORSESPACE)
-
-    @property
-    def detected_wpm(self) -> int:
-        return self._d_wpm
+    def wpm(self):
+        return self._wpm
 
     def decode(self, codeSeq, use_flusher=True):
         # Code received - cancel an existing 'flusher'
@@ -508,7 +520,7 @@ class Reader:
 
     def shutdown(self):
         """
-        Initiate shutdown of our operations (and don't start anything new), 
+        Initiate shutdown of our operations (and don't start anything new),
         but DO NOT BLOCK.
         """
         self._shutdown.set()

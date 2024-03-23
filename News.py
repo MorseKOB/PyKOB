@@ -24,13 +24,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""News.py
+"""
+News.py
 
 Fetches articles from an RSS news feed and sends them in Morse
 to a sounder.
 
-Serial port or to use GPIO, code speed, and audio preferences should be specified by running the
-'configure.sh' script or executing 'python3 Configure.py'.
+Serial port or to use GPIO, code speed, and audio preferences should be 
+specified by running 'python3 Configure.py'.
 """
 
 import sys
@@ -41,16 +42,19 @@ from pykob import config,newsreader, morse, kob
 SOURCE   = 'https://www.ansa.it/sito/ansait_rss.xml'  # news feed
 PORT = config.serial_port # serial port for KOB interface
 USEGPIO = config.gpio
+USESOUNDER = config.sounder
 USESOUND = config.sound # whether to enable computer sound for sounder
+AUDIOTYPE = config.audio_type
+HWTYPE = config.interface_type
 
-WPM = config.words_per_min_speed  # code speed (words per minute)
-CWPM     = 18  # minimum character speed
+WPM = config.text_speed  # code speed (words per minute)
+CWPM     = config.min_char_speed  # minimum character speed
 PAUSE    = 5  # gap to leave between articles (seconds)
 CODETYPE = config.code_type
 CODESPACING = config.spacing
 
 mySender = morse.Sender(WPM, CWPM, CODETYPE, CODESPACING)
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND)
+myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
 
 try:
     while True:
