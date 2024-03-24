@@ -473,18 +473,24 @@ class MKOBMain:
         Change the current wire. If connected, drop the current connection and
         connect to the new wire.
         """
+        if wire < 0:  # protect against invalid values.
+            wire = 0
         if not wire == self._wire:
             # Disconnect, change wire, reconnect.
             log.debug("mkm - change_wire: {}->{}".format(self._wire, wire))
             was_connected = self._connected.is_set()
-            self.disconnect()
             self._wire = wire
+            self.disconnect()
             rec = self.Recorder
             if rec:
                 rec.wire = wire
-            if was_connected:
-                self._shutdown.wait(0.50)  # Needed to allow UTP packets to clear
-                self.toggle_connect()
+            if not self._wire == 0:
+                self._kw.connect_enable(True)
+                if was_connected:
+                        self._shutdown.wait(0.50)  # Needed to allow UTP packets to clear
+                        self.toggle_connect()
+            else:
+                self._kw.connect_enable(False)
         return
 
     def do_morse_change(self):
@@ -695,6 +701,9 @@ class MKOBMain:
                     codeType=code_type,
                     callback=self._reader_callback,
                 )
+            kob_ = self._kob
+            if kob_:
+                kob_.keyer_dit_len = self._msender.dot_len
             if self.key_graph_is_active():
                 self._key_graph_win.wpm = cwpm
             self._kw.cwpm = cwpm
@@ -727,6 +736,10 @@ class MKOBMain:
         if not self._connected.is_set():
             # Connect
             log.debug("mkmain.toggle_connect - connect", 3)
+            if self._wire == 0:
+                log.debug("mkmain.toggle_connect - connect NOT ALLOWED on Wire-0")
+                self._kw.connect_enable(False)
+                return
             self._sender_ID = ""
             self._wire_data_received = False
             self._ka.handle_stations_clear()
@@ -762,6 +775,7 @@ class MKOBMain:
                 inet.disconnect(self._on_disconnect)
             if kob_:
                 kob_.wire_connected = False
+        self._kw.connected_set(self.connected)
         return
 
     def _on_disconnect_followup(self, *args):
@@ -796,6 +810,8 @@ class MKOBMain:
             kob_.power_save(False)
         if not self._odc_fu:
             self._odc_fu = self._tkroot.after(950, self._on_disconnect_followup)
+        if self._wire == 0:
+            self._kw.connect_enable(False)
         return
 
     def _op_playback_finished_fu(self):

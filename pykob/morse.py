@@ -38,10 +38,6 @@ from pykob import config, log
 DOTSPERWORD = 45     # dot units per word, including all spaces (MORSE is 43, PARIS is 47)
 MAXINT = sys.maxsize # a very large integer
 
-"""
-Code sender class
-"""
-
 # Resource folder
 root_folder = Path(__file__).parent
 data_folder = root_folder / "data"
@@ -65,6 +61,13 @@ readEncodeTable(config.CodeType.american, 'codetable-american.txt')
 readEncodeTable(config.code_type.international, 'codetable-international.txt')
 
 class Sender:
+    """
+    Code sender class used to convert text into code (down/up duration) sequences.
+    """
+
+    """ Constant approximate duration for a dot at 20 Words per Minute. """
+    DOT_LEN_20WPM = 60
+
     def __init__(self, wpm, cwpm=0, codeType=config.CodeType.american, spacing=config.Spacing.char):
         self._codeType = codeType
         self._spacing = spacing
