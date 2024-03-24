@@ -40,8 +40,10 @@ Example:
     python MRT.py 11
 """
 
-from pykob import VERSION, config, config2, log, kob, internet, morse
+from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
 from pykob.config2 import Config
+from pykob.recorder import Recorder
+import pkappargs
 
 import argparse
 from pathlib import Path
@@ -147,6 +149,7 @@ class Mrt:
         self,
         app_name_version: str, wire: int,
         cfg: Config,
+        record_filepath: Optional[str] = None,
         file_to_send: Optional[str] = None,
     ) -> None:
         self._app_name_version = app_name_version
@@ -180,6 +183,19 @@ class Mrt:
         self._sender_current = ""
 
         self._exit_status = 1
+
+        if record_filepath:
+            log.info("Recording to '{}'".format(record_filepath))
+            self._recorder = Recorder(
+                record_filepath,
+                None,
+                station_id=self._our_office_id,
+                wire=self._wire,
+                play_code_callback=None,
+                play_sender_id_callback=None,
+                play_station_list_callback=None,
+                play_wire_callback=None,
+            )
 
         self._kob = kob.KOB(
             interfaceType=cfg.interface_type,
@@ -381,26 +397,28 @@ class Mrt:
                 self._set_local_loop_active(True)
         return
 
-    def _emit_local_code(self, code, code_source):
+    def _emit_local_code(self, code, code_source, char:Optional[str]=None):
         """
         Emit local code. That involves:
         1. Record code if recording is enabled
         2. Send code to the wire if connected
+        3. Decode the code and display it if from the key (no need to display code from the keyboard)
 
         This is used indirectly from the key or the keyboard threads to emit code once they
         determine it should be emitted.
         """
         self._handle_sender_update(self._our_office_id)
-        # Reader.decode(code)
         if self._recorder:
-            self._recorder.record(code, code_source)
+            self._recorder.record(code, code_source, char)
         if self._connected and self._cfg.remote:
             self._internet.write(code)
         if code_source == kob.CodeSource.keyboard:
             self._kob.soundCode(code, code_source)
+        if code_source == kob.CodeSource.key:
+            self._reader.decode(code)
         return
 
-    def _from_file(self, code):
+    def _from_file(self, code, char:Optional[str]=None):
         """
         Handle inputs received from reading a file.
         Only send if the circuit is open.
@@ -415,7 +433,7 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 return
         if not self._internet_station_active and self._local_loop_active:
-            self._emit_local_code(code, kob.CodeSource.keyboard) # Say that it' from the keyboard
+            self._emit_local_code(code, kob.CodeSource.keyboard, char) # Say that it' from the keyboard
         return
 
     def _from_key(self, code):
@@ -437,7 +455,7 @@ class Mrt:
             self._emit_local_code(code, kob.CodeSource.key)
         return
 
-    def _from_keyboard(self, code):
+    def _from_keyboard(self, code, char:Optional[str]=None):
         """
         Handle inputs received from the keyboard sender.
         Only send if the circuit is open.
@@ -454,7 +472,7 @@ class Mrt:
                 sys.stdout.flush()
                 return
         if not self._internet_station_active and self._local_loop_active:
-            self._emit_local_code(code, kob.CodeSource.keyboard)
+            self._emit_local_code(code, kob.CodeSource.keyboard, char)
         return
 
     def _from_internet(self, code):
@@ -473,6 +491,9 @@ class Mrt:
         return
 
     def _reader_callback(self, char, spacing):
+        rec = self._recorder
+        if rec:
+            rec.record([], "", text=char)
         if not char == '=':
             if self._last_received_para:
                 print()
@@ -538,7 +559,7 @@ class Mrt:
                                 # don't send control characters
                                 continue
                             code = self._sender.encode(ch)
-                            self._from_file(code)
+                            self._from_file(code, ch)
                 done_sending = True
             except Exception as ex:
                 print(
@@ -591,7 +612,7 @@ class Mrt:
             try:
                 ch = self._kb_queue.get(block=False)
                 code = self._sender.encode(ch)
-                self._from_keyboard(code)
+                self._from_keyboard(code, ch)
             except Empty:
                 # The queue was empty. Wait a bit, then try again.
                 self._shutdown.wait(0.001)
@@ -616,7 +637,8 @@ if __name__ == "__main__":
                 config2.min_char_speed_override,
                 config2.text_speed_override,
                 config2.config_file_override,
-                config2.logging_level_override
+                config2.logging_level_override,
+                pkappargs.record_session_override
             ]
         )
         arg_parser.add_argument(
@@ -632,6 +654,8 @@ if __name__ == "__main__":
         args = arg_parser.parse_args()
         cfg = config2.process_config_args(args)
         wire = args.wire if args.wire else cfg.wire
+        record_filepath = pkappargs.record_filepath_from_args(args)
+
         log.set_logging_level(cfg.logging_level)
 
         print(MRT_VERSION_TEXT)
@@ -639,7 +663,7 @@ if __name__ == "__main__":
         print("pykob: " + VERSION)
         print("PySerial: " + config.pyserial_version)
 
-        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, args.sendtext_filepath)
+        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, record_filepath, args.sendtext_filepath)
         mrt.start()
         mrt.main_loop()
         mrt = None

@@ -31,10 +31,12 @@ import argparse
 import sys
 import threading
 import time
-from pykob import config, kob, morse, log, recorder
+from pykob import config2, kob, morse, log, recorder
+from pykob.config2 import Config
 from pykob.util import strtobool
 
 myKOB = None
+myRecorder = None
 playback_finished = threading.Event()
 
 def callbackPlay(code):
@@ -46,6 +48,7 @@ def callbackPlay(code):
         myKOB.soundCode(code, code_source=kob.CodeSource.player)
     except:
         playback_finished.set()
+    return
 
 def callbackPlayFinished():
     """
@@ -54,30 +57,44 @@ def callbackPlayFinished():
     global playback_finished
     playback_finished.set()
     print("Playback finished.")
+    return
 
 try:
-    #log.log("Starting Play")
-
-    arg_parser = argparse.ArgumentParser(description="MorseKOB record player", parents=\
-     [\
-      config.interface_type_override, \
-      config.serial_port_override, \
-      config.gpio_override, \
-      config.sound_override, \
-      config.sounder_override])
-    arg_parser.add_argument('playback_file', metavar='file',
-                    help='file (in MorseKOB recorder format) to be played back.')
-    arg_parser.add_argument("--list", action="store_true", default=False, help="Display the recorded data as it is played.", dest="listData")
-    arg_parser.add_argument("--speedfactor", type=int, metavar="n", default=100, help="Factor (percentage) to adjust playback speed by (Default 100).", dest="speedFactor")
-    arg_parser.add_argument("--maxsilence", type=int, metavar="n", default=5, help="Longest silence duration to play, in seconds. A value of '0' will reproduce all silence as recorded (Defalut 5).", dest="maxSilence")
+    arg_parser = argparse.ArgumentParser(description="MorseKOB record player", parents= [
+        config2.interface_type_override,
+        config2.serial_port_override,
+        config2.gpio_override,
+        config2.sound_override,
+        config2.audio_type_override,
+        config2.sounder_override,
+        config2.logging_level_override,
+        config2.config_file_override,
+      ])
+    arg_parser.add_argument('playback_file', metavar='recording_file',
+            help='Recording file (in PyKOB Recorder format) to be played back.')
+    arg_parser.add_argument("--list", action="store_true", default=False, 
+            help="Display the recorded data as it is played.", dest="list_data")
+    arg_parser.add_argument("--speedfactor", type=int, metavar="n", default=100, 
+            help="Factor (percentage) to adjust playback speed by (Default 100).", dest="speed_factor")
+    arg_parser.add_argument("--maxsilence", type=int, metavar="n", default=5, 
+            help="Longest silence duration to play, in seconds. A value of '0' will reproduce all silence as recorded (Defalut 5).", dest="max_silence")
     args = arg_parser.parse_args()
-    
-    interface_type = args.interface_type
-    port = args.serial_port # serial port for KOB/sounder interface
-    useGpio = strtobool(args.gpio) # use GPIO (Raspberry Pi)
-    sound = strtobool(args.sound)
-    sounder = strtobool(args.sounder)
+    cfg:Config = config2.process_config_args(args)
+
+    log.set_logging_level(cfg.logging_level)
+    log.debug("Starting Play")
+
+    interface_type = cfg.interface_type
+    port = cfg.serial_port              # serial port for KOB/sounder interface
+    useGpio = cfg.gpio                  # use GPIO (Raspberry Pi)
+    sound = cfg.sound                   # use audio
+    audio_type = cfg.audio_type         # Sounder or Tone
+    sounder = cfg.sounder               # use the physical sounder
     playback_file = args.playback_file
+
+
+    if playback_file:
+        playback_file = recorder.add_ext_if_needed(playback_file)
 
     # Validate that the file can be opened
     try:
@@ -85,15 +102,22 @@ try:
         fp.close()
     except FileNotFoundError:
         log.err("Recording file not found: {}".format(playback_file))
+        sys.exit(1)
 
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound, interfaceType=interface_type)
+    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound, audioType=audio_type, useSounder=sounder, interfaceType=interface_type)
 
-    myRecorder = recorder.Recorder(None, playback_file, play_code_callback=callbackPlay, play_finished_callback=callbackPlayFinished, station_id="Player")
-    myRecorder.playback_start(list_data=args.listData, max_silence=args.maxSilence, speed_factor=args.speedFactor)
+    myRecorder = recorder.Recorder(None, playback_file, play_code_callback=callbackPlay, play_finished_callback=callbackPlayFinished, station_id="PyKOB Player")
+    myRecorder.playback_start(list_data=args.list_data, max_silence=args.max_silence, speed_factor=args.speed_factor)
     # Wait until playback is finished
     while not playback_finished.is_set():
         time.sleep(0.5)
+    pass
 except KeyboardInterrupt:
     print("\nEarly exit.")
     myRecorder.playback_stop()
-    sys.exit(0)     # ^C is considered a normal exit.
+finally:
+    if myRecorder:
+        myRecorder.exit()
+    if myKOB:
+        myKOB.exit()
+sys.exit(0)     # ^C is considered a normal exit.

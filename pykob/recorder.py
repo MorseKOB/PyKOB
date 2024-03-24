@@ -52,6 +52,9 @@ from datetime import datetime, timedelta
 from enum import Enum, IntEnum, unique
 from pykob import kob, log
 from threading import Event, Lock, Thread
+from typing import Optional
+
+PYKOB_RECORDING_EXT = ".pkrec"
 
 @unique
 class PlaybackState(IntEnum):
@@ -61,6 +64,16 @@ class PlaybackState(IntEnum):
     idle = 0
     playing = 1
     paused = 2
+
+def add_ext_if_needed(s: str) -> str:
+    """
+    Add the PyKOB Recording file extension if needed.
+
+    Adds '.pkrec' to the string argument if it doesn't already end with it.
+    """
+    if s and not s.endswith(PYKOB_RECORDING_EXT):
+        return (s + PYKOB_RECORDING_EXT)
+    return s
 
 def get_timestamp() -> int:
     """
@@ -88,6 +101,16 @@ def date_time_from_ts(ts: int) -> str:
     dateTime = datetime.fromtimestamp(ts / 1000.0)
     dateTimeStr = str(dateTime.ctime()) + ": "
     return dateTimeStr
+
+def generate_session_recording_name(basename: Optional[str] = None) -> str:
+    ts = get_timestamp()
+    dt = datetime.fromtimestamp(ts / 1000.0)
+    dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(
+        dt.year, dt.month, dt.day, dt.hour, dt.minute
+    )
+    basename = basename if not basename is None else "Session-"
+    recording_filepath = basename + dateTimeStr + PYKOB_RECORDING_EXT
+    return recording_filepath
 
 def hms_from_ts(ts1: int, ts2: int) -> str:
     """
@@ -252,6 +275,7 @@ class Recorder:
         """
         Record a code sequence in JSON format with additional context information.
         """
+        text = text if not text is None else ''
         if self._playback_state == PlaybackState.idle: # Only record if not playing back a recording
             timestamp = get_timestamp()
             data = {
@@ -641,7 +665,7 @@ class Recorder:
             with self._p_fileop_lock:
                 self._p_fp = None
             if self._list_data:
-                print("Playback done.")
+                print("Player done.")
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
