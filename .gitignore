@@ -46,5 +46,7 @@ Capture-Replay/*.txt
 *.json
 # Ignore PKCFG files from saving configurations. If PKCFG files are needed in the source, include them with a '!' line.
 *.pkcfg
+# Ignore PKREC files from recordings. If PKREC files are needed in the source, include them with a '!' line.
+*.pkrec
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py

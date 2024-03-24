@@ -48,7 +48,7 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 
 
 class MKOBMain:
-    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config) -> None:
+    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, record_filepath: Optional[str]=None) -> None:
         self.app_ver = app_ver
         self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
@@ -60,6 +60,7 @@ class MKOBMain:
         self._cwpm = 0  # Set by do_morse_change
         self._twpm = 0  # Set by do_morse_change
         self._spacing = None  # Set by do_morse_change
+        self._record_file_initial = record_filepath
 
         self._key_graph_win = None
 
@@ -172,13 +173,8 @@ class MKOBMain:
             )
         return
 
-    def _create_recorder(self):
-        ts = recorder.get_timestamp()
-        dt = datetime.fromtimestamp(ts / 1000.0)
-        dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(
-            dt.year, dt.month, dt.day, dt.hour, dt.minute
-        )
-        targetFileName = "Session-" + dateTimeStr + ".json"
+    def _create_recorder(self, filename=None):
+        targetFileName = recorder.add_ext_if_needed(filename) if not filename is None else recorder.generate_session_recording_name()
         log.info("Recording to '{}'".format(targetFileName))
         with self._recorder_guard:
             self._recorder = Recorder(
@@ -396,6 +392,10 @@ class MKOBMain:
         if self._cfg.auto_connect:
             log.debug("MKOBMain: Auto-connect.")
             self._ka.doConnect()  # Suggest a connect.
+        #
+        # If requested to initially record the session, start it.
+        if self._record_file_initial:
+            self.record_session(self._record_file_initial, show_msgbox=False)
         return
 
     @property
@@ -1054,15 +1054,17 @@ class MKOBMain:
             msgbox.showerror(title=self.app_ver, message=msg)
         return
 
-    def record_session(self):
+    def record_session(self, filepath: Optional[str], show_msgbox: bool=True):
         """
         Start recording if not already started.
         """
         rec = self.Recorder
-        if not rec:
-            self._create_recorder()
+        if not rec or filepath:
+            self._create_recorder(filepath)
         msg = "Recording session to: {}".format(self._recorder.target_file_path)
-        msgbox.showinfo(title=self.app_ver, message=msg)
+        self._ka.trigger_status_msg_set(msg)
+        if show_msgbox:
+            msgbox.showinfo(title=self.app_ver, message=msg)
         return
 
     def recording_end(self):
@@ -1072,7 +1074,9 @@ class MKOBMain:
             self._recorder = None
             msg = "Session recorded to: {}".format(rec.target_file_path)
             rec.playback_stop()
+        self._ka.trigger_status_msg_set(msg)
         msgbox.showinfo(title=self.app_ver, message=msg)
+        self.tkroot.after(10000, self._ka.trigger_status_msg_clear)
         return
 
     def _recording_play_followup(self):

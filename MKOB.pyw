@@ -34,6 +34,7 @@ import tkinter as tk
 import sys
 from pykob import config2, log
 from pykob import VERSION as PKVERSION
+import pkappargs
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
@@ -54,12 +55,15 @@ try:
                                          + "The Global Configuration is used unless a configuration file is specified.",
         parents= [
             config2.config_file_override,
-            config2.logging_level_override
+            config2.logging_level_override,
+            pkappargs.record_session_override,
         ]
     )
     args = arg_parser.parse_args()
     cfg = config2.process_config_args(args)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
+
+    record_filepath = pkappargs.record_filepath_from_args(args)
 
     log.set_logging_level(cfg.logging_level)
     log.debug("MKOB: Logging level: {}".format(cfg.logging_level))
@@ -70,7 +74,7 @@ try:
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
     # Our content
-    mkobwin = MKOBWindow(root, MKOB_VERSION_TEXT, cfg)
+    mkobwin = MKOBWindow(root, MKOB_VERSION_TEXT, cfg, record_filepath)
 
     # Set a minsize for the window, and place it in the middle
     root.update()
@@ -81,8 +85,8 @@ try:
         mkw.print_hierarchy(root)
 
     # Schedule a couple things to run after we have entered the main loop.
-    root.after(300, mkobwin.set_minimum_sizes)
-    root.after(600, mkobwin.on_app_started)
+    root.after(100, mkobwin.set_minimum_sizes)
+    root.after(800, mkobwin.on_app_started)
     #
     root.mainloop()
     destoy_on_exit = False  # App is already destoyed at this point

@@ -482,7 +482,7 @@ class StatusBar:
         return
 
 class MKOBWindow:
-    def __init__(self, root, mkob_version_text, cfg: Config) -> None:
+    def __init__(self, root, mkob_version_text, cfg: Config, record_filepath: Optional[str]=None) -> None:
 
         self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
@@ -503,6 +503,8 @@ class MKOBWindow:
         self._twpm = cfg.text_speed
         self._spacing = cfg.spacing
         self._ignore_morse_setting_change = False
+        ## passed in
+        self._record_filepath = record_filepath
 
         # Pointers for other modules
         self._krdr = MKOBReader(self)
@@ -1059,7 +1061,7 @@ class MKOBWindow:
         # Set to disconnected state
         self.connected(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._record_filepath)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()

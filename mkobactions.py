@@ -66,7 +66,11 @@ class MKOBActions():
 
     def doFilePlay(self):
         log.debug("Play a file...")
-        pf = fd.askopenfilename(title='Select KOB Recording', filetypes=[('KOB Recording','*.json')])
+        pf = fd.askopenfilename(title='Select KOB Recording', 
+                filetypes=[
+                    ("KOB Recording", recorder.PYKOB_RECORDING_EXT),
+                    ("Recording JSON", ".json")
+                ])
         if pf:
             self._km.recording_play(pf)
         self._kw.give_keyboard_focus()

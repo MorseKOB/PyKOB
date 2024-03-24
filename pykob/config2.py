@@ -54,6 +54,11 @@ VERSION = "2.0.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
 def add_ext_if_needed(s: str) -> str:
+    """
+    Add the PyKOB Configuration file extension if needed.
+
+    Adds '.pkcfg' to the string argument if it doesn't already end with it.
+    """
     if s and not s.endswith(PYKOB_CFG_EXT):
         return (s + PYKOB_CFG_EXT)
     return s
@@ -125,7 +130,7 @@ class Config:
         self._auto_connect: bool = False
         self._p_auto_connect: bool = False
         self._logging_level: int = 0
-        self._p_debug_level: int = 0
+        self._p_logging_level: int = 0
         self._local: bool = True
         self._p_local: bool = True
         self._remote: bool = True
@@ -169,7 +174,7 @@ class Config:
             config._MIN_CHAR_SPEED_KEY: self._set_min_char_speed,
             config._SPACING_KEY: self._set_spacing,
             config._TEXT_SPEED_KEY: self._set_text_speed,
-            config._LOGGING_LEVEL_KEY: self._set_debug_level
+            config._LOGGING_LEVEL_KEY: self._set_logging_level
         }
         #
         # Listeners is a dictionary of Callable(int) keys and int (ChangeType...) values.
@@ -558,17 +563,17 @@ class Config:
             self._changed_ops()
         return
 
-    def _set_debug_level(self, v: int) -> None:
+    def _set_logging_level(self, v: int) -> None:
         self.logging_level = v
         return
 
     @property
-    def debug_level_p(self) -> int:
-        return self._p_debug_level
+    def logging_level_p(self) -> int:
+        return self._p_logging_level
 
     @property
-    def debug_level_changed(self) -> bool:
-        return not self._logging_level == self._p_debug_level
+    def logging_level_changed(self) -> bool:
+        return not self._logging_level == self._p_logging_level
 
     @property
     def local(self) -> bool:
@@ -717,7 +722,7 @@ class Config:
         self._p_text_speed = self._text_speed
         # Operational Settings
         self._p_auto_connect = self._auto_connect
-        self._p_debug_level = self._logging_level
+        self._p_logging_level = self._logging_level
         self._p_local = self._local
         self._p_remote = self._remote
         self._p_server_url = self._server_url
@@ -803,7 +808,7 @@ class Config:
             ct = ct | ChangeType.OPERATIONS
         if self.wire_changed:
             ct = ct | ChangeType.OPERATIONS
-        if self.debug_level_changed:
+        if self.logging_level_changed:
             ct = ct | ChangeType.OPERATIONS
         return ct
 
@@ -909,7 +914,7 @@ class Config:
         # Operational Settings
         if  not self._p_auto_connect == self._auto_connect:
             return True
-        if not self._p_debug_level == self._logging_level:
+        if not self._p_logging_level == self._logging_level:
             return True
         if not self._p_local == self._local:
             return True
@@ -1116,7 +1121,7 @@ class Config:
         self._text_speed = self._p_text_speed
         # Operational Settings
         self._auto_connect = self._p_auto_connect
-        self._logging_level = self._p_debug_level
+        self._logging_level = self._p_logging_level
         self._local = self._p_local
         self._remote = self._p_remote
         self._server_url = self._p_server_url
