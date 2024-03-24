@@ -28,15 +28,15 @@ config module
 Reads configuration information for the PyKOB modules and applications.
 
 Configuration/preference values are read/written to:
- Windows:
-  User: [user]\AppData\Roaming\pykob\config-[user].ini
-  Machine: \ProgramData\pykob\config_app.ini
- Mac:
-  User: ~/.pykob/config-[user].ini
-  Machine: ~/.pykob/config_app.ini
- Linux:
-  User: ~/.pykob/config-[user].ini
-  Machine: ~/.pykob/config_app.ini
+    Windows:
+        User: [user]\AppData\Roaming\pykob\config-[user].ini
+        Machine: \ProgramData\pykob\config_app.ini
+    Mac:
+        User: ~/.pykob/config-[user].ini
+        Machine: ~/.pykob/config_app.ini
+    Linux:
+        User: ~/.pykob/config-[user].ini
+        Machine: ~/.pykob/config_app.ini
 
 The files are INI format with the values in a section named "PYKOB".
 
@@ -71,9 +71,9 @@ class CodeType(IntEnum):
 
 @unique
 class InterfaceType(IntEnum):
-    key_sounder = 1
-    loop = 2
-    keyer = 3
+    key_sounder = 1     # Separate Key & Sounder
+    loop = 2            # Key and Sounder in series
+    keyer = 3           # Dit-Dah Paddle and separate (or no) Sounder
 
 # Application name
 _APP_NAME = "pykob"

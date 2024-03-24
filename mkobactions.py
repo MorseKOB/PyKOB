@@ -191,7 +191,6 @@ class MKOBActions():
             if self._km.Player and not self._km.Player.playback_state == recorder.PlaybackState.idle:
                 return
         self._km.toggle_connect()
-        self._kw.connected(self._km.connected)
         return
 
     ####

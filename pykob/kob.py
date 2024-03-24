@@ -25,20 +25,30 @@ SOFTWARE.
 """
 kob module
 
-Handles external key and/or sounder and the virtual sounder (computer audio).
+Handles external key, kob, sounder, keyer/paddle and the virtual sounder
+(computer audio).
 
 The interface type controls certain aspects of how the physical sounder is driven.
 See the table in the documents section for the different modes/states the physical
 and synth sounders are in based on the states of the closers (key and virtual).
 
-Also used to appropriately spend time based on the code being sounded,
-even if no hardware or synth is being used.
+A keyer/paddle acts as a bug (key) with a separate sounder (not a KOB).
+The keyer/paddle has 3 states:
+    1. Idle
+    2. Send dits
+    3. Send dah (until state changes to Idle or Send dits)
+A method is also provided to change the state from other sources, for example the
+keyboard. Note that a keyer/paddle will not have closer, and therefore, the
+virtual closer will need to be used.
+
+The `sound_code` method can also be used to appropriately spend time based on the
+code being sounded without causing any sound to be produced.
 
 """
 import sys
 import time
 from enum import Enum, IntEnum, unique
-from pykob import config, log
+from pykob import config, log, morse
 from pykob.config import AudioType, InterfaceType
 import threading
 from threading import Event, RLock, Thread
@@ -67,6 +77,13 @@ class HWInterface(IntEnum):
     NONE = 0
     GPIO = 1
     SERIAL = 2
+
+@unique
+class KeyerMode(IntEnum):
+    IDLE = 0
+    DITS = 1
+    DAH  = 2
+
 
 SLC_BITS = 0x10  # Bits in ...Mode that signify that local code (not from key) should be sounded.
 @unique
@@ -136,17 +153,18 @@ class KOB:
         (2, 3)      # WC  & NLC | WC  & LC
     )
 
+    
     def __init__(
             self, interfaceType:InterfaceType=InterfaceType.loop, portToUse:Optional[str]=None,
             useGpio:bool=False, useAudio:bool=False, audioType:AudioType=AudioType.SOUNDER, useSounder:bool=False, invertKeyInput:bool=False, soundLocal:bool=True, sounderPowerSaveSecs:int=0,
                     virtual_closer_in_use: bool = False, err_msg_hndlr=None, keyCallback=None):
         """
-        When code is not running, the physical sounder (if connected) is not enabled, so
-        set the initial state flags accordingly.
+        When PyKOB code is not running, the physical sounder (if connected) is not powered by
+        a connected interface, so set the initial state flags accordingly.
 
         Initialize the hardware and update the flags and mode.
         """
-        self._interface_type:InterfaceType = interfaceType
+        self._interface_type:InterfaceType = interfaceType # Loop, K&S, Keyer/Paddle (K&S and Keyer are mostly the same)
         self._invert_key_input:bool = invertKeyInput
         self._err_msg_hndlr = err_msg_hndlr if err_msg_hndlr else log.warn  # Function that can take a string
         self._port_to_use:str = portToUse
@@ -161,12 +179,22 @@ class KOB:
         self._shutdown: Event = Event()
         self._hw_interface:HWInterface = HWInterface.NONE
         self._gpio_key_read = None
+        self._gpio_pdl_dah = None
         self._gpio_sndr_drive = None
         self._port = None
-        self._serial_key_read = self.__read_dsr  # Assume key is on DSR. Changed in HW Init if needed.
+        self._serial_key_read = self.__read_nul  # Read a NUL key. Changed in HW Init if interface is configured.
+        self._serial_pdl_dah = self.__read_nul   # Read a NUL paddle dah (dash).
         self._audio = None
+        self._paddle_is_supported = False        # Set in HW Init if possible.
         self._audio_guard: RLock = RLock()
+        self._keyer_mode_guard: RLock = RLock()
         self._sounder_guard: RLock = RLock()
+        #
+        now = time.time()
+        self._keyer_mode: tuple[KeyerMode,CodeSource] = (KeyerMode.IDLE, CodeSource.key)
+        self._keyer_dit_len: int = morse.Sender.DOT_LEN_20WPM
+        self._t_keyer_mode_change: float = now  # time of last keyer mode change during processing
+        self._keyer_dits_down: bool = False
         #
         self._key_closer_is_open: bool = True
         self._virtual_closer_is_open: bool = True
@@ -185,8 +213,9 @@ class KOB:
         #
         self._key_callback = None # Set to the passed in value once we establish an interface
         #
-        self._thread_keyread = None
-        self._thread_powersave = None
+        self._thread_keyer: Optional[Thread] = None
+        self._thread_keyread: Optional[Thread] = None
+        self._thread_powersave: Optional[Thread] = None
         self._threadsStop: Event = Event()
         #
         self._key_state_last_closed = False
@@ -262,11 +291,14 @@ class KOB:
             if gpio_module_available:
                 try:
                     self._gpio_key_read = gpio_button(21, pull_up=True)  # GPIO21 is key input.
+                    self._gpio_pdl_dah = gpio_button(20, pull_up=True)   # GPIO20 is paddle-dah (dash).
                     self._gpio_sndr_drive = gpio_led(26)  # GPIO26 used to drive sounder.
                     self._hw_interface = HWInterface.GPIO
+                    self._paddle_is_supported = True
                     log.info("The GPIO interface is available/active and will be used.")
                 except:
                     self._hw_interface = HWInterface.NONE
+                    self._paddle_is_supported = False
                     self._err_msg_hndlr(
                         "Interface for key and/or sounder on GPIO not available. GPIO key/sounder will not function."
                     )
@@ -279,6 +311,7 @@ class KOB:
                     self.__read_dsr()
                     # Check for loopback - The PyKOB interface loops-back data to identify itself. It uses CTS for the key.
                     self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
+                    self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
                     self._hw_interface = HWInterface.SERIAL
                     log.info("The serial interface is available/active and will be used.")
                     self._port.write(b"PyKOB\n")
@@ -286,11 +319,16 @@ class KOB:
                     indata = self._port.readline()
                     if indata == b"PyKOB\n":
                         self._serial_key_read = self.__read_cts  # Use CTS to read the key
+                        self._serial_pdl_dah = self.__read_nul   # Paddle Dah/Dash cannot be supported
+                        self._paddle_is_supported = False
                         log.info("KOB Serial Interface is 'minimal' type (key on CTS).")
                     else:
-                        log.info("KOB Serial Interface is 'full' type (key on DSR).")
+                        self._paddle_is_supported = True
+                        log.info("KOB Serial Interface is 'full' type (key/pdl-dit on DSR, pdl-dah on CTS).")
                 except Exception as ex:
                     self._hw_interface = HWInterface.NONE
+                    self._serial_key_read = self.__read_nul
+                    self._serial_pdl_dah = self.__read_nul
                     self._err_msg_hndlr(
                         "Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use)
                     )
@@ -308,16 +346,20 @@ class KOB:
         return
 
     def __read_cts(self) -> bool:
-        v = True
+        v = False
         if self._port:
             v = self._port.cts
         return v
 
     def __read_dsr(self) -> bool:
-        v = True
+        v = False
         if self._port:
             v = self._port.dsr
         return v
+
+    def __read_nul(self) -> bool:
+        """ Always returns False """
+        return False
 
     def __restart_hw_processing(self) -> None:
         """
@@ -336,6 +378,9 @@ class KOB:
         if not self._shutdown.is_set() and self._hw_is_available():
             self._threadsStop.clear()
             self.power_save(False)
+            if not self._thread_keyer:
+                self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body)
+                self._thread_keyer.start()
             if self._key_callback:
                 if not self._thread_keyread:
                     self._thread_keyread = Thread(name="KOB-KeyRead", target=self._thread_keyread_body)
@@ -353,6 +398,35 @@ class KOB:
             self._thread_powersave.join(timeout=2.0)
         self._thread_keyread = None
         self._thread_powersave = None
+        return
+
+    def _thread_keyer_body(self):
+        """
+        Called by the Keyer thread `run` to send automated dits/dah based on the mode.
+        """
+                # # Create the code tuple to send
+                # idle_time = int((self._t_vkey_last_change - self._t_vkey_llast_change) * 1000)
+                # if idle_time > MKOBKeyboard.MAX_VKEY_IDLE_TIME:
+                #     idle_time = MKOBKeyboard.MAX_VKEY_IDLE_TIME
+                # down_time = int((now - self._t_vkey_last_change) * 1000) - MKOBKeyboard.VKEY_OVERHEAD_TIME
+                # self._t_vkey_last_change = now
+                # code = (-idle_time, down_time)
+                # self._km.from_keyboard_vkey(code, False)
+                # # Update the flags
+                # self._vkey_send_state = VKSendState.IDLE
+                # self._in_key_press.clear()
+        last_state = KeyerMode.IDLE  # Used to key track of what was last done
+        while not self._threadsStop.is_set() and not self._shutdown.is_set():
+            code = self.keyer()
+            if len(code) > 0:
+                if code[-1] == 1: # special code for closer/circuit closed
+                    self._set_key_closer_open(False)
+                elif code[-1] == 2: # special code for closer/circuit open
+                    self._set_key_closer_open(True)
+                if self._key_callback and not self._threadsStop.is_set():
+                    self._key_callback(code)
+            self._threadsStop.wait(0.001)
+        log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
     def _thread_keyread_body(self):
@@ -584,9 +658,22 @@ class KOB:
         return
 
     @property
+    def keyer_dit_len(self) -> int:
+        return self._keyer_dit_len
+    @keyer_dit_len.setter
+    def keyer_dit_len(self, dit_len:int):
+        self._keyer_dit_len = dit_len
+        return
+
+    @property
+    def keyer_mode(self) -> tuple[KeyerMode,CodeSource]:
+        with self._keyer_mode_guard:
+            return self._keyer_mode
+        pass
+
+    @property
     def message_receiver(self):
         return self._err_msg_hndlr
-
     @message_receiver.setter
     def message_receiver(self, f):
         self._err_msg_hndlr = f if not f is None else log.warn
@@ -716,13 +803,13 @@ class KOB:
             self._gpio_sndr_drive = None
         return
 
-    def key(self):
+    def key(self) -> tuple[int,...]:
         '''
         Process input from the key and return a code sequence.
         '''
-        if self._shutdown.is_set():
-            return
         code = ()  # Start with empty sequence
+        if self._shutdown.is_set():
+            return code
         while not self._threadsStop.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
             try:
@@ -762,6 +849,80 @@ class KOB:
             self._threadsStop.wait(0.005)
         return code
 
+    def keyer(self) -> tuple[int,...]:
+        '''
+        generate and return a code sequence based on the current and changes to
+        the keyer_mode.
+        '''
+        code = ()  # Start with empty sequence
+        if self._shutdown.is_set():
+            return code
+        km1 = self.keyer_mode  # Use the property to employ the guard
+        drive_sounder = ((self._sounder_mode == SounderMode.FK) or
+                        (self._sounder_mode == SounderMode.SLC) or
+                        (self._synth_mode == SynthMode.FK) or
+                        (self._synth_mode == SynthMode.SLC))
+        while not self._threadsStop.is_set():
+            km = self.keyer_mode
+            t = time.time()
+            if km[0] == km1[0] and km[0] == KeyerMode.DITS:
+                # Still generating dits
+                if drive_sounder:
+                    self.energize_sounder(self._keyer_dits_down, km[1])
+                self._threadsStop.wait(self.keyer_dit_len / 1000)
+                klen = self.keyer_dit_len if self._keyer_dits_down else -self.keyer_dit_len
+                code += (klen,)
+                self._keyer_dits_down = not self._keyer_dits_down
+                t = time.time()
+            elif km[0] != km1[0]:  # Mode changed?
+                km2 = km1  # We'll need to know if it was DITS
+                km1 = km
+                dt = self.keyer_dit_len if km2[0] == KeyerMode.DITS else (int((t - self._t_keyer_mode_change) * 1000) - 8)
+                self._t_keyer_mode_change = t
+                #
+                # Drive the sounder based on the mode.
+                #
+                if km[0] == KeyerMode.DITS:
+                    # Start generating dits...
+                    self._keyer_dits_down = True
+                else:  # DAH or IDLE
+                    self._keyer_dits_down = False
+                    if drive_sounder:
+                        energize = km[0] == KeyerMode.DAH
+                        self.energize_sounder(energize, CodeSource.key)
+                if km[0] == KeyerMode.IDLE:
+                    if self._circuit_is_closed:
+                        code += (-dt, +2)  # unlatch closed circuit
+                        self._circuit_is_closed = False
+                        return code
+                    elif km2[0] == KeyerMode.DITS:
+                        return code
+                    else:
+                        code += (dt,)
+                else:  # DITS or DAH
+                    code += (-dt,)
+            if km[0] == KeyerMode.IDLE and code and t > self._t_keyer_mode_change + CODESPACE:
+                return code
+            if km[0] == KeyerMode.DAH and not self._circuit_is_closed and t > self._t_keyer_mode_change + CKTCLOSE:
+                code += (+1,)  # latch circuit closed
+                self._circuit_is_closed = True
+                return code
+            if len(code) >= 50:  # code sequences can't have more than 50 elements
+                return code
+            if km[0] == KeyerMode.IDLE:
+                self._threadsStop.wait(0.001)
+        return code
+
+    def keyer_mode_set(self, mode: KeyerMode, source: CodeSource):
+        """
+        Set the keyer mode. 
+        """
+        km:tuple[KeyerMode,CodeSource] = (mode, source)
+        log.debug("kob.keyer_mode_set {}->{}".format(self._keyer_mode, km), 3)
+        with self._keyer_mode_guard:
+            self._keyer_mode = km
+        return
+
     def power_save(self, enable: bool):
         """
         True to turn off the sounder power to save power (reduce risk of fire, etc.)
@@ -770,8 +931,8 @@ class KOB:
         if self._shutdown.is_set():
             return
         if enable and (
-            self._sounder_mode == SounderMode.DIS or 
-            self._sounder_mode == SounderMode.EFK or 
+            self._sounder_mode == SounderMode.DIS or
+            self._sounder_mode == SounderMode.EFK or
             self._sounder_mode == SounderMode.FK):
             return
         if enable == self._power_saving:
@@ -792,7 +953,7 @@ class KOB:
 
     def shutdown(self):
         """
-        Initiate shutdown of our operations (and don't start anything new), 
+        Initiate shutdown of our operations (and don't start anything new),
         but DO NOT BLOCK.
         """
         self._shutdown.set()

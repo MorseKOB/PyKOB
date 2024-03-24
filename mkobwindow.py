@@ -730,7 +730,7 @@ class MKOBWindow:
         self._spnWireNo = ttk.Spinbox(
             fm_wire_connect,
             style="MK.TSpinbox",
-            from_=1,
+            from_=0,
             to=32000,
             width=7,
             format="%1.0f",
@@ -946,6 +946,12 @@ class MKOBWindow:
     def _handle_connect_pressed(self, *args):
         if self._shutdown.is_set():
             return
+        if self._after_hwc:
+            # There is a wire change pending. Process it before handling connect
+            self._root.after_cancel(self._after_hwc)
+            self._handle_wire_change_delayed()
+            self._root.after(10, self._handle_connect_pressed)
+            return
         self._ka.doConnect()
         self.give_keyboard_focus()
         return
@@ -1008,7 +1014,9 @@ class MKOBWindow:
             return
         if self._after_hwc:
             self._root.after_cancel(self._after_hwc)
-        self._after_hwc = self._root.after(1200, self._handle_wire_change_delayed)
+        # Wait quite a while, as this changed by the user, and we want to allow
+        # time for multiple increase/decrease changes or for typing.
+        self._after_hwc = self._root.after(1800, self._handle_wire_change_delayed)
         return
 
     def _handle_text_speed_change_delayed(self, *args):
@@ -1059,7 +1067,7 @@ class MKOBWindow:
         if self._shutdown.is_set():
             return
         # Set to disconnected state
-        self.connected(False)
+        self.connected_set(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
         self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._record_filepath)
         self._ka.start(self._km, self._kkb)
@@ -1210,7 +1218,19 @@ class MKOBWindow:
         self.status_msg = ""
         return
 
-    def connected(self, connected):
+    def connect_enable(self, enable:bool):
+        """
+        Enable/disable the 'Connect' button.
+
+        Disable is only allowed if current state is 'not connected'.
+        """
+        if not enable and not self._connect_indicator.connected:
+            self._btnConnect.config(state=tk.DISABLED)
+        elif enable:
+            self._btnConnect.config(state=tk.NORMAL)
+        return
+
+    def connected_set(self, connected):
         """
         Fill the connected indicator and change the button label based on state.
         """

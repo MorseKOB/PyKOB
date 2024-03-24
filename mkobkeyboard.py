@@ -34,27 +34,16 @@ from typing import Optional
 HIGHLIGHT = 'highlight'
 MARK_SEND = 'send'
 
-@unique
-class VKSendState(IntEnum):
-    """
-    The state of the Virtual Key (controlled by the cursor left/right keys)
-    """
-    IDLE = 0
-    DITS = 1
-    DAH  = 2
-
 class MKOBKeyboard():
     """
     kobkeyboard.py
 
-    Text area used to send code from the keyboard.
+    Text area used to send code from the keyboard. Provides a virtual keyer using the
+    Left and Right cursor keys (when used with CTRL and the key is open).
 
     Calls to the 'handle_' methods should be made on the main GUI thread as a result
     of the GUI handling message events.
     """
-
-    MAX_VKEY_IDLE_TIME = 3000
-    VKEY_OVERHEAD_TIME = 15
 
     def __init__(self, mkactions, mkwindow) -> None:
         self._kw = mkwindow
@@ -64,44 +53,9 @@ class MKOBKeyboard():
         self._repeat = False
         self._last_send_pos = 1.0
         self._in_key_press: Event = Event()
-        self._vkey_code = ()  # Tuple of key down/up ms values
-        self._vkey_send_state: VKSendState = VKSendState.IDLE
-        self._t_vkey_llast_change: float = time.time()  # time of last-last virtual key transition
-        self._t_vkey_last_change: float = time.time()  # time of last virtual key transition
         self._waiting_for_sent_code:Event = Event()
         self._send_guard:Lock = Lock()
-        self._dit_sender_thread:Thread = Thread(name="MKKeyboard-DitSender", target=self._dits_sender_run)
         self._shutdown: Event = Event()
-        return
-
-    def _dit_send_complete(self):
-        if self._vkey_send_state == VKSendState.DITS:
-            dot_len = self._km.Sender.dot_len
-            self._dit_send(dot_len)
-        return
-
-    def _dit_send(self, idle_time=-1):
-        if self._vkey_send_state == VKSendState.DITS:
-            now = time.time()
-            dot_len = self._km.Sender.dot_len
-            if idle_time < 0:
-                idle_time = int((now - self._t_vkey_llast_change) * 1000)
-                if idle_time > MKOBKeyboard.MAX_VKEY_IDLE_TIME:
-                    idle_time = MKOBKeyboard.MAX_VKEY_IDLE_TIME
-            self._t_vkey_llast_change = self._t_vkey_last_change
-            self._t_vkey_last_change = now
-            code = (-idle_time, dot_len)
-            self._km.from_keyboard_vkey(code, True, finished_callback=self._dit_send_complete)
-
-        return
-
-    def _dits_sender_run(self):
-        """
-        Dits Sender Thread - Run routine
-        """
-        while not self._shutdown.is_set():
-            self._shutdown.wait(0.01)
-            pass
         return
 
     def _keyboard_send_complete(self):
@@ -122,13 +76,15 @@ class MKOBKeyboard():
             return  # Do normal processing if the Virtual Key is closed
         if ((event.type == EventType.KeyPress and not self._in_key_press.is_set())
             or (event.type == EventType.KeyRelease and self._in_key_press.is_set())):
+            kob_: Optional[kob.KOB] = self._km.Kob
             if event.type == EventType.KeyPress:
                 self._in_key_press.set()
-                self._vkey_send_state = VKSendState.DITS
-                self._dit_send()
+                if not kob_ is None:
+                    kob_.keyer_mode_set(kob.KeyerMode.DITS, kob.CodeSource.keyboard)
             else:
-                self._vkey_send_state = VKSendState.IDLE
                 self._in_key_press.clear()
+                if not kob_ is None:
+                    kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
             log.debug("KB ctrl-curlf: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
@@ -141,25 +97,12 @@ class MKOBKeyboard():
             kob_: Optional[kob.KOB] = self._km.Kob
             if event.type == EventType.KeyPress:
                 self._in_key_press.set()
-                self._vkey_send_state = VKSendState.DAH
-                self._t_vkey_llast_change = self._t_vkey_last_change
-                self._t_vkey_last_change = now
                 if not kob_ is None:
-                    kob_.energize_sounder(True, kob.CodeSource.keyboard)
+                    kob_.keyer_mode_set(kob.KeyerMode.DAH, kob.CodeSource.keyboard)
             else:
-                if not kob_ is None:
-                    kob_.energize_sounder(False, kob.CodeSource.keyboard)
-                # Create the code tuple to send
-                idle_time = int((self._t_vkey_last_change - self._t_vkey_llast_change) * 1000)
-                if idle_time > MKOBKeyboard.MAX_VKEY_IDLE_TIME:
-                    idle_time = MKOBKeyboard.MAX_VKEY_IDLE_TIME
-                down_time = int((now - self._t_vkey_last_change) * 1000) - MKOBKeyboard.VKEY_OVERHEAD_TIME
-                self._t_vkey_last_change = now
-                code = (-idle_time, down_time)
-                self._km.from_keyboard_vkey(code, False)
-                # Update the flags
-                self._vkey_send_state = VKSendState.IDLE
                 self._in_key_press.clear()
+                if not kob_ is None:
+                    kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
             log.debug("KB ctrl-currt: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
@@ -256,8 +199,6 @@ class MKOBKeyboard():
 
     def exit(self):
         self.shutdown()
-        if self._dit_sender_thread.is_alive():
-            self._dit_sender_thread.join()
         return
 
     def handle_clear(self, event_data=None):
@@ -352,6 +293,5 @@ class MKOBKeyboard():
         self.original_mark = redirector.register("mark", self._on_mark)
         self._kw.keyboard_win.mark_set(MARK_SEND, '1.0')
         self._kw.keyboard_win.mark_gravity(MARK_SEND, "left")
-        self._dit_sender_thread.start()
         self._ka.trigger_keyboard_send()
         return

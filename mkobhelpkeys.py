@@ -69,26 +69,30 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree.insert("", tk.END, values=("Next (Pg-Down)", "Decrease speed"))
         self._tree.insert("", tk.END, values=("Prior (Pg-Up)", "Increase speed"))
         #
-        self._tree.insert("", tk.END, values=("------", "-- Keyboard Code Sender (within text) --"))
+        self._tree.insert("", tk.END, values=("----------", "-- Keyboard Code Sender (within text) --"))
         self._tree.insert("", tk.END, values=("~", "Open the key"))
         self._tree.insert("", tk.END, values=("+", "Close the key"))
         #
-        self._tree.insert("", tk.END, values=("------", "-- Playback Control --"))
+        self._tree.insert("", tk.END, values=("----------", "-- Keyer (Active when key is open) --"))
+        self._tree.insert("", tk.END, values=("Ctrl+LEFT", "Dits"))
+        self._tree.insert("", tk.END, values=("Ctrl+RIGHT", "Dah (key down while pressed)"))
+        #
+        self._tree.insert("", tk.END, values=("----------", "-- Recording Playback Control --"))
         self._tree.insert("", tk.END, values=("Ctrl+S", "Stop recording playback"))
         self._tree.insert(
-            "", tk.END, values=("Ctrl+P", "Pause/Resume recording playback")
+            "", tk.END, values=("Ctrl+P", "Pause/Resume playback")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+H", "Move playback back 15 seconds")
+            "", tk.END, values=("Ctrl+H", "Move back 15 seconds")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+L", "Move playback forward 15 seconds")
+            "", tk.END, values=("Ctrl+L", "Move forward 15 seconds")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+J", "Move playback to start of current sender")
+            "", tk.END, values=("Ctrl+J", "Move to start of current sender")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+K", "Move playback to end of current sender")
+            "", tk.END, values=("Ctrl+K", "Move to end of current sender")
         )
 
         self._tree.grid(row=0, column=0, sticky=(N, E, S, W))
