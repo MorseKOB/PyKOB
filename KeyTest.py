@@ -32,6 +32,7 @@ import sys
 from pykob import kob
 from pykob import config
 
+myKOB = None
 try:
     port = config.serial_port
     use_gpio = config.gpio
@@ -44,7 +45,8 @@ try:
     while True:
         print(myKOB.key())
 except KeyboardInterrupt:
-    myKOB.exit()
+    if myKOB:
+        myKOB.exit()
     print()
     print("Thank you for using the Key-Test!\n~73")
     sys.exit(0)     # Indicate this was a normal exit
