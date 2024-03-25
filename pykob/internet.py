@@ -279,8 +279,15 @@ class Internet:
                             if oe.errno == 57:
                                 # Generated on shutdown if the socket isn't connected
                                 pass
+                            elif oe.errno == 107:
+                                # Generated on shutdown if transport endpoint isn't connected
+                                pass
                             else:
-                                raise oe
+                                log.debug("internet.disconnect - OSError: {}:{}".format(oe.errno, oe.strerror))
+                                pass
+                        except Exception as ex:
+                            log.debug("internet.disconnect - {}".format(ex))
+                            pass
                         pass
                 log.debug("internet.disconnect -   socketWRGuard-release", 7)
             finally:

@@ -179,7 +179,7 @@ class Mrt:
         self._internet_station_active = False  # True if a remote station is sending
         self._last_received_para = False # The last character received was a Paragraph ('=')
         self._local_loop_active = False  # True if sending on key or keyboard
-        self._our_office_id = cfg.station
+        self._our_office_id = cfg.station if not cfg.station is None else ""
         self._sender_current = ""
 
         self._exit_status = 1
