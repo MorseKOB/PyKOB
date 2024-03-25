@@ -517,6 +517,13 @@ class MKOBWindow:
         self._root.withdraw()
         self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
 
+        self._ttk_style = ttk.Style()  # Set the style in use
+        log.debug("Themes available: {}".format(self._ttk_style.theme_names()))
+        self._ttk_style.theme_use("classic")
+        self._ttk_style.configure("Reader.TFrame")  # Style used by our Reader Window
+        self._ttk_style.configure("Sender.TFrame")  # Style used by our Sender.Window
+        self._ttk_style.configure("TSpinbox", padding=(1, 1, 6, 1))
+
         # The main (visible) window
         self._window = ttk.Frame(root)
 
@@ -651,8 +658,6 @@ class MKOBWindow:
         )
 
         # Reader (top left)
-        style_reader = ttk.Style()
-        style_reader.configure("Reader.TFrame")
         fm_reader = ttk.Frame(self._pw_topbottom_lf, style="Reader.TFrame", padding=2)
         self._txtReader = tkst.ScrolledText(
             fm_reader,
@@ -665,8 +670,6 @@ class MKOBWindow:
         )
         # Code Sender w/controls (bottom left)
         ## Sender  w/controls
-        style_sender = ttk.Style()
-        style_sender.configure("Sender.TFrame")
         fm_sender_pad = ttk.Frame(self._pw_topbottom_lf, style="Sender.TFrame", padding=4)
         fm_sender = ttk.Frame(fm_sender_pad, borderwidth=2, relief="groove")
         self._txtKeyboard = tkst.ScrolledText(
@@ -694,10 +697,6 @@ class MKOBWindow:
         # Stations Connected | Office | Closer & Speed | Wire/Connect
         #  (right)
         self._fm_right = ttk.Frame(self._pw_left_right)
-        style_spinbox = ttk.Style()  # Add padding around the spinbox entry fields to move the text away from the arrows
-        style_spinbox.configure(
-            "MK.TSpinbox", padding=(1, 1, 6, 1)
-        )  # padding='W N E S'
         ## Station list
         self._txtStnList = tkst.ScrolledText(
             self._fm_right,

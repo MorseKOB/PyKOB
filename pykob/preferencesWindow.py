@@ -42,6 +42,9 @@ class PreferencesWindow:
         self._quitOnExit = quitWhenDismissed
         self._cfg = cfg
 
+        self.ttk_style = ttk.Style()  # Make the lines taller for Linux
+        self.ttk_style.configure("TSpinbox", padding=(1,1,6,1)) # padding='W N E S'
+
         self._allowApply = allowApply  # If True, provide an 'Apply' button and change 'OK' to 'Save'
         self._saveIfRequested = saveIfRequested
         self._apply_pressed = False
@@ -315,10 +318,6 @@ class PreferencesWindow:
         codeOptions = ttk.LabelFrame(code_prefs, text=" Code Options")
 
         ttk.Label(codeOptions, text="Speed (WPM) and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
-
-        # Customize the TSpinbox style to add some padding between the entry and the arrows.
-        style_spinbox = ttk.Style()
-        style_spinbox.configure('MK.TSpinbox', padding=(1,1,6,1)) # padding='W N E S'
 
         ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
         self._dotSpeed = tk.DoubleVar(value=self._cfg.min_char_speed)
