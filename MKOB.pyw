@@ -50,9 +50,9 @@ destoy_on_exit = True
 mkobwin: MKOBWindow = None
 try:
     arg_parser = argparse.ArgumentParser(description="Morse KOB application. This provides a full graphical interface to "
-                                         + "send and receive Morse over the internet, "
-                                         + "as well as practice locally.\nFor a text-only (command line version), try 'MRT'. "
-                                         + "The Global Configuration is used unless a configuration file is specified.",
+            + "send and receive Morse over the internet, "
+            + "as well as practice locally.\nFor a text-only (command line version), try 'MRT'. "
+            + "The Global Configuration is used unless a configuration file is specified.",
         parents= [
             config2.config_file_override,
             config2.logging_level_override,

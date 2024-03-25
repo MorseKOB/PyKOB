@@ -39,6 +39,7 @@ from pykob.config2 import Config
 from pykob.internet import PORT_DEFAULT
 import mkobevents
 
+import platform
 import sys
 from threading import Event
 from tkinter import N, S, W, E, VERTICAL
@@ -197,7 +198,7 @@ class SenderControls:
             # style="MK.TSpinbox",
             from_=5,
             to=40,
-            borderwidth=4,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
@@ -517,9 +518,19 @@ class MKOBWindow:
         self._root.withdraw()
         self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
 
+        self._operating_system = platform.system()
+
         self._ttk_style = ttk.Style()  # Set the style in use
         log.debug("Themes available: {}".format(self._ttk_style.theme_names()))
-        self._ttk_style.theme_use("classic")
+        if self._operating_system == "Windows":
+            self._ttk_style.theme_use("vista")
+        elif self._operating_system == "Darwin":
+            self._ttk_style.theme_use("aqua")
+        elif self._operating_system == "Linux":
+            self._ttk_style.theme_use("classic")
+        else:
+            self._ttk_style.theme_use("classic")
+
         self._ttk_style.configure("Reader.TFrame")  # Style used by our Reader Window
         self._ttk_style.configure("Sender.TFrame")  # Style used by our Sender.Window
         self._ttk_style.configure("TSpinbox", padding=(1, 1, 6, 1))
@@ -734,7 +745,7 @@ class MKOBWindow:
             # style="MK.TSpinbox",
             from_=5,
             to=40,
-            borderwidth=4,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
@@ -757,7 +768,7 @@ class MKOBWindow:
             # style="MK.TSpinbox",
             from_=0,
             to=32000,
-            borderwidth=4,
+            borderwidth=2,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
