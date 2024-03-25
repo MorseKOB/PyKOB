@@ -192,14 +192,17 @@ class SenderControls:
         self._varTWPM = tk.StringVar()
         self._varTWPM.set(self._text_speed)
         self._varTWPM.trace_add("write", self._handle_txtspeed_change)
-        self._spnTWPM = ttk.Spinbox(
+        self._spnTWPM = tk.Spinbox(
             self.window,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=4,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._input_validator, "%P"),
             textvariable=self._varTWPM,
@@ -372,6 +375,7 @@ class StatusBar:
         self._mkm: Optional[MKOBMain] = None
         self._tkroot = self._mkwin.tkroot
         self._shutdown: Event = Event()
+        self._sndr_pwr_save_last: bool = False
 
         self.window = ttk.Frame(
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
@@ -389,21 +393,38 @@ class StatusBar:
     def _update_values(self) -> None:
         if self._shutdown.is_set():
             return
-        if not self._mkm is None:
-            if not self._mkm.Reader is None:
-                dspeed = self._mkm.Reader.detected_wpm
+        mkm = self._mkm
+        if not mkm is None:
+            reader = mkm.Reader
+            if not reader is None:
+                dspeed = reader.detected_wpm
                 self._d_speed[TEXT] = str(dspeed)
             else:
                 self._d_speed[TEXT] = ""
-            if not self._mkm.Internet is None:
-                host = self._mkm.Internet.host
-                port = self._mkm.Internet.port
+            inet = mkm.Internet
+            if not inet is None:
+                host = inet.host
+                port = inet.port
                 server = host
                 if not port == PORT_DEFAULT:
                     server += ":{}".format(port)
                 self._server[TEXT] = server
             else:
                 self._server[TEXT] = ""
+            kob_ = mkm.Kob
+            if not kob_ is None:
+                sndr_pwr_save = kob_.sounder_is_power_saving
+                if not sndr_pwr_save == self._sndr_pwr_save_last:
+                    self._sndr_pwr_save_last = sndr_pwr_save
+                    msg = "Sounder power save is on"
+                    if sndr_pwr_save:
+                        self._status_msg[TEXT] = msg
+                    elif self._status_msg[TEXT] == msg:
+                        # Clear our message, but not others
+                        self._status_msg[TEXT] = ""
+                    pass
+                pass
+            pass
         else:
             self._d_speed[TEXT] = ""
             self._server[TEXT] = ""
@@ -478,6 +499,9 @@ class StatusBar:
         if self._shutdown.is_set():
             return
         self._mkm = mkmain
+        if not mkmain is None:
+            if not mkmain.Kob is None:
+                self._sndr_pwr_save_last = mkmain.Kob.sounder_is_power_saving
         self._tkroot.after(1000, self._update_values)
         return
 
@@ -670,9 +694,7 @@ class MKOBWindow:
         # Stations Connected | Office | Closer & Speed | Wire/Connect
         #  (right)
         self._fm_right = ttk.Frame(self._pw_left_right)
-        style_spinbox = (
-            ttk.Style()
-        )  # Add padding around the spinbox entry fields to move the text away from the arrows
+        style_spinbox = ttk.Style()  # Add padding around the spinbox entry fields to move the text away from the arrows
         style_spinbox.configure(
             "MK.TSpinbox", padding=(1, 1, 6, 1)
         )  # padding='W N E S'
@@ -708,14 +730,18 @@ class MKOBWindow:
         self._varCWPM = tk.StringVar()
         self._varCWPM.set(cfg.min_char_speed)
         self._varCWPM.trace_add("write", self._handle_char_speed_change)
-        spnCWPM = ttk.Spinbox(
+        spnCWPM = tk.Spinbox(
             fm_closer_speed,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=4,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            relief="sunken",
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varCWPM,
@@ -727,14 +753,17 @@ class MKOBWindow:
         self._varWireNo = tk.StringVar()
         self._varWireNo.set(str(cfg.wire))
         self._varWireNo.trace_add("write", self._handle_wire_change)
-        self._spnWireNo = ttk.Spinbox(
+        self._spnWireNo = tk.Spinbox(
             fm_wire_connect,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=0,
             to=32000,
+            borderwidth=4,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=200,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varWireNo,

@@ -1070,7 +1070,7 @@ class MKOBMain:
             msgbox.showerror(title=self.app_ver, message=msg)
         return
 
-    def record_session(self, filepath: Optional[str], show_msgbox: bool=True):
+    def record_session(self, filepath: Optional[str] = None, show_msgbox: bool=True):
         """
         Start recording if not already started.
         """

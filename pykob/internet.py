@@ -174,7 +174,7 @@ class Internet:
                 self._current_sender = None  # clear the current sender so it will update
                 self.sendID()
                 self._shutdown.wait(10.0)  # send another keepalive sequence every ten seconds
-            self._shutdown.wait(1.0)  # don't hog CPU when we aren't connected
+            self._shutdown.wait(3.0)  # don't hog CPU when we aren't connected
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
         return

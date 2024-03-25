@@ -64,7 +64,7 @@ UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 class RawTerm:
     """
-    Sets the terminal to Raw Mode (but still w/CRNL on output) and provides a method to 
+    Sets the terminal to Raw Mode (but still w/CRNL on output) and provides a method to
     gets a single character.  Does not echo to the screen.
 
     This uses native calls on Windows and *nix (Linux and MacOS), and relies on
@@ -92,12 +92,13 @@ class RawTerm:
                 log.error("unable to get direct keyboard access (Linux:{})".format(ex))
         return
 
-    def getch(self) -> str: 
+    def getch(self) -> str:
         return self.impl._getch()
 
     def exit(self) -> None:
         self.impl._exit()
         return
+
 class _GetchUnix:
     """
     Get a single character from the standard input on *nix
@@ -126,6 +127,7 @@ class _GetchUnix:
     def _exit(self):
         import termios
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+        return
 
 class _GetchWindows:
     """
@@ -136,6 +138,7 @@ class _GetchWindows:
     def __init__(self):
         import msvcrt
         pass
+        return
 
     def _getch(self) -> str:
         import msvcrt
@@ -143,6 +146,7 @@ class _GetchWindows:
 
     def _exit(self):
         return
+
 class Mrt:
 
     def __init__(
@@ -237,6 +241,7 @@ class Mrt:
         self._thread_fsender = None
         if self._send_file_path:
             self._thread_fsender = Thread(name="File-send-thread", daemon=False, target=self._thread_fsender_body)
+        return
 
     def exit(self):
         print("\nClosing...")

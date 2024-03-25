@@ -404,18 +404,6 @@ class KOB:
         """
         Called by the Keyer thread `run` to send automated dits/dah based on the mode.
         """
-                # # Create the code tuple to send
-                # idle_time = int((self._t_vkey_last_change - self._t_vkey_llast_change) * 1000)
-                # if idle_time > MKOBKeyboard.MAX_VKEY_IDLE_TIME:
-                #     idle_time = MKOBKeyboard.MAX_VKEY_IDLE_TIME
-                # down_time = int((now - self._t_vkey_last_change) * 1000) - MKOBKeyboard.VKEY_OVERHEAD_TIME
-                # self._t_vkey_last_change = now
-                # code = (-idle_time, down_time)
-                # self._km.from_keyboard_vkey(code, False)
-                # # Update the flags
-                # self._vkey_send_state = VKSendState.IDLE
-                # self._in_key_press.clear()
-        last_state = KeyerMode.IDLE  # Used to key track of what was last done
         while not self._threadsStop.is_set() and not self._shutdown.is_set():
             code = self.keyer()
             if len(code) > 0:
@@ -425,7 +413,6 @@ class KOB:
                     self._set_key_closer_open(True)
                 if self._key_callback and not self._threadsStop.is_set():
                     self._key_callback(code)
-            self._threadsStop.wait(0.001)
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
@@ -690,6 +677,10 @@ class KOB:
         return
 
     @property
+    def sounder_is_power_saving(self) -> bool:
+        return self._power_saving
+
+    @property
     def sounder_power_save_secs(self) -> int:
         return self._sounder_power_save_secs
     @sounder_power_save_secs.setter
@@ -810,6 +801,11 @@ class KOB:
         code = ()  # Start with empty sequence
         if self._shutdown.is_set():
             return code
+        # The following 3 are used to slowing increase the sleep
+        # time if the key is idle. This is to reduce CPU usage.
+        no_change = 0
+        sleep_time = 0.001
+        sleep_bump = 0.005
         while not self._threadsStop.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
             try:
@@ -838,6 +834,15 @@ class KOB:
                     return code
                 else:
                     code += (dt,)
+                no_change = 0
+                sleep_time = 0.001
+                sleep_bump = 0.005
+            else:
+                if sleep_time < 0.025:
+                    no_change += 1
+                    if (no_change % 1000) == 0:
+                        sleep_time += sleep_bump  # if no changes for a while, slightly increase sleep
+                        sleep_bump += sleep_bump
             if not kc and code and t > self._t_key_last_change + CODESPACE:
                 return code
             if kc and not self._circuit_is_closed and t > self._t_key_last_change + CKTCLOSE:
@@ -846,7 +851,7 @@ class KOB:
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
-            self._threadsStop.wait(0.005)
+            self._threadsStop.wait(sleep_time)
         return code
 
     def keyer(self) -> tuple[int,...]:
@@ -858,11 +863,16 @@ class KOB:
         if self._shutdown.is_set():
             return code
         km1 = self.keyer_mode  # Use the property to employ the guard
-        drive_sounder = ((self._sounder_mode == SounderMode.FK) or
-                        (self._sounder_mode == SounderMode.SLC) or
-                        (self._synth_mode == SynthMode.FK) or
-                        (self._synth_mode == SynthMode.SLC))
+        # The following 3 are used to slowing increase the sleep
+        # time if the key is idle. This is to reduce CPU usage.
+        no_change = 0
+        sleep_time = 0.001
+        sleep_bump = 0.005
         while not self._threadsStop.is_set():
+            drive_sounder = ((self._sounder_mode == SounderMode.FK) or
+                            (self._sounder_mode == SounderMode.SLC) or
+                            (self._synth_mode == SynthMode.FK) or
+                            (self._synth_mode == SynthMode.SLC))
             km = self.keyer_mode
             t = time.time()
             if km[0] == km1[0] and km[0] == KeyerMode.DITS:
@@ -874,7 +884,7 @@ class KOB:
                 code += (klen,)
                 self._keyer_dits_down = not self._keyer_dits_down
                 t = time.time()
-            elif km[0] != km1[0]:  # Mode changed?
+            elif km[0] != km1[0]:  # Mode changed
                 km2 = km1  # We'll need to know if it was DITS
                 km1 = km
                 dt = self.keyer_dit_len if km2[0] == KeyerMode.DITS else (int((t - self._t_keyer_mode_change) * 1000) - 8)
@@ -901,6 +911,15 @@ class KOB:
                         code += (dt,)
                 else:  # DITS or DAH
                     code += (-dt,)
+                no_change = 0
+                sleep_time = 0.001
+                sleep_bump = 0.005
+            else:
+                if sleep_time < 0.030:
+                    no_change += 1
+                    if (no_change % 1000) == 0:
+                        sleep_time += sleep_bump  # if no changes for a while, slightly increase sleep
+                        sleep_bump += sleep_bump
             if km[0] == KeyerMode.IDLE and code and t > self._t_keyer_mode_change + CODESPACE:
                 return code
             if km[0] == KeyerMode.DAH and not self._circuit_is_closed and t > self._t_keyer_mode_change + CKTCLOSE:
@@ -910,7 +929,7 @@ class KOB:
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
             if km[0] == KeyerMode.IDLE:
-                self._threadsStop.wait(0.001)
+                self._threadsStop.wait(sleep_time)
         return code
 
     def keyer_mode_set(self, mode: KeyerMode, source: CodeSource):

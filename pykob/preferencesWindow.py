@@ -322,19 +322,34 @@ class PreferencesWindow:
 
         ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
         self._dotSpeed = tk.DoubleVar(value=self._cfg.min_char_speed)
-        self._dotSpeedControl = \
-            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
-                        command=self._dotSpeedChange,
-                        textvariable=self._dotSpeed)
+        self._dotSpeedControl = tk.Spinbox(codeOptions, 
+                # style='MK.TSpinbox', 
+                from_=1, 
+                to=99, 
+                borderwidth=4,
+                width=4, 
+                format="%2.f", 
+                justify=tk.RIGHT,
+                repeatdelay=700,
+                repeatinterval=300,
+                command=self._dotSpeedChange,
+                textvariable=self._dotSpeed)
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
 
         ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
         self._textSpeed = tk.DoubleVar(value=self._cfg.text_speed)
-        self._textSpeedControl = \
-            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,
-                        width=4, format="%2.f", justify=tk.RIGHT,
-                        command=self._codeSpeedChange,
-                        textvariable=self._textSpeed)
+        self._textSpeedControl = tk.Spinbox(codeOptions, 
+                # style='MK.TSpinbox', 
+                from_=5, 
+                to=40,
+                borderwidth=3,
+                width=4, 
+                format="%2.f", 
+                justify=tk.RIGHT,
+                repeatdelay=700,
+                repeatinterval=300,
+                command=self._codeSpeedChange,
+                textvariable=self._textSpeed)
         self._textSpeedControl.grid(row=1, column=4, padx=(4,10), sticky=tk.W)
 
         # Create three Radiobuttons using one IntVar for the character spacing options
@@ -389,14 +404,17 @@ class PreferencesWindow:
         if not lll == cll:
             self._cfg.logging_level = ll
         self._varLoggingLevel.set(ll)
-        self._spnLogLevel = ttk.Spinbox(
+        self._spnLogLevel = tk.Spinbox(
             loggingOptions,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=log.LOGGING_MIN_LEVEL,
             to=99999,
+            borderwidth=4,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             textvariable=self._varLoggingLevel,
         ).grid(row=0, column=1, padx=1)
