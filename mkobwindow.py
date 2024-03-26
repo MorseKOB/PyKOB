@@ -39,6 +39,7 @@ from pykob.config2 import Config
 from pykob.internet import PORT_DEFAULT
 import mkobevents
 
+import platform
 import sys
 from threading import Event
 from tkinter import N, S, W, E, VERTICAL
@@ -192,14 +193,17 @@ class SenderControls:
         self._varTWPM = tk.StringVar()
         self._varTWPM.set(self._text_speed)
         self._varTWPM.trace_add("write", self._handle_txtspeed_change)
-        self._spnTWPM = ttk.Spinbox(
+        self._spnTWPM = tk.Spinbox(
             self.window,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._input_validator, "%P"),
             textvariable=self._varTWPM,
@@ -372,6 +376,7 @@ class StatusBar:
         self._mkm: Optional[MKOBMain] = None
         self._tkroot = self._mkwin.tkroot
         self._shutdown: Event = Event()
+        self._sndr_pwr_save_last: bool = False
 
         self.window = ttk.Frame(
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
@@ -389,21 +394,38 @@ class StatusBar:
     def _update_values(self) -> None:
         if self._shutdown.is_set():
             return
-        if not self._mkm is None:
-            if not self._mkm.Reader is None:
-                dspeed = self._mkm.Reader.detected_wpm
+        mkm = self._mkm
+        if not mkm is None:
+            reader = mkm.Reader
+            if not reader is None:
+                dspeed = reader.detected_wpm
                 self._d_speed[TEXT] = str(dspeed)
             else:
                 self._d_speed[TEXT] = ""
-            if not self._mkm.Internet is None:
-                host = self._mkm.Internet.host
-                port = self._mkm.Internet.port
+            inet = mkm.Internet
+            if not inet is None:
+                host = inet.host
+                port = inet.port
                 server = host
                 if not port == PORT_DEFAULT:
                     server += ":{}".format(port)
                 self._server[TEXT] = server
             else:
                 self._server[TEXT] = ""
+            kob_ = mkm.Kob
+            if not kob_ is None:
+                sndr_pwr_save = kob_.sounder_is_power_saving
+                if not sndr_pwr_save == self._sndr_pwr_save_last:
+                    self._sndr_pwr_save_last = sndr_pwr_save
+                    msg = "Sounder power save is on"
+                    if sndr_pwr_save:
+                        self._status_msg[TEXT] = msg
+                    elif self._status_msg[TEXT] == msg:
+                        # Clear our message, but not others
+                        self._status_msg[TEXT] = ""
+                    pass
+                pass
+            pass
         else:
             self._d_speed[TEXT] = ""
             self._server[TEXT] = ""
@@ -478,6 +500,9 @@ class StatusBar:
         if self._shutdown.is_set():
             return
         self._mkm = mkmain
+        if not mkmain is None:
+            if not mkmain.Kob is None:
+                self._sndr_pwr_save_last = mkmain.Kob.sounder_is_power_saving
         self._tkroot.after(1000, self._update_values)
         return
 
@@ -492,6 +517,23 @@ class MKOBWindow:
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
         self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
+
+        self._operating_system = platform.system()
+
+        self._ttk_style = ttk.Style()  # Set the style in use
+        log.debug("Themes available: {}".format(self._ttk_style.theme_names()))
+        if self._operating_system == "Windows":
+            self._ttk_style.theme_use("vista")
+        elif self._operating_system == "Darwin":
+            self._ttk_style.theme_use("aqua")
+        elif self._operating_system == "Linux":
+            self._ttk_style.theme_use("classic")
+        else:
+            self._ttk_style.theme_use("classic")
+
+        self._ttk_style.configure("Reader.TFrame")  # Style used by our Reader Window
+        self._ttk_style.configure("Sender.TFrame")  # Style used by our Sender.Window
+        self._ttk_style.configure("TSpinbox", padding=(1, 1, 6, 1))
 
         # The main (visible) window
         self._window = ttk.Frame(root)
@@ -627,8 +669,6 @@ class MKOBWindow:
         )
 
         # Reader (top left)
-        style_reader = ttk.Style()
-        style_reader.configure("Reader.TFrame")
         fm_reader = ttk.Frame(self._pw_topbottom_lf, style="Reader.TFrame", padding=2)
         self._txtReader = tkst.ScrolledText(
             fm_reader,
@@ -641,8 +681,6 @@ class MKOBWindow:
         )
         # Code Sender w/controls (bottom left)
         ## Sender  w/controls
-        style_sender = ttk.Style()
-        style_sender.configure("Sender.TFrame")
         fm_sender_pad = ttk.Frame(self._pw_topbottom_lf, style="Sender.TFrame", padding=4)
         fm_sender = ttk.Frame(fm_sender_pad, borderwidth=2, relief="groove")
         self._txtKeyboard = tkst.ScrolledText(
@@ -670,12 +708,6 @@ class MKOBWindow:
         # Stations Connected | Office | Closer & Speed | Wire/Connect
         #  (right)
         self._fm_right = ttk.Frame(self._pw_left_right)
-        style_spinbox = (
-            ttk.Style()
-        )  # Add padding around the spinbox entry fields to move the text away from the arrows
-        style_spinbox.configure(
-            "MK.TSpinbox", padding=(1, 1, 6, 1)
-        )  # padding='W N E S'
         ## Station list
         self._txtStnList = tkst.ScrolledText(
             self._fm_right,
@@ -708,14 +740,18 @@ class MKOBWindow:
         self._varCWPM = tk.StringVar()
         self._varCWPM.set(cfg.min_char_speed)
         self._varCWPM.trace_add("write", self._handle_char_speed_change)
-        spnCWPM = ttk.Spinbox(
+        spnCWPM = tk.Spinbox(
             fm_closer_speed,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            relief="sunken",
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varCWPM,
@@ -727,14 +763,17 @@ class MKOBWindow:
         self._varWireNo = tk.StringVar()
         self._varWireNo.set(str(cfg.wire))
         self._varWireNo.trace_add("write", self._handle_wire_change)
-        self._spnWireNo = ttk.Spinbox(
+        self._spnWireNo = tk.Spinbox(
             fm_wire_connect,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=0,
             to=32000,
+            borderwidth=2,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=200,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varWireNo,
@@ -754,10 +793,10 @@ class MKOBWindow:
         self._window.grid(column=0, row=0, sticky=(N, S, E, W))
         self._window.rowconfigure(0, weight=1)
         self._window.rowconfigure(1, weight=0)
-        self._window.columnconfigure(0, weight=1)
-        self._window.columnconfigure(1, weight=0)
+        self._window.columnconfigure(0, weight=6)
+        # self._window.columnconfigure(1, weight=3)
         ## Status Bar (across the bottom)
-        self._status_bar.window.grid(row=1, column=0, columnspan=2, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
+        self._status_bar.window.grid(row=1, column=0, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
         self._status_bar.layout()
         ## Reader (top)
         fm_reader.rowconfigure(0, weight=1, minsize=20, pad=2)
@@ -841,7 +880,7 @@ class MKOBWindow:
             stretch="always",
         )
         self._pw_left_right.add(
-            self._fm_right, minsize=98, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
+            self._fm_right, minsize=110, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
         )
 
         ###########################################################################################

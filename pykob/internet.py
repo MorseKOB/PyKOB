@@ -174,7 +174,7 @@ class Internet:
                 self._current_sender = None  # clear the current sender so it will update
                 self.sendID()
                 self._shutdown.wait(10.0)  # send another keepalive sequence every ten seconds
-            self._shutdown.wait(1.0)  # don't hog CPU when we aren't connected
+            self._shutdown.wait(3.0)  # don't hog CPU when we aren't connected
             pass
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -279,8 +279,15 @@ class Internet:
                             if oe.errno == 57:
                                 # Generated on shutdown if the socket isn't connected
                                 pass
+                            elif oe.errno == 107:
+                                # Generated on shutdown if transport endpoint isn't connected
+                                pass
                             else:
-                                raise oe
+                                log.debug("internet.disconnect - OSError: {}:{}".format(oe.errno, oe.strerror))
+                                pass
+                        except Exception as ex:
+                            log.debug("internet.disconnect - {}".format(ex))
+                            pass
                         pass
                 log.debug("internet.disconnect -   socketWRGuard-release", 7)
             finally:

@@ -31,6 +31,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import N, S, W, E
 
+from pykob import log
 
 
 class MKOBHelpKeys(tk.Toplevel):
@@ -44,6 +45,9 @@ class MKOBHelpKeys(tk.Toplevel):
         self.withdraw()  # Hide until built
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
+
+        self.ttk_style = ttk.Style()  # Make the lines taller for Linux
+        self.ttk_style.configure("Treeview", rowheight=30)
 
         self._tree = ttk.Treeview(self, columns=("k", "op"))
         self._tree.column("k", width=100, anchor=tk.CENTER)
@@ -103,9 +107,17 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree["yscrollcommand"] = self._tree_vs.set
 
         self.update()
-        self.geometry("380x420+20+20")
         self.state("normal")
+        self._set_win_size()
         self.__class__.active = True  # Indicate that the window is 'active'
+        # self.after(100, self._set_win_size)
+        return
+
+    def _set_win_size(self):
+        w = self._tree.winfo_width()
+        geo = "{}x{}+{}+{}".format("1170", "800", "40", "40")
+        self.geometry(geo)
+        return
 
     def destroy(self):
         # Restore the attribute on close.
