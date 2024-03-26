@@ -565,6 +565,12 @@ class KOB:
         """
         log.debug("kob._set_key_closer_open: {}".format(open), 3)
         if not open == self._key_closer_is_open:
+            if not open and self._sounder_mode == SounderMode.EFK:
+                # If the sounder was enabled to follow the key (loop)
+                # and the key is now closed, update the sounder enabled
+                # time so the power save won't kick right away (due to
+                # the time spent using the key)
+                self._t_sounder_energized = time.time()
             if not self._virtual_closer_in_use:
                 # Have virtual track physical and update modes
                 self._virtual_closer_is_open = open
@@ -825,10 +831,6 @@ class KOB:
                 #
                 if self._sounder_mode == SounderMode.FK or self._synth_mode == SynthMode.FK:
                     self.energize_sounder(kc, CodeSource.key)
-                elif self._sounder_mode == SounderMode.EFK and self._use_sounder and kc:
-                    # For LOOP interface, update the key energized time so the sounder power
-                    # save won't kick in as soon as the key is closed.
-                    self._t_sounder_energized = t
                 self._threadsStop.wait(DEBOUNCE)
                 if kc:
                     code += (-dt,)
