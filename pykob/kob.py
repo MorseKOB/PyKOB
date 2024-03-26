@@ -449,7 +449,7 @@ class KOB:
         if self._shutdown.is_set():
             return
         with self._sounder_guard:
-            hw_energize = energize and self._use_sounder
+            hw_energize = (energize and self._use_sounder)
             log.debug("kob._energize_hw_sounder: {}:{}".format(energize, hw_energize), 3)
             if not self._sounder_energized == hw_energize:
                 if hw_energize:
@@ -825,6 +825,10 @@ class KOB:
                 #
                 if self._sounder_mode == SounderMode.FK or self._synth_mode == SynthMode.FK:
                     self.energize_sounder(kc, CodeSource.key)
+                elif self._sounder_mode == SounderMode.EFK and self._use_sounder and kc:
+                    # For LOOP interface, update the key energized time so the sounder power
+                    # save won't kick in as soon as the key is closed.
+                    self._t_sounder_energized = t
                 self._threadsStop.wait(DEBOUNCE)
                 if kc:
                     code += (-dt,)

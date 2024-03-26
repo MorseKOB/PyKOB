@@ -793,10 +793,10 @@ class MKOBWindow:
         self._window.grid(column=0, row=0, sticky=(N, S, E, W))
         self._window.rowconfigure(0, weight=1)
         self._window.rowconfigure(1, weight=0)
-        self._window.columnconfigure(0, weight=1)
-        self._window.columnconfigure(1, weight=0)
+        self._window.columnconfigure(0, weight=6)
+        # self._window.columnconfigure(1, weight=3)
         ## Status Bar (across the bottom)
-        self._status_bar.window.grid(row=1, column=0, columnspan=2, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
+        self._status_bar.window.grid(row=1, column=0, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
         self._status_bar.layout()
         ## Reader (top)
         fm_reader.rowconfigure(0, weight=1, minsize=20, pad=2)
@@ -880,7 +880,7 @@ class MKOBWindow:
             stretch="always",
         )
         self._pw_left_right.add(
-            self._fm_right, minsize=98, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
+            self._fm_right, minsize=110, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
         )
 
         ###########################################################################################

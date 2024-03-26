@@ -52,9 +52,10 @@ import queue
 from queue import Empty, Queue
 import re  # RegEx
 import sys
+from sys import platform
 from threading import Event, Thread
 from time import sleep
-from typing import Any, Callable, Optional
+from typing import Optional
 
 __version__ = '1.3.1'
 MRT_VERSION_TEXT = "MRT " + __version__
@@ -74,22 +75,18 @@ class RawTerm:
     """
     def __init__(self):
         self.impl = None
-        operating_system = platform.system()
-        if operating_system == "Windows":
+        if platform.startswith(("darwin", "linux", "freebsd", "openbsd")):  # MacOSX and Linux/UNIX
+            try:
+                self.impl = _GetchUnix()
+            except Exception as ex:
+                log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
+        elif platform in ("win32", "cygwin"):
             try:
                 self.impl = _GetchWindows()
             except Exception as ex:
-                log.error("Unable to get direct keyboard access (Win:{})".format(ex))
-        elif operating_system == "Darwin": # MacOSX
-            try:
-                self.impl = _GetchUnix()
-            except Exception as ex:
-                log.error("unable to get direct keyboard access (Mac:{})".format(ex))
-        elif operating_system == "Linux":
-            try:
-                self.impl = _GetchUnix()
-            except Exception as ex:
-                log.error("unable to get direct keyboard access (Linux:{})".format(ex))
+                log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
+        else:
+            log.warn("The platform {} is not currently supported for direct keyboard access.".format(platform))
         return
 
     def getch(self) -> str:
@@ -108,16 +105,32 @@ class _GetchUnix:
     def __init__(self):
         import tty, sys, termios
         self.fd = sys.stdin.fileno()
-        self.original_settings = termios.tcgetattr(self.fd)
+        self.original_settings = None
+        try:
+            self.original_settings = termios.tcgetattr(self.fd)
+        except Exception as ex:
+            log.warn("RawTerm cannot read the current terminal settings. "
+                    + "The terminal will not be able to be restored when MRT terminates. "
+                    + "Error: {}".format(ex))
         try:
             tty.setraw(sys.stdin.fileno())
             attrs = termios.tcgetattr(self.fd)
             attrs[1] |= termios.OPOST
             termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
         except Exception as ex:
-            log.warn("GetchUnix - Error setting terminal attributes: {}".format(ex))
+            log.warn("RawTerm cannot set the terminal settings needed to read keys directly. "
+                    + "MRT will not be able to support keyboard sending. "
+                    + "Error: {}".format(ex))
             # try to put the original back
-            termios.tcsetattr(self.fd, termios.TCSANOW, self.original_settings)
+            if self.original_settings:
+                try:
+                    termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+                except Exception as ex:
+                    log.warn("Terminal settings were not able to be restored. " +
+                        "It is suggested that you close the terminal when done with MRT.")
+                    pass
+                pass
+            pass
         return
 
     def _getch(self) -> str:
@@ -126,7 +139,14 @@ class _GetchUnix:
 
     def _exit(self):
         import termios
-        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+        if self.original_settings:
+            try:
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
+            except Exception as ex:
+                log.warn("Terminal settings were not able to be restored. " +
+                    "It is suggested that you close the terminal when done with MRT.")
+                pass
+            pass
         return
 
 class _GetchWindows:
@@ -456,7 +476,6 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 return
         if not self._internet_station_active and self._local_loop_active:
-            self._reader.decode(code)
             self._emit_local_code(code, kob.CodeSource.key)
         return
 

@@ -1096,7 +1096,6 @@ class MKOBMain:
         return
 
     def _recording_play_followup(self):
-        # Open the virtual closer to sound code
         if self._shutdown.is_set():
             return
         kob_ = self._kob
@@ -1104,7 +1103,7 @@ class MKOBMain:
         self._player_vco = False
         if kob_:
             self._player_vco = self._kob.virtual_closer_is_open
-            self._kob.virtual_closer_is_open = True
+            self._kob.virtual_closer_is_open = False
         if plyr:
             plyr.playback_start(list_data=False, max_silence=5)  # Limit the silence to 5 seconds
         return
