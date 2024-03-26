@@ -46,9 +46,6 @@ class MKOBHelpKeys(tk.Toplevel):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self.ttk_style = ttk.Style()  # Make the lines taller for Linux
-        self.ttk_style.configure("Treeview", rowheight=30)
-
         self._tree = ttk.Treeview(self, columns=("k", "op"))
         self._tree.column("k", width=100, anchor=tk.CENTER)
         self._tree.column("op", width=260, anchor=tk.W)
@@ -108,14 +105,15 @@ class MKOBHelpKeys(tk.Toplevel):
 
         self.update()
         self.state("normal")
-        self._set_win_size()
+#        self._set_win_size()
         self.__class__.active = True  # Indicate that the window is 'active'
-        # self.after(100, self._set_win_size)
+        self.after(80, self._set_win_size)
         return
 
     def _set_win_size(self):
         w = self._tree.winfo_width()
-        geo = "{}x{}+{}+{}".format("1170", "800", "40", "40")
+        ws = "{}".format(2 * w)
+        geo = "{}x{}+{}+{}".format(ws, "600", "40", "40")
         self.geometry(geo)
         return
 

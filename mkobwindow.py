@@ -44,6 +44,7 @@ import sys
 from threading import Event
 from tkinter import N, S, W, E, VERTICAL
 import tkinter as tk
+from tkinter import font
 from tkinter import ttk
 import tkinter.scrolledtext as tkst
 from typing import Optional
@@ -534,6 +535,11 @@ class MKOBWindow:
         self._ttk_style.configure("Reader.TFrame")  # Style used by our Reader Window
         self._ttk_style.configure("Sender.TFrame")  # Style used by our Sender.Window
         self._ttk_style.configure("TSpinbox", padding=(1, 1, 6, 1))
+        text_font = font.nametofont("TkTextFont")
+        text_font_metrics = text_font.metrics()
+        line_height = text_font_metrics["linespace"]
+        treeview_line_height = int (line_height * 1.3)
+        self._ttk_style.configure("Treeview", rowheight=treeview_line_height)
 
         # The main (visible) window
         self._window = ttk.Frame(root)
