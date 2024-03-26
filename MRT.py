@@ -198,6 +198,8 @@ class Mrt:
         self._reader = None
         self._recorder = None
         self._sender = None
+        self._thread_kbreader = None
+        self._thread_kbsender = None
 
         self._connected = False
         self._internet_station_active = False  # True if a remote station is sending
@@ -242,12 +244,6 @@ class Mrt:
             err_msg_hndlr=log.warn
         )
         self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
-        self._reader = morse.Reader(
-            wpm=cfg.text_speed,
-            cwpm=cfg.min_char_speed,
-            codeType=cfg.code_type,
-            callback=self._reader_callback
-            )
         self._sender = morse.Sender(
             wpm=cfg.text_speed,
             cwpm=cfg.min_char_speed,
@@ -255,9 +251,17 @@ class Mrt:
             spacing=cfg.spacing
             )
 
-        # Thread to read characters from the keyboard to allow sending without (instead of) a physical key.
-        self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
-        self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
+        if sys.stdout.isatty():
+            self._reader = morse.Reader(
+                wpm=cfg.text_speed,
+                cwpm=cfg.min_char_speed,
+                codeType=cfg.code_type,
+                callback=self._reader_callback
+                )
+        if sys.stdin.isatty():
+            # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
+            self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
+            self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
         self._thread_fsender = None
         if self._send_file_path:
             self._thread_fsender = Thread(name="File-send-thread", daemon=False, target=self._thread_fsender_body)
@@ -350,8 +354,9 @@ class Mrt:
         return
 
     def start(self):
-        self._thread_kbreader.start()
-        self._thread_kbsender.start()
+        if not self._thread_kbreader is None and not self._thread_kbsender is None:
+            self._thread_kbreader.start()
+            self._thread_kbsender.start()
         return
 
     def _handle_sender_update(self, sender):
@@ -407,7 +412,8 @@ class Mrt:
             if self._cfg.local:
                 if not closed:
                     self._handle_sender_update(self._our_office_id)
-                self._reader.decode(code)
+                if self._reader:
+                    self._reader.decode(code)
             if self._recorder:
                 self._recorder.record(code, kob.CodeSource.local)
         if self._connected and self._cfg.remote:
@@ -416,7 +422,8 @@ class Mrt:
             if code[-1] == 1:
                 # Unlatch (Key closed)
                 self._set_local_loop_active(False)
-                self._reader.flush()
+                if self._reader:
+                    self._reader.flush()
             elif code[-1] == 2:
                 # Latch (Key open)
                 self._set_local_loop_active(True)
@@ -439,7 +446,7 @@ class Mrt:
             self._internet.write(code)
         if code_source == kob.CodeSource.keyboard:
             self._kob.soundCode(code, code_source)
-        if code_source == kob.CodeSource.key:
+        if code_source == kob.CodeSource.key and self._reader:
             self._reader.decode(code)
         return
 
@@ -503,7 +510,8 @@ class Mrt:
         """handle inputs received from the internet"""
         if self._connected:
             if not self._sender_current == self._our_office_id:
-                self._reader.decode(code)
+                if self._reader:
+                    self._reader.decode(code)
                 self._kob.soundCode(code, kob.CodeSource.wire)
             if self._recorder:
                 self._recorder.record(code, kob.CodeSource.wire)
