@@ -42,7 +42,7 @@ class PreferencesWindow:
         self._quitOnExit = quitWhenDismissed
         self._cfg = cfg
 
-        self.ttk_style = ttk.Style()  # Make the lines taller for Linux
+        self.ttk_style = ttk.Style()
         self.ttk_style.configure("TSpinbox", padding=(1,1,6,1)) # padding='W N E S'
 
         self._allowApply = allowApply  # If True, provide an 'Apply' button and change 'OK' to 'Save'
@@ -472,10 +472,14 @@ class PreferencesWindow:
         # left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
         # top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
         # self.root.geometry('+%d+%d' % (left_offset, top_offset))
-        self.root.geometry("+36+36")
-        self.root.state("normal")
+        self.root.after(50, self._win_normal_update)
 
     # #############################################################################################
+    def _win_normal_update(self):
+        self.root.geometry("+80+80")
+        self.root.state("normal")
+        self.root.update_idletasks()
+        return
 
     def _audioTypeSelected(self, *args):
         #
