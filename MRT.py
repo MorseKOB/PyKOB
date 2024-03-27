@@ -42,6 +42,9 @@ Example:
 
 from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
 from pykob.config2 import Config
+from pykob.internet import Internet
+from pykob.kob import KOB
+from pykob.morse import Reader, Sender
 from pykob.recorder import Recorder
 import pkappargs
 
@@ -168,23 +171,60 @@ class _GetchWindows:
         return
 
 class Mrt:
+    """
+    Morse Receive & Transmit 'Marty'.
 
+    Process the keyboard and a key to send code sequences. Receive from a wire
+    and sound and decode/display.
+
+    Options allow sending a file or playing a recording, and repeating that operation.
+    """
     def __init__(
         self,
         app_name_version: str, wire: int,
         cfg: Config,
+        repeat_delay: int = -1,
         record_filepath: Optional[str] = None,
+        file_to_play: Optional[str] = None,
         file_to_send: Optional[str] = None,
     ) -> None:
         self._app_name_version = app_name_version
         self._wire = wire
         self._cfg = cfg
-        self._shutdown = Event()
-        self._control_c_pressed = Event()
-        self._kb_queue = Queue(128)
+        self._repeat_delay: int = repeat_delay
+        self._shutdown: Event = Event()
+        self._fst_stop: Event = Event()
+        self._kbt_stop: Event = Event()
+        self._prt_stop: Event = Event()
+        self._control_c_pressed: Event = Event()
+        self._kb_queue: Queue = Queue(128)
 
+        self._player: Optional[Recorder] = None
+        self._playback_complete: Event = Event()
+        self._play_file_path = None
+        if file_to_play:
+            self._play_file_path = recorder.add_ext_if_needed(file_to_play.strip())
+            p = Path(self._play_file_path)
+            p.resolve()
+            if not p.is_file():
+                print("Recording not found. '{}'".format(self._play_file_path))
+                self._play_file_path = None
+                self._playback_complete.set()
+            else:
+                self._player = Recorder(
+                    None,
+                    self._play_file_path,
+                    station_id=self._cfg.station,
+                    wire=self._wire,
+                    play_code_callback=self._from_player,
+                    play_sender_id_callback=self._handle_sender_update,
+                    play_station_list_callback=None,
+                    play_wire_callback=None,
+                    play_finished_callback=self._from_player_finished
+                )
+
+        self._filesend_running: Event = Event()
         self._send_file_path = None
-        self._send_repeat_count = -1  # -1 is flag to indicate that a repeat hasn't been set
         if file_to_send:
             self._send_file_path = file_to_send.strip()
             p = Path(self._send_file_path)
@@ -193,13 +233,13 @@ class Mrt:
                 print("File to send not found. '{}'".format(self._send_file_path))
                 self._send_file_path = None
 
-        self._internet = None
-        self._kob = None
-        self._reader = None
-        self._recorder = None
-        self._sender = None
-        self._thread_kbreader = None
-        self._thread_kbsender = None
+        self._internet: Optional[Internet] = None
+        self._kob: Optional[KOB] = None
+        self._reader: Optional[Reader] = None
+        self._recorder: Optional[Recorder] = None
+        self._sender: Optional[Sender] = None
+        self._thread_kbreader: Optional[Thread] = None
+        self._thread_kbsender: Optional[Thread] = None
 
         self._connected = False
         self._internet_station_active = False  # True if a remote station is sending
@@ -207,6 +247,9 @@ class Mrt:
         self._local_loop_active = False  # True if sending on key or keyboard
         self._our_office_id = cfg.station if not cfg.station is None else ""
         self._sender_current = ""
+
+        self._do_automated_stuff: bool = (not self._play_file_path is None or not self._send_file_path is None)
+        self._automation_started: bool = False
 
         self._exit_status = 1
 
@@ -264,7 +307,7 @@ class Mrt:
             self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
         self._thread_fsender = None
         if self._send_file_path:
-            self._thread_fsender = Thread(name="File-send-thread", daemon=False, target=self._thread_fsender_body)
+            self.__create_file_thread()
         return
 
     def exit(self):
@@ -284,21 +327,26 @@ class Mrt:
             log.debug("MRT.exit - 4a", 3)
             inet.exit()
             log.debug("MRT.exit - 4b", 3)
+        plr = self._player
+        if plr:
+            log.debug("MRT.exit - 5a", 3)
+            plr.exit()
+            log.debug("MRT.exit - 5b", 3)
         rdr = self._reader
         if rdr:
-            log.debug("MRT.exit - 5a", 3)
+            log.debug("MRT.exit - 6a", 3)
             rdr.exit()
-            log.debug("MRT.exit - 5b", 3)
+            log.debug("MRT.exit - 6b", 3)
         rec = self._recorder
         if rec:
-            log.debug("MRT.exit - 6a", 3)
+            log.debug("MRT.exit - 7a", 3)
             rec.exit()
-            log.debug("MRT.exit - 6b", 3)
+            log.debug("MRT.exit - 7b", 3)
         sndr = self._sender
         if sndr:
-            log.debug("MRT.exit - 7a", 3)
+            log.debug("MRT.exit - 8a", 3)
             sndr.exit()
-            log.debug("MRT.exit - 7b", 3)
+            log.debug("MRT.exit - 8b", 3)
         return
 
     def main_loop(self):
@@ -312,10 +360,14 @@ class Mrt:
                 kob_.wire_connected = self._connected
         self._shutdown.wait(0.5)
         try:
-            if self._thread_fsender:
-                self._thread_fsender.start()
+            #
+            # If we have been asked to play a recording, play it.
+            # If we have been asked to send a file, send it.
+            # If we have a non-negative repeat value, repeat (with a pause if specified)
+            #
             while not self._shutdown.is_set() and not self._control_c_pressed.is_set():
-                self._shutdown.wait(0.02)  # Loop while background threads take care of 'stuff'
+                self._process_automation()
+                self._shutdown.wait(0.05)  # Loop while background threads take care of 'stuff'
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
         except KeyboardInterrupt:
@@ -336,21 +388,26 @@ class Mrt:
             log.debug("MRT.shutdown - 4a", 3)
             inet.shutdown()
             log.debug("MRT.shutdown - 4b", 3)
+        plr = self._player
+        if plr:
+            log.debug("MRT.shutdown - 5a", 3)
+            plr.shutdown()
+            log.debug("MRT.shutdown - 5b", 3)
         rdr = self._reader
         if rdr:
-            log.debug("MRT.shutdown - 5a", 3)
+            log.debug("MRT.shutdown - 6a", 3)
             rdr.shutdown()
-            log.debug("MRT.shutdown - 5b", 3)
+            log.debug("MRT.shutdown - 6b", 3)
         rec = self._recorder
         if rec:
-            log.debug("MRT.shutdown - 6a", 3)
+            log.debug("MRT.shutdown - 7a", 3)
             rec.shutdown()
-            log.debug("MRT.shutdown - 6b", 3)
+            log.debug("MRT.shutdown - 7b", 3)
         sndr = self._sender
         if sndr:
-            log.debug("MRT.shutdown - 7a", 3)
+            log.debug("MRT.shutdown - 8a", 3)
             sndr.shutdown()
-            log.debug("MRT.shutdown - 7b", 3)
+            log.debug("MRT.shutdown - 8b", 3)
         return
 
     def start(self):
@@ -359,74 +416,14 @@ class Mrt:
             self._thread_kbsender.start()
         return
 
-    def _handle_sender_update(self, sender):
-        """
-        Handle a <<Current_Sender>> message by:
-        1. Displaying the sender if new
-        """
-        if not self._sender_current == sender:
-            self._sender_current = sender
-            print()
-            print(f'<<{self._sender_current}>>')
-        return
-
-    def _print_start_info(self):
-        cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
-        print("Using configuration: {}".format(cfgname))
-        if self._wire == 0:
-            print("Not connecting to a wire.")
-        else:
-            print("Connecting to wire: " + str(self._wire))
-        print("Connecting as Station/Office: " + self._our_office_id)
-        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
-        if self._cfg.invert_key_input:
-            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
-                "To enable/disable this setting use `Configure --iki`.")
-        if self._send_file_path:
-            print("Sending text from file: {}".format(self._send_file_path))
-        print("[Use CTRL+Z for keyboard help.]", flush=True)
-        return
-
-    def _set_local_loop_active(self, active):
-        """
-        Set local_loop_active state
-
-        True: Key or Keyboard active (Ciruit Closer OPEN)
-        False: Circuit Closer (physical and virtual) CLOSED
-        """
-        self._local_loop_active = active
-        self._kob.energize_sounder((not active), kob.CodeSource.local)
-        return
-
-    def _set_virtual_closer_closed(self, closed):
-        """
-        Handle change of Circuit Closer state.
-
-        A state of:
-        True: 'latch'
-        False: 'unlatch'
-        """
-        self._kob.virtual_closer_is_open = not closed
-        code = LATCH_CODE if closed else UNLATCH_CODE
-        if not self._internet_station_active:
-            if self._cfg.local:
-                if not closed:
-                    self._handle_sender_update(self._our_office_id)
-                if self._reader:
-                    self._reader.decode(code)
-            if self._recorder:
-                self._recorder.record(code, kob.CodeSource.local)
-        if self._connected and self._cfg.remote:
-            self._internet.write(code)
-        if len(code) > 0:
-            if code[-1] == 1:
-                # Unlatch (Key closed)
-                self._set_local_loop_active(False)
-                if self._reader:
-                    self._reader.flush()
-            elif code[-1] == 2:
-                # Latch (Key open)
-                self._set_local_loop_active(True)
+    def __create_file_thread(self):
+        if self._thread_fsender:
+            self._fst_stop.set()
+            if self._thread_fsender.is_alive():
+                self._thread_fsender.join()
+        self._thread_fsender = Thread(name="File-send-thread", daemon=False, target=self._thread_fsender_body)
+        self._fst_stop.clear()
+        self._filesend_running.clear()
         return
 
     def _emit_local_code(self, code, code_source, char:Optional[str]=None):
@@ -439,15 +436,17 @@ class Mrt:
         This is used indirectly from the key or the keyboard threads to emit code once they
         determine it should be emitted.
         """
+        kob_ = self._kob
+        if kob_:
+            kob_.internet_circuit_closed = not self._internet_station_active
         self._handle_sender_update(self._our_office_id)
-        if self._recorder:
+        if self._recorder and not code_source == kob.CodeSource.player:
             self._recorder.record(code, code_source, char)
+        kob_.soundCode(code, code_source)
+        if self._reader and not code_source == kob.CodeSource.keyboard:
+            self._reader.decode(code)
         if self._connected and self._cfg.remote:
             self._internet.write(code)
-        if code_source == kob.CodeSource.keyboard:
-            self._kob.soundCode(code, code_source)
-        if code_source == kob.CodeSource.key and self._reader:
-            self._reader.decode(code)
         return
 
     def _from_file(self, code, char:Optional[str]=None):
@@ -465,7 +464,7 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 return
         if not self._internet_station_active and self._local_loop_active:
-            self._emit_local_code(code, kob.CodeSource.keyboard, char) # Say that it' from the keyboard
+            self._emit_local_code(code, kob.CodeSource.player, char) # Say that it's from the player
         return
 
     def _from_key(self, code):
@@ -522,10 +521,112 @@ class Mrt:
             self._kob.internet_circuit_closed = not self._internet_station_active
         return
 
+    def _from_player(self, code, char:Optional[str]=None):
+        """
+        Handle inputs received from the recording player.
+        Only send if the circuit is open.
+
+        Called from the player.
+        """
+        if not self._internet_station_active and self._local_loop_active:
+            self._emit_local_code(tuple(code), kob.CodeSource.player, char)
+        return
+
+    def _from_player_finished(self):
+        if self._reader:
+            # If we have a Reader, assume we printed some text, so print a NL
+            print("", flush=True)
+        log.debug("Recording playback finished.")
+        self._playback_complete.set()
+        return
+
+    def _handle_sender_update(self, sender):
+        """
+        Handle a <<Current_Sender>> message by:
+        1. Displaying the sender if new
+        """
+        if not self._sender_current == sender:
+            self._sender_current = sender
+            print()
+            print(f'<<{self._sender_current}>>')
+        return
+
+    def _print_start_info(self):
+        cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
+        print("Using configuration: {}".format(cfgname))
+        if self._wire == 0:
+            print("Not connecting to a wire.")
+        else:
+            print("Connecting to wire: " + str(self._wire))
+        print("Connecting as Station/Office: " + self._our_office_id)
+        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
+        if self._cfg.invert_key_input:
+            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+                "To enable/disable this setting use `Configure --iki`.")
+        if self._play_file_path:
+            print("Play recording: {}".format(self._play_file_path))
+        if self._send_file_path:
+            print("Process text from file: {}".format(self._send_file_path))
+        print("[Use CTRL+Z for keyboard help.]", flush=True)
+        return
+
+    def _process_automation(self):
+        """
+        Start and monitor playing a recording and/or sending a file.
+        """
+        if not self._do_automated_stuff:
+            return
+        if self._play_file_path and self._player and not self._playback_complete.is_set():
+            # We have a recording to play. See if we are playing it.
+            if self._player.playback_state == recorder.PlaybackState.idle:
+                # Not playing it, are we sending a file?
+                if self._send_file_path and self._filesend_running.is_set():
+                    # Yes.
+                    return
+                # Start it playing
+                log.debug("Mrt._process_automation - Play recording...", 2)
+                self._set_virtual_closer_closed(False)
+                self._playback_complete.clear()
+                self._player.playback_start(max_silence=8)
+                return
+            else:
+                # We are currently playing.
+                return
+        if self._send_file_path and self._thread_fsender and not self._filesend_running.is_set():
+            # We have a file to send.
+            # Start it sending
+            log.debug("Mrt._process_automation - Key a file...", 2)
+            self._thread_fsender.start()
+            self._shutdown.wait(0.010)
+            self._filesend_running.set()
+            return
+        #
+        # See if things are running...
+        if not self._playback_complete.is_set() or (self._thread_fsender and self._thread_fsender.is_alive()):
+            return
+        #
+        # Done with one pass of a recording or a file. See if we should loop.
+        #
+        self._playback_complete.clear()
+        self._filesend_running.clear()
+        if self._repeat_delay < 0:
+            # No repeat. We are done.
+            self._do_automated_stuff = False
+            log.debug("Mrt._process_automation - No repeat, finished processing.", 2)
+            return
+        if self._repeat_delay > 0:
+            log.debug("Mrt._process_automation - Delaying before repeat...", 2)
+            self._shutdown.wait(self._repeat_delay)
+        if self._send_file_path:
+            self.__create_file_thread()
+        return
+
     def _reader_callback(self, char, spacing):
         rec = self._recorder
+        player = self._player
         if rec:
-            rec.record([], "", text=char)
+            if not player or (player and player.playback_state == recorder.PlaybackState.idle):
+                rec.record([], "", text=char)
         if not char == '=':
             if self._last_received_para:
                 print()
@@ -548,56 +649,69 @@ class Mrt:
             print()
         return
 
+    def _set_local_loop_active(self, active):
+        """
+        Set local_loop_active state
+
+        True: Key or Keyboard active (Ciruit Closer OPEN)
+        False: Circuit Closer (physical and virtual) CLOSED
+        """
+        self._local_loop_active = active
+        self._kob.energize_sounder((not active), kob.CodeSource.local)
+        return
+
+    def _set_virtual_closer_closed(self, closed):
+        """
+        Handle change of Circuit Closer state.
+
+        A state of:
+        True: 'latch'
+        False: 'unlatch'
+        """
+        self._kob.virtual_closer_is_open = not closed
+        code = LATCH_CODE if closed else UNLATCH_CODE
+        if not self._internet_station_active:
+            if self._cfg.local:
+                if not closed:
+                    self._handle_sender_update(self._our_office_id)
+                if self._reader:
+                    self._reader.decode(code)
+            if self._recorder:
+                self._recorder.record(code, kob.CodeSource.local)
+        if self._connected and self._cfg.remote:
+            self._internet.write(code)
+        if len(code) > 0:
+            if code[-1] == 1:
+                # Unlatch (Key closed)
+                self._set_local_loop_active(False)
+                if self._reader:
+                    self._reader.flush()
+            elif code[-1] == 2:
+                # Latch (Key open)
+                self._set_local_loop_active(True)
+        return
+
     def _thread_fsender_body(self):
-        done_sending = False
-        while not done_sending and not self._shutdown.is_set():
+        while not self._fst_stop.is_set() and not self._shutdown.is_set():
             try:
                 self._set_virtual_closer_closed(False)
-                while (
-                    not self._send_repeat_count == 0
-                    and not self._shutdown.is_set()
-                    ):
+                while not self._fst_stop.is_set() and not self._shutdown.is_set():
                     with open(self._send_file_path, "r") as fp:
-                        while not self._shutdown.is_set():
+                        while not self._fst_stop.is_set() and not self._shutdown.is_set():
                             ch = fp.read(1)
                             if not ch:
-                                # at the end, adjust repeat count
-                                self._send_repeat_count = 0
-                                break
-                            elif ch == '`':
-                                if not self._send_repeat_count == -1:
-                                    # We already set a repeat count, so repeat now.
-                                    if not self._send_repeat_count == -2:
-                                        self._send_repeat_count -= 1
-                                    break
-                                # Collect the repeat count
-                                l = fp.readline()
-                                if l == "" or l[0] == '*':
-                                    self._send_repeat_count = -2  # Repeat indefinately
-                                else:
-                                    # Try to collect a number
-                                    rc = 1
-                                    p = re.compile("[0-9]+")
-                                    m = p.match(l)
-                                    n = m.group()
-                                    if n:
-                                        rc = int(n)
-                                    if rc > 0:
-                                        self._send_repeat_count = rc
-                                    else:
-                                        self._send_repeat_count = 1
                                 break
                             if ch < ' ':
                                 # don't send control characters
                                 continue
                             code = self._sender.encode(ch)
                             self._from_file(code, ch)
-                done_sending = True
+                    self._fst_stop.set()
             except Exception as ex:
                 print(
-                    "<<< File sender encountered an error and will stop running. Exception: {}"
+                    "<<< File sender encountered an error and will stop sending. Exception: {}"
                 ).format(ex)
-                self._shutdown.set()
+                self._fst_stop.set()
             finally:
                 self._set_virtual_closer_closed(True)
         log.debug("MRT-File Sender thread done.")
@@ -606,7 +720,7 @@ class Mrt:
     def _thread_kbreader_body(self):
         rawterm = RawTerm()
         try:
-            while not self._shutdown.is_set():
+            while not self._kbt_stop.is_set() and not self._shutdown.is_set():
                 try:
                     ch = rawterm.getch()
                     if ch == '\x03': # They pressed ^C
@@ -633,14 +747,14 @@ class Mrt:
                     self._shutdown.wait(0.008)
                 except Exception as ex:
                     print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
-                    self._shutdown.set()
+                    self._kbt_stop.set()
         finally:
             rawterm.exit()
             log.debug("MRT-KB Reader thread done.")
         return
 
     def _thread_kbsender_body(self):
-        while not self._shutdown.is_set():
+        while not self._kbt_stop.is_set() and not self._shutdown.is_set():
             try:
                 ch = self._kb_queue.get(block=False)
                 code = self._sender.encode(ch)
@@ -650,7 +764,7 @@ class Mrt:
                 self._shutdown.wait(0.001)
             except Exception as ex:
                 print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
-                self._shutdown.set()
+                self._kbt_stop.set()
         log.debug("MRT-KB Sender thread done.")
         return
 
@@ -674,15 +788,30 @@ if __name__ == "__main__":
             ]
         )
         arg_parser.add_argument(
-            "--send",
-            metavar="text-file",
-            dest="sendtext_filepath",
-            help="Text file to send when started. If the text ends with a back-tick and a number '`2', "
-            + "it will be repeated that many times. Ending with '`*' will repeat indefinately.",
+            "--play",
+            metavar="recording-path",
+            dest="play_filepath",
+            help="Play a recording when started. Code will be sent if connected to a wire.",
+        )
+        arg_parser.add_argument(
+            "--file",
+            metavar="text-file-path",
+            dest="textfile_filepath",
+            help="Key a text file when started. Code will be sent if connected to a wire.",
+        )
+        arg_parser.add_argument(
+            "--repeat",
+            metavar="delay",
+            dest="repeat_delay",
+            default=-1,
+            type=int,
+            help="Used in conjunction with '--play' or '--file', " +
+                "this will cause the playback or file processing to be repeated. " +
+                "The value is the delay, in seconds, to pause before repeating."
         )
         arg_parser.add_argument("wire", nargs='?', type=int,
-            help="Wire to connect to. If specified, this is used rather than the configured wire. "
-            + "Use 0 to not connect.")
+            help="Wire to connect to. If specified, this is used rather than the configured wire. " +
+                "Use 0 to not connect.")
         args = arg_parser.parse_args()
         cfg = config2.process_config_args(args)
         wire = args.wire if args.wire else cfg.wire
@@ -695,7 +824,11 @@ if __name__ == "__main__":
         print("pykob: " + VERSION)
         print("PySerial: " + config.pyserial_version)
 
-        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, record_filepath, args.sendtext_filepath)
+        play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
+        sendtext_filepath = None if not (hasattr(args, "textfile_filepath") and args.textfile_filepath) else args.textfile_filepath
+        repeat_delay = args.repeat_delay
+
+        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, repeat_delay=repeat_delay, record_filepath=record_filepath, file_to_play=play_filepath, file_to_send=sendtext_filepath)
         mrt.start()
         mrt.main_loop()
         mrt = None

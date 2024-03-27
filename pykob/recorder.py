@@ -55,6 +55,7 @@ from threading import Event, Lock, Thread
 from typing import Optional
 
 PYKOB_RECORDING_EXT = ".pkrec"
+PYKOB_RECORDING_EXT_DEP = ".json"  # Deprecated file extension for recordings
 
 @unique
 class PlaybackState(IntEnum):
@@ -71,7 +72,7 @@ def add_ext_if_needed(s: str) -> str:
 
     Adds '.pkrec' to the string argument if it doesn't already end with it.
     """
-    if s and not s.endswith(PYKOB_RECORDING_EXT):
+    if s and not (s.endswith(PYKOB_RECORDING_EXT) or s.endswith(PYKOB_RECORDING_EXT_DEP)):
         return (s + PYKOB_RECORDING_EXT)
     return s
 
