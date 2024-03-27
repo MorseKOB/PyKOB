@@ -65,7 +65,7 @@ class MKOBActions():
             self._kkb.load_file(pf)
 
     def doFilePlay(self):
-        log.debug("Play a file...")
+        log.debug("Play a recording...")
         pf = fd.askopenfilename(title='Select KOB Recording', 
                 filetypes=[
                     ("KOB Recording", recorder.PYKOB_RECORDING_EXT),

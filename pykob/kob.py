@@ -123,13 +123,15 @@ class KOB:
     #           3: WireConnected & NoLocalCopy
     #
     __LOOP_MODES = (
+        ("Loop Modes"),  # For debugging
         (SounderMode.REC, SounderMode.DIS, SounderMode.REC, SounderMode.DIS),
         (SounderMode.REC, SounderMode.SLC, SounderMode.REC, SounderMode.EFK),
         (SounderMode.SRC, SounderMode.DIS, SounderMode.SRC, SounderMode.DIS),
-        (SounderMode.SRC, SounderMode.SLC, SounderMode.SRC, SounderMode.EFK)
+        (SounderMode.SRC, SounderMode.SLC, SounderMode.SRC, SounderMode.EFK),
     )
 
     __KS_MODES = (
+        ("Key&Sounder Modes"),  # For debugging
         (SounderMode.REC, SounderMode.DIS, SounderMode.REC, SounderMode.DIS),
         (SounderMode.REC, SounderMode.SLC, SounderMode.REC, SounderMode.FK),
         (SounderMode.SRC, SounderMode.DIS, SounderMode.SRC, SounderMode.DIS),
@@ -137,6 +139,7 @@ class KOB:
     )
 
     __SYNTH_MODES = (
+        ("Synth Modes"),  # For debugging
         (SynthMode.REC, SynthMode.DIS, SynthMode.REC, SynthMode.DIS),
         (SynthMode.REC, SynthMode.SLC, SynthMode.REC, SynthMode.FK),
         (SynthMode.SRC, SynthMode.DIS, SynthMode.SRC, SynthMode.DIS),
@@ -148,12 +151,12 @@ class KOB:
         (2, 3)      # KO & VC | KO & VO
     )
 
-    __ROW_SEL = (
-        (0, 1),     # WNC & NLC | WNC & LC
-        (2, 3)      # WC  & NLC | WC  & LC
+    __ROW_SEL = (  # Row 0 is the table name
+        (1, 2),     # WNC & NLC | WNC & LC
+        (3, 4)      # WC  & NLC | WC  & LC
     )
 
-    
+
     def __init__(
             self, interfaceType:InterfaceType=InterfaceType.loop, portToUse:Optional[str]=None,
             useGpio:bool=False, useAudio:bool=False, audioType:AudioType=AudioType.SOUNDER, useSounder:bool=False, invertKeyInput:bool=False, soundLocal:bool=True, sounderPowerSaveSecs:int=0,
@@ -196,7 +199,7 @@ class KOB:
         self._t_keyer_mode_change: float = now  # time of last keyer mode change during processing
         self._keyer_dits_down: bool = False
         #
-        self._key_closer_is_open: bool = True
+        self._key_closer_is_open: bool = False  # Will be set from the key in HW Init
         self._virtual_closer_is_open: bool = True
         self._circuit_is_closed: bool = False
         self._internet_circuit_closed = False
@@ -221,7 +224,8 @@ class KOB:
         self._key_state_last_closed = False
         #
         self.__init_audio()  # Do this first so it doesn't get an error when HW energizes the sounder.
-        self.__init_hw_interface()
+        self._set_key_closer_open(True)  # Use the method to set to True (for no key or key w/o closer)
+        self.__init_hw_interface()  # This will make the closer state correct if there is one
         self._update_modes()
         #
         self._key_callback = keyCallback
@@ -563,8 +567,9 @@ class KOB:
         """
         Track the physical key closer. This controlles the Loop/KOB sounder state.
         """
-        log.debug("kob._set_key_closer_open: {}".format(open), 3)
+        log.debug("kob._set_key_closer_open: {}->{}".format(self._key_closer_is_open, open), 3)
         if not open == self._key_closer_is_open:
+            self._key_closer_is_open = open
             if not open and self._sounder_mode == SounderMode.EFK:
                 # If the sounder was enabled to follow the key (loop)
                 # and the key is now closed, update the sounder enabled
@@ -572,13 +577,12 @@ class KOB:
                 # the time spent using the key)
                 self._t_sounder_energized = time.time()
             if not self._virtual_closer_in_use:
-                # Have virtual track physical and update modes
+                # Have virtual track physical
                 self._virtual_closer_is_open = open
-                self._update_modes()
             elif open:
                 if self._virtual_closer_is_open:
-                    self._update_modes()
-                self.power_save(False)
+                    self.power_save(False)
+            self._update_modes()
         return
 
     def _set_virtual_closer_open(self, open: bool):
@@ -609,6 +613,13 @@ class KOB:
         mode_col = KOB.__COL_SEL[self._key_closer_is_open][self._virtual_closer_is_open]
         mode_row = KOB.__ROW_SEL[self._wire_connected][self._sound_local]
         sounder_tbl = KOB.__LOOP_MODES if self._interface_type == InterfaceType.loop else KOB.__KS_MODES
+        log.debug("kob._update_modes: Table: '{}'  Row: {}  Col: {}  KO: {}  VO: {}".format(
+            sounder_tbl[0],
+            mode_row,
+            mode_col + 1,
+            self._key_closer_is_open,
+            self._virtual_closer_is_open), 4)  # Print COL 1-based
+
         sounder_mode = SounderMode.DIS if (self._hw_interface == HWInterface.NONE) else (
             (sounder_tbl[mode_row])[mode_col]
         )
@@ -940,7 +951,7 @@ class KOB:
 
     def keyer_mode_set(self, mode: KeyerMode, source: CodeSource):
         """
-        Set the keyer mode. 
+        Set the keyer mode.
         """
         km:tuple[KeyerMode,CodeSource] = (mode, source)
         log.debug("kob.keyer_mode_set {}->{}".format(self._keyer_mode, km), 3)
