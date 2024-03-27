@@ -540,6 +540,7 @@ class MKOBWindow:
         line_height = text_font_metrics["linespace"]
         treeview_line_height = int (line_height * 1.3)
         self._ttk_style.configure("Treeview", rowheight=treeview_line_height)
+        log.debug("MKOBWindow - Tk font metrics for 'TkTextFont: {}".format(text_font_metrics), 3)
 
         # The main (visible) window
         self._window = ttk.Frame(root)

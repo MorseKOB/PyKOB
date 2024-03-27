@@ -136,7 +136,11 @@ class PreferencesWindow:
         self._serialPort = tk.StringVar()
         if SERIAL:
             systemSerialPorts = serial.tools.list_ports.comports()
-            serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
+            for p in range(len(systemSerialPorts)):
+                sp = systemSerialPorts[p]
+                log.debug("preferencesWindow - Serial Port: dev='{}' name='{}' id='{}' desc='{}' mfg='{}' SN='{}' prod='{}'".format(
+                    sp.device, sp.name, sp.hwid, sp.description, sp.manufacturer, sp.serial_number, sp.product))
+            serialPortValues = [sp.device]
         else:
             serialPortValues = []
         serialPortMenu = ttk.Combobox(basiclocalInterface,
