@@ -222,6 +222,9 @@ class Mrt:
                     play_wire_callback=None,
                     play_finished_callback=self._from_player_finished
                 )
+            pass
+        else:
+            self._playback_complete.set()
 
         self._filesend_running: Event = Event()
         self._send_file_path = None
@@ -607,17 +610,18 @@ class Mrt:
         #
         # Done with one pass of a recording or a file. See if we should loop.
         #
-        self._playback_complete.clear()
-        self._filesend_running.clear()
         if self._repeat_delay < 0:
             # No repeat. We are done.
             self._do_automated_stuff = False
             log.debug("Mrt._process_automation - No repeat, finished processing.", 2)
             return
         if self._repeat_delay > 0:
-            log.debug("Mrt._process_automation - Delaying before repeat...", 2)
+            print("Automation - Delaying {} seconds before repeat...".format(self._repeat_delay), flush=True)
             self._shutdown.wait(self._repeat_delay)
+        if self._play_file_path:
+            self._playback_complete.clear()
         if self._send_file_path:
+            self._filesend_running.clear()
             self.__create_file_thread()
         return
 
