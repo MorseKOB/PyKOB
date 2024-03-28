@@ -582,7 +582,7 @@ class KOB:
             elif open:
                 if self._virtual_closer_is_open:
                     self.power_save(False)
-            self._update_modes()
+            self._update_modes(from_key_closer=True)
         return
 
     def _set_virtual_closer_open(self, open: bool):
@@ -597,7 +597,7 @@ class KOB:
             self._update_modes()
         return
 
-    def _update_modes(self):
+    def _update_modes(self, from_key_closer=False):
         """
         Based on the type of interface, the closers states, and the local-copy flag,
         set the current sounder and synth mode.
@@ -634,17 +634,11 @@ class KOB:
         if not synth_mode == synth_mode_was:
             log.debug("kob._update_modes: synth_mode changed", 4)
 
-        energize_sounder = ((
-                not self._virtual_closer_is_open and
-                not self._wire_connected
-            ) or (
-                self._wire_connected and
-                self._internet_circuit_closed and
-                not self._virtual_closer_is_open
-            )
-        )
-        self._energize_hw_sounder(energize_sounder or sounder_mode == SounderMode.EFK)
-        self._energize_synth(energize_sounder, no_tone=True)
+        energize_sounder = (not sounder_mode == SounderMode.SLC) or (sounder_mode == SounderMode.EFK)
+        self._energize_hw_sounder(energize_sounder)
+        if not (from_key_closer and self._virtual_closer_in_use):
+            energize_synth = (not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK)
+            self._energize_synth(energize_synth, no_tone=True)
         log.debug("kob._update_modes: now {}:{}".format(self._sounder_mode.name, self._synth_mode.name), 2)
         return
 
