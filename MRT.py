@@ -498,7 +498,8 @@ class Mrt:
         self._handle_sender_update(self._our_office_id)
         if self._recorder and not code_source == kob.CodeSource.player:
             self._recorder.record(code, code_source, char)
-        kob_.soundCode(code, code_source)
+        if not code_source == kob.CodeSource.key:
+            kob_.soundCode(code, code_source)
         if self._reader and not code_source == kob.CodeSource.keyboard:
             self._reader.decode(code)
         if self._connected and self._cfg.remote:
@@ -844,10 +845,10 @@ class MrtSelector:
         return s
 
 
-    def __init__(self, selector_file_path) -> None:
+    def __init__(self, selector_port, selector_file_path) -> None:
         self._selector_file_path = MrtSelector.add_ext_if_needed(selector_file_path)
+        self._selector_port: str = selector_port
 
-        self._selector_port: Optional[str] = None
         self._selector_type: Optional[SelectorType] = None
         self._selections: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
         self._selector: Optional[Selector] = None
@@ -884,7 +885,6 @@ class MrtSelector:
             with open(filepath, 'r', encoding="utf-8") as fp:
                 selector_spec = json.load(fp)
             if selector_spec:
-                    self._selector_port = selector_spec[SELECTOR_PORT_KEY]
                     selector_type_name = selector_spec[SELECTOR_TYPE_KEY]
                     self._selector_type = SelectorType(selector_type_name)
                     selections: list[Optional[dict[str,list[Optional[str]]]]] = selector_spec[SELECTOR_SELECTIONS_KEY]
@@ -1013,10 +1013,12 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=T
     if allow_selector:
         arg_parser.add_argument(
             "--selector",
-            metavar="mrt-selector-spec",
-            dest="selector_filepath",
+            nargs=2,
+            metavar="port specfile",
+            dest="selector_args",
             help="Use a PyKOB Selector to run MRT with different options based on " +
-                "the MRT Selector Specification and the current selector setting."
+                "the MRT Selector Specification file 'specfile' and the current selector " +
+                "setting of a selector connected to port 'port'."
         )
     arg_parser.add_argument("wire", nargs='?', type=int,
         help="Wire to connect to. If specified, this is used rather than the configured wire. " +
@@ -1032,16 +1034,21 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=T
     play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
     sendtext_filepath = None if not (hasattr(args, "textfile_filepath") and args.textfile_filepath) else args.textfile_filepath
     repeat_delay = args.repeat_delay
-    selector_filepath = None if not (hasattr(args, "selector_filepath") and args.selector_filepath) else args.selector_filepath
+    selector_specpath = None
+    selector_port = None
+    if hasattr(args, "selector_args"):
+        if args.selector_args:
+            selector_port = args.selector_args[0]
+            selector_specpath = args.selector_args[1]
 
     #
     # Check to see that recordings/files aren't specified if there is a selector
-    if selector_filepath and (play_filepath or sendtext_filepath):
-        raise Exception("Cannot specify a recording or a file to process when using a Selector.")
+    if selector_specpath and (play_filepath or sendtext_filepath):
+        raise Exception("Cannot specify a recording or a file to process when using a Selector. ")
 
     #
-    # If we have a selector filepath, create a selector to return
-    selector = None if not selector_filepath else MrtSelector(selector_filepath)
+    # If we have a selector spec path, create a selector to return
+    selector = None if not selector_specpath else MrtSelector(selector_port, selector_specpath)
 
     mrt = None if not selector is None else Mrt(
         MRT_VERSION_TEXT,
