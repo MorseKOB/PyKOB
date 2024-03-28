@@ -110,7 +110,7 @@ class MKOBMain:
                 self._internet.shutdown()
             self._internet = internet.Internet(
                 officeID=cfg.station,
-                code_callback=self.from_internet,
+                code_callback=self._from_internet,
                 pckt_callback=self._packet_callback,
                 appver=self.app_ver,
                 server_url=cfg.server_url,
@@ -144,7 +144,7 @@ class MKOBMain:
                 sounderPowerSaveSecs=cfg.sounder_power_save,
                 virtual_closer_in_use=True,
                 err_msg_hndlr=self._kob_err_msg_hndlr,
-                keyCallback=self.from_key
+                keyCallback=self._from_key
             )
             self._kob.virtual_closer_is_open = vcloser
         kob_ = self.Kob
@@ -165,7 +165,7 @@ class MKOBMain:
                 None,
                 station_id=self._sender_ID,
                 wire=self._wire,
-                play_code_callback=self.from_recorder,
+                play_code_callback=self._from_recorder,
                 play_sender_id_callback=self._ka.trigger_current_sender_update,
                 play_station_list_callback=self._ka.trigger_station_active_update,
                 play_wire_callback=self._ka.trigger_player_wire_change,
@@ -522,7 +522,7 @@ class MKOBMain:
         self._emit_code_queue.put(emit_code_packet)
         return
 
-    def from_key(self, code):
+    def _from_key(self, code):
         """
         Handle inputs received from the external key.
         Only send if the circuit is open.
@@ -580,7 +580,7 @@ class MKOBMain:
             )
         return
 
-    def from_internet(self, code):
+    def _from_internet(self, code):
         """handle inputs received from the internet"""
         if self._shutdown.is_set():
             return
@@ -603,7 +603,7 @@ class MKOBMain:
             self._set_internet_station_active(False)
         return
 
-    def from_recorder(self, code, source=None):
+    def _from_recorder(self, code, source=None):
         """
         Handle inputs received from the recorder during playback.
         """
