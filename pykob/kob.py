@@ -818,11 +818,7 @@ class KOB:
         code = ()  # Start with empty sequence
         if self._shutdown.is_set():
             return code
-        # The following 3 are used to slowing increase the sleep
-        # time if the key is idle. This is to reduce CPU usage.
-        no_change = 0
         sleep_time = 0.001
-        sleep_bump = 0.005
         while not self._threadsStop.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
             try:
@@ -851,15 +847,6 @@ class KOB:
                     return code
                 else:
                     code += (dt,)
-                no_change = 0
-                sleep_time = 0.001
-                sleep_bump = 0.005
-            else:
-                if sleep_time < 0.025:
-                    no_change += 1
-                    if (no_change % 1000) == 0:
-                        sleep_time += sleep_bump  # if no changes for a while, slightly increase sleep
-                        sleep_bump += sleep_bump
             if not kc and code and t > self._t_key_last_change + CODESPACE:
                 return code
             if kc and not self._circuit_is_closed and t > self._t_key_last_change + CKTCLOSE:
@@ -880,11 +867,7 @@ class KOB:
         if self._shutdown.is_set():
             return code
         km1 = self.keyer_mode  # Use the property to employ the guard
-        # The following 3 are used to slowing increase the sleep
-        # time if the key is idle. This is to reduce CPU usage.
-        no_change = 0
         sleep_time = 0.001
-        sleep_bump = 0.005
         while not self._threadsStop.is_set():
             drive_sounder = ((self._sounder_mode == SounderMode.FK) or
                             (self._sounder_mode == SounderMode.SLC) or
@@ -928,15 +911,6 @@ class KOB:
                         code += (dt,)
                 else:  # DITS or DAH
                     code += (-dt,)
-                no_change = 0
-                sleep_time = 0.001
-                sleep_bump = 0.005
-            else:
-                if sleep_time < 0.030:
-                    no_change += 1
-                    if (no_change % 1000) == 0:
-                        sleep_time += sleep_bump  # if no changes for a while, slightly increase sleep
-                        sleep_bump += sleep_bump
             if km[0] == KeyerMode.IDLE and code and t > self._t_keyer_mode_change + CODESPACE:
                 return code
             if km[0] == KeyerMode.DAH and not self._circuit_is_closed and t > self._t_keyer_mode_change + CKTCLOSE:
