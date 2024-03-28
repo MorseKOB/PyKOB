@@ -16,7 +16,7 @@
         {
             "desc":"Chat (Wire 11)",
             "args":[
-                "11"
+                "11", "--config", "wire-11-public.pkcfg"
             ]
         },
         {
