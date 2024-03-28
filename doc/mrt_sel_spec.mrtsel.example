@@ -1,0 +1,29 @@
+{
+    "type":"1OF4",
+    "selections": [
+        {
+            "desc":"Local only",
+            "args":[
+                "0"
+            ]
+        },
+        {
+            "desc":"News (Wire 108)",
+            "args":[
+                "108"
+            ]
+        },
+        {
+            "desc":"Chat (Wire 11)",
+            "args":[
+                "11"
+            ]
+        },
+        {
+            "desc":"Play a recording and process a file, sending to Wire 230.",
+            "args":[
+                "230", "--play", "mrt-session.pkrec", "--file", "mkob_learn/The quick brown fox.txt", "--repeat", "8"
+            ]
+        }
+    ]
+}
