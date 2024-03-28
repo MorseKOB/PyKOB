@@ -40,15 +40,20 @@ Example:
     python MRT.py 11
 """
 
-from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
+from pykob import VERSION, config, config2, log, kob, internet, morse, mrt_selector, recorder
 from pykob.config2 import Config
 from pykob.internet import Internet
 from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 from pykob.recorder import Recorder
+from pykob.mrt_selector import Selector, SelectorMode, SelectorChange
 import pkappargs
 
 import argparse
+from collections import namedtuple
+from enum import Enum
+import json
+from json import JSONDecodeError
 from pathlib import Path
 import platform
 import queue
@@ -58,10 +63,52 @@ import sys
 from sys import platform
 from threading import Event, Thread
 from time import sleep
-from typing import Optional
+from typing import Optional, Sequence
 
 __version__ = '1.3.1'
 MRT_VERSION_TEXT = "MRT " + __version__
+
+MRT_SEL_EXT = ".mrtsel"
+
+class SelectorType(Enum):
+
+    def __new__(cls, *args, **kwds):
+        obj = object.__new__(cls)
+        obj._value_ = args[0]
+        obj._key = args[0]
+        obj._elements = args[1]
+        obj._mode = args[2]
+        obj._change = args[3]
+        return obj
+
+    def __repr__(self):
+        return f'<{type(self).__name__}.{self.name}:({self._key},{self._elements!r},{self._mode!r},{self._change!r})>'
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def key(self) -> str:
+        return self._key
+    @property
+    def elements(self) -> int:
+        return self._elements
+    @property
+    def mode(self) -> SelectorMode:
+        return self._mode
+    @property
+    def change(self) -> SelectorChange:
+        return self._change
+
+    ONE_OF_FOUR = "1OF4", 4, SelectorMode.OneOfFour, SelectorChange.OneOfFour
+    BINARY = "BINARY", 16, SelectorMode.Binary, SelectorChange.Binary
+
+
+SELECTOR_PORT_KEY = "port"
+SELECTOR_SELECTIONS_KEY = "selections"
+SELECTOR_TYPE_KEY = "type"
+SELECTION_ARGS_KEY = "args"
+SELECTION_DESCRIPTION_KEY = "desc"
 
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
@@ -186,7 +233,7 @@ class Mrt:
         repeat_delay: int = -1,
         record_filepath: Optional[str] = None,
         file_to_play: Optional[str] = None,
-        file_to_send: Optional[str] = None,
+        file_to_send: Optional[str] = None
     ) -> None:
         self._app_name_version = app_name_version
         self._wire = wire
@@ -199,6 +246,7 @@ class Mrt:
         self._control_c_pressed: Event = Event()
         self._kb_queue: Queue = Queue(128)
 
+        self._record_filepath = None if record_filepath is None else recorder.add_ext_if_needed(record_filepath.strip())
         self._player: Optional[Recorder] = None
         self._playback_complete: Event = Event()
         self._play_file_path = None
@@ -210,18 +258,7 @@ class Mrt:
                 print("Recording not found. '{}'".format(self._play_file_path))
                 self._play_file_path = None
                 self._playback_complete.set()
-            else:
-                self._player = Recorder(
-                    None,
-                    self._play_file_path,
-                    station_id=self._cfg.station,
-                    wire=self._wire,
-                    play_code_callback=self._from_player,
-                    play_sender_id_callback=self._handle_sender_update,
-                    play_station_list_callback=None,
-                    play_wire_callback=None,
-                    play_finished_callback=self._from_player_finished
-                )
+                raise FileNotFoundError(p)
             pass
         else:
             self._playback_complete.set()
@@ -235,6 +272,9 @@ class Mrt:
             if not p.is_file():
                 print("File to send not found. '{}'".format(self._send_file_path))
                 self._send_file_path = None
+                raise FileNotFoundError(p)
+            pass
+
 
         self._internet: Optional[Internet] = None
         self._kob: Optional[KOB] = None
@@ -256,61 +296,6 @@ class Mrt:
 
         self._exit_status = 1
 
-        if record_filepath:
-            log.info("Recording to '{}'".format(record_filepath))
-            self._recorder = Recorder(
-                record_filepath,
-                None,
-                station_id=self._our_office_id,
-                wire=self._wire,
-                play_code_callback=None,
-                play_sender_id_callback=None,
-                play_station_list_callback=None,
-                play_wire_callback=None,
-            )
-
-        self._kob = kob.KOB(
-            interfaceType=cfg.interface_type,
-            portToUse=cfg.serial_port,
-            useGpio=cfg.gpio,
-            useAudio=cfg.sound,
-            audioType=cfg.audio_type,
-            useSounder=cfg.sounder,
-            invertKeyInput=cfg.invert_key_input,
-            soundLocal=cfg.local,
-            sounderPowerSaveSecs=cfg.sounder_power_save,
-            virtual_closer_in_use=True,
-            keyCallback=self._from_key
-            )
-        self._internet = internet.Internet(
-            officeID=self._our_office_id,
-            code_callback=self._from_internet,
-            appver=self._app_name_version,
-            server_url=cfg.server_url,
-            err_msg_hndlr=log.warn
-        )
-        self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
-        self._sender = morse.Sender(
-            wpm=cfg.text_speed,
-            cwpm=cfg.min_char_speed,
-            codeType=cfg.code_type,
-            spacing=cfg.spacing
-            )
-
-        if sys.stdout.isatty():
-            self._reader = morse.Reader(
-                wpm=cfg.text_speed,
-                cwpm=cfg.min_char_speed,
-                codeType=cfg.code_type,
-                callback=self._reader_callback
-                )
-        if sys.stdin.isatty():
-            # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
-            self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
-            self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
-        self._thread_fsender = None
-        if self._send_file_path:
-            self.__create_file_thread()
         return
 
     def exit(self):
@@ -374,6 +359,8 @@ class Mrt:
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
         except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        finally:
             self.exit()
         return
 
@@ -414,6 +401,72 @@ class Mrt:
         return
 
     def start(self):
+        if self._play_file_path:
+            self._player = Recorder(
+                None,
+                self._play_file_path,
+                station_id=self._cfg.station,
+                wire=self._wire,
+                play_code_callback=self._from_player,
+                play_sender_id_callback=self._handle_sender_update,
+                play_station_list_callback=None,
+                play_wire_callback=None,
+                play_finished_callback=self._from_player_finished
+            )
+        if self._record_filepath:
+            log.info("Recording to '{}'".format(self._record_filepath))
+            self._recorder = Recorder(
+                self._record_filepath,
+                None,
+                station_id=self._our_office_id,
+                wire=self._wire,
+                play_code_callback=None,
+                play_sender_id_callback=None,
+                play_station_list_callback=None,
+                play_wire_callback=None,
+            )
+
+        self._kob = kob.KOB(
+            interfaceType=self._cfg.interface_type,
+            portToUse=self._cfg.serial_port,
+            useGpio=self._cfg.gpio,
+            useAudio=self._cfg.sound,
+            audioType=self._cfg.audio_type,
+            useSounder=self._cfg.sounder,
+            invertKeyInput=self._cfg.invert_key_input,
+            soundLocal=self._cfg.local,
+            sounderPowerSaveSecs=self._cfg.sounder_power_save,
+            virtual_closer_in_use=True,
+            keyCallback=self._from_key
+            )
+        self._internet = internet.Internet(
+            officeID=self._our_office_id,
+            code_callback=self._from_internet,
+            appver=self._app_name_version,
+            server_url=self._cfg.server_url,
+            err_msg_hndlr=log.warn
+        )
+        self._internet.monitor_sender(self._handle_sender_update) # Set callback for monitoring current sender
+        self._sender = morse.Sender(
+            wpm=self._cfg.text_speed,
+            cwpm=self._cfg.min_char_speed,
+            codeType=self._cfg.code_type,
+            spacing=self._cfg.spacing
+            )
+        if sys.stdout.isatty():
+            self._reader = morse.Reader(
+                wpm=self._cfg.text_speed,
+                cwpm=self._cfg.min_char_speed,
+                codeType=self._cfg.code_type,
+                callback=self._reader_callback
+                )
+        if sys.stdin.isatty():
+            # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
+            self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
+            self._thread_kbsender = Thread(name="Keyboard-send-thread", daemon=False, target=self._thread_kbsender_body)
+        self._thread_fsender = None
+        if self._send_file_path:
+            self.__create_file_thread()
         if not self._thread_kbreader is None and not self._thread_kbsender is None:
             self._thread_kbreader.start()
             self._thread_kbsender.start()
@@ -750,7 +803,7 @@ class Mrt:
                             print('\x07', end='', flush=True) # Ring the bell to let them know we are full
                     self._shutdown.wait(0.008)
                 except Exception as ex:
-                    print("<<< Keyboard reader encountered an error and will stop reading. Exception: {}").format(ex)
+                    print("<<< Keyboard reader encountered an error and will stop reading. Error: {}".format(ex))
                     self._kbt_stop.set()
         finally:
             rawterm.exit()
@@ -767,83 +820,278 @@ class Mrt:
                 # The queue was empty. Wait a bit, then try again.
                 self._shutdown.wait(0.001)
             except Exception as ex:
-                print("<<< Keyboard sender encountered an error and will stop running. Exception: {}").format(ex)
+                print("<<< Keyboard sender encountered an error and will stop running. Exception: {}".format(ex))
                 self._kbt_stop.set()
         log.debug("MRT-KB Sender thread done.")
         return
+
+class SelectorLoadError(Exception):
+    pass
+
+class MrtSelector:
+    """
+    Uses a pykob.Selector to run Mrt in different ways (as specified in a Selector structure).
+    """
+
+    def add_ext_if_needed(s: str) -> str:
+        """
+        Add the MRT selector file extension if needed.
+
+        Adds '.mrtsel' to the string argument if it doesn't already end with it.
+        """
+        if s and not s.endswith(MRT_SEL_EXT):
+            return (s + MRT_SEL_EXT)
+        return s
+
+
+    def __init__(self, selector_file_path) -> None:
+        self._selector_file_path = MrtSelector.add_ext_if_needed(selector_file_path)
+
+        self._selector_port: Optional[str] = None
+        self._selector_type: Optional[SelectorType] = None
+        self._selections: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
+        self._selector: Optional[Selector] = None
+        self._accept_select: Event = Event()
+        self._selection_changed: Event = Event()
+        self._run_complete: Event = Event()
+
+        self._mrt: Optional[Mrt] = None
+        self._new_mrt: Optional[Mrt] = None
+        self._spec_args: Optional[list[str]] = None
+        self._spec_desc: Optional[str] = None
+
+        self._load_selector(self._selector_file_path)
+        return
+
+    def _load_selector(self, filepath:str) -> bool:
+        """
+        Load a MRT selector file (json).
+
+        filepath: File path to use for a Selector Spec.
+
+        Selector Spec is:
+        0. Selector Type
+        1. Mrt specs
+            a. Number
+            b. Spec
+
+        Raises: FileNotFoundError if the selector file isn't found.
+                SelectorLoadError if the selector file isn't valid.
+                System may throw other file related exceptions.
+        """
+        try:
+            selector_spec = None
+            with open(filepath, 'r', encoding="utf-8") as fp:
+                selector_spec = json.load(fp)
+            if selector_spec:
+                    self._selector_port = selector_spec[SELECTOR_PORT_KEY]
+                    selector_type_name = selector_spec[SELECTOR_TYPE_KEY]
+                    self._selector_type = SelectorType(selector_type_name)
+                    selections: list[Optional[dict[str,list[Optional[str]]]]] = selector_spec[SELECTOR_SELECTIONS_KEY]
+                    # Make sure the list has the correct number of elements
+                    ne = self._selector_type.elements
+                    for n in range(len(selections), ne):
+                        selections.append(None)
+                    self._selections = selections
+                    log.debug("MrtSelector.load_selector - Port: {}".format(self._selector_port))
+                    log.debug("MrtSelector.load_selector - Type: {}".format(selector_type_name))
+                    log.debug("MrtSelector.load_selector - Mrt Specs: {}".format(selections))
+                    #
+                    # Create the selector
+                    self._selector = Selector(self._selector_port, self._selector_type.mode, on_change=self._on_selection_changed)
+                    self._selector.start()
+                    return True
+        except FileNotFoundError as fnf:
+            log.debug("MrtSelector.load_selector - File not found: {}".format(filepath))
+            raise SelectorLoadError(fnf)
+        except JSONDecodeError as jde:
+            log.debug("MrtSelector.load_selector - Spec error: {}".format(jde))
+            raise SelectorLoadError(jde)
+        except Exception as ex:
+            log.debug(ex)
+            raise SelectorLoadError("MrtSelector.load_selector - Error: {}".format(ex))
+        return False
+
+    def _on_selection_changed(self, change:SelectorChange, value):
+        """
+        The Selector changed. Get the selection number and start an Mrt with the configuration.
+        """
+        if self._accept_select.is_set() and self._selector_type.change == change and value > 0:
+            selected = value
+            spec = self._selections[selected-1]  # Selection is 1-based
+            if spec is None:
+                # There wasn't a specification for this selection. ZZZ: Raise an exception?
+                return
+            self._spec_args = spec[SELECTION_ARGS_KEY]
+            self._spec_desc = spec[SELECTION_DESCRIPTION_KEY]
+            new_mrt, dummy = mrt_from_args(self._spec_args, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+            if new_mrt is None:
+                # Should we raise an exception in this case?
+                pass
+            else:
+                self._new_mrt = new_mrt
+                if self._mrt:
+                    self._mrt.exit()
+                self._selection_changed.set()
+        return
+
+    def exit(self) -> None:
+        self._new_mrt = None
+        self._selection_changed.set()  # Wake up `run
+        self._run_complete.wait()
+        if self._mrt:
+            self._mrt.exit()
+        if self._selector:
+            self._selector.exit()
+        return
+
+    def run(self) -> None:
+        """
+        Main loop of the Selector.
+
+        Create a pykob selector for the port and allow it to select configurations.
+        """
+        try:
+            self._accept_select.set()
+            while self._selection_changed.wait():
+                self._selection_changed.clear()
+                self._accept_select.clear()
+                if self._mrt:
+                    self._mrt.exit()
+                    self._mrt = None
+                if self._new_mrt:
+                    log.log("\nSwitching to MRT selection {}: {}\n\n".format(self._selector.one_of_four, self._spec_desc), dt="")
+                    self._mrt = self._new_mrt
+                    self._new_mrt = None
+                    self._mrt.start()
+                    self._accept_select.set()
+                    self._mrt.main_loop()
+                    log.debug("MrtSelector.run - Mrt returned from main_loop.")
+                else:
+                    break
+        finally:
+            log.debug("MrtSelector.run - ending", 3)
+            self._run_complete.set()
+            self.exit()
+            log.debug("MrtSelector.run - done")
+        return
+
+def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
+    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
+        + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
+        parents= [
+            config2.station_override,
+            config2.min_char_speed_override,
+            config2.text_speed_override,
+            config2.config_file_override,
+            config2.logging_level_override,
+            pkappargs.record_session_override
+        ]
+    )
+    arg_parser.add_argument(
+        "--file",
+        metavar="text-file-path",
+        dest="textfile_filepath",
+        help="Key a text file when started. Code will be sent if connected to a wire.",
+    )
+    arg_parser.add_argument(
+        "--play",
+        metavar="recording-path",
+        dest="play_filepath",
+        help="Play a recording when started. Code will be sent if connected to a wire.",
+    )
+    arg_parser.add_argument(
+        "--repeat",
+        metavar="delay",
+        dest="repeat_delay",
+        default=-1,
+        type=int,
+        help="Used in conjunction with '--play' or '--file', " +
+            "this will cause the playback or file processing to be repeated. " +
+            "The value is the delay, in seconds, to pause before repeating."
+    )
+    if allow_selector:
+        arg_parser.add_argument(
+            "--selector",
+            metavar="mrt-selector-spec",
+            dest="selector_filepath",
+            help="Use a PyKOB Selector to run MRT with different options based on " +
+                "the MRT Selector Specification and the current selector setting."
+        )
+    arg_parser.add_argument("wire", nargs='?', type=int,
+        help="Wire to connect to. If specified, this is used rather than the configured wire. " +
+            "Use 0 to not connect.")
+
+    args = arg_parser.parse_args(options)
+
+    cfg = config2.process_config_args(args)
+    log.set_logging_level(cfg.logging_level)
+
+    wire = args.wire if args.wire else cfg.wire
+    record_filepath = pkappargs.record_filepath_from_args(args)
+    play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
+    sendtext_filepath = None if not (hasattr(args, "textfile_filepath") and args.textfile_filepath) else args.textfile_filepath
+    repeat_delay = args.repeat_delay
+    selector_filepath = None if not (hasattr(args, "selector_filepath") and args.selector_filepath) else args.selector_filepath
+
+    #
+    # Check to see that recordings/files aren't specified if there is a selector
+    if selector_filepath and (play_filepath or sendtext_filepath):
+        raise Exception("Cannot specify a recording or a file to process when using a Selector.")
+
+    #
+    # If we have a selector filepath, create a selector to return
+    selector = None if not selector_filepath else MrtSelector(selector_filepath)
+
+    mrt = None if not selector is None else Mrt(
+        MRT_VERSION_TEXT,
+            wire,
+            cfg,
+            record_filepath=record_filepath,
+            repeat_delay=repeat_delay,
+            file_to_play=play_filepath,
+            file_to_send=sendtext_filepath,
+        )
+    return (mrt, selector)
 
 """
 Main code
 """
 if __name__ == "__main__":
     mrt = None
+    mrt_selector = None
     exit_status = 1
     try:
         # Main code
-        arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
-            + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
-            parents= [
-                config2.station_override,
-                config2.min_char_speed_override,
-                config2.text_speed_override,
-                config2.config_file_override,
-                config2.logging_level_override,
-                pkappargs.record_session_override
-            ]
-        )
-        arg_parser.add_argument(
-            "--play",
-            metavar="recording-path",
-            dest="play_filepath",
-            help="Play a recording when started. Code will be sent if connected to a wire.",
-        )
-        arg_parser.add_argument(
-            "--file",
-            metavar="text-file-path",
-            dest="textfile_filepath",
-            help="Key a text file when started. Code will be sent if connected to a wire.",
-        )
-        arg_parser.add_argument(
-            "--repeat",
-            metavar="delay",
-            dest="repeat_delay",
-            default=-1,
-            type=int,
-            help="Used in conjunction with '--play' or '--file', " +
-                "this will cause the playback or file processing to be repeated. " +
-                "The value is the delay, in seconds, to pause before repeating."
-        )
-        arg_parser.add_argument("wire", nargs='?', type=int,
-            help="Wire to connect to. If specified, this is used rather than the configured wire. " +
-                "Use 0 to not connect.")
-        args = arg_parser.parse_args()
-        cfg = config2.process_config_args(args)
-        wire = args.wire if args.wire else cfg.wire
-        record_filepath = pkappargs.record_filepath_from_args(args)
-
-        log.set_logging_level(cfg.logging_level)
-
         print(MRT_VERSION_TEXT)
         print("Python: " + sys.version + " on " + sys.platform)
         print("pykob: " + VERSION)
         print("PySerial: " + config.pyserial_version)
 
-        play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
-        sendtext_filepath = None if not (hasattr(args, "textfile_filepath") and args.textfile_filepath) else args.textfile_filepath
-        repeat_delay = args.repeat_delay
 
-        mrt = Mrt(MRT_VERSION_TEXT, wire, cfg, repeat_delay=repeat_delay, record_filepath=record_filepath, file_to_play=play_filepath, file_to_send=sendtext_filepath)
-        mrt.start()
-        mrt.main_loop()
-        mrt = None
+        mrt, mrt_selector = mrt_from_args(allow_selector=True)
+
+        if mrt_selector:
+            mrt_selector.run()
+            mrt_selector = None
+        elif mrt:
+            mrt.start()
+            mrt.main_loop()
+            mrt = None
+        else:
+            raise Exception("Could not initialize MRT or Selector.")
         exit_status = 0
     except FileNotFoundError as fnf:
         print("File not found: {}".format(fnf.args[0]))
+    except SelectorLoadError as sle:
+        print("Error loading selector specification file - {}".format(sle))
     except Exception as ex:
         print("Error encountered: {}".format(ex))
     finally:
         if mrt:
             mrt.exit()
+        if mrt_selector:
+            mrt_selector.exit()
         print()
         print("~73")
         sleep(0.5)

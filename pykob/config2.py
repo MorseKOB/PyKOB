@@ -37,7 +37,7 @@ A mechanism for change notification is available.
 
 """
 import argparse
-from enum import Flag, IntEnum, unique
+from enum import IntEnum, unique
 import json
 from json import JSONDecodeError
 import os.path

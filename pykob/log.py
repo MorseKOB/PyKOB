@@ -49,12 +49,15 @@ global LOGGING_MIN_LEVEL
 """ Minimum logging level. This disables all logging. """
 LOGGING_MIN_LEVEL = -3
 
-def log(msg, type="", dt=None, level_threshold=ERROR_LEVEL):
+def log(msg, type="", dt=None, level_threshold=INFO_LEVEL):
     global __logging_level
     if __logging_level >= level_threshold:
-        dtl = dt if dt else str(datetime.datetime.now())[:19]
+        dtl = dt if not dt is None else str(datetime.datetime.now())[:19]
         typestr = " {0}".format(type) if type else ""
-        sys.stdout.write('{0}{1}: \t{2}\n'.format(dtl, typestr, msg))
+        if not typestr and not dtl:
+            sys.stdout.write(msg)
+        else:
+            sys.stdout.write('{0}{1}: \t{2}\n'.format(dtl, typestr, msg))
         sys.stdout.flush()
     return
 
@@ -84,7 +87,7 @@ def error(msg):
     logErr("{0}\n{1}".format(msg, val))
     return
 
-def info(msg):
+def info(msg, ):
     log(msg, type="INFO", level_threshold=INFO_LEVEL)
     return
 

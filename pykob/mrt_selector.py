@@ -33,9 +33,10 @@ SOFTWARE.
 from enum import Enum, IntEnum, unique
 import sys
 import time
-import log
 import threading
 from threading import Condition, Event, Thread
+
+from pykob import log
 
 serialModuleAvailable = False
 try:
@@ -61,7 +62,7 @@ class SelectorChange(IntEnum):
 
 class Selector:
     def __init__(self, portToUse:str, mode:SelectorMode=SelectorMode.OneOfFour,
-                 pole_cycle_time:float=0.1, steady_time:float=0.3, on_change=None) -> None:
+            pole_cycle_time:float=0.1, steady_time:float=0.3, on_change=None) -> None:
         self._portToUse = portToUse
         self._port = None
         self._mode = mode
@@ -119,14 +120,14 @@ class Selector:
                             # Call On-Change?
                             if self._on_change:
                                 if (oof_changed and self._mode == SelectorMode.OneOfFour):
-                                    self._on_change(SelectorChange.OneOfFour)
+                                    self._on_change(SelectorChange.OneOfFour, self._one_of_four)
                                 else:
                                     change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
                                         (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
                                     if (binary_changed and self._mode == SelectorMode.Binary):
-                                        self._on_change(change)
+                                        self._on_change(change, self._binary_value)
                                     else:
-                                        self._on_change(change)
+                                        self._on_change(change, (self._binary_value, self._one_of_four))
                             # Clear the flags
                             values_need_updating = False
                             oof_changed = False
@@ -167,7 +168,7 @@ class Selector:
         try:
             self._port = serial.Serial(self._portToUse)
             self._thread_port_checker.start()
-            log.debug("The UART '{}' for the Selector is available.".format(self._portToUse))
+            log.debug("The port '{}' for the Selector is available.".format(self._portToUse))
         except Exception as ex:
             log.info("Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
             log.debug("Selector exception: {}".format(ex))
@@ -179,15 +180,16 @@ if __name__ == "__main__":
     # Self-test
     __test_selector = None
 
-    def __test_on_change(change):
+    def __test_on_change(change, value):
         global __test_selector
         print("Test On Change: {}".format(change))
+        print(" value: {}".format(value))
         print(" Binary: {}".format(__test_selector.binary_value))
         print(" 1 of 4: {}".format(__test_selector.one_of_four))
 
     try:
         log.set_logging_level(log.DEBUG_MIN_LEVEL)
-        port = sys.argv[1] if len(sys.argv) == 2 else 'COM6'
+        port = sys.argv[1] if len(sys.argv) == 2 else 'COM4'
         __test_selector = Selector(port, SelectorMode.OneOfFour, on_change=__test_on_change)
         __test_selector.start()
         while True:
