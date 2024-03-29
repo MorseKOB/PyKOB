@@ -34,7 +34,8 @@ from enum import Enum, IntEnum, unique
 import sys
 import time
 import threading
-from threading import Condition, Event, Thread
+from threading import Event, Thread
+from typing import Optional
 
 from pykob import log
 
@@ -62,7 +63,7 @@ class SelectorChange(IntEnum):
 
 class Selector:
     def __init__(self, portToUse:str, mode:SelectorMode=SelectorMode.OneOfFour,
-            pole_cycle_time:float=0.1, steady_time:float=0.3, on_change=None) -> None:
+            pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None) -> None:
         self._portToUse = portToUse
         self._port = None
         self._mode = mode
