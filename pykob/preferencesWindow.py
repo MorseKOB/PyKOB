@@ -134,15 +134,13 @@ class PreferencesWindow:
 
         # Add a pop-up menu with the list of available serial connections:
         self._serialPort = tk.StringVar()
+        serialPortValues = []
         if SERIAL:
             systemSerialPorts = serial.tools.list_ports.comports()
-            for p in range(len(systemSerialPorts)):
-                sp = systemSerialPorts[p]
+            for sp in systemSerialPorts:
                 log.debug("preferencesWindow - Serial Port: dev='{}' name='{}' id='{}' desc='{}' mfg='{}' SN='{}' prod='{}'".format(
                     sp.device, sp.name, sp.hwid, sp.description, sp.manufacturer, sp.serial_number, sp.product))
-                serialPortValues = [sp.device]
-        else:
-            serialPortValues = []
+                serialPortValues += [sp.device]
         serialPortMenu = ttk.Combobox(basiclocalInterface,
                                       width=30,
                                       textvariable=self._serialPort,
