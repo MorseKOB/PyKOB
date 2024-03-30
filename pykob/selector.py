@@ -155,7 +155,8 @@ class Selector:
         Stop the threads and exit.
         """
         self.shutdown()
-        self._thread_port_checker.join(timeout=2.0)
+        if self._thread_port_checker and self._thread_port_checker.is_alive():
+            self._thread_port_checker.join(timeout=2.0)
 
     def shutdown(self):
         """

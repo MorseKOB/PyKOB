@@ -140,7 +140,7 @@ class PreferencesWindow:
                 sp = systemSerialPorts[p]
                 log.debug("preferencesWindow - Serial Port: dev='{}' name='{}' id='{}' desc='{}' mfg='{}' SN='{}' prod='{}'".format(
                     sp.device, sp.name, sp.hwid, sp.description, sp.manufacturer, sp.serial_number, sp.product))
-            serialPortValues = [sp.device]
+                serialPortValues = [sp.device]
         else:
             serialPortValues = []
         serialPortMenu = ttk.Combobox(basiclocalInterface,
