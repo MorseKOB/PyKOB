@@ -77,11 +77,12 @@ class SelectorType(Enum):
         obj._key = args[0]
         obj._elements = args[1]
         obj._mode = args[2]
-        obj._change = args[3]
+        obj._index_adj = args[3]
+        obj._change = args[4]
         return obj
 
     def __repr__(self):
-        return f'<{type(self).__name__}.{self.name}:({self._key},{self._elements!r},{self._mode!r},{self._change!r})>'
+        return f'<{type(self).__name__}.{self.name}:({self._key},{self._elements!r},{self._mode!r},{self._index_adj},{self._change!r})>'
 
     def __str__(self) -> str:
         return self.name
@@ -96,11 +97,14 @@ class SelectorType(Enum):
     def mode(self) -> SelectorMode:
         return self._mode
     @property
+    def index_adj(self) -> int:
+        return self._index_adj
+    @property
     def change(self) -> SelectorChange:
         return self._change
 
-    ONE_OF_FOUR = "1OF4", 4, SelectorMode.OneOfFour, SelectorChange.OneOfFour
-    BINARY = "BINARY", 16, SelectorMode.Binary, SelectorChange.Binary
+    ONE_OF_FOUR = "1OF4", 4, SelectorMode.OneOfFour, -1, SelectorChange.OneOfFour
+    BINARY = "BINARY", 16, SelectorMode.Binary, 0, SelectorChange.Binary
 
 
 SELECTOR_SELECTIONS_KEY = "selections"
@@ -844,6 +848,20 @@ class Mrt:
 class SelectorLoadError(Exception):
     pass
 
+class SelectorLoadSpecError(SelectorLoadError):
+    pass
+
+class SelectorLoadFileNotFound(SelectorLoadError):
+    pass
+
+class SelectorMrtLoadError(SelectorLoadError):
+    pass
+
+class SelectorMrtArgumentsError(SelectorMrtLoadError):
+    pass
+class SelectorMrtFileNotFound(SelectorMrtLoadError):
+    pass
+
 class MrtSelector:
     """
     Uses a pykob.Selector to run Mrt in different ways (as specified in a Selector structure).
@@ -866,7 +884,7 @@ class MrtSelector:
         self._cfg: Optional[Config] = cfg
 
         self._selector_type: Optional[SelectorType] = None
-        self._selections: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
+        self._selector_specs: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
         self._selector: Optional[Selector] = None
         self._accept_select: Event = Event()
         self._selection_changed: Event = Event()
@@ -880,16 +898,43 @@ class MrtSelector:
         self._load_selector(self._selector_file_path)
         return
 
+    def _load_mrt_for_spec(self, spec:dict[str,Optional[list[str]]]) -> Optional[Mrt]:
+        """
+        Create an Mrt based on the specification.
+
+        Can raise:
+            * SelectorMrtLoadError: General Mrt creation error.
+            * SelectorMrtFileNotFound: A file needed to create the Mrt wasn't found.
+        """
+        spec_args = spec[SELECTION_ARGS_KEY]
+        spec_desc = spec[SELECTION_DESCRIPTION_KEY]
+        log.debug("MrtSelector._load_mrt_for_spec: '{}'  MRT {}".format(spec_desc, spec_args))
+        mrt = None
+        try:
+            mrt, sel_spec = mrt_from_args(spec_args, cfg=self._cfg, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+        except FileNotFoundError as fnf:
+            raise SelectorMrtFileNotFound("File not found: '{}', trying to load specification: '{}'".format(fnf, spec_desc))
+        except Exception as ex:
+            raise SelectorMrtLoadError(ex)
+        except SystemExit as args_err:
+            raise SelectorMrtArgumentsError(args_err)
+        finally:
+            if not mrt is None:
+                self._spec_desc = spec_desc
+                self._spec_args = spec_args
+        return mrt
+
     def _load_selector(self, filepath:str) -> bool:
         """
         Load a MRT selector file (json).
+        Create a pykob selector for the port.
 
         filepath: File path to use for a Selector Spec.
 
         Selector Spec is:
         0. Selector Type
         1. Mrt specs
-            a. Number
+            a. Description
             b. Spec
 
         Raises: FileNotFoundError if the selector file isn't found.
@@ -907,40 +952,53 @@ class MrtSelector:
                     # Make sure the list has the correct number of elements
                     ne = self._selector_type.elements
                     for n in range(len(selections), ne):
-                        selections.append(None)
-                    self._selections = selections
+                        selection_no = n - self._selector_type.index_adj
+                        log.log("Adding a generated selector entry for selection {}.\n".format(selection_no), dt="")
+                        entry = {SELECTION_DESCRIPTION_KEY : "Selection {}".format(selection_no), SELECTION_ARGS_KEY : []}
+                        selections.append(entry)
+                    self._selector_specs = selections
                     log.debug("MrtSelector.load_selector - Port: {}".format(self._selector_port))
                     log.debug("MrtSelector.load_selector - Type: {}".format(selector_type_name))
                     log.debug("MrtSelector.load_selector - Mrt Specs: {}".format(selections))
                     #
                     # Create the selector
                     self._selector = Selector(self._selector_port, self._selector_type.mode, on_change=self._on_selection_changed)
+                    #
+                    # Try to load an Mrt for each spec
+                    for n in range(0, len(self._selector_specs)):
+                        selection_no = n - self._selector_type.index_adj
+                        spec = self._selector_specs[n]
+                        log.log("Checking selector spec for selection {}\n".format(selection_no), dt="")
+                        test_mrt = self._load_mrt_for_spec(spec)
+                        log.debug("MrtSelector._load_selector - Test Mrt created for spec [{}] with args {}".format(spec[SELECTION_DESCRIPTION_KEY], spec[SELECTION_ARGS_KEY]), 4)
                     self._selector.start()
                     return True
+        except SelectorMrtLoadError as smle:
+            # Just raise it, as it is already set with a message.
+            raise smle
         except FileNotFoundError as fnf:
-            log.debug("MrtSelector.load_selector - File not found: {}".format(filepath))
-            raise SelectorLoadError(fnf)
+            log.debug("Selector file not found: {}".format(filepath))
+            raise SelectorLoadFileNotFound(fnf)
         except JSONDecodeError as jde:
-            log.debug("MrtSelector.load_selector - Spec error: {}".format(jde))
-            raise SelectorLoadError(jde)
+            log.debug("Selector spec error: {}".format(jde))
+            raise SelectorLoadSpecError(jde)
         except Exception as ex:
             log.debug(ex)
-            raise SelectorLoadError("MrtSelector.load_selector - Error: {}".format(ex))
+            raise SelectorLoadError("Load selector error: {}".format(ex))
         return False
 
     def _on_selection_changed(self, change:SelectorChange, value):
         """
         The Selector changed. Get the selection number and start an Mrt with the configuration.
         """
-        if self._accept_select.is_set() and self._selector_type.change == change and value > 0:
+        if self._accept_select.is_set() and self._selector_type.change == change:
             selected = value
-            spec = self._selections[selected-1]  # Selection is 1-based
+            index = selected + self._selector_type.index_adj
+            spec = self._selector_specs[index]
             if spec is None:
                 # There wasn't a specification for this selection. ZZZ: Raise an exception?
                 return
-            self._spec_args = spec[SELECTION_ARGS_KEY]
-            self._spec_desc = spec[SELECTION_DESCRIPTION_KEY]
-            new_mrt, dummy = mrt_from_args(self._spec_args, cfg=self._cfg, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+            new_mrt = self._load_mrt_for_spec(spec)
             if new_mrt is None:
                 # Should we raise an exception in this case?
                 pass
@@ -965,7 +1023,8 @@ class MrtSelector:
         """
         Main loop of the Selector.
 
-        Create a pykob selector for the port and allow it to select configurations.
+        Wait for a selection change.
+        On selection change, switch to the new Mrt.
         """
         try:
             self._accept_select.set()
@@ -1002,7 +1061,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             config2.config_file_override,
             config2.logging_level_override,
             pkappargs.record_session_override
-        ]
+        ],
+        exit_on_error=False
     )
     arg_parser.add_argument(
         "--file",
@@ -1095,6 +1155,7 @@ if __name__ == "__main__":
         mrt, mrt_selector = mrt_from_args(allow_selector=True)
 
         if mrt_selector:
+            log.log("Running with a selector.\n", dt="")
             mrt_selector.run()
             mrt_selector = None
         elif mrt:
@@ -1109,9 +1170,11 @@ if __name__ == "__main__":
     except FileNotFoundError as fnf:
         print("File not found: {}".format(fnf.args[0]))
     except SelectorLoadError as sle:
-        print("Error loading selector specification file - {}".format(sle))
+        print("Error loading selector - {}".format(sle))
     except Exception as ex:
         print("Error encountered: {}".format(ex))
+    except SystemExit as arg_err:
+        print(arg_err)
     finally:
         if mrt:
             mrt.exit()

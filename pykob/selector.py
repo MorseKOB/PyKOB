@@ -61,6 +61,21 @@ class SelectorChange(IntEnum):
     Binary = 2
     BinaryAnd1of4 = 3
 
+class SelectorLoadError(Exception):
+    def __init__(self, port:Optional[str]=None, ex:Optional[Exception]=None):
+        Exception.__init__(ex)
+        self._parent = ex
+        self._port = port
+        return
+
+    @property
+    def parent(self) -> Optional[Exception]:
+        return self._parent
+
+    @property
+    def port(self) -> Optional[str]:
+        return self._port
+
 class Selector:
     def __init__(self, portToUse:str, mode:SelectorMode=SelectorMode.OneOfFour,
             pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None) -> None:
@@ -160,7 +175,7 @@ class Selector:
 
     def shutdown(self):
         """
-        Initiate shutdown of our operations (and don't start anything new), 
+        Initiate shutdown of our operations (and don't start anything new),
         but DO NOT BLOCK.
         """
         self._shutdown.set()
@@ -172,8 +187,9 @@ class Selector:
             self._thread_port_checker.start()
             log.debug("The port '{}' for the Selector is available.".format(self._portToUse))
         except Exception as ex:
-            log.info("Serial port '{}' not available. The Selector will not function.".format(self._portToUse))
+            log.log("Serial port '{}' not available. The Selector will not function.\n".format(self._portToUse), dt="")
             log.debug("Selector exception: {}".format(ex))
+            raise SelectorLoadError(self._portToUse, ex)
 
 """
 Test code

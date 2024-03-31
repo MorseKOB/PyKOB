@@ -102,5 +102,5 @@ def get_logging_level():
 def set_logging_level(level):
     global __logging_level
     __logging_level = level if level >= LOGGING_MIN_LEVEL else INFO_LEVEL
-    info("log.set_logging_level: " + str(__logging_level))
+    debug("log.set_logging_level: " + str(__logging_level))
     return
