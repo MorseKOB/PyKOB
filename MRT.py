@@ -40,17 +40,16 @@ Example:
     python MRT.py 11
 """
 
-from pykob import VERSION, config, config2, log, kob, internet, morse, mrt_selector, recorder
+from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
 from pykob.config2 import Config
 from pykob.internet import Internet
 from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 from pykob.recorder import Recorder
-from pykob.mrt_selector import Selector, SelectorMode, SelectorChange
+from pykob.selector import Selector, SelectorMode, SelectorChange
 import pkappargs
 
 import argparse
-from collections import namedtuple
 from enum import Enum
 import json
 from json import JSONDecodeError
@@ -58,7 +57,7 @@ from pathlib import Path
 import platform
 import queue
 from queue import Empty, Queue
-import re  # RegEx
+import select
 import sys
 from sys import platform
 from threading import Event, Thread
@@ -78,11 +77,12 @@ class SelectorType(Enum):
         obj._key = args[0]
         obj._elements = args[1]
         obj._mode = args[2]
-        obj._change = args[3]
+        obj._index_adj = args[3]
+        obj._change = args[4]
         return obj
 
     def __repr__(self):
-        return f'<{type(self).__name__}.{self.name}:({self._key},{self._elements!r},{self._mode!r},{self._change!r})>'
+        return f'<{type(self).__name__}.{self.name}:({self._key},{self._elements!r},{self._mode!r},{self._index_adj},{self._change!r})>'
 
     def __str__(self) -> str:
         return self.name
@@ -97,14 +97,16 @@ class SelectorType(Enum):
     def mode(self) -> SelectorMode:
         return self._mode
     @property
+    def index_adj(self) -> int:
+        return self._index_adj
+    @property
     def change(self) -> SelectorChange:
         return self._change
 
-    ONE_OF_FOUR = "1OF4", 4, SelectorMode.OneOfFour, SelectorChange.OneOfFour
-    BINARY = "BINARY", 16, SelectorMode.Binary, SelectorChange.Binary
+    ONE_OF_FOUR = "1OF4", 4, SelectorMode.OneOfFour, -1, SelectorChange.OneOfFour
+    BINARY = "BINARY", 16, SelectorMode.Binary, 0, SelectorChange.Binary
 
 
-SELECTOR_PORT_KEY = "port"
 SELECTOR_SELECTIONS_KEY = "selections"
 SELECTOR_TYPE_KEY = "type"
 SELECTION_ARGS_KEY = "args"
@@ -123,16 +125,17 @@ class RawTerm:
 
     Call `exit` when done using, to restore settings.
     """
-    def __init__(self):
-        self.impl = None
+    def __init__(self, shutdown_event:Optional[Event]=None):
+        self._shutdown_event = shutdown_event if not shutdown_event is None else Event()
+        self._impl = None
         if platform.startswith(("darwin", "linux", "freebsd", "openbsd")):  # MacOSX and Linux/UNIX
             try:
-                self.impl = _GetchUnix()
+                self._impl = _GetchUnix(self._shutdown_event)
             except Exception as ex:
                 log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
         elif platform in ("win32", "cygwin"):
             try:
-                self.impl = _GetchWindows()
+                self._impl = _GetchWindows(self._shutdown_event)
             except Exception as ex:
                 log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
         else:
@@ -140,10 +143,11 @@ class RawTerm:
         return
 
     def getch(self) -> str:
-        return self.impl._getch()
+        return self._impl._getch()
 
     def exit(self) -> None:
-        self.impl._exit()
+        self._shutdown_event.set()
+        self._impl._exit()
         return
 
 class _GetchUnix:
@@ -152,8 +156,9 @@ class _GetchUnix:
 
     Used by `RawTerm`
     """
-    def __init__(self):
+    def __init__(self, shutdown_event:Event):
         import tty, sys, termios
+        self.shutdown_event = shutdown_event
         self.fd = sys.stdin.fileno()
         self.original_settings = None
         try:
@@ -184,11 +189,16 @@ class _GetchUnix:
         return
 
     def _getch(self) -> str:
-        ch = sys.stdin.read(1)
-        return ch
+        while not self.shutdown_event.is_set():
+            char_ready = select.select([self.fd], [], [], 0)  # Check readability and never block
+            if len(char_ready[0]) > 0:  # Simple check since we only have stdin registered
+                return sys.stdin.read(1)
+            self.shutdown_event.wait(0.01)
+        return ''
 
     def _exit(self):
         import termios
+        self.shutdown_event.set()
         if self.original_settings:
             try:
                 termios.tcsetattr(self.fd, termios.TCSADRAIN, self.original_settings)
@@ -205,16 +215,22 @@ class _GetchWindows:
 
     Used by `RawTerm`
     """
-    def __init__(self):
+    def __init__(self, shutdown_event:Event()):
         import msvcrt
-        pass
+        self.shutdown_event = shutdown_event
         return
 
     def _getch(self) -> str:
         import msvcrt
-        return msvcrt.getch().decode("utf-8")
+
+        while not self.shutdown_event.is_set():
+            if msvcrt.kbhit():
+                return msvcrt.getch().decode("utf-8")
+            self.shutdown_event.wait(0.01)
+        return ''
 
     def _exit(self):
+        self.shutdown_event.set()
         return
 
 class Mrt:
@@ -245,6 +261,7 @@ class Mrt:
         self._prt_stop: Event = Event()
         self._control_c_pressed: Event = Event()
         self._kb_queue: Queue = Queue(128)
+        self._closed: Event = Event()
 
         self._record_filepath = None if record_filepath is None else recorder.add_ext_if_needed(record_filepath.strip())
         self._player: Optional[Recorder] = None
@@ -299,42 +316,44 @@ class Mrt:
         return
 
     def exit(self):
-        print("\nClosing...")
-        self._shutdown.set()
-        sleep(0.3)
-        log.debug("MRT.exit - 1", 3)
-        self.shutdown()
-        log.debug("MRT.exit - 2", 3)
-        kob_ = self._kob
-        if kob_:
-            log.debug("MRT.exit - 3a", 3)
-            kob_.exit()
-            log.debug("MRT.exit - 3b", 3)
-        inet = self._internet
-        if inet:
-            log.debug("MRT.exit - 4a", 3)
-            inet.exit()
-            log.debug("MRT.exit - 4b", 3)
-        plr = self._player
-        if plr:
-            log.debug("MRT.exit - 5a", 3)
-            plr.exit()
-            log.debug("MRT.exit - 5b", 3)
-        rdr = self._reader
-        if rdr:
-            log.debug("MRT.exit - 6a", 3)
-            rdr.exit()
-            log.debug("MRT.exit - 6b", 3)
-        rec = self._recorder
-        if rec:
-            log.debug("MRT.exit - 7a", 3)
-            rec.exit()
-            log.debug("MRT.exit - 7b", 3)
-        sndr = self._sender
-        if sndr:
-            log.debug("MRT.exit - 8a", 3)
-            sndr.exit()
-            log.debug("MRT.exit - 8b", 3)
+        if not self._closed.is_set():
+            self._closed.set()
+            print("\nClosing...")
+            self._shutdown.set()
+            sleep(0.3)
+            log.debug("MRT.exit - 1", 3)
+            self.shutdown()
+            log.debug("MRT.exit - 2", 3)
+            kob_ = self._kob
+            if kob_:
+                log.debug("MRT.exit - 3a", 3)
+                kob_.exit()
+                log.debug("MRT.exit - 3b", 3)
+            inet = self._internet
+            if inet:
+                log.debug("MRT.exit - 4a", 3)
+                inet.exit()
+                log.debug("MRT.exit - 4b", 3)
+            plr = self._player
+            if plr:
+                log.debug("MRT.exit - 5a", 3)
+                plr.exit()
+                log.debug("MRT.exit - 5b", 3)
+            rdr = self._reader
+            if rdr:
+                log.debug("MRT.exit - 6a", 3)
+                rdr.exit()
+                log.debug("MRT.exit - 6b", 3)
+            rec = self._recorder
+            if rec:
+                log.debug("MRT.exit - 7a", 3)
+                rec.exit()
+                log.debug("MRT.exit - 7b", 3)
+            sndr = self._sender
+            if sndr:
+                log.debug("MRT.exit - 8a", 3)
+                sndr.exit()
+                log.debug("MRT.exit - 8b", 3)
         return
 
     def main_loop(self):
@@ -776,7 +795,7 @@ class Mrt:
         return
 
     def _thread_kbreader_body(self):
-        rawterm = RawTerm()
+        rawterm = RawTerm(self._shutdown)
         try:
             while not self._kbt_stop.is_set() and not self._shutdown.is_set():
                 try:
@@ -829,6 +848,20 @@ class Mrt:
 class SelectorLoadError(Exception):
     pass
 
+class SelectorLoadSpecError(SelectorLoadError):
+    pass
+
+class SelectorLoadFileNotFound(SelectorLoadError):
+    pass
+
+class SelectorMrtLoadError(SelectorLoadError):
+    pass
+
+class SelectorMrtArgumentsError(SelectorMrtLoadError):
+    pass
+class SelectorMrtFileNotFound(SelectorMrtLoadError):
+    pass
+
 class MrtSelector:
     """
     Uses a pykob.Selector to run Mrt in different ways (as specified in a Selector structure).
@@ -845,12 +878,13 @@ class MrtSelector:
         return s
 
 
-    def __init__(self, selector_port, selector_file_path) -> None:
+    def __init__(self, selector_port, selector_file_path, cfg:Optional[Config]=None) -> None:
         self._selector_file_path = MrtSelector.add_ext_if_needed(selector_file_path)
         self._selector_port: str = selector_port
+        self._cfg: Optional[Config] = cfg
 
         self._selector_type: Optional[SelectorType] = None
-        self._selections: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
+        self._selector_specs: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
         self._selector: Optional[Selector] = None
         self._accept_select: Event = Event()
         self._selection_changed: Event = Event()
@@ -864,16 +898,43 @@ class MrtSelector:
         self._load_selector(self._selector_file_path)
         return
 
+    def _load_mrt_for_spec(self, spec:dict[str,Optional[list[str]]]) -> Optional[Mrt]:
+        """
+        Create an Mrt based on the specification.
+
+        Can raise:
+            * SelectorMrtLoadError: General Mrt creation error.
+            * SelectorMrtFileNotFound: A file needed to create the Mrt wasn't found.
+        """
+        spec_args = spec[SELECTION_ARGS_KEY]
+        spec_desc = spec[SELECTION_DESCRIPTION_KEY]
+        log.debug("MrtSelector._load_mrt_for_spec: '{}'  MRT {}".format(spec_desc, spec_args))
+        mrt = None
+        try:
+            mrt, sel_spec = mrt_from_args(spec_args, cfg=self._cfg, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+        except FileNotFoundError as fnf:
+            raise SelectorMrtFileNotFound("File not found: '{}', trying to load specification: '{}'".format(fnf, spec_desc))
+        except Exception as ex:
+            raise SelectorMrtLoadError(ex)
+        except SystemExit as args_err:
+            raise SelectorMrtArgumentsError(args_err)
+        finally:
+            if not mrt is None:
+                self._spec_desc = spec_desc
+                self._spec_args = spec_args
+        return mrt
+
     def _load_selector(self, filepath:str) -> bool:
         """
         Load a MRT selector file (json).
+        Create a pykob selector for the port.
 
         filepath: File path to use for a Selector Spec.
 
         Selector Spec is:
         0. Selector Type
         1. Mrt specs
-            a. Number
+            a. Description
             b. Spec
 
         Raises: FileNotFoundError if the selector file isn't found.
@@ -891,40 +952,53 @@ class MrtSelector:
                     # Make sure the list has the correct number of elements
                     ne = self._selector_type.elements
                     for n in range(len(selections), ne):
-                        selections.append(None)
-                    self._selections = selections
+                        selection_no = n - self._selector_type.index_adj
+                        log.log("Adding a generated selector entry for selection {}.\n".format(selection_no), dt="")
+                        entry = {SELECTION_DESCRIPTION_KEY : "Selection {}".format(selection_no), SELECTION_ARGS_KEY : []}
+                        selections.append(entry)
+                    self._selector_specs = selections
                     log.debug("MrtSelector.load_selector - Port: {}".format(self._selector_port))
                     log.debug("MrtSelector.load_selector - Type: {}".format(selector_type_name))
                     log.debug("MrtSelector.load_selector - Mrt Specs: {}".format(selections))
                     #
                     # Create the selector
                     self._selector = Selector(self._selector_port, self._selector_type.mode, on_change=self._on_selection_changed)
+                    #
+                    # Try to load an Mrt for each spec
+                    for n in range(0, len(self._selector_specs)):
+                        selection_no = n - self._selector_type.index_adj
+                        spec = self._selector_specs[n]
+                        log.log("Checking selector spec for selection {}\n".format(selection_no), dt="")
+                        test_mrt = self._load_mrt_for_spec(spec)
+                        log.debug("MrtSelector._load_selector - Test Mrt created for spec [{}] with args {}".format(spec[SELECTION_DESCRIPTION_KEY], spec[SELECTION_ARGS_KEY]), 4)
                     self._selector.start()
                     return True
+        except SelectorMrtLoadError as smle:
+            # Just raise it, as it is already set with a message.
+            raise smle
         except FileNotFoundError as fnf:
-            log.debug("MrtSelector.load_selector - File not found: {}".format(filepath))
-            raise SelectorLoadError(fnf)
+            log.debug("Selector file not found: {}".format(filepath))
+            raise SelectorLoadFileNotFound(fnf)
         except JSONDecodeError as jde:
-            log.debug("MrtSelector.load_selector - Spec error: {}".format(jde))
-            raise SelectorLoadError(jde)
+            log.debug("Selector spec error: {}".format(jde))
+            raise SelectorLoadSpecError(jde)
         except Exception as ex:
             log.debug(ex)
-            raise SelectorLoadError("MrtSelector.load_selector - Error: {}".format(ex))
+            raise SelectorLoadError("Load selector error: {}".format(ex))
         return False
 
     def _on_selection_changed(self, change:SelectorChange, value):
         """
         The Selector changed. Get the selection number and start an Mrt with the configuration.
         """
-        if self._accept_select.is_set() and self._selector_type.change == change and value > 0:
+        if self._accept_select.is_set() and self._selector_type.change == change:
             selected = value
-            spec = self._selections[selected-1]  # Selection is 1-based
+            index = selected + self._selector_type.index_adj
+            spec = self._selector_specs[index]
             if spec is None:
                 # There wasn't a specification for this selection. ZZZ: Raise an exception?
                 return
-            self._spec_args = spec[SELECTION_ARGS_KEY]
-            self._spec_desc = spec[SELECTION_DESCRIPTION_KEY]
-            new_mrt, dummy = mrt_from_args(self._spec_args, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+            new_mrt = self._load_mrt_for_spec(spec)
             if new_mrt is None:
                 # Should we raise an exception in this case?
                 pass
@@ -949,7 +1023,8 @@ class MrtSelector:
         """
         Main loop of the Selector.
 
-        Create a pykob selector for the port and allow it to select configurations.
+        Wait for a selection change.
+        On selection change, switch to the new Mrt.
         """
         try:
             self._accept_select.set()
@@ -976,7 +1051,7 @@ class MrtSelector:
             log.debug("MrtSelector.run - done")
         return
 
-def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
+def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
         + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
         parents= [
@@ -986,7 +1061,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=T
             config2.config_file_override,
             config2.logging_level_override,
             pkappargs.record_session_override
-        ]
+        ],
+        exit_on_error=False
     )
     arg_parser.add_argument(
         "--file",
@@ -1026,7 +1102,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=T
 
     args = arg_parser.parse_args(options)
 
-    cfg = config2.process_config_args(args)
+    cfg = config2.process_config_args(args, cfg)
     log.set_logging_level(cfg.logging_level)
 
     wire = args.wire if args.wire else cfg.wire
@@ -1048,7 +1124,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, allow_selector:bool=T
 
     #
     # If we have a selector spec path, create a selector to return
-    selector = None if not selector_specpath else MrtSelector(selector_port, selector_specpath)
+    selector = None if not selector_specpath else MrtSelector(selector_port, selector_specpath, cfg)
 
     mrt = None if not selector is None else Mrt(
         MRT_VERSION_TEXT,
@@ -1079,21 +1155,26 @@ if __name__ == "__main__":
         mrt, mrt_selector = mrt_from_args(allow_selector=True)
 
         if mrt_selector:
+            log.log("Running with a selector.\n", dt="")
             mrt_selector.run()
             mrt_selector = None
         elif mrt:
             mrt.start()
             mrt.main_loop()
             mrt = None
+            exit_status = 0
         else:
             raise Exception("Could not initialize MRT or Selector.")
+    except KeyboardInterrupt:
         exit_status = 0
     except FileNotFoundError as fnf:
         print("File not found: {}".format(fnf.args[0]))
     except SelectorLoadError as sle:
-        print("Error loading selector specification file - {}".format(sle))
+        print("Error loading selector - {}".format(sle))
     except Exception as ex:
         print("Error encountered: {}".format(ex))
+    except SystemExit as arg_err:
+        print(arg_err)
     finally:
         if mrt:
             mrt.exit()
