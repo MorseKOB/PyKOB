@@ -175,7 +175,7 @@ class MKOBMain:
 
     def _create_recorder(self, filename=None):
         targetFileName = recorder.add_ext_if_needed(filename) if not filename is None else recorder.generate_session_recording_name()
-        log.info("Recording to '{}'".format(targetFileName))
+        log.log("Recording to '{}'\n".format(targetFileName), dt="")
         with self._recorder_guard:
             self._recorder = Recorder(
                 targetFileName,
@@ -763,7 +763,7 @@ class MKOBMain:
                 self._connected.set()
             else:
                 msg = "Internet not available. Unable to connect at this time."
-                log.info("{}".format(msg))
+                log.log("{}\n".format(msg), dt="")
                 msgbox.showinfo(title=self.app_ver, message=msg)
         else:
             # Disconnect

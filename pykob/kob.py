@@ -299,7 +299,7 @@ class KOB:
                     self._gpio_sndr_drive = gpio_led(26)  # GPIO26 used to drive sounder.
                     self._hw_interface = HWInterface.GPIO
                     self._paddle_is_supported = True
-                    log.info("The GPIO interface is available/active and will be used.")
+                    log.debug("The GPIO interface is available/active and will be used.")
                 except:
                     self._hw_interface = HWInterface.NONE
                     self._paddle_is_supported = False
@@ -317,7 +317,7 @@ class KOB:
                     self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
                     self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
                     self._hw_interface = HWInterface.SERIAL
-                    log.info("The serial interface is available/active and will be used.")
+                    log.debug("The serial interface is available/active and will be used.")
                     self._port.write(b"PyKOB\n")
                     self._threadsStop.wait(0.5)
                     indata = self._port.readline()
@@ -325,10 +325,10 @@ class KOB:
                         self._serial_key_read = self.__read_cts  # Use CTS to read the key
                         self._serial_pdl_dah = self.__read_nul   # Paddle Dah/Dash cannot be supported
                         self._paddle_is_supported = False
-                        log.info("KOB Serial Interface is 'minimal' type (key on CTS).")
+                        log.debug("KOB Serial Interface is 'minimal' type (key on CTS).")
                     else:
                         self._paddle_is_supported = True
-                        log.info("KOB Serial Interface is 'full' type (key/pdl-dit on DSR, pdl-dah on CTS).")
+                        log.debug("KOB Serial Interface is 'full' type (key/pdl-dit on DSR, pdl-dah on CTS).")
                 except Exception as ex:
                     self._hw_interface = HWInterface.NONE
                     self._serial_key_read = self.__read_nul

@@ -50,8 +50,15 @@ try:
     import serial
     print('pySerial ' + serial.VERSION)
     import serial.tools.list_ports
-    for p in serial.tools.list_ports.comports():
-        print(p)
+    systemSerialPorts = serial.tools.list_ports.comports()
+    for sp in systemSerialPorts:
+        dev = "Device: " + sp.device
+        name = " Name: " + sp.name if sp.name else ""
+        desc = " Desc: " + sp.description if sp.description else ""
+        mfg = " Manufacturer:" + sp.manufacturer if sp.manufacturer else ""
+        sn = " SN: " + sp.serial_number if sp.serial_number else ""
+        prod = " Product: " + sp.product if sp.product else ""
+        print("{}{}{}{}{}{}".format(dev, name, desc, mfg, sn, prod))
 except:
     print('pySerial not installed')
 
