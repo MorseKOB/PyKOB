@@ -433,7 +433,7 @@ class Mrt:
                 play_finished_callback=self._from_player_finished
             )
         if self._record_filepath:
-            log.info("Recording to '{}'".format(self._record_filepath))
+            log.log("Recording to '{}'\n".format(self._record_filepath), dt="")
             self._recorder = Recorder(
                 self._record_filepath,
                 None,
