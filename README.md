@@ -88,8 +88,9 @@ usage help is included in the **doc** folder.
 ### SysCheck.py
 
 Collects and lists information about the current Python, PyKOB, and 
-comm interface available, that is relevent for running the PyKOB utilites 
-and applications.
+comm interfaces available, that is relevent for running the PyKOB utilites 
+and applications. The comm port information is especially helpful when 
+using the CLI version of Configure or a Selector.
 
 ### Sample.py
 
