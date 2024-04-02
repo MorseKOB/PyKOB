@@ -1307,20 +1307,7 @@ sounder_override.add_argument(
     "--sounder",
     metavar="sounder",
     dest="sounder",
-    choices=[
-        "ON",
-        "On",
-        "on",
-        "YES",
-        "Yes",
-        "yes",
-        "OFF",
-        "Off",
-        "off",
-        "NO",
-        "No",
-        "no",
-    ],
+    choices=["ON","On","on","YES","Yes","yes","OFF","Off","off","NO","No","no"],
     help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.",
 )
 
