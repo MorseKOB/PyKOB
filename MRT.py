@@ -61,6 +61,7 @@ import select
 import sys
 from sys import platform
 from threading import Event, Thread
+import time
 from time import sleep
 from typing import Optional, Sequence
 
@@ -246,14 +247,16 @@ class Mrt:
         self,
         app_name_version: str, wire: int,
         cfg: Config,
+        sender_dt: bool,
         repeat_delay: int = -1,
         record_filepath: Optional[str] = None,
         file_to_play: Optional[str] = None,
         file_to_send: Optional[str] = None
     ) -> None:
         self._app_name_version = app_name_version
-        self._wire = wire
-        self._cfg = cfg
+        self._wire: int = wire
+        self._cfg: Config = cfg
+        self._sender_dt: bool = sender_dt
         self._repeat_delay: int = repeat_delay
         self._shutdown: Event = Event()
         self._fst_stop: Event = Event()
@@ -623,8 +626,11 @@ class Mrt:
         """
         if not self._sender_current == sender:
             self._sender_current = sender
+            ts = ""
+            if self._sender_dt:
+                ts = time.strftime("%Y-%m-%d %I:%M:%S %p ")
             print()
-            print(f'<<{self._sender_current}>>')
+            print(f"{ts}<<{self._sender_current}>>")
         return
 
     def _print_start_info(self):
@@ -1060,7 +1066,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             config2.text_speed_override,
             config2.config_file_override,
             config2.logging_level_override,
-            pkappargs.record_session_override
+            pkappargs.record_session_override,
+            pkappargs.sender_datetime_override
         ],
         exit_on_error=False
     )
@@ -1116,7 +1123,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
         if args.selector_args:
             selector_port = args.selector_args[0]
             selector_specpath = args.selector_args[1]
-
+        pass
+    sender_dt = args.sender_dt
     #
     # Check to see that recordings/files aren't specified if there is a selector
     if selector_specpath and (play_filepath or sendtext_filepath):
@@ -1130,6 +1138,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
         MRT_VERSION_TEXT,
             wire,
             cfg,
+            sender_dt,
             record_filepath=record_filepath,
             repeat_delay=repeat_delay,
             file_to_play=play_filepath,
