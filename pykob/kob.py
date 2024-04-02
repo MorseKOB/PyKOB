@@ -636,7 +636,7 @@ class KOB:
         if not synth_mode == synth_mode_was:
             log.debug("kob._update_modes: synth_mode changed", 4)
 
-        energize_sounder = (not sounder_mode == SounderMode.SLC) or (sounder_mode == SounderMode.EFK)
+        energize_sounder = (sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK)
         self._energize_hw_sounder(energize_sounder)
         if not (from_key_closer and self._virtual_closer_in_use):
             energize_synth = (not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK)

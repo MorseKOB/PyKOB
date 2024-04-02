@@ -579,10 +579,10 @@ class MKOBWindow:
         self._root.bind_all("<Key-Escape>", self._ka.handle_toggle_closer)
         self._root.bind_all("<Key-Pause>", self._ka.handle_toggle_code_sender)
         self._root.bind_all("<Key-F1>", self._ka.handle_toggle_code_sender)
-        self._root.bind_all("<Key-F2>", self._ka.doConnect)
         ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
+        self._root.bind_all("<Key-F8>", self._ka.doConnect)
         self._root.bind_all("<Key-F11>", self._ka.handle_reader_clear_fk)
         self._root.bind_all("<Key-F12>", self._ka.handle_sender_clear_fk)
         self._root.bind_all("<Key-Next>", self._ka.handle_decrease_wpm)

@@ -85,7 +85,7 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB ctrl-curlf: {}".format(event), 3)
+            log.debug("KB shift-left: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
     def _on_shift_cursor_right(self, event):
@@ -103,7 +103,7 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB ctrl-currt: {}".format(event), 3)
+            log.debug("KB shift-right: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
     def _on_delete(self, *args):
