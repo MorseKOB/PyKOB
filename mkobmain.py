@@ -48,13 +48,14 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 
 
 class MKOBMain:
-    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, record_filepath: Optional[str]=None) -> None:
+    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
         self.app_ver = app_ver
         self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
         self._cfg = cfg
+        self._sender_dt = sender_dt
         self._set_on_cfg:bool = False # Flag to control setting values on our config
         self._code_type = None  # Set by do_morse_change
         self._cwpm = 0  # Set by do_morse_change
@@ -1163,5 +1164,8 @@ class MKOBMain:
             return
         if id != self._sender_ID:  # new sender
             self._sender_ID = id
-            self._ka.trigger_reader_append_text("\n<{}>".format(self._sender_ID))
+            ts = ""
+            if self._sender_dt:
+                ts = time.strftime("%Y-%m-%d %I:%M:%S %p ")
+            self._ka.trigger_reader_append_text("\n{}<{}>".format(ts, self._sender_ID))
         return

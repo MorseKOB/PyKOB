@@ -508,7 +508,7 @@ class StatusBar:
         return
 
 class MKOBWindow:
-    def __init__(self, root, mkob_version_text, cfg: Config, record_filepath: Optional[str]=None) -> None:
+    def __init__(self, root, mkob_version_text, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
 
         self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
@@ -553,9 +553,11 @@ class MKOBWindow:
         self._spacing = cfg.spacing
         self._ignore_morse_setting_change = False
         ## passed in
+        self._sender_dt = sender_dt
         self._record_filepath = record_filepath
 
         # Pointers for other modules
+        self._km = None
         self._krdr = MKOBReader(self)
         self._ksl = MKOBStationList(self)
         self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
@@ -579,10 +581,10 @@ class MKOBWindow:
         self._root.bind_all("<Key-Escape>", self._ka.handle_toggle_closer)
         self._root.bind_all("<Key-Pause>", self._ka.handle_toggle_code_sender)
         self._root.bind_all("<Key-F1>", self._ka.handle_toggle_code_sender)
-        self._root.bind_all("<Key-F2>", self._ka.doConnect)
         ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
+        self._root.bind_all("<Key-F8>", self._ka.doConnect)
         self._root.bind_all("<Key-F11>", self._ka.handle_reader_clear_fk)
         self._root.bind_all("<Key-F12>", self._ka.handle_sender_clear_fk)
         self._root.bind_all("<Key-Next>", self._ka.handle_decrease_wpm)
@@ -1115,7 +1117,7 @@ class MKOBWindow:
         # Set to disconnected state
         self.connected_set(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._record_filepath)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._sender_dt, self._record_filepath)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()

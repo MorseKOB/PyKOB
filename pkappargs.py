@@ -37,6 +37,14 @@ record_session_override = argparse.ArgumentParser(add_help=False)
 record_session_override.add_argument("--record", metavar="filepath|['A'|'AUTO']", dest="record_filepath",
     help="Record the session to a PyREC recording file. The file is 'filepath' if specified or is auto-generated if 'AUTO'.")
 
+sender_datetime_override = argparse.ArgumentParser(add_help=False)
+sender_datetime_override.add_argument(
+    "--senderdt",
+    dest="sender_dt",
+    action='store_true',
+    help="Add a date-time stamp to the current sender printed when the sender changes."
+)
+
 def record_filepath_from_args(args) -> Optional[str]:
     record_filepath = None
     if hasattr(args, "record_filepath"):

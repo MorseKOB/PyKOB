@@ -71,7 +71,7 @@ class MKOBKeyboard():
         self._ka.trigger_keyboard_send()
         return
 
-    def _on_ctrl_cursor_left(self, event):
+    def _on_shift_cursor_left(self, event):
         if self._kw.vkey_closed:
             return  # Do normal processing if the Virtual Key is closed
         if ((event.type == EventType.KeyPress and not self._in_key_press.is_set())
@@ -85,10 +85,10 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB ctrl-curlf: {}".format(event), 3)
+            log.debug("KB shift-left: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
-    def _on_ctrl_cursor_right(self, event):
+    def _on_shift_cursor_right(self, event):
         if self._kw.vkey_closed:
             return  # Do normal processing if the Virtual Key is closed
         if ((event.type == EventType.KeyPress and not self._in_key_press.is_set())
@@ -103,7 +103,7 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB ctrl-currt: {}".format(event), 3)
+            log.debug("KB shift-right: {}".format(event), 3)
         return "break"  # Don't perform normal processing
 
     def _on_delete(self, *args):
@@ -282,10 +282,10 @@ class MKOBKeyboard():
         self._km = mkmain
         self._kw.keyboard_win.bind("<Button-2>", self._on_right_click)
         self._kw.keyboard_win.bind("<Button-3>", self._on_right_click)
-        self._kw.keyboard_win.bind("<Control-KeyPress-Left>", self._on_ctrl_cursor_left)
-        self._kw.keyboard_win.bind("<Control-KeyPress-Right>", self._on_ctrl_cursor_right)
-        self._kw.keyboard_win.bind("<Control-KeyRelease-Left>", self._on_ctrl_cursor_left)
-        self._kw.keyboard_win.bind("<Control-KeyRelease-Right>", self._on_ctrl_cursor_right)
+        self._kw.keyboard_win.bind("<Shift-KeyPress-Left>", self._on_shift_cursor_left)
+        self._kw.keyboard_win.bind("<Shift-KeyPress-Right>", self._on_shift_cursor_right)
+        self._kw.keyboard_win.bind("<Shift-KeyRelease-Left>", self._on_shift_cursor_left)
+        self._kw.keyboard_win.bind("<Shift-KeyRelease-Right>", self._on_shift_cursor_right)
         self._kw.keyboard_win.tag_config(HIGHLIGHT, background='gray75', underline='yes')
         redirector = WidgetRedirector(self._kw.keyboard_win)
         self.original_delete = redirector.register("delete", self._on_delete)

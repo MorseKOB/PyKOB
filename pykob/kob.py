@@ -412,9 +412,11 @@ class KOB:
             code = self.keyer()
             if len(code) > 0:
                 if code[-1] == 1: # special code for closer/circuit closed
-                    self._set_key_closer_open(False)
+                    pass
+                    # self._set_key_closer_open(False)
                 elif code[-1] == 2: # special code for closer/circuit open
-                    self._set_key_closer_open(True)
+                    pass
+                    # self._set_key_closer_open(True)
                 if self._key_callback and not self._threadsStop.is_set():
                     self._key_callback(code)
         log.debug("{} thread done.".format(threading.current_thread().name))
@@ -634,7 +636,7 @@ class KOB:
         if not synth_mode == synth_mode_was:
             log.debug("kob._update_modes: synth_mode changed", 4)
 
-        energize_sounder = (not sounder_mode == SounderMode.SLC) or (sounder_mode == SounderMode.EFK)
+        energize_sounder = (sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK)
         self._energize_hw_sounder(energize_sounder)
         if not (from_key_closer and self._virtual_closer_in_use):
             energize_synth = (not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK)
@@ -889,27 +891,22 @@ class KOB:
                 if km[0] == KeyerMode.DITS:
                     # Start generating dits...
                     self._keyer_dits_down = True
+                    self._threadsStop.wait(self.keyer_dit_len / 2000)  # Delay 1/2 a dit len to allow for keyboard reaction
                 else:  # DAH or IDLE
                     self._keyer_dits_down = False
                     if drive_sounder:
                         energize = km[0] == KeyerMode.DAH
                         self.energize_sounder(energize, CodeSource.key)
                 if km[0] == KeyerMode.IDLE:
-                    if self._circuit_is_closed:
-                        code += (-dt, +2)  # unlatch closed circuit
-                        self._circuit_is_closed = False
-                        return code
-                    elif km2[0] == KeyerMode.DITS:
+                    if km2[0] == KeyerMode.DITS:
+                        if code[-1] < 0:
+                            code += (dt,)
                         return code
                     else:
                         code += (dt,)
                 else:  # DITS or DAH
                     code += (-dt,)
             if km[0] == KeyerMode.IDLE and code and t > self._t_keyer_mode_change + CODESPACE:
-                return code
-            if km[0] == KeyerMode.DAH and not self._circuit_is_closed and t > self._t_keyer_mode_change + CKTCLOSE:
-                code += (+1,)  # latch circuit closed
-                self._circuit_is_closed = True
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
