@@ -949,6 +949,8 @@ class Config:
             self.load_from_global()
         else:
             try:
+                errors = 0
+                dirpath, filename = os.path.split(filepath)
                 data: dict[str:Any]
                 with open(filepath, 'r', encoding="utf-8") as fp:
                     data = json.load(fp)
@@ -956,17 +958,30 @@ class Config:
                     # Disable change notifications until we are complete
                     with self.notification_pauser() as muted_cfg:
                         # Use the 'properties' to set the values in order to properly flag changes
-                        muted_cfg._version_loaded = None
+                        muted_cfg._version_loaded = data.get(_PYKOB_CFG_VERSION_KEY)
+                        if muted_cfg._version_loaded is None:
+                            log.warn("No configuration version information found in {}".format(fp))
+                        else:
+                            log.debug("Loading configuration version: {}  This version: {}".format(muted_cfg._version_loaded, VERSION))
                         for key, value in data.items():
                             if _PYKOB_CFG_VERSION_KEY == key:
-                                muted_cfg._version_loaded = value
+                                pass
                             else:
                                 try:
                                     muted_cfg._key_prop_setters[key](value)
                                 except KeyError as ke:
-                                    log.debug("Property setter for entry not found: {}".format(ke))
+                                    log.warn("Loading configuration file: {}  Unknown property: {}  With value: {}".format(filename, key, value))
+                                    errors += 1
+                                pass
+                            pass
                         #
                         muted_cfg.set_filepath(filepath)
+                    pass
+                else:
+                    log.warn("No data loaded from {}".format(filepath))
+                    errors += 1
+                if errors > 0:
+                    log.warn("Loading configuration file: {}  Encountered {} error(s).".format(filename, errors))
             except JSONDecodeError as jde:
                 log.debug(jde)
                 raise ConfigLoadError(jde)
