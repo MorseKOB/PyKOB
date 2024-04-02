@@ -65,7 +65,7 @@ import time
 from time import sleep
 from typing import Optional, Sequence
 
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -1061,6 +1061,10 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
         + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
         parents= [
+            config2.sound_override,
+            config2.sounder_override,
+            config2.gpio_override,
+            config2.serial_port_override,
             config2.station_override,
             config2.min_char_speed_override,
             config2.text_speed_override,

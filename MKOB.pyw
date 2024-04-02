@@ -38,7 +38,7 @@ import pkappargs
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
-__version__ = "4.2.1"
+__version__ = "4.2.2"
 VERSION = __version__
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 print(MKOB_VERSION_TEXT)
