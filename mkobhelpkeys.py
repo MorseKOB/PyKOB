@@ -75,8 +75,8 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree.insert("", tk.END, values=("+", "Close the key"))
         #
         self._tree.insert("", tk.END, values=("----------", "-- Keyer (Active when key is open) --"))
-        self._tree.insert("", tk.END, values=("Ctrl+LEFT", "Dits"))
-        self._tree.insert("", tk.END, values=("Ctrl+RIGHT", "Dah (key down while pressed)"))
+        self._tree.insert("", tk.END, values=("Shift+LEFT", "Dits"))
+        self._tree.insert("", tk.END, values=("Shift+RIGHT", "Dah (key down while pressed)"))
         #
         self._tree.insert("", tk.END, values=("----------", "-- Recording Playback Control --"))
         self._tree.insert("", tk.END, values=("Ctrl+S", "Stop recording playback"))
