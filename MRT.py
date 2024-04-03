@@ -65,7 +65,7 @@ import time
 from time import sleep
 from typing import Optional, Sequence
 
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -216,7 +216,7 @@ class _GetchWindows:
 
     Used by `RawTerm`
     """
-    def __init__(self, shutdown_event:Event()):
+    def __init__(self, shutdown_event:Event):
         import msvcrt
         self.shutdown_event = shutdown_event
         return
