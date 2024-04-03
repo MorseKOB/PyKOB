@@ -275,7 +275,7 @@ class Mrt:
             p = Path(self._play_file_path)
             p.resolve()
             if not p.is_file():
-                print("Recording not found. '{}'".format(self._play_file_path))
+                print("Recording not found. '{}'".format(self._play_file_path), flush=True)
                 self._play_file_path = None
                 self._playback_complete.set()
                 raise FileNotFoundError(p)
@@ -290,7 +290,7 @@ class Mrt:
             p = Path(self._send_file_path)
             p.resolve()
             if not p.is_file():
-                print("File to send not found. '{}'".format(self._send_file_path))
+                print("File to send not found. '{}'".format(self._send_file_path), flush=True)
                 self._send_file_path = None
                 raise FileNotFoundError(p)
             pass
@@ -475,13 +475,12 @@ class Mrt:
             codeType=self._cfg.code_type,
             spacing=self._cfg.spacing
             )
-        if sys.stdout.isatty():
-            self._reader = morse.Reader(
-                wpm=self._cfg.text_speed,
-                cwpm=self._cfg.min_char_speed,
-                codeType=self._cfg.code_type,
-                callback=self._reader_callback
-                )
+        self._reader = morse.Reader(
+            wpm=self._cfg.text_speed,
+            cwpm=self._cfg.min_char_speed,
+            codeType=self._cfg.code_type,
+            callback=self._reader_callback
+            )
         if sys.stdin.isatty():
             # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
             self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
@@ -577,7 +576,7 @@ class Mrt:
                 return
             elif code[-1] == 2: # special code for closer/circuit open
                 self._set_virtual_closer_closed(False)
-                print('[+ to close key (Ctrl-Z=Help)]')
+                print('[+ to close key (Ctrl-Z=Help)]', flush=True)
                 sys.stdout.flush()
                 return
         if not self._internet_station_active and self._local_loop_active:
@@ -630,7 +629,7 @@ class Mrt:
             if self._sender_dt:
                 ts = time.strftime("%Y-%m-%d %I:%M:%S %p ")
             print()
-            print(f"{ts}<<{self._sender_current}>>")
+            print(f"{ts}<<{self._sender_current}>>", flush=True)
         return
 
     def _print_start_info(self):
@@ -667,6 +666,7 @@ class Mrt:
                     return
                 # Start it playing
                 log.debug("Mrt._process_automation - Play recording...", 2)
+                self._sender_current = ""
                 self._set_virtual_closer_closed(False)
                 self._playback_complete.clear()
                 self._player.playback_start(max_silence=8)
@@ -678,6 +678,7 @@ class Mrt:
             # We have a file to send.
             # Start it sending
             log.debug("Mrt._process_automation - Key a file...", 2)
+            self._handle_sender_update(self._our_office_id)
             self._thread_fsender.start()
             self._shutdown.wait(0.010)
             self._filesend_running.set()
@@ -712,7 +713,7 @@ class Mrt:
                 rec.record([], "", text=char)
         if not char == '=':
             if self._last_received_para:
-                print()
+                print(flush=True)
             self._last_received_para = False
         else:
             self._last_received_para = True
@@ -729,7 +730,7 @@ class Mrt:
             print(' ', end='')
         print(char, end='', flush=True)
         if char == '_':
-            print()
+            print(flush=True)
         return
 
     def _set_local_loop_active(self, active):
@@ -1162,7 +1163,7 @@ if __name__ == "__main__":
         print(MRT_VERSION_TEXT)
         print("Python: " + sys.version + " on " + sys.platform)
         print("pykob: " + VERSION)
-        print("PySerial: " + config.pyserial_version)
+        print("PySerial: " + config.pyserial_version, flush=True)
 
 
         mrt, mrt_selector = mrt_from_args(allow_selector=True)
@@ -1194,6 +1195,6 @@ if __name__ == "__main__":
         if mrt_selector:
             mrt_selector.exit()
         print()
-        print("~73")
+        print("~73", flush=True)
         sleep(0.5)
         sys.exit(exit_status)
