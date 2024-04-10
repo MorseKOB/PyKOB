@@ -194,18 +194,30 @@ Follow the instructions here:
  https://pyserial.readthedocs.io/en/latest/pyserial.html
 
 ## Getting Started
-It is suggested that you set all of the configuration options before running 
-utilities or MKOB for the first time. To do that:
+The best thing to run first is **SysCheck**. That will display information about
+the system, Python, the libraries used, and the serial devices (if you are going to
+use an interface to a physical key and/or sounder). It is simple to run:
+
+```
+python3 SysCheck.py
+```
+
+Next, it is suggested that you set all of the configuration options before running 
+any of the Morse utilities or MKOB/MRT for the first time. To do that:
 
 * Open a Command/Terminal window in the PyKOB folder
-* (I suggest running) `python3 --version` (to make sure you are running a 3.11.xx version)
-* If your Python version is not 3.11.xx you will need to upgrade it.
+* (I suggest running) `python3 --version` (to make sure you are running a 3.11.xx  or later version)
+* If your Python version is not 3.11.xx or later you will need to upgrade it.
 * Run: `python3 Configure.py`
   That will list the current configuration. Since this is a new installation,
   the settings will all be the defaults.
 * Run: 'python3 Configure.py --help'
   That will list all the option flags to use to set your desired configuration.
 * Run: `python3 Configure.py <with the options you want to set>`
+* There is also a GUI for configuring. To use it, use the **--gui** option:
+  ```
+  python3 Configure.py --gui
+  ```
 
 ## Run 'Sample.py'
 Once you have the settings you want, you are ready to run any of the utilities, 
