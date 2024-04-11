@@ -309,6 +309,7 @@ class KOB:
             elif serial_module_available:
                 try:
                     self._port = serial.Serial(self._port_to_use, timeout=0.5)
+                    self._port.open()
                     self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
                     # Read the inputs to initialize them
                     self.__read_cts()

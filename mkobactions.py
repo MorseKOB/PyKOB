@@ -157,6 +157,10 @@ class MKOBActions():
         self._kw.show_shortcuts()
         return
 
+    def doHelpWires(self):
+        self._kw.show_wires()
+        return
+
     ####
     #### Action handlers for control events
     ####

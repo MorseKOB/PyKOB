@@ -712,6 +712,17 @@ class MKOBMain:
             self._kw.spacing = self._cfg.spacing
         return
 
+    def connect(self):
+        """
+        Connect if not connected.
+        """
+        if self._shutdown.is_set():
+            return
+        log.debug("mkmain.connect", 3)
+        if not self._connected.is_set():
+            self.toggle_connect()
+        return
+
     def disconnect(self):
         """
         Disconnect if connected.

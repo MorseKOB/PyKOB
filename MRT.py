@@ -65,7 +65,7 @@ import time
 from time import sleep
 from typing import Optional, Sequence
 
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
