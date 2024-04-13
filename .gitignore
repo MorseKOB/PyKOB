@@ -52,3 +52,8 @@ Capture-Replay/*.txt
 *.pkrec
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
+# Include anything that is put into the doc and mkob_learn folders
+!doc/*.mrtsel
+!doc/*.pkcfg
+!doc/*pkrec
+!mkob_learn/*.pkrec
