@@ -232,6 +232,7 @@ class KOB:
         #
         # Kick everything off
         #
+        self.__start_keyer_processing()
         self.__start_hw_processing()
         return
 
@@ -383,9 +384,6 @@ class KOB:
         if not self._shutdown.is_set() and self._hw_is_available():
             self._threadsStop.clear()
             self.power_save(False)
-            if not self._thread_keyer:
-                self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body)
-                self._thread_keyer.start()
             if self._key_callback:
                 if not self._thread_keyread:
                     self._thread_keyread = Thread(name="KOB-KeyRead", target=self._thread_keyread_body)
@@ -393,6 +391,13 @@ class KOB:
             if not self._thread_powersave:
                 self._thread_powersave = Thread(name="KOB-PowerSave", target=self._thread_powersave_body)
                 self._thread_powersave.start()
+        return
+
+    def __start_keyer_processing(self) -> None:
+        if not self._shutdown.is_set() and not self._thread_keyer:
+            self._threadsStop.clear()
+            self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body)
+            self._thread_keyer.start()
         return
 
     def __stop_hw_processing(self) -> None:
