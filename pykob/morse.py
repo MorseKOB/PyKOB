@@ -31,17 +31,12 @@ Provides classes for sending and reading American and International Morse code.
 import sys
 import codecs
 from pathlib import Path
-from threading import current_thread, Timer
+from threading import current_thread, Event, Timer
 import traceback
 from pykob import config, log
 
-DOTSPERWORD = 45     # dot units per word, including all spaces
-                     #   (MORSE is 43, PARIS is 47)
+DOTSPERWORD = 45     # dot units per word, including all spaces (MORSE is 43, PARIS is 47)
 MAXINT = sys.maxsize # a very large integer
-
-"""
-Code sender class
-"""
 
 # Resource folder
 root_folder = Path(__file__).parent
@@ -60,16 +55,26 @@ def readEncodeTable(codeType, filename):
         a, t, c = s.rstrip().partition('\t')
         encodeTable[cti][a] = c  # dictionary key is character
     f.close()
+    return
 
 readEncodeTable(config.CodeType.american, 'codetable-american.txt')
 readEncodeTable(config.code_type.international, 'codetable-international.txt')
 
 class Sender:
+    """
+    Code sender class used to convert text into code (down/up duration) sequences.
+    """
+
+    """ Constant approximate duration for a dot at 20 Words per Minute. """
+    DOT_LEN_20WPM = 60
+
     def __init__(self, wpm, cwpm=0, codeType=config.CodeType.american, spacing=config.Spacing.char):
         self._codeType = codeType
         self._spacing = spacing
         self.setWPM(wpm, cwpm)
         self._space = self._wordSpace  # delay before next code element (ms)
+        self._shutdown: Event = Event()
+        return
 
     @property
     def dot_len(self):
@@ -146,6 +151,13 @@ class Sender:
             self._space = self._charSpace
         return code
 
+    def exit(self):
+        """
+        Exit this instance.
+        """
+        self.shutdown()
+        return
+
     def setWPM(self, wpm, cwpm=0):
         if cwpm == 0:
             cwpm = wpm  # adjust for legacy clients
@@ -168,6 +180,15 @@ class Sender:
             self._wordSpace += int(delta / 3)
         elif self._spacing == config.Spacing.word:
             self._wordSpace += int(delta)
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
 
 
 """
@@ -200,6 +221,8 @@ def readDecodeTable(codeType, filename):
         a, t, c = s.rstrip().partition('\t')
         decodeTable[codeType][c] = a  # dictionary key is code
     f.close()
+    return
+
 readDecodeTable(0, 'codetable-american.txt') # American code table is at 0 index
 readDecodeTable(1, 'codetable-international.txt') # International code table is at 1 index
 
@@ -219,27 +242,22 @@ class Reader:
         self._spaceBuf  = [0, 0]       # space before each character
         self._markBuf   = [0, 0]       # length of last dot or dash in character
         self._nChars    = 0            # number of complete characters in buffer
-        self._callback  = callback     # function to call when character decoded
+        self._char_callback  = callback     # function to call when character decoded
+        self._shutdown  = Event()      # Used to cancel running threads and shutdown operations
         self._flusher   = None         # holds Timer (thread) to call flush if no code received
         self._latched   = False        # True if cicuit has been latched closed by a +1 code element
         self._mark      = 0            # accumulates the length of a mark as positive code elements are received
         self._space     = 1            # accumulates the length of a space as negative code elements are received
         # Detected code speed values. Start with the configured speed and calculated values
-        self._d_wpm = self._wpm
+        self._d_wpm:int = self._wpm
         self._d_dotLen = self._dotLen
         self._d_truDot = self._truDot
+        self._d_update_missed:int = 0  # accumulates how many times the detected speed calculation wasn't performed
+        return
 
     @property
-    def wpm(self):
-        return self._wpm
-
-    @property
-    def dot_len(self):
-        return self._dotLen
-
-    @property
-    def dot_len_max(self):
-        return ((self._dotLen * MINDASHLEN) - 0.1)
+    def char_space_max(self):
+        return (self._dotLen * MAXMORSESPACE)
 
     @property
     def dash_len_min(self):
@@ -258,6 +276,30 @@ class Reader:
         return (self._dotLen * MAXDASHLEN)
 
     @property
+    def detected_dot_len(self) -> int:
+        return self._d_dotLen
+
+    @property
+    def detected_dot_tru(self) -> int:
+        return self._d_truDot
+
+    @property
+    def detected_wpm(self) -> int:
+        return self._d_wpm
+
+    @property
+    def dot_len(self):
+        return self._dotLen
+
+    @property
+    def dot_len_max(self):
+        return ((self._dotLen * MINDASHLEN) - 0.1)
+
+    @property
+    def dot_tru(self):
+        return self._truDot
+
+    @property
     def intra_char_space_min(self):
         return (self._dotLen * 1.45)
 
@@ -266,8 +308,8 @@ class Reader:
         return ((self._dotLen + (self._dotLen * MINCHARSPACE)) - 0.1)
 
     @property
-    def char_space_max(self):
-        return (self._dotLen * MAXMORSESPACE)
+    def wpm(self):
+        return self._wpm
 
     def decode(self, codeSeq, use_flusher=True):
         # Code received - cancel an existing 'flusher'
@@ -315,45 +357,77 @@ class Reader:
                     self._space = 0
                 elif self._mark > 0:  # continuation of mark
                     self._mark += c
-        if use_flusher:
+        if use_flusher and not self._shutdown.is_set():
             self._flusher = Timer(((20.0 * self._truDot) / 1000.0), self._flushHandler)  # if idle call `flush`
             self._flusher.setName("Reader-Flusher <:{}".format(current_thread().name))
             self._flusher.start()
         else:
             pass # To allow breakpoint for debugging
+        return
 
     def exit(self):
         """
         Cancel the flusher (if it exists) and exit.
         """
+        self.shutdown()
         f = self._flusher
         self._flusher = None
-        if f:
+        if f and f.is_alive():
             f.cancel()
-            f.join(0.5)
+            f.join()
+        return
 
     def setWPM(self, wpm, cwpm=0):
         self._wpm       = max(wpm, cwpm)  # configured code speed
         self._dotLen    = int(1200.0 / self._wpm)  # nominal dot length (ms)
         self._truDot    = self._dotLen  # actual length of typical dot (ms)
+        return
 
     def updateDWPM(self, codeSeq):
+        """
+        Update the detected WPM value from the incoming code.
+        """
         for i in range(1, len(codeSeq) - 2, 2):
             minDotLen = int(0.5 * self._d_dotLen)
             maxDotLen = int(1.5 * self._d_dotLen)
-            if codeSeq[i] > minDotLen and codeSeq[i] < maxDotLen and \
-                    codeSeq[i] - codeSeq[i+1] < 2 * maxDotLen and \
-                    codeSeq[i+2] < maxDotLen:
-                dotLen = (codeSeq[i] - codeSeq[i+1]) / 2
-                self._d_truDot = int(ALPHA * codeSeq[i] + (1 - ALPHA) * self._d_truDot)
+            c1 = codeSeq[i]
+            c2 = codeSeq[i+1]
+            c3 = codeSeq[i+2]
+            du_len = c1 - c2
+            if ((c1 > minDotLen)
+                and (c1 < maxDotLen)
+                and (du_len < (2 * maxDotLen))
+                and (c3 < maxDotLen)
+            ):
+                dotLen = int(du_len / 2.0)
+                self._d_truDot = int(ALPHA * c1 + (1 - ALPHA) * self._d_truDot)
                 self._d_dotLen = int(ALPHA * dotLen + (1 - ALPHA) * self._d_dotLen)
-                self._d_wpm = 1200. / self._d_dotLen
+                self._d_wpm = int(1200.0 / self._d_dotLen)
+                self._d_update_missed = 0
+            else:
+                self._d_update_missed += 1
+                if self._d_update_missed > 8:
+                    # We haven't matched the criteria to get into the update calculation
+                    # for over 8 code pairs. Try a less granular value. This might not
+                    # be correct, but will hopefully get us to fall into the calculation
+                    # on subsequent code sequences.
+                    d2 = c1 * 2
+                    du_diff = abs(d2 - du_len)
+                    du_delta = du_diff / 100.0
+                    if du_delta < 0.05:
+                        # The down/up appears to be a dot. Use this as a new speed
+                        self._d_truDot = int(du_len / 2.0)
+                        self._d_dotLen = self._d_truDot
+                        self._d_wpm = int(2400.0 / du_len)
+                        self._d_update_missed = 0
+        return
 
     def _flushHandler(self):
         f = self._flusher
         self._flusher = None
         if f:
             self.flush()
+        return
 
     def flush(self):
         f = self._flusher
@@ -378,8 +452,10 @@ class Reader:
             self._spaceBuf = [0, 0]
             self._markBuf = [0, 0]
             self._nChars = 0
-            if self._latched:
-                self._callback('_', float(spacing) / (3 * self._truDot) - 1)
+            cb = self._char_callback
+            if self._latched and cb:
+                cb('_', float(spacing) / (3 * self._truDot) - 1)
+        return
 
     def decodeChar(self, nextSpace):
         self._nChars += 1  # number of complete characters in buffer (1 or 2)
@@ -433,8 +509,10 @@ class Reader:
         self._spaceBuf[self._nChars] = nextSpace
         if code != '' and s == '':
             s = '[' + code + ']'
-        if s != '':
-            self._callback(s, float(sp1) / (3 * self._truDot) - 1)
+        cb = self._char_callback
+        if s != '' and cb:
+            cb(s, float(sp1) / (3 * self._truDot) - 1)
+        return
 
     def lookupChar(self, code):
         codeTableIndex = 0 if self._codeType == config.CodeType.american else 1
@@ -443,8 +521,21 @@ class Reader:
         else:
             return('')
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        self._char_callback = None
+        f = self._flusher
+        if not f is None and f.is_alive():
+            f.cancel()
+        return
+
     def displayBuffers(self, text):
         """Display the code buffer and other information for troubleshooting"""
         log.debug("{}: nChars = {}".format(text, self._nChars))
         for i in range(2):
             print("{} '{}' {}".format(self._spaceBuf[i], self._codeBuf[i], self._markBuf[i]))
+        return

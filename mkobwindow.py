@@ -29,6 +29,7 @@ Create the main window for MKOB and lay out its widgets (controls).
 """
 from mkobactions import MKOBActions
 from mkobhelpkeys import MKOBHelpKeys
+from mkobhelpwires import MKOBHelpWires
 from mkobkeyboard import MKOBKeyboard
 from mkobmain import MKOBMain
 from mkobreader import MKOBReader
@@ -36,14 +37,21 @@ from mkobstationlist import MKOBStationList
 from pykob import config, config2, log
 from pykob import VERSION as PKVERSION
 from pykob.config2 import Config
+from pykob.internet import PORT_DEFAULT
 import mkobevents
 
+import platform
 import sys
-from tkinter import N, S, W, E
+from threading import Event
+from tkinter import N, S, W, E, VERTICAL
 import tkinter as tk
+from tkinter import font
 from tkinter import ttk
 import tkinter.scrolledtext as tkst
+from typing import Optional
 
+global TEXT
+TEXT = "text"
 
 def print_hierarchy(w, depth=0):
     log.debug(
@@ -111,10 +119,10 @@ class SenderControls:
     """
     Frame to encapsulate the Code Sender controls.
     """
-
     def __init__(
         self,
         parent,
+        mkwin,
         mkkbd,
         spacing: config.Spacing,
         text_speed: int,
@@ -126,9 +134,11 @@ class SenderControls:
         borderwidth=3,
         relief="groove",
     ):
+        self._shutdown: Event = Event()
         self.window = ttk.Frame(
             parent, width=width, height=height, borderwidth=borderwidth, relief=relief
         )
+        self._mkwin = mkwin
         self._mkkbd = mkkbd
         self._spacing = spacing
         self._text_speed = text_speed
@@ -145,7 +155,7 @@ class SenderControls:
             self.window, text="Repeat", variable=self._varCodeSenderRepeat
         )
         self._btnCodeSenderClear = ttk.Button(
-            self.window, text="Clear", command=self._mkkbd.handle_clear
+            self.window, text="Clear", command=self._handle_sender_clear
         )
         self._varCodeSenderOn.trace_add("write", self._handle_enable_change)
         self._varCodeSenderRepeat.trace_add("write", self._handle_repeat_change)
@@ -184,21 +194,27 @@ class SenderControls:
         ## Text/Word speed
         self._varTWPM = tk.StringVar()
         self._varTWPM.set(self._text_speed)
-        self._varTWPM.trace_add("write", self._text_change_callback)
-        self._spnTWPM = ttk.Spinbox(
+        self._varTWPM.trace_add("write", self._handle_txtspeed_change)
+        self._spnTWPM = tk.Spinbox(
             self.window,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._input_validator, "%P"),
             textvariable=self._varTWPM,
         )
+        return
 
     def _adjust_text_speed_enable(self, v: config.Spacing):
+        if self._shutdown.is_set():
+            return
         if v == config.Spacing.none:
             # Farnsworth spacing has been turned off - disable the 'Text Speed' control:
             if str(self._spnTWPM.cget("state")) == tk.NORMAL:
@@ -207,17 +223,45 @@ class SenderControls:
             # Farnsworth spacing is on: enable the "Text Speed" control:
             if str(self._spnTWPM.cget("state")) == tk.DISABLED:
                 self._spnTWPM.config(state=tk.NORMAL)
+        return
 
     def _handle_enable_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._mkkbd.enabled = self._varCodeSenderOn.get()
+        self._mkwin.give_keyboard_focus()
+        return
 
     def _handle_repeat_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._mkkbd.repeat = self._varCodeSenderRepeat.get()
+        self._mkwin.give_keyboard_focus()
+        return
+
+    def _handle_sender_clear(self, *args):
+        if self._shutdown.is_set():
+            return
+        self._mkkbd.handle_clear()
+        self._mkwin.give_keyboard_focus()
+        return
+
 
     def _handle_spacing_change(self, *args):
+        if self._shutdown.is_set():
+            return
         self._adjust_text_speed_enable(self._farnsworthSpacing.get() - 1)
         if self._farns_change_callback:
             self._farns_change_callback()
+        self._mkwin.give_keyboard_focus()
+        return
+
+    def _handle_txtspeed_change(self, *args):
+        if self._shutdown.is_set():
+            return
+        if self._text_change_callback:
+            self._text_change_callback()
+        return
 
     @property
     def code_sender_enabled(self) -> bool:
@@ -226,6 +270,7 @@ class SenderControls:
     @code_sender_enabled.setter
     def code_sender_enabled(self, b: bool) -> None:
         self._varCodeSenderOn.set(b)
+        return
 
     @property
     def code_sender_repeat(self) -> bool:
@@ -234,6 +279,7 @@ class SenderControls:
     @code_sender_repeat.setter
     def code_sender_repeat(self, b: bool) -> None:
         self._varCodeSenderRepeat.set(b)
+        return
 
     @property
     def farnsworth_spacing(self) -> config.Spacing:
@@ -245,6 +291,7 @@ class SenderControls:
     def farnsworth_spacing(self, v: config.Spacing) -> None:
         self._farnsworthSpacing.set(v + 1)
         self._adjust_text_speed_enable(v)
+        return
 
     @property
     def text_speed(self) -> int:
@@ -253,6 +300,11 @@ class SenderControls:
     @text_speed.setter
     def text_speed(self, v: int) -> None:
         self._varTWPM.set(str(v))
+        return
+
+    def exit(self):
+        self.shutdown()
+        return
 
     def get_minimum_width(self):
         """
@@ -297,17 +349,202 @@ class SenderControls:
             row=0, column=3, columnspan=3, sticky=(E), padx=(0, 2)
         )
 
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
+
+
+
+class StatusBar:
+    """
+    Frame to encapsulate the Status Bar containing:
+    - Detected Speed (based on code sequences processed by the Reader).
+    - KOBServer host:port in use.
+    """
+    def __init__(
+        self,
+        parent,  # Parent Window
+        mkwin,   # MKOBWindow (class) object
+        width=100,
+        height=20,
+        borderwidth=2,
+        relief="solid",
+    ):
+        self._mkwin: MKOBWindow = mkwin
+        self._mkm: Optional[MKOBMain] = None
+        self._tkroot = self._mkwin.tkroot
+        self._shutdown: Event = Event()
+        self._sndr_pwr_save_last: bool = False
+
+        self.window = ttk.Frame(
+            parent, width=width, height=height, borderwidth=borderwidth, relief=relief
+        )
+        self._lbl_d_speed = ttk.Label(self.window, text="Detected Speed:")
+        self._d_speed = ttk.Label(self.window, text="", width=3)
+        self._lbl_server = ttk.Label(self.window, text="Server:")
+        self._server = ttk.Label(self.window, text="")
+        self._status_msg = ttk.Label(self.window, text=" ")
+        #
+        self._sep1 = ttk.Separator(self.window, orient=VERTICAL)
+        self._sep2 = ttk.Separator(self.window, orient=VERTICAL)
+        return
+
+    def _update_values(self) -> None:
+        if self._shutdown.is_set():
+            return
+        mkm = self._mkm
+        if not mkm is None:
+            reader = mkm.Reader
+            if not reader is None:
+                dspeed = reader.detected_wpm
+                self._d_speed[TEXT] = str(dspeed)
+            else:
+                self._d_speed[TEXT] = ""
+            inet = mkm.Internet
+            if not inet is None:
+                host = inet.host
+                port = inet.port
+                server = host
+                if not port == PORT_DEFAULT:
+                    server += ":{}".format(port)
+                self._server[TEXT] = server
+            else:
+                self._server[TEXT] = ""
+            kob_ = mkm.Kob
+            if not kob_ is None:
+                sndr_pwr_save = kob_.sounder_is_power_saving
+                if not sndr_pwr_save == self._sndr_pwr_save_last:
+                    self._sndr_pwr_save_last = sndr_pwr_save
+                    msg = "Sounder power save is on"
+                    if sndr_pwr_save:
+                        self._status_msg[TEXT] = msg
+                    elif self._status_msg[TEXT] == msg:
+                        # Clear our message, but not others
+                        self._status_msg[TEXT] = ""
+                    pass
+                pass
+            pass
+        else:
+            self._d_speed[TEXT] = ""
+            self._server[TEXT] = ""
+        #
+        # Schedule an update
+        self._tkroot.after(1000, self._update_values)
+        return
+
+    @property
+    def status_msg(self) -> str:
+        return self._status_msg[TEXT]
+
+    @status_msg.setter
+    def status_msg(self, msg:str):
+        self._status_msg[TEXT] = msg
+        return
+
+    def exit(self):
+        self.shutdown()
+        return
+
+    def get_minimum_width(self) -> int:
+        """
+        Get the width of the Farnsworth controls (they are the widest)
+        """
+        w = 0
+        w += self._lbl_d_speed.winfo_width()
+        w += self._d_speed.winfo_width()
+        w += self._status_msg.winfo_width()
+        w += self._lbl_server.winfo_width()
+        w += self._server()
+        w += 12  # Some padding
+        return w
+
+    def layout(self):
+        """
+        Layout the frame.
+        """
+        self.window.rowconfigure(0, minsize=22, pad=1, weight=0)
+        # Left (detected speed)
+        self.window.columnconfigure(0, weight=0)  # Speed label
+        self.window.columnconfigure(1, weight=0)  # Speed
+        # Center (status)
+        self.window.columnconfigure(2, weight=0)  # separator
+        self.window.columnconfigure(3, weight=1)  # Status
+        self.window.columnconfigure(4, weight=0)  # separator
+        # Right (server address)
+        self.window.columnconfigure(5, weight=0)  # Server label
+        self.window.columnconfigure(6, weight=0)  # Server Address
+
+        # Left (detected speed)
+        self._lbl_d_speed.grid(row=0, column=0, padx=(0, 2), sticky=(E))
+        self._d_speed.grid(row=0, column=1, padx=(0, 0), sticky=(W))
+        # Center (status)
+        self._sep1.grid(row=0, column=2, padx=(1, 1))
+        self._status_msg.grid(row=0, column=3, sticky=(W,E), padx=(0, 0))
+        self._sep2.grid(row=0, column=4, padx=(1, 1))
+        # Right (server address)
+        self._lbl_server.grid(row=0, column=5, padx=(0, 2), sticky=(E))
+        self._server.grid(row=0, column=6, padx=(0, 0), sticky=(W))
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return
+
+    def start(self, mkmain:MKOBMain) -> None:
+        if self._shutdown.is_set():
+            return
+        self._mkm = mkmain
+        if not mkmain is None:
+            if not mkmain.Kob is None:
+                self._sndr_pwr_save_last = mkmain.Kob.sounder_is_power_saving
+        self._tkroot.after(1000, self._update_values)
+        return
 
 class MKOBWindow:
-    def __init__(self, root, mkob_version_text, cfg: Config) -> None:
+    def __init__(self, root, mkob_version_text, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
 
         self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
         self._app_name_version = mkob_version_text
+        self._shutdown: Event = Event()
+
         # Hide the window from view until its content can be fully initialized
         self._root.withdraw()
-        self._root.protocol("WM_DELETE_WINDOW", self._on_app_distroy)  # Handle user clicking [X]
-        self.window = ttk.Frame(root)
+        self._root.protocol("WM_DELETE_WINDOW", self._on_app_destoy)  # Handle user clicking [X]
+
+        self._operating_system = platform.system()
+
+        self._ttk_style = ttk.Style()  # Set the style in use
+        log.debug("Themes available: {}".format(self._ttk_style.theme_names()))
+        if self._operating_system == "Windows":
+            self._ttk_style.theme_use("vista")
+        elif self._operating_system == "Darwin":
+            self._ttk_style.theme_use("aqua")
+        elif self._operating_system == "Linux":
+            self._ttk_style.theme_use("classic")
+        else:
+            self._ttk_style.theme_use("classic")
+
+        self._ttk_style.configure("Reader.TFrame")  # Style used by our Reader Window
+        self._ttk_style.configure("Sender.TFrame")  # Style used by our Sender.Window
+        self._ttk_style.configure("TSpinbox", padding=(1, 1, 6, 1))
+        text_font = font.nametofont("TkTextFont")
+        text_font_metrics = text_font.metrics()
+        line_height = text_font_metrics["linespace"]
+        treeview_line_height = int (line_height * 1.3)
+        self._ttk_style.configure("Treeview", rowheight=treeview_line_height)
+        log.debug("MKOBWindow - Tk font metrics for 'TkTextFont: {}".format(text_font_metrics), 3)
+
+        # The main (visible) window
+        self._window = ttk.Frame(root)
 
         # Operational values (from config)
         self._cfg = cfg
@@ -316,13 +553,18 @@ class MKOBWindow:
         self._twpm = cfg.text_speed
         self._spacing = cfg.spacing
         self._ignore_morse_setting_change = False
+        ## passed in
+        self._sender_dt = sender_dt
+        self._record_filepath = record_filepath
 
         # Pointers for other modules
+        self._km = None
         self._krdr = MKOBReader(self)
         self._ksl = MKOBStationList(self)
         self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
         self._kkb = MKOBKeyboard(self._ka, self)
         self._shortcuts_win = None
+        self._wires_win = None
 
         # validators
         self._digits_only_validator = root.register(self._validate_number_entry)
@@ -341,12 +583,12 @@ class MKOBWindow:
         self._root.bind_all("<Key-Escape>", self._ka.handle_toggle_closer)
         self._root.bind_all("<Key-Pause>", self._ka.handle_toggle_code_sender)
         self._root.bind_all("<Key-F1>", self._ka.handle_toggle_code_sender)
-        self._root.bind_all("<Key-F2>", self._ka.doConnect)
         ## Reserve F3 to avoid conflict with MorseKOB2
         self._root.bind_all("<Key-F4>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-F5>", self._ka.handle_increase_wpm)
-        self._root.bind_all("<Key-F11>", self._ka.handle_clear_reader_window)
-        self._root.bind_all("<Key-F12>", self._ka.handle_clear_sender_window)
+        self._root.bind_all("<Key-F8>", self._ka.doConnect)
+        self._root.bind_all("<Key-F11>", self._ka.handle_reader_clear_fk)
+        self._root.bind_all("<Key-F12>", self._ka.handle_sender_clear_fk)
         self._root.bind_all("<Key-Next>", self._ka.handle_decrease_wpm)
         self._root.bind_all("<Key-Prior>", self._ka.handle_increase_wpm)
         #
@@ -422,14 +664,16 @@ class MKOBWindow:
         # Help menu
         self._helpMenu = tk.Menu(self._menu)
         self._menu.add_cascade(label="Help", menu=self._helpMenu)
+        self._helpMenu.add_command(label="Active Wires", command=self._ka.doHelpWires)
         self._helpMenu.add_command(label="Keyboard Shortcuts", command=self._ka.doHelpShortcuts)
         self._helpMenu.add_separator()
         self._helpMenu.add_command(label="About", command=self._ka.doHelpAbout)
 
+        # Status Bar (Detected Speed and Host Address)
         # Paned/Splitter windows
         ## left (the Reader|Sender paned window) / right: Stations Connected & Controls)
         self._pw_left_right = tk.PanedWindow(
-            self.window, orient=tk.HORIZONTAL, sashrelief="raised"
+            self._window, orient=tk.HORIZONTAL, sashrelief="raised"
         )
         # top: Reader / bottom: Sender
         self._pw_topbottom_lf = tk.PanedWindow(
@@ -437,8 +681,6 @@ class MKOBWindow:
         )
 
         # Reader (top left)
-        style_reader = ttk.Style()
-        style_reader.configure("Reader.TFrame")
         fm_reader = ttk.Frame(self._pw_topbottom_lf, style="Reader.TFrame", padding=2)
         self._txtReader = tkst.ScrolledText(
             fm_reader,
@@ -451,8 +693,6 @@ class MKOBWindow:
         )
         # Code Sender w/controls (bottom left)
         ## Sender  w/controls
-        style_sender = ttk.Style()
-        style_sender.configure("Sender.TFrame")
         fm_sender_pad = ttk.Frame(self._pw_topbottom_lf, style="Sender.TFrame", padding=4)
         fm_sender = ttk.Frame(fm_sender_pad, borderwidth=2, relief="groove")
         self._txtKeyboard = tkst.ScrolledText(
@@ -468,6 +708,7 @@ class MKOBWindow:
         ### code sender checkboxes, clear, and Farnsworth
         self._fm_sndr_controls = SenderControls(
             fm_sender,
+            self,
             self._kkb,
             self._spacing,
             self._twpm,
@@ -479,12 +720,6 @@ class MKOBWindow:
         # Stations Connected | Office | Closer & Speed | Wire/Connect
         #  (right)
         self._fm_right = ttk.Frame(self._pw_left_right)
-        style_spinbox = (
-            ttk.Style()
-        )  # Add padding around the spinbox entry fields to move the text away from the arrows
-        style_spinbox.configure(
-            "MK.TSpinbox", padding=(1, 1, 6, 1)
-        )  # padding='W N E S'
         ## Station list
         self._txtStnList = tkst.ScrolledText(
             self._fm_right,
@@ -505,26 +740,30 @@ class MKOBWindow:
         # Closer & Speed
         fm_closer_speed = ttk.Frame(self._fm_right, borderwidth=3, relief="groove")
         ## circuit closer
-        self._varCircuitCloser = tk.IntVar()
-        chkCCircuitCloser = ttk.Checkbutton(
+        self._varVKeyClosed = tk.IntVar()
+        chkVKeyClosed = ttk.Checkbutton(
             fm_closer_speed,
             text="Key Closed",
-            variable=self._varCircuitCloser,
-            command=self._ka.doCircuitCloser,
+            variable=self._varVKeyClosed,
+            command=self._handle_vkey_closed_change,
         )
         ## Character speed
         self._lbl_cwpm = ttk.Label(fm_closer_speed, text="Speed:")
         self._varCWPM = tk.StringVar()
         self._varCWPM.set(cfg.min_char_speed)
         self._varCWPM.trace_add("write", self._handle_char_speed_change)
-        spnCWPM = ttk.Spinbox(
+        spnCWPM = tk.Spinbox(
             fm_closer_speed,
-            style="MK.TSpinbox",
+            # style="MK.TSpinbox",
             from_=5,
             to=40,
+            borderwidth=2,
             width=4,
             format="%1.0f",
             justify=tk.RIGHT,
+            relief="sunken",
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varCWPM,
@@ -536,14 +775,17 @@ class MKOBWindow:
         self._varWireNo = tk.StringVar()
         self._varWireNo.set(str(cfg.wire))
         self._varWireNo.trace_add("write", self._handle_wire_change)
-        self._spnWireNo = ttk.Spinbox(
+        self._spnWireNo = tk.Spinbox(
             fm_wire_connect,
-            style="MK.TSpinbox",
-            from_=1,
+            # style="MK.TSpinbox",
+            from_=0,
             to=32000,
+            borderwidth=2,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=200,
             validate="key",
             validatecommand=(self._digits_only_validator, "%P"),
             textvariable=self._varWireNo,
@@ -551,26 +793,30 @@ class MKOBWindow:
         ## Connect
         self._connect_indicator = ConnectIndicator(fm_wire_connect)
         self._btnConnect = ttk.Button(
-            fm_wire_connect, text=" Connect  ", width=10, command=self._ka.doConnect
+            fm_wire_connect, text=" Connect  ", width=10, command=self._handle_connect_pressed
         )
+        # Status Bar
+        self._status_bar = StatusBar(self._window, self)
 
         ###########################################################################################
         # Layout...
         #  Make this the whole content of the application.
         #  We will subdivide below to hold the different widgets
-        self.window.grid(column=0, row=0, sticky=(N, S, E, W))
-        self.window.rowconfigure(0, weight=1)
-        self.window.columnconfigure(0, weight=1)
-        self.window.columnconfigure(1, weight=0)
+        self._window.grid(column=0, row=0, sticky=(N, S, E, W))
+        self._window.rowconfigure(0, weight=1)
+        self._window.rowconfigure(1, weight=0)
+        self._window.columnconfigure(0, weight=6)
+        # self._window.columnconfigure(1, weight=3)
+        ## Status Bar (across the bottom)
+        self._status_bar.window.grid(row=1, column=0, padx=(3,3), pady=(0,4), sticky=(N, S, E, W))
+        self._status_bar.layout()
         ## Reader (top)
         fm_reader.rowconfigure(0, weight=1, minsize=20, pad=2)
         fm_reader.columnconfigure(0, weight=1, minsize=100)
         ## Sender (bottom)
         fm_sender_pad.rowconfigure(0, weight=1, minsize=1)
         fm_sender_pad.columnconfigure(0, weight=1)
-        fm_sender.grid(
-            row=0, column=0, sticky=(N, S, W, E), padx=2, pady=2, ipadx=2, ipady=2
-        )
+        fm_sender.grid(row=0, column=0, sticky=(N, S, W, E), padx=2, pady=2, ipadx=2, ipady=2)
         fm_sender.rowconfigure(0, weight=1, minsize=50, pad=2)
         fm_sender.rowconfigure(1, weight=0, minsize=20, pad=2)
         fm_sender.columnconfigure(0, weight=1, minsize=80)
@@ -601,7 +847,7 @@ class MKOBWindow:
         fm_closer_speed.rowconfigure(0, weight=0)
         fm_closer_speed.columnconfigure(0, weight=0)
         fm_closer_speed.columnconfigure(1, weight=1)
-        chkCCircuitCloser.grid(row=0, column=0, sticky=(W))
+        chkVKeyClosed.grid(row=0, column=0, sticky=(W))
         self._lbl_cwpm.grid(row=0, column=1, sticky=(N, S, E), padx=2)
         spnCWPM.grid(row=0, column=2, sticky=(E))
         ### Wire & Connect
@@ -646,7 +892,7 @@ class MKOBWindow:
             stretch="always",
         )
         self._pw_left_right.add(
-            self._fm_right, minsize=98, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
+            self._fm_right, minsize=110, padx=2, pady=1, sticky=(N, S, W, E), stretch="always"
         )
 
         ###########################################################################################
@@ -671,7 +917,7 @@ class MKOBWindow:
         cmd = self._root.register(self._ka.handle_emit_kb_code)
         self._root.tk.call("bind", root, mkobevents.EVENT_EMIT_KB_CODE, cmd + " %d")
         #### Current Sender and Station List
-        self._root.bind(mkobevents.EVENT_STATIONS_CLEAR, self._ka.handle_clear_stations)
+        self._root.bind(mkobevents.EVENT_STATIONS_CLEAR, self._ka.handle_stations_clear)
         ### self._root.bind(mkobevents.EVENT_CURRENT_SENDER, self._ka.handle_sender_update)
         cmd = self._root.register(self._ka.handle_sender_update)
         self._root.tk.call("bind", root, mkobevents.EVENT_CURRENT_SENDER, cmd + " %d")
@@ -683,12 +929,16 @@ class MKOBWindow:
         self._root.bind(mkobevents.EVENT_READER_CLEAR, self._ka.handle_reader_clear)
         ### self._root.bind(mkobevents.EVENT_APPEND_TEXT, krdr.handle_append_text)
         cmd = self._root.register(self._ka.handle_reader_append_text)
-        self._root.tk.call(
-            "bind", root, mkobevents.EVENT_READER_APPEND_TEXT, cmd + " %d"
-        )
+        self._root.tk.call("bind", root, mkobevents.EVENT_READER_APPEND_TEXT, cmd + " %d")
+
+        #### Status Bar Message
+        self._root.bind(mkobevents.EVENT_STATUS_MSG_CLEAR, self._ka.handle_status_msg_clear)
+        ### self._root.bind(mkobevents.EVENT_STATUS_MSG_SET, ka.handle_status_msg_set(message))
+        cmd = self._root.register(self._ka.handle_status_msg_set)
+        self._root.tk.call("bind", root, mkobevents.EVENT_STATUS_MSG_SET, cmd + " %d")
 
         # set option values
-        self._varCircuitCloser.set(True)
+        self._varVKeyClosed.set(True)
         self._fm_sndr_controls.code_sender_enabled = True
         self._fm_sndr_controls.code_sender_repeat = False
 
@@ -709,7 +959,10 @@ class MKOBWindow:
         """
         Called by the Config instance when a change is made.
         """
+        if self._shutdown.is_set():
+            return
         self.set_app_title()
+        return
 
     def _validate_number_entry(self, P):
         """
@@ -719,6 +972,8 @@ class MKOBWindow:
         return p_is_ok
 
     def _handle_char_speed_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_csc = None
         cwpmstr = self._varCWPM.get().strip()
         new_cwpm = self._cwpm
@@ -729,13 +984,32 @@ class MKOBWindow:
             if new_cwpm < self._twpm:
                 self._fm_sndr_controls.text_speed = new_cwpm
             self._handle_morse_change()
+        return
 
     def _handle_char_speed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_csc:
             self._root.after_cancel(self._after_csc)
         self._after_csc = self._root.after(800, self._handle_char_speed_change_delayed)
+        return
+
+    def _handle_connect_pressed(self, *args):
+        if self._shutdown.is_set():
+            return
+        if self._after_hwc:
+            # There is a wire change pending. Process it before handling connect
+            self._root.after_cancel(self._after_hwc)
+            self._handle_wire_change_delayed()
+            self._root.after(10, self._handle_connect_pressed)
+            return
+        self._ka.doConnect()
+        self.give_keyboard_focus()
+        return
 
     def _handle_morse_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_hmc = None
         fspacing = self._fm_sndr_controls.farnsworth_spacing
         cwpmstr = self._varCWPM.get().strip()
@@ -759,13 +1033,19 @@ class MKOBWindow:
         if changed:
             log.debug("_handle_morse_change")
             self._ka.doMorseChange()
+        return
 
     def _handle_morse_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_hmc:
             self._root.after_cancel(self._after_hmc)
         self._after_hmc = self._root.after(1200, self._handle_morse_change_delayed)
+        return
 
     def _handle_wire_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_hwc = None
         log.debug("_handle_wire_change")
         wstr = self._varWireNo.get().strip()
@@ -778,13 +1058,21 @@ class MKOBWindow:
             if not str(new_wire) == wstr:
                 self._varWireNo.set(str(new_wire))
             self._ka.doWireNo()
+        return
 
     def _handle_wire_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_hwc:
             self._root.after_cancel(self._after_hwc)
-        self._after_hwc = self._root.after(1200, self._handle_wire_change_delayed)
+        # Wait quite a while, as this changed by the user, and we want to allow
+        # time for multiple increase/decrease changes or for typing.
+        self._after_hwc = self._root.after(1800, self._handle_wire_change_delayed)
+        return
 
     def _handle_text_speed_change_delayed(self, *args):
+        if self._shutdown.is_set():
+            return
         self._after_tsc = None
         twpmstr = self._fm_sndr_controls.text_speed
         new_twpm = self._twpm
@@ -795,18 +1083,31 @@ class MKOBWindow:
             if new_twpm > self._cwpm:
                 self.cwpm = new_twpm
             self._handle_morse_change()
+        return
 
     def _handle_text_speed_change(self, *args):
+        if self._shutdown.is_set():
+            return
         if self._after_tsc:
             self._root.after_cancel(self._after_tsc)
         self._after_tsc = self._root.after(800, self._handle_text_speed_change_delayed)
+        self.give_keyboard_focus()
+        return
 
-    def _on_app_distroy(self) -> None:
+    def _handle_vkey_closed_change(self, *args):
+        if self._shutdown.is_set():
+            return
+        self._ka.doCircuitCloser()
+        self.give_keyboard_focus()
+        return
+
+    def _on_app_destoy(self) -> None:
         """
         Called when TK generates the WM_DELETE_WINDOW event due to user clicking 'X' on main window.
         """
-        log.debug("MKOBWindow._on_app_distroy triggered.")
-        self.exit()
+        log.debug("MKOBWindow._on_app_destoy triggered.")
+        self.shutdown()
+        self.exit(destroy_app=True)
         return
 
     def on_app_started(self) -> None:
@@ -814,16 +1115,23 @@ class MKOBWindow:
         Called by MKOB via a tk.after when the main loop has been started.
         """
         self._app_started = True
+        if self._shutdown.is_set():
+            return
+        # Set to disconnected state
+        self.connected_set(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._sender_dt, self._record_filepath)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()
-        # Set to disconnected state
-        self.connected(False)
+        self._status_bar.start(self._km)
         # Finish up...
         self._ka.doMorseChange()
         return
+
+    @property
+    def app_name_version(self):
+        return self._app_name_version
 
     @property
     def code_sender_enabled(self):
@@ -840,45 +1148,6 @@ class MKOBWindow:
         self._fm_sndr_controls.code_sender_enabled = enabled
 
     @property
-    def circuit_closer(self):
-        return self._varCircuitCloser.get()
-
-    @circuit_closer.setter
-    def circuit_closer(self, v):
-        self._varCircuitCloser.set(v)
-
-    @property
-    def app_name_version(self):
-        return self._app_name_version
-
-    @property
-    def show_packets(self):
-        """
-        Boolean indicating if the 'show packets' option is set.
-        """
-        return self._showPacketsBV.get()
-
-    @property
-    def keyboard_win(self):
-        return self._txtKeyboard
-
-    @property
-    def reader_win(self):
-        return self._txtReader
-
-    @property
-    def root_win(self):
-        return self._root
-
-    @property
-    def keyboard_sender(self):
-        return self._kkb
-
-    @property
-    def station_list_win(self):
-        return self._txtStnList
-
-    @property
     def cwpm(self) -> int:
         """
         Current code/char speed in words per minute.
@@ -891,6 +1160,56 @@ class MKOBWindow:
         self._ignore_morse_setting_change = True
         self._varCWPM.set(speed)
         self._ignore_morse_setting_change = False
+        return
+
+    @property
+    def keyboard_win(self):
+        return self._txtKeyboard
+
+    @property
+    def keyboard_sender(self):
+        return self._kkb
+
+    @property
+    def mkactions(self) -> MKOBActions:
+        return self._ka
+
+    @property
+    def mkmain(self):
+        return self._km
+
+    @property
+    def station_list_win(self):
+        return self._txtStnList
+
+    @property
+    def status_msg(self) -> str:
+        return self._status_bar.status_msg
+
+    @status_msg.setter
+    def status_msg(self, msg:str):
+        self._status_bar.status_msg = msg
+        return
+
+    @property
+    def office_id(self):
+        return self._varOfficeID.get()
+
+    @office_id.setter
+    def office_id(self, v):
+        self._varOfficeID.set(v)
+        return
+
+    @property
+    def reader_win(self):
+        return self._txtReader
+
+    @property
+    def show_packets(self):
+        """
+        Boolean indicating if the 'show packets' option is set.
+        """
+        return self._showPacketsBV.get()
 
     @property
     def spacing(self) -> config.Spacing:
@@ -902,6 +1221,11 @@ class MKOBWindow:
         self._spacing = sp
         self._fm_sndr_controls.farnsworth_spacing = sp
         self._ignore_morse_setting_change = False
+        return
+
+    @property
+    def tkroot(self):
+        return self._root
 
     @property
     def twpm(self) -> int:
@@ -916,14 +1240,16 @@ class MKOBWindow:
         self._twpm = speed
         self._fm_sndr_controls.text_speed = speed
         self._ignore_morse_setting_change = False
+        return
 
     @property
-    def office_id(self):
-        return self._varOfficeID.get()
+    def vkey_closed(self):
+        return self._varVKeyClosed.get()
 
-    @office_id.setter
-    def office_id(self, v):
-        self._varOfficeID.set(v)
+    @vkey_closed.setter
+    def vkey_closed(self, v):
+        self._varVKeyClosed.set(v)
+        return
 
     @property
     def wire_number(self) -> int:
@@ -942,30 +1268,77 @@ class MKOBWindow:
         w = self._varWireNo.get()
         if not str(v) == w:
             self._varWireNo.set(str(v))
+        return
 
-    def connected(self, connected):
+    def clear_status_msg(self):
+        """
+        Clear the status message portion of the Status Bar.
+        """
+        self.status_msg = ""
+        return
+
+    def connect_enable(self, enable:bool):
+        """
+        Enable/disable the 'Connect' button.
+
+        Disable is only allowed if current state is 'not connected'.
+        """
+        if not enable and not self._connect_indicator.connected:
+            self._btnConnect.config(state=tk.DISABLED)
+        elif enable:
+            self._btnConnect.config(state=tk.NORMAL)
+        return
+
+    def connected_set(self, connected):
         """
         Fill the connected indicator and change the button label based on state.
         """
+        if self._shutdown.is_set():
+            return
         self._connect_indicator.connected = connected
-        self._btnConnect["text"] = "Disconnect" if connected else "Connect"
+        self._btnConnect[TEXT] = "Disconnect" if connected else "Connect"
+        return
 
     def event_generate(self, event, when="tail", data=None):
         """
         Generate a main message loop event.
         """
+        if self._shutdown.is_set():
+            return
         log.debug("=>Event generate: {}".format(event), 4)
         return self._root.event_generate(event, when=when, data=data)
 
-    def exit(self, distroy_app:bool = True):
+    def exit(self, destroy_app:bool):
         """
-        Exit the program by distroying the main window and quiting
+        Exit the program by destoying the main window and quiting
         the message loop.
         """
+        self.shutdown()
+        if self._kkb:
+            self._kkb.shutdown()
+            self._kkb.exit()
+            self._kkb = None
+        if self._krdr:
+            self._krdr.shutdown()
+            self._krdr.exit()
+            self._krdr = None
+        if self._ksl:
+            self._ksl.shutdown()
+            self._ksl.exit()
+            self._ksl = None
+        if self._status_bar:
+            self._status_bar.shutdown()
+            self._status_bar.exit()
+            self._status_bar = None
+        if self._fm_sndr_controls:
+            self._fm_sndr_controls.shutdown()
+            self._fm_sndr_controls.exit()
+            self._fm_sndr_controls = None
         if self._km:
+            self._km.shutdown()
             self._km.exit()
             self._km = None
-        if distroy_app:
+        if destroy_app:
             self._root.destroy()
         self._root.quit()
         return
@@ -974,9 +1347,13 @@ class MKOBWindow:
         """
         Make the keyboard window the active (focused) window.
         """
-        self._txtKeyboard.focus_set()
+        if not self._shutdown.is_set():
+            self._txtKeyboard.focus_set()
+        return
 
     def set_app_title(self):
+        if self._shutdown.is_set():
+            return
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
         # If our config has a filename, display it as part of our title
         name = self._cfg.get_name()
@@ -985,6 +1362,7 @@ class MKOBWindow:
         else:
             n = " - Global"
         self._root.title(self._app_name_version + n + cfg_modified_attrib)
+        return
 
     def set_minimum_sizes(self):
         """
@@ -1003,11 +1381,14 @@ class MKOBWindow:
             self._fm_right, minsize=w
         )
         self._root.minsize(self._root.winfo_width(), int(self._root.winfo_height() * 0.666))
+        return
 
     def show_help_about(self):
         """
         Display help about the app and environment.
         """
+        if self._shutdown.is_set():
+            return
         title = "About MKOB"
         copy_license = "Copyright (c) 2020-24 PyKOB - MorseKOB in Python\nMIT License"
         msg = "{}\n{}\n\npykob: {}\nPython: {}\npyaudio: {}\npyserial: {}\nTcl/Tk: {}/{}".format(
@@ -1021,11 +1402,34 @@ class MKOBWindow:
             tk.TkVersion,
         )
         tk.messagebox.showinfo(title=title, message=msg)
+        return
 
     def show_shortcuts(self):
         """
         Display the Keyboard Shortcuts window.
         """
+        if self._shutdown.is_set():
+            return
         if not (self._shortcuts_win and MKOBHelpKeys.active):
             self._shortcuts_win = MKOBHelpKeys()
         self._shortcuts_win.focus()
+        return
+    
+    def show_wires(self):
+        """
+        Display the active wires from the KOBServer.
+        """
+        if self._shutdown.is_set():
+            return
+        if not (self._wires_win and MKOBHelpWires.active):
+            self._wires_win = MKOBHelpWires(self, self._cfg)
+        self._wires_win.focus()
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new),
+        but DO NOT BLOCK.
+        """
+        self._shutdown.set()
+        return

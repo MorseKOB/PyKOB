@@ -106,7 +106,7 @@ def main(argv):
                     config2.min_char_speed_override,
                     config2.text_speed_override,
                     config2.spacing_override,
-                    config2.debug_level_override
+                    config2.logging_level_override
                 ])
         arg_parser.add_argument('--gload', dest="global_load", action='store_true',
                 help="Load configuration from the global store. " +
@@ -185,20 +185,17 @@ def main(argv):
     if GUI and args.gui_config:
         try:
             root = tk.Tk()
-            root.overrideredirect(1)
+            root.overrideredirect(False)
             root.withdraw()
 
             menu = tk.Menu()
             root.config(menu=menu)
             fileMenu = tk.Menu(menu)
             menu.add_cascade(label='File', menu=fileMenu)
-            fileMenu.add_command(label='Preferences...', command=_doFilePreferences)
-            fileMenu.add_separator()
             fileMenu.add_command(label='Quit', command=_doFileExit)
 
             prefs = preferencesWindow.PreferencesWindow(cfg, quitWhenDismissed=True)
             prefs.display()
-            # root.quit()
         except KeyboardInterrupt:
             print()
             sys.exit(0)

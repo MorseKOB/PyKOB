@@ -30,11 +30,16 @@ Waits for a station to send a message ending in WX XXXX, where XXXX is the
 4- or 5-character code for a U.S. weather reporting station, and replies
 with the current weather conditions and short term forecast for that area.
 
+Command line parameters (required):
+    wire - KOB wire no.
+    idText - office call, etc.
+
 Change history:
 
 1.0.8  2024-03-13
-- Create Internet instance with all parameters needed to adapt to new config usage
-  (modules don't read directly from config)
+- Create Internet instance with all parameters needed to adapt to new config
+  usage (modules no longer read directly from config).
+  Use (required) command line parameters for the Wire and Office ID.
 
 1.0.7  2020-05-28
 - changed header to `#!/usr/bin/env python3`
@@ -62,6 +67,7 @@ Change history:
 - initial release
 """
 
+import argparse
 from urllib.request import Request, urlopen
 import re
 import sys
@@ -69,12 +75,10 @@ import time
 from pykob import config, internet, morse, kob, log
 import pykob  # to access PyKOB version number
 
-VERSION = '1.0.8'
-WIRE    = 106
-IDTEXT  = 'KOB Weather Service, AC'
+VERSION = '1.0.9'
 WPM     = 20  # initial guess at received Morse speed
-#DEBUG   = '~IACWXKSEA+'  # run locally, don't connect to wire
-DEBUG   = ''  # run normally
+DEBUG   = '~IESWXKSEA+'  # run locally, don't connect to wire
+#DEBUG   = ''  # run normally
 
 global app_ver
 app_ver = "Weather {}".format(VERSION)
@@ -84,7 +88,7 @@ log.log('PyKOB version ' + pykob.VERSION)
 
 def readerCallback(char, spacing):
     global msg, bracket
-    if spacing * 3 * myReader.dotLen > 20000 and char != '~':  # dropped packet
+    if spacing * 3 * myReader.dot_len > 20000 and char != '~':  # dropped packet
         msg += ' QN ? QJ '
     for i in range(0, len(char)):
         if char[i] == '[':
@@ -103,9 +107,9 @@ def readerCallback(char, spacing):
         else:
             msg += char
     if msg[-1] == '+':
-        log.log('Weather.py: {} @ {:.1f} wpm ({} ms)'.format(msg,
-                1200. / myReader.dotLen, myReader.truDot))
-        mySender.__init__(myReader.wpm)  # send at same speed as received
+        log.debug('Weather.py: {} @ {:.1f} wpm ({} ms) (Reader detected: {}:{}:{})'.format(
+            msg, 1200.0 / myReader.dot_len, myReader.dot_tru, myReader.detected_dot_len, myReader.detected_dot_tru, myReader.detected_wpm))
+        mySender.setWPM(myReader.detected_wpm)  # send at same speed as received
         sendForecast(msg)
         myReader.setWPM(WPM)
         msg = ''
@@ -214,24 +218,51 @@ def send(text):
         myKOB.soundCode(code)  # to pace the code sent to the wire
         myInternet.write(code)
 
+exit_status = 1
 try:
+    arg_parser = argparse.ArgumentParser(description="Morse weather conditions and forcast service.",
+        epilog="Waits for a station to send a message ending in WX XXXX, where XXXX is the 4- or 5-character "
+         + "code for a U.S. weather reporting station, and replies with the current weather conditions and "
+         + "short term forecast for that area.",
+        parents= [
+            config.code_type_override,
+            config.server_url_override,
+        ])
+    arg_parser.add_argument("wire", type=int, help="The wire no. for the service.")
+    arg_parser.add_argument("station", metavar="station-id", type=str,
+                            help="The station identifier for the service.")
+
+    args = arg_parser.parse_args()
+
+    # Wire number for service:
+    wire = args.wire
+
+    # Station ID for service:
+    service_id = args.station
+
+    # Check optional arguments
+    server_url = args.server_url
+    code_type = args.code_type
+
     if DEBUG:
         print(DEBUG)
         sendForecast(DEBUG)
         exit()
 
-    myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
-    myInternet.connect(WIRE)
-    myReader = morse.Reader(callback=readerCallback)
-    mySender = morse.Sender(WPM)
+    myInternet = internet.Internet(service_id, appver=app_ver, server_url=server_url)
+    myInternet.connect(wire)
+    myReader = morse.Reader(WPM, WPM, codeType=code_type, callback=readerCallback)
+    mySender = morse.Sender(WPM, WPM, codeType=code_type)
     myKOB = kob.KOB(portToUse=None, useAudio=False)
     myReader.setWPM(WPM)
     code = []
     bracket = False
     msg = ''
     while True:
-        try:
-            code += myInternet.read()
+#        try:
+        c = myInternet.read()
+        if c:
+            code += c
             if code[-1] == 1:
                 log.log('Weather.py: {}'.format(code))
                 myReader.decode(code)
@@ -239,12 +270,22 @@ try:
                 code = []
                 bracket = False
                 msg = ''
-        except:
-            log.err('Weather.py: Recovering from fatal error.')
-            time.sleep(30)
-            code = []
-            bracket = False
-            msg = ''
+#        except Exception as ex:
+#            log.err('Weather.py: Recovering from fatal error: {}.'.format(ex))
+#            time.sleep(15)
+#            code = []
+#            bracket = False
+#            msg = ''
 except KeyboardInterrupt:
+    exit_status = 0  # Ctrl-C is a normal exit
+finally:
+    if myInternet:
+        myInternet.exit()
+    if myKOB:
+        myKOB.exit()
+    if myReader:
+        myReader.exit()
+    if mySender:
+        mySender.exit()
     print()
-    sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
+sys.exit(exit_status)

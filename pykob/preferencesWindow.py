@@ -42,6 +42,9 @@ class PreferencesWindow:
         self._quitOnExit = quitWhenDismissed
         self._cfg = cfg
 
+        self.ttk_style = ttk.Style()
+        self.ttk_style.configure("TSpinbox", padding=(1,1,6,1)) # padding='W N E S'
+
         self._allowApply = allowApply  # If True, provide an 'Apply' button and change 'OK' to 'Save'
         self._saveIfRequested = saveIfRequested
         self._apply_pressed = False
@@ -131,11 +134,13 @@ class PreferencesWindow:
 
         # Add a pop-up menu with the list of available serial connections:
         self._serialPort = tk.StringVar()
+        serialPortValues = []
         if SERIAL:
             systemSerialPorts = serial.tools.list_ports.comports()
-            serialPortValues = [systemSerialPorts[p].device for p in range(len(systemSerialPorts))]
-        else:
-            serialPortValues = []
+            for sp in systemSerialPorts:
+                log.debug("preferencesWindow - Serial Port: dev='{}' name='{}' id='{}' desc='{}' mfg='{}' SN='{}' prod='{}'".format(
+                    sp.device, sp.name, sp.hwid, sp.description, sp.manufacturer, sp.serial_number, sp.product))
+                serialPortValues += [sp.device]
         serialPortMenu = ttk.Combobox(basiclocalInterface,
                                       width=30,
                                       textvariable=self._serialPort,
@@ -316,25 +321,36 @@ class PreferencesWindow:
 
         ttk.Label(codeOptions, text="Speed (WPM) and Farnsworth spacing:").grid(row=0, column=0, columnspan=2, sticky=tk.W)
 
-        # Customize the TSpinbox style to add some padding between the entry and the arrows.
-        style_spinbox = ttk.Style()
-        style_spinbox.configure('MK.TSpinbox', padding=(1,1,6,1)) # padding='W N E S'
-
         ttk.Label(codeOptions, text="Character speed:").grid(row=1, column=1, sticky=tk.E)
         self._dotSpeed = tk.DoubleVar(value=self._cfg.min_char_speed)
-        self._dotSpeedControl = \
-            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=1, to=99, width=4, format="%2.f", justify=tk.RIGHT,
-                        command=self._dotSpeedChange,
-                        textvariable=self._dotSpeed)
+        self._dotSpeedControl = tk.Spinbox(codeOptions, 
+                # style='MK.TSpinbox', 
+                from_=1, 
+                to=99, 
+                borderwidth=4,
+                width=4, 
+                format="%2.f", 
+                justify=tk.RIGHT,
+                repeatdelay=700,
+                repeatinterval=300,
+                command=self._dotSpeedChange,
+                textvariable=self._dotSpeed)
         self._dotSpeedControl.grid(row=1, column=2, padx=(4,10), sticky=tk.W)
 
         ttk.Label(codeOptions, text="Text (word) speed:").grid(row=1, column=3, sticky=tk.E)
         self._textSpeed = tk.DoubleVar(value=self._cfg.text_speed)
-        self._textSpeedControl = \
-            ttk.Spinbox(codeOptions, style='MK.TSpinbox', from_=5, to=40,
-                        width=4, format="%2.f", justify=tk.RIGHT,
-                        command=self._codeSpeedChange,
-                        textvariable=self._textSpeed)
+        self._textSpeedControl = tk.Spinbox(codeOptions, 
+                # style='MK.TSpinbox', 
+                from_=5, 
+                to=40,
+                borderwidth=3,
+                width=4, 
+                format="%2.f", 
+                justify=tk.RIGHT,
+                repeatdelay=700,
+                repeatinterval=300,
+                command=self._codeSpeedChange,
+                textvariable=self._textSpeed)
         self._textSpeedControl.grid(row=1, column=4, padx=(4,10), sticky=tk.W)
 
         # Create three Radiobuttons using one IntVar for the character spacing options
@@ -377,31 +393,33 @@ class PreferencesWindow:
 
         #######################################################################
         #
-        #   Debug Options
+        #   Logging Options
         #
         #######################################################################
-        advancedDebugOptions = ttk.LabelFrame(advanced_prefs, text=" Debug Options")
-        ttk.Label(advancedDebugOptions, text="Level:").grid(row=0, column=0, padx=[24, 0], sticky=tk.W)
-        self._varDBLevel = tk.StringVar()
-        ldl = log.get_debug_level()
-        cdl = self._cfg.debug_level
-        dl = max(ldl, cdl)
-        if not ldl == cdl:
-            self._cfg.debug_level = dl
-        self._varDBLevel.set(dl)
-        self._spnDBLevel = ttk.Spinbox(
-            advancedDebugOptions,
-            style="MK.TSpinbox",
-            from_=1,
+        loggingOptions = ttk.LabelFrame(advanced_prefs, text=" Logging")
+        ttk.Label(loggingOptions, text="Level:").grid(row=0, column=0, padx=[24, 0], sticky=tk.W)
+        self._varLoggingLevel = tk.StringVar()
+        lll = log.get_logging_level()
+        cll = self._cfg.logging_level
+        ll = max(lll, cll)
+        if not lll == cll:
+            self._cfg.logging_level = ll
+        self._varLoggingLevel.set(ll)
+        self._spnLogLevel = tk.Spinbox(
+            loggingOptions,
+            # style="MK.TSpinbox",
+            from_=log.LOGGING_MIN_LEVEL,
             to=99999,
+            borderwidth=4,
             width=7,
             format="%1.0f",
             justify=tk.RIGHT,
+            repeatdelay=700,
+            repeatinterval=300,
             validate="key",
-            validatecommand=(self._digits_only_validator, "%P"),
-            textvariable=self._varDBLevel,
+            textvariable=self._varLoggingLevel,
         ).grid(row=0, column=1, padx=1)
-        advancedDebugOptions.pack(fill=tk.BOTH)
+        loggingOptions.pack(fill=tk.BOTH)
 
         #######################################################################
         #
@@ -456,10 +474,14 @@ class PreferencesWindow:
         # left_offset = int((win_width - prefs_width) / 2 - self.root.winfo_y())
         # top_offset = int((win_height - prefs_height) * 0.4- self.root.winfo_x())     # 40% of padding above, 60% below
         # self.root.geometry('+%d+%d' % (left_offset, top_offset))
-        self.root.geometry("+36+36")
-        self.root.state("normal")
+        self.root.after(50, self._win_normal_update)
 
     # #############################################################################################
+    def _win_normal_update(self):
+        self.root.geometry("+80+80")
+        self.root.state("normal")
+        self.root.update_idletasks()
+        return
 
     def _audioTypeSelected(self, *args):
         #
@@ -515,10 +537,14 @@ class PreferencesWindow:
 
     def _apply(self):
         with self._cfg.notification_pauser() as muted_cfg:
-            ndl = self._varDBLevel.get()
+            ndl = self._varLoggingLevel.get()
             if ndl:
-                dlv = int(ndl)
-                muted_cfg.debug_level = dlv
+                lv = log.INFO_LEVEL
+                try:
+                    lv = int(ndl)
+                except Exception:
+                    pass
+                muted_cfg.logging_level = lv
             log.debug("Interface type: {}  Equipment type: {}".format(self.HW_INTERFACE_TYPES[self._interfaceType.get() - 1],
                 self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
             it = self._interfaceType.get() - 1

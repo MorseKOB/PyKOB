@@ -47,7 +47,16 @@ log.txt
 Capture-Replay/*.txt
 # Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
 *.json
+# Ignore MRT Selector files. If .mrtsel files are needed in the source, include them with a '!' line.
+*.mrtsel
 # Ignore PKCFG files from saving configurations. If PKCFG files are needed in the source, include them with a '!' line.
 *.pkcfg
+# Ignore PKREC files from recordings. If PKREC files are needed in the source, include them with a '!' line.
+*.pkrec
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
+# Include anything that is put into the doc and mkob_learn folders
+!doc/*.mrtsel
+!doc/*.pkcfg
+!doc/*pkrec
+!mkob_learn/*.pkrec

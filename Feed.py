@@ -114,7 +114,7 @@ def checkForActivity():
         time.sleep(0.1)
 
 def activeListener():
-    return time.time() < myInternet._tLastListener + TIMEOUT
+    return time.time() < myInternet._t_last_listener + TIMEOUT
 
 def activeSender():
     global wait
@@ -306,7 +306,7 @@ try:
     elif args_code_type == "I" or args_code_type =="INTERNATIONAL":
         code_type = config.CodeType.international
     else:
-        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(s)
+        msg = "TYPE value '{}' is not a valid `Code Type` value of 'AMERICAN' or 'INTERNATIONAL'.".format(args_code_type)
         log.err(msg)
         raise ValueError(msg)
 

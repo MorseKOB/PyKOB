@@ -28,15 +28,15 @@ config module
 Reads configuration information for the PyKOB modules and applications.
 
 Configuration/preference values are read/written to:
- Windows:
-  User: [user]\AppData\Roaming\pykob\config-[user].ini
-  Machine: \ProgramData\pykob\config_app.ini
- Mac:
-  User: ~/.pykob/config-[user].ini
-  Machine: ~/.pykob/config_app.ini
- Linux:
-  User: ~/.pykob/config-[user].ini
-  Machine: ~/.pykob/config_app.ini
+    Windows:
+        User: [user]\AppData\Roaming\pykob\config-[user].ini
+        Machine: \ProgramData\pykob\config_app.ini
+    Mac:
+        User: ~/.pykob/config-[user].ini
+        Machine: ~/.pykob/config_app.ini
+    Linux:
+        User: ~/.pykob/config-[user].ini
+        Machine: ~/.pykob/config_app.ini
 
 The files are INI format with the values in a section named "PYKOB".
 
@@ -51,7 +51,7 @@ import socket
 import sys
 from pykob.util import strtobool
 from enum import IntEnum, unique
-from pykob import log
+from pykob import log, util
 
 @unique
 class Spacing(IntEnum):
@@ -71,9 +71,9 @@ class CodeType(IntEnum):
 
 @unique
 class InterfaceType(IntEnum):
-    key_sounder = 1
-    loop = 2
-    keyer = 3
+    key_sounder = 1     # Separate Key & Sounder
+    loop = 2            # Key and Sounder in series
+    keyer = 3           # Dit-Dah Paddle and separate (or no) Sounder
 
 # Application name
 _APP_NAME = "pykob"
@@ -86,7 +86,7 @@ _GPIO_KEY = "GPIO"
 _AUDIO_TYPE_KEY = "AUDIO_TYPE"
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
 _CODE_TYPE_KEY = "CODE_TYPE"
-_DEBUG_LEVEL_KEY = "DEBUG_LEVEL"
+_LOGGING_LEVEL_KEY = "LOGGING_LEVEL"
 _INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 _LOCAL_KEY = "LOCAL"
@@ -131,7 +131,7 @@ gpio = False
 audio_type = AudioType.SOUNDER
 auto_connect = False
 code_type = CodeType.american
-debug_level = 0
+logging_level = log.INFO_LEVEL
 interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
@@ -145,35 +145,6 @@ station = None
 wire = 0
 min_char_speed = 18
 text_speed = 18
-
-def onOffFromBool(b):
-    """Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
-
-    Parameters
-    ----------
-    b : boolean
-        The value to evaluate
-    Return
-    ------
-        'ON' for `True`, 'OFF' for `False`
-    """
-    #print(b)
-    r = "ON" if b else "OFF"
-    return r
-
-def noneOrValueFromStr(s):
-    """Return `None` if `s` is '' and the string value otherwise
-
-    Parameters
-    ----------
-    s : str
-        The string value to evaluate
-    Return
-    ------
-        `None` or the string value
-"""
-    r = None if not s or not s.strip() or s.upper() == 'NONE' else s
-    return r
 
 def codeTypeFromString(s):
     """Return the CodeType for a string (A:AMERICAN|I:INTERNATIONAL). Raises a ValueError if not valid"""
@@ -262,7 +233,7 @@ def set_auto_connect(s):
     global auto_connect
     try:
         auto_connect = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _AUTO_CONNECT_KEY, onOffFromBool(auto_connect))
+        user_config.set(_CONFIG_SECTION, _AUTO_CONNECT_KEY, util.on_off_from_bool(auto_connect))
     except ValueError as ex:
         log.err("Auto Connect value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -301,7 +272,7 @@ def set_code_type(s):
     code_type = code_type_from_str(s)
     user_config.set(_CONFIG_SECTION, _CODE_TYPE_KEY, code_type.name.upper())
 
-def set_debug_level(s: str):
+def set_logging_level(s: str):
     """Sets the debug level (0-...)
 
     Parameters
@@ -312,18 +283,18 @@ def set_debug_level(s: str):
 
     try:
         _l = int(s)
-        set_debug_level_int(_l)
+        set_logging_level_int(_l)
     except ValueError as ex:
         log.err(
-            "Debug Level value '{}' is not a valid integer value.".format(ex.args[0])
+            "Logging Level value '{}' is not a valid integer value.".format(ex.args[0])
         )
         raise
 
 
-def set_debug_level_int(l: int):
-    global debug_level
-    debug_level = l if l >=0 else 0
-    user_config.set(_CONFIG_SECTION, _DEBUG_LEVEL_KEY, str(debug_level))
+def set_logging_level_int(level: int):
+    global logging_level
+    logging_level = level if level >=log.LOGGING_MIN_LEVEL else log.LOGGING_MIN_LEVEL
+    user_config.set(_CONFIG_SECTION, _LOGGING_LEVEL_KEY, str(logging_level))
 
 
 def interface_type_from_str(s):
@@ -382,7 +353,7 @@ def set_invert_key_input(b):
     global invert_key_input
     try:
         invert_key_input = strtobool(str(b))
-        user_config.set(_CONFIG_SECTION, _INVERT_KEY_INPUT_KEY, onOffFromBool(invert_key_input))
+        user_config.set(_CONFIG_SECTION, _INVERT_KEY_INPUT_KEY, util.on_off_from_bool(invert_key_input))
     except ValueError as ex:
         log.err("INVERT KEY INPUT value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -403,7 +374,7 @@ def set_local(l):
     global local
     try:
         local = strtobool(str(l))
-        user_config.set(_CONFIG_SECTION, _LOCAL_KEY, onOffFromBool(local))
+        user_config.set(_CONFIG_SECTION, _LOCAL_KEY, util.on_off_from_bool(local))
     except ValueError as ex:
         log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -424,7 +395,7 @@ def set_remote(r):
     global remote
     try:
         remote = strtobool(str(r))
-        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, onOffFromBool(remote))
+        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, util.on_off_from_bool(remote))
     except ValueError as ex:
         log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -468,7 +439,7 @@ def set_serial_port(p):
     """
 
     global serial_port
-    serial_port = noneOrValueFromStr(p)
+    serial_port = util.str_none_or_value(p)
     app_config.set(_CONFIG_SECTION, _SERIAL_PORT_KEY, serial_port)
 
 def set_gpio(s):
@@ -488,7 +459,7 @@ def set_gpio(s):
     global gpio
     try:
         gpio = strtobool(str(s))
-        app_config.set(_CONFIG_SECTION, _GPIO_KEY, onOffFromBool(gpio))
+        app_config.set(_CONFIG_SECTION, _GPIO_KEY, util.on_off_from_bool(gpio))
     except ValueError as ex:
         log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -503,7 +474,7 @@ def set_server_url(s):
     """
 
     global server_url
-    server_url = noneOrValueFromStr(s)
+    server_url = util.str_none_or_value(s)
     if server_url and server_url.upper() == 'DEFAULT':
         server_url = None
     user_config.set(_CONFIG_SECTION, _SERVER_URL_KEY, server_url)
@@ -524,7 +495,7 @@ def set_sound(s):
     global sound
     try:
         sound = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _SOUND_KEY, onOffFromBool(sound))
+        user_config.set(_CONFIG_SECTION, _SOUND_KEY, util.on_off_from_bool(sound))
     except ValueError as ex:
         log.err("SOUND value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -546,7 +517,7 @@ def set_sounder(s):
     global sounder
     try:
         sounder = strtobool(str(s))
-        user_config.set(_CONFIG_SECTION, _SOUNDER_KEY, onOffFromBool(sounder))
+        user_config.set(_CONFIG_SECTION, _SOUNDER_KEY, util.on_off_from_bool(sounder))
     except ValueError as ex:
         log.err("SOUNDER value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -629,7 +600,7 @@ def set_station(s):
     """
 
     global station
-    station = noneOrValueFromStr(s)
+    station = util.str_none_or_value(s)
     user_config.set(_CONFIG_SECTION, _STATION_KEY, station)
 
 def set_wire(w: str):
@@ -701,30 +672,30 @@ def print_system_info():
 def print_config():
     """Print the PyKOB configuration
     """
-    url = noneOrValueFromStr(server_url)
+    url = util.str_none_or_value(server_url)
     url = url if url else ''
     print("======================================")
     print("Serial serial_port: '{}'".format(serial_port))
-    print("GPIO interface (Raspberry Pi):", onOffFromBool(gpio))
+    print("GPIO interface (Raspberry Pi):", util.on_off_from_bool(gpio))
     print("--------------------------------------")
     print("Audio type:", audio_type.name.upper())
-    print("Auto Connect to Wire:", onOffFromBool(auto_connect))
+    print("Auto Connect to Wire:", util.on_off_from_bool(auto_connect))
     print("Code type:", code_type.name.upper())
     print("Interface type:", interface_type.name.upper())
-    print("Invert key input:", onOffFromBool(invert_key_input))
-    print("Local copy:", onOffFromBool(local))
-    print("Remote send:", onOffFromBool(remote))
+    print("Invert key input:", util.on_off_from_bool(invert_key_input))
+    print("Local copy:", util.on_off_from_bool(local))
+    print("Remote send:", util.on_off_from_bool(remote))
     print("KOB Server URL:", url)
-    print("Sound:", onOffFromBool(sound))
-    print("Sounder:", onOffFromBool(sounder))
+    print("Sound:", util.on_off_from_bool(sound))
+    print("Sounder:", util.on_off_from_bool(sounder))
     print("Sounder Power Save (seconds):", sounder_power_save)
     print("Spacing:", spacing.name.upper())
-    print("Station: '{}'".format(noneOrValueFromStr(station)))
+    print("Station: '{}'".format(util.str_none_or_value(station)))
     print("Wire:", wire)
     print("Character speed", min_char_speed)
     print("Words per min speed:", text_speed)
     print()
-    print("Debug level:", debug_level)
+    print("Logging level:", logging_level)
 
 def save_config():
     """Save (write) the configuration values out to the user and
@@ -763,7 +734,7 @@ def read_config():
     global audio_type
     global auto_connect
     global code_type
-    global debug_level
+    global logging_level
     global interface_type
     global invert_key_input
     global local
@@ -825,10 +796,10 @@ def read_config():
         _AUDIO_TYPE_KEY:"SOUNDER",
         _AUTO_CONNECT_KEY:"OFF",
         _CODE_TYPE_KEY:"AMERICAN",
-        _DEBUG_LEVEL_KEY:"0",
         _INTERFACE_TYPE_KEY:"LOOP",
         _INVERT_KEY_INPUT_KEY:"OFF",
         _LOCAL_KEY:"ON",
+        _LOGGING_LEVEL_KEY:"0",
         _MIN_CHAR_SPEED_KEY:"18",
         _REMOTE_KEY:"ON",
         _SERVER_URL_KEY:"NONE",
@@ -885,9 +856,9 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
-        __option = "Debug Level"
-        __key = _DEBUG_LEVEL_KEY
-        debug_level = user_config.getint(_CONFIG_SECTION, __key)
+        __option = "Logging Level"
+        __key = _LOGGING_LEVEL_KEY
+        logging_level = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Interface type"
         __key = _INTERFACE_TYPE_KEY
         _interface_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
@@ -975,30 +946,29 @@ audio_type_override.add_argument(
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
 auto_connect_override.add_argument("-C", "--autoconnect", default="ON" if auto_connect else "OFF",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.", \
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+help="'ON' or 'OFF' to indicate whether an application should automatically connect to a configured wire.",
 metavar="auto-connect", dest="auto_connect")
 
 code_type_override = argparse.ArgumentParser(add_help=False)
-code_type_override.add_argument("-T", "--type", default=code_type.name.upper(), \
+code_type_override.add_argument("-T", "--type", default=code_type.name.upper(),
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
 
-debug_level_override = argparse.ArgumentParser(add_help=False)
-debug_level_override.add_argument(
-    "--debug-level",
-    metavar="debug-level",
-    dest="debug_level",
+logging_level_override = argparse.ArgumentParser(add_help=False)
+logging_level_override.add_argument(
+    "--logging-level",
+    metavar="logging-level",
+    dest="logging_level",
     type=int,
-    default=0,
-    help="Debug logging level. A value of '0' disables output, higher values enable more output.",
+    help="Logging level. A value of '0' disables DEBUG output, '-1' disables INFO, '-2' disables WARN, '-3' disables ERROR. Higher values above '0' enable more DEBUG output."
 )
 
 interface_type_override = argparse.ArgumentParser(add_help=False)
-interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(), \
+interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(),
 help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.", metavar="interface-type", dest="interface_type")
 
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
-invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input, \
+invert_key_input_override.add_argument("-M", "--iki", default=invert_key_input,
 help="True/False to Enable/Disable inverting the key input signal (used for dial-up/modem connections).", metavar="invert-key-input", dest="invert_key_input")
 
 local_override = argparse.ArgumentParser(add_help=False)
@@ -1012,8 +982,8 @@ local_override.add_argument(
 )
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
-min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int, \
-help="The minimum character speed to use in words per minute (used for Farnsworth timing).", \
+min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int,
+help="The minimum character speed to use in words per minute (used for Farnsworth timing).",
 metavar="wpm", dest="min_char_speed")
 
 remote_override = argparse.ArgumentParser(add_help=False)
@@ -1027,11 +997,11 @@ remote_override.add_argument(
 )
 
 server_url_override = argparse.ArgumentParser(add_help=False)
-server_url_override.add_argument("-U", "--url", default=server_url, \
+server_url_override.add_argument("-U", "--url", default=server_url,
 help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", default=serial_port, \
+serial_port_override.add_argument("-p", "--port", default=serial_port,
 help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
 
 gpio_override = argparse.ArgumentParser(add_help=False)
@@ -1039,20 +1009,7 @@ gpio_override.add_argument(
     "-g",
     "--gpio",
     default="ON" if gpio else "OFF",
-    choices=[
-        "ON",
-        "On",
-        "on",
-        "YES",
-        "Yes",
-        "yes",
-        "OFF",
-        "Off",
-        "off",
-        "NO",
-        "No",
-        "no",
-    ],
+    choices=["ON","On","on","YES","Yes","yes","OFF","Off","off","NO","No","no"],
     help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
  GPIO takes priority over the serial interface if both are specified.",
     metavar="gpio",
@@ -1061,19 +1018,19 @@ gpio_override.add_argument(
 
 sound_override = argparse.ArgumentParser(add_help=False)
 sound_override.add_argument("-a", "--sound", default="ON" if sound else "OFF",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether computer audio should be used to sound code.", \
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+help="'ON' or 'OFF' to indicate whether computer audio should be used to sound code.",
 metavar="sound", dest="sound")
 
 sounder_override = argparse.ArgumentParser(add_help=False)
 sounder_override.add_argument("-A", "--sounder", default="ON" if sounder else "OFF",
-choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"], \
-help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.", \
+choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.",
 metavar="sounder", dest="sounder")
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
-sounder_pwrsv_override.add_argument("-P", "--pwrsv", default=sounder_power_save, type=int, \
-help="The sounder power-save delay in seconds, or '0' to disable power-save.", \
+sounder_pwrsv_override.add_argument("-P", "--pwrsv", default=sounder_power_save, type=int,
+help="The sounder power-save delay in seconds, or '0' to disable power-save.",
 metavar="seconds", dest="sounder_power_save")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
@@ -1087,7 +1044,7 @@ spacing_override.add_argument(
 )
 
 station_override = argparse.ArgumentParser(add_help=False)
-station_override.add_argument("-S", "--station", default=station, \
+station_override.add_argument("-S", "--station", default=station,
 help="The Station ID to use (or 'NONE').", metavar="station", dest="station")
 
 text_speed_override = argparse.ArgumentParser(add_help=False)
@@ -1103,5 +1060,5 @@ text_speed_override.add_argument(
 )
 
 wire_override = argparse.ArgumentParser(add_help=False)
-wire_override.add_argument("-W", "--wire", default=wire, \
+wire_override.add_argument("-W", "--wire", default=wire,
 help="The Wire to use (or 'NONE').", metavar="wire", dest="wire")

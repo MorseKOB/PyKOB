@@ -37,8 +37,7 @@ A mechanism for change notification is available.
 
 """
 import argparse
-from pykob.util import strtobool
-from enum import Flag, IntEnum, unique
+from enum import IntEnum, unique
 import json
 from json import JSONDecodeError
 import os.path
@@ -46,15 +45,20 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, Optional
 
-from pykob import config, log
+from pykob import config, log, util
 from pykob.config import AudioType, CodeType, InterfaceType, Spacing
+from pykob.util import strtobool
 
 PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
-_DEBUG_LEVEL_KEY = "DEBUG_LEVEL"
 
 def add_ext_if_needed(s: str) -> str:
+    """
+    Add the PyKOB Configuration file extension if needed.
+
+    Adds '.pkcfg' to the string argument if it doesn't already end with it.
+    """
     if s and not s.endswith(PYKOB_CFG_EXT):
         return (s + PYKOB_CFG_EXT)
     return s
@@ -125,8 +129,8 @@ class Config:
         # Operational Settings
         self._auto_connect: bool = False
         self._p_auto_connect: bool = False
-        self._debug_level: int = 0
-        self._p_debug_level: int = 0
+        self._logging_level: int = 0
+        self._p_logging_level: int = 0
         self._local: bool = True
         self._p_local: bool = True
         self._remote: bool = True
@@ -170,7 +174,7 @@ class Config:
             config._MIN_CHAR_SPEED_KEY: self._set_min_char_speed,
             config._SPACING_KEY: self._set_spacing,
             config._TEXT_SPEED_KEY: self._set_text_speed,
-            _DEBUG_LEVEL_KEY: self._set_debug_level
+            config._LOGGING_LEVEL_KEY: self._set_logging_level
         }
         #
         # Listeners is a dictionary of Callable(int) keys and int (ChangeType...) values.
@@ -547,29 +551,29 @@ class Config:
         return not self._auto_connect == self._p_auto_connect
 
     @property
-    def debug_level(self) -> int:
-        return self._debug_level
+    def logging_level(self) -> int:
+        return self._logging_level
 
-    @debug_level.setter
-    def debug_level(self, v: int) -> None:
-        x = self._debug_level
-        self._debug_level = v
+    @logging_level.setter
+    def logging_level(self, v: int) -> None:
+        x = self._logging_level
+        self._logging_level = v
         if not v == x:
-            log.set_debug_level(v)
+            log.set_logging_level(v)
             self._changed_ops()
         return
 
-    def _set_debug_level(self, v: int) -> None:
-        self.debug_level = v
+    def _set_logging_level(self, v: int) -> None:
+        self.logging_level = v
         return
 
     @property
-    def debug_level_p(self) -> int:
-        return self._p_debug_level
+    def logging_level_p(self) -> int:
+        return self._p_logging_level
 
     @property
-    def debug_level_changed(self) -> bool:
-        return not self._debug_level == self._p_debug_level
+    def logging_level_changed(self) -> bool:
+        return not self._logging_level == self._p_logging_level
 
     @property
     def local(self) -> bool:
@@ -718,7 +722,7 @@ class Config:
         self._p_text_speed = self._text_speed
         # Operational Settings
         self._p_auto_connect = self._auto_connect
-        self._p_debug_level = self._debug_level
+        self._p_logging_level = self._logging_level
         self._p_local = self._local
         self._p_remote = self._remote
         self._p_server_url = self._server_url
@@ -755,7 +759,7 @@ class Config:
             muted_cfg.text_speed = cfg_src._text_speed
             # App Operation Settings
             muted_cfg.auto_connect = cfg_src._auto_connect
-            muted_cfg.debug_level = cfg_src._debug_level
+            muted_cfg.logging_level = cfg_src._logging_level
             muted_cfg.local = cfg_src._local
             muted_cfg.remote = cfg_src._remote
             muted_cfg.server_url = cfg_src._server_url
@@ -804,7 +808,7 @@ class Config:
             ct = ct | ChangeType.OPERATIONS
         if self.wire_changed:
             ct = ct | ChangeType.OPERATIONS
-        if self.debug_level_changed:
+        if self.logging_level_changed:
             ct = ct | ChangeType.OPERATIONS
         return ct
 
@@ -821,7 +825,7 @@ class Config:
             config._INVERT_KEY_INPUT_KEY: self._invert_key_input,
             config._SOUNDER_POWER_SAVE_KEY: self._sounder_power_save,
             config._AUTO_CONNECT_KEY: self._auto_connect,
-            config._DEBUG_LEVEL_KEY: self._debug_level,
+            config._LOGGING_LEVEL_KEY: self._logging_level,
             config._LOCAL_KEY: self._local,
             config._REMOTE_KEY: self._remote,
             config._SERVER_URL_KEY: self._server_url,
@@ -910,7 +914,7 @@ class Config:
         # Operational Settings
         if  not self._p_auto_connect == self._auto_connect:
             return True
-        if not self._p_debug_level == self._debug_level:
+        if not self._p_logging_level == self._logging_level:
             return True
         if not self._p_local == self._local:
             return True
@@ -945,6 +949,8 @@ class Config:
             self.load_from_global()
         else:
             try:
+                errors = 0
+                dirpath, filename = os.path.split(filepath)
                 data: dict[str:Any]
                 with open(filepath, 'r', encoding="utf-8") as fp:
                     data = json.load(fp)
@@ -952,17 +958,30 @@ class Config:
                     # Disable change notifications until we are complete
                     with self.notification_pauser() as muted_cfg:
                         # Use the 'properties' to set the values in order to properly flag changes
-                        muted_cfg._version_loaded = None
+                        muted_cfg._version_loaded = data.get(_PYKOB_CFG_VERSION_KEY)
+                        if muted_cfg._version_loaded is None:
+                            log.warn("No configuration version information found in {}".format(fp))
+                        else:
+                            log.debug("Loading configuration version: {}  This version: {}".format(muted_cfg._version_loaded, VERSION))
                         for key, value in data.items():
                             if _PYKOB_CFG_VERSION_KEY == key:
-                                muted_cfg._version_loaded = value
+                                pass
                             else:
                                 try:
                                     muted_cfg._key_prop_setters[key](value)
                                 except KeyError as ke:
-                                    log.debug("Property setter for entry not found: {}".format(ke))
+                                    log.warn("Loading configuration file: {}  Unknown property: {}  With value: {}".format(filename, key, value))
+                                    errors += 1
+                                pass
+                            pass
                         #
                         muted_cfg.set_filepath(filepath)
+                    pass
+                else:
+                    log.warn("No data loaded from {}".format(filepath))
+                    errors += 1
+                if errors > 0:
+                    log.warn("Loading configuration file: {}  Encountered {} error(s).".format(filename, errors))
             except JSONDecodeError as jde:
                 log.debug(jde)
                 raise ConfigLoadError(jde)
@@ -995,7 +1014,7 @@ class Config:
                 muted_cfg.text_speed = config.text_speed
                 # App Operation Settings
                 muted_cfg.auto_connect = config.auto_connect
-                muted_cfg.debug_level = config.debug_level
+                muted_cfg.logging_level = config.logging_level
                 muted_cfg.local = config.local
                 muted_cfg.remote = config.remote
                 muted_cfg.server_url = config.server_url
@@ -1022,7 +1041,7 @@ class Config:
             config.set_sounder_power_save(str(self._sounder_power_save))
             # App Operation Settings
             config.set_auto_connect(self._auto_connect)
-            config.set_debug_level_int(self._debug_level)
+            config.set_logging_level_int(self._logging_level)
             config.set_local(self._local)
             config.set_remote(self._remote)
             config.set_server_url(self._server_url)
@@ -1047,33 +1066,33 @@ class Config:
         """
         Print this configuration
         """
-        url = config.noneOrValueFromStr(self._server_url)
+        url = util.str_none_or_value(self._server_url)
         url = url if url else ''
         f = file
         print("======================================", file=f)
-        print("GPIO interface (Raspberry Pi): {}".format(config.onOffFromBool(self._gpio)), file=f)
+        print("GPIO interface (Raspberry Pi): {}".format(util.on_off_from_bool(self._gpio)), file=f)
         print("Serial serial_port: '{}'".format(self._serial_port), file=f)
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
-        print("Invert key input: {}".format(config.onOffFromBool(self._invert_key_input)), file=f)
-        print("Sound: {}".format(config.onOffFromBool(self._sound)), file=f)
+        print("Invert key input: {}".format(util.on_off_from_bool(self._invert_key_input)), file=f)
+        print("Sound: {}".format(util.on_off_from_bool(self._sound)), file=f)
         print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
-        print("Sounder: {}".format(config.onOffFromBool(self._sounder)), file=f)
+        print("Sounder: {}".format(util.on_off_from_bool(self._sounder)), file=f)
         print("Sounder Power Save (seconds): {}".format(self._sounder_power_save), file=f)
         print("--------------------", file=f)
         print("KOB Server URL: {}".format(url), file=f)
-        print("Auto Connect to Wire: {}".format(config.onOffFromBool(self._auto_connect)), file=f)
+        print("Auto Connect to Wire: {}".format(util.on_off_from_bool(self._auto_connect)), file=f)
         print("Wire: {}".format(self._wire), file=f)
-        print("Station: '{}'".format(config.noneOrValueFromStr(self._station)), file=f)
+        print("Station: '{}'".format(util.str_none_or_value(self._station)), file=f)
         print("--------------------", file=f)
         print("Code type: {}".format(self._code_type.name.upper()), file=f)
         print("Character speed: {}".format(self._min_char_speed), file=f)
         print("Words per min speed: {}".format(self._text_speed), file=f)
         print("Spacing: {}".format(self._spacing.name.upper()), file=f)
         print("--------------------", file=f)
-        print("Local copy: {}".format(config.onOffFromBool(self._local)), file=f)
-        print("Remote send: {}".format(config.onOffFromBool(self._remote)), file=f)
-        print("Debug level: {}".format(self._debug_level), file=f)
+        print("Local copy: {}".format(util.on_off_from_bool(self._local)), file=f)
+        print("Remote send: {}".format(util.on_off_from_bool(self._remote)), file=f)
+        print("Logging level: {}".format(self._logging_level), file=f)
         return
 
     def register_listener(self, listener:Callable[[int],None], change_types: int) -> None:
@@ -1117,7 +1136,7 @@ class Config:
         self._text_speed = self._p_text_speed
         # Operational Settings
         self._auto_connect = self._p_auto_connect
-        self._debug_level = self._p_debug_level
+        self._logging_level = self._p_logging_level
         self._local = self._p_local
         self._remote = self._p_remote
         self._server_url = self._p_server_url
@@ -1211,13 +1230,14 @@ config_file_override = argparse.ArgumentParser(add_help=False)
 config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg_filepath",
     help="Configuration file to use. If not specified, the global configuration is used.")
 
-debug_level_override = argparse.ArgumentParser(add_help=False)
-debug_level_override.add_argument(
-    "--debug-level",
-    metavar="debug-level",
-    dest="debug_level",
+logging_level_override = argparse.ArgumentParser(add_help=False)
+logging_level_override.add_argument(
+    "--logging-level",
+    metavar="logging-level",
+    dest="logging_level",
     type=int,
-    help="Debug logging level. A value of '0' disables output, higher values enable more output.")
+    help="Logging level. A value of '0' disables DEBUG output, '-1' disables INFO, '-2' disables WARN, '-3' disables ERROR. Higher values above '0' enable more DEBUG output."
+)
 
 audio_type_override = argparse.ArgumentParser(add_help=False)
 audio_type_override.add_argument(
@@ -1287,20 +1307,7 @@ sounder_override.add_argument(
     "--sounder",
     metavar="sounder",
     dest="sounder",
-    choices=[
-        "ON",
-        "On",
-        "on",
-        "YES",
-        "Yes",
-        "yes",
-        "OFF",
-        "Off",
-        "off",
-        "NO",
-        "No",
-        "no",
-    ],
+    choices=["ON","On","on","YES","Yes","yes","OFF","Off","off","NO","No","no"],
     help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is configured.",
 )
 
@@ -1342,7 +1349,7 @@ def process_config_arg(args) -> Config:
     """
     cfg = Config()
     if hasattr(args, "pkcfg_filepath"):
-        file_path = config.noneOrValueFromStr(args.pkcfg_filepath)
+        file_path = util.str_none_or_value(args.pkcfg_filepath)
         if file_path:
             file_path = file_path.strip()
             file_path = add_ext_if_needed(file_path)
@@ -1370,10 +1377,10 @@ def process_config_args(args, cfg:Config=None) -> Config:
         # Get a Config instance to use as a base
         cfg = process_config_arg(args)
     # Set config values if they were specified
-    if hasattr(args, "debug_level"):
-        if not args.debug_level is None:
-            n = args.debug_level
-            cfg.debug_level = n if n >= 0 else 0
+    if hasattr(args, "logging_level"):
+        if not args.logging_level is None:
+            n = args.logging_level
+            cfg.logging_level = n if n >= log.LOGGING_MIN_LEVEL else log.LOGGING_MIN_LEVEL
     if hasattr(args, "audio_type"):
         if not args.audio_type is None:
             cfg.audio_type = config.audio_type_from_str(args.audio_type)
@@ -1405,7 +1412,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.remote = strtobool(args.remote)
     if hasattr(args, "serial_port"):
         if not args.serial_port is None:
-            s = config.noneOrValueFromStr(args.serial_port)
+            s = util.str_none_or_value(args.serial_port)
             if not s or s.strip().upper() == 'NONE':
                 cfg.serial_port = None
             else:
@@ -1415,7 +1422,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.gpio = strtobool(args.gpio)
     if hasattr(args, "server_url"):
         if not args.server_url is None:
-            s = config.noneOrValueFromStr(args.server_url)
+            s = util.str_none_or_value(args.server_url)
             if not s or s.strip().upper() == 'DEFAULT' or s.strip().upper() == 'NONE':
                 cfg.server_url = None
             else:

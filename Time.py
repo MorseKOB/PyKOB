@@ -24,7 +24,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-"""Time.py
+"""
+Time.py
 
 Sends time signals to a KOB wire and/or to a sounder or speakers. The time
 signals can be sent hourly, daily at 12:00 noon EST, or continuously (every
@@ -64,7 +65,7 @@ Time 1.3  2019-02-13
 """
 
 def send(code):
-    if wire and time.time() < myInternet._tLastListener + TIMEOUT:
+    if wire and time.time() < myInternet._t_last_listener + TIMEOUT:
         myInternet.write(code)
     myKOB.soundCode(code)
 
@@ -78,6 +79,8 @@ try:
     PORT    = config.serial_port # serial port for KOB interface
     USEGPIO = config.gpio # use the GPIO on Raspberry Pi
     SOUND   = config.sound # whether to enable computer sound for sounder
+    SOUNDER = config.sounder # whether to enable a physical sounder
+    HWTYPE  = config.interface_type # the key&sounder interface type
     TIMEOUT = 30.0  # time to send after last indication of live listener (sec)
     TICK    = (-1, +1, -200, +1, -200, +2) + 3 * (-200, +2)
     NOTICK  = 5 * (-200, +2)
@@ -95,7 +98,7 @@ try:
     else:
         wire = None
 
-    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND)
+    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND, useSounder=SOUNDER, interfaceType=HWTYPE)
 
     if wire:
         myInternet = internet.Internet(idText, appver=app_ver, server_url=config.server_url)

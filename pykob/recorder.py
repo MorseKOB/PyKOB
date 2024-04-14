@@ -51,7 +51,11 @@ import time
 from datetime import datetime, timedelta
 from enum import Enum, IntEnum, unique
 from pykob import kob, log
-from threading import Lock, RLock
+from threading import Event, Lock, Thread
+from typing import Optional
+
+PYKOB_RECORDING_EXT = ".pkrec"
+PYKOB_RECORDING_EXT_DEP = ".json"  # Deprecated file extension for recordings
 
 @unique
 class PlaybackState(IntEnum):
@@ -61,6 +65,16 @@ class PlaybackState(IntEnum):
     idle = 0
     playing = 1
     paused = 2
+
+def add_ext_if_needed(s: str) -> str:
+    """
+    Add the PyKOB Recording file extension if needed.
+
+    Adds '.pkrec' to the string argument if it doesn't already end with it.
+    """
+    if s and not (s.endswith(PYKOB_RECORDING_EXT) or s.endswith(PYKOB_RECORDING_EXT_DEP)):
+        return (s + PYKOB_RECORDING_EXT)
+    return s
 
 def get_timestamp() -> int:
     """
@@ -89,6 +103,16 @@ def date_time_from_ts(ts: int) -> str:
     dateTimeStr = str(dateTime.ctime()) + ": "
     return dateTimeStr
 
+def generate_session_recording_name(basename: Optional[str] = None) -> str:
+    ts = get_timestamp()
+    dt = datetime.fromtimestamp(ts / 1000.0)
+    dateTimeStr = str("{:04}{:02}{:02}-{:02}{:02}").format(
+        dt.year, dt.month, dt.day, dt.hour, dt.minute
+    )
+    basename = basename if not basename is None else "Session-"
+    recording_filepath = basename + dateTimeStr + PYKOB_RECORDING_EXT
+    return recording_filepath
+
 def hms_from_ts(ts1: int, ts2: int) -> str:
     """
     Return a string with HH:MM:SS from a pair of timestamp values.
@@ -111,12 +135,13 @@ class Recorder:
     Recorder class provides functionality to record and playback a code stream.
     """
 
-    def __init__(self, target_file_path:str=None, source_file_path:str=None, \
-            station_id:str="", wire:int=-1, \
-            play_code_callback=None, \
-            play_finished_callback=None, \
-            play_sender_id_callback=None, \
-            play_wire_callback=None, \
+    def __init__(self, 
+            target_file_path:str=None, source_file_path:str=None,
+            station_id:str="", wire:int=-1,
+            play_code_callback=None,
+            play_finished_callback=None,
+            play_sender_id_callback=None,
+            play_wire_callback=None,
             play_station_list_callback=None):
         self._target_file_path = target_file_path
         self._source_file_path = source_file_path
@@ -134,11 +159,12 @@ class Recorder:
 
         self._playback_state = PlaybackState.idle
 
-        self._playback_thread = None
-        self._p_stations_thread = None
+        self._shutdown = Event()
+        self._thread_playback = None
+        self._thread_pb_stations = None
 
-        self._playback_resume_flag = threading.Event()
-        self._playback_stop_flag = threading.Event()
+        self._playback_resume_flag = Event()
+        self._playback_stop_flag = Event()
 
         self._playback_code = None
         self._list_data = False
@@ -226,10 +252,31 @@ class Recorder:
         """
         self._recorder_wire = wire
 
+    def exit(self):
+        """
+        Exit this instance.
+        """
+        log.debug("recorder.exit - 1", 3)
+        self.shutdown()
+        # Wait on our threads.
+        log.debug("recorder.exit - 2", 3)
+        if self._thread_pb_stations and self._thread_pb_stations.is_alive():
+            log.debug("recorder.exit - 3a", 3)
+            self._thread_pb_stations.join()
+            log.debug("recorder.exit - 3b", 3)
+            self._thread_pb_stations = None
+        if self._thread_playback and self._thread_playback.is_alive():
+            log.debug("recorder.exit - 4a", 3)
+            self._thread_playback.join()
+            log.debug("recorder.exit - 4b", 3)
+            self._thread_playback = None
+        return
+
     def record(self, code, source, text=''):
         """
         Record a code sequence in JSON format with additional context information.
         """
+        text = text if not text is None else ''
         if self._playback_state == PlaybackState.idle: # Only record if not playing back a recording
             timestamp = get_timestamp()
             data = {
@@ -418,16 +465,6 @@ class Recorder:
         else:
             self.playback_resume()
 
-    def playback_stop(self):
-        """
-        Stop playback and clear the playback state
-        """
-        if self._playback_thread:
-            pt = self._playback_thread
-            self._playback_thread = None
-            self._playback_stop_flag.set()
-            self._playback_resume_flag.set() # Set resume flag incase playback was paused
-
     def playback_start(self, list_data=False, max_silence=0, speed_factor=100):
         """
         Play a recording to the configured sounder.
@@ -482,11 +519,11 @@ class Recorder:
                     log.err("Error processing recording file: '{}' Line: {} Error: {}".format(self._source_file_path, self._p_line_no, ex))
                     return
         # Calculate recording file values to aid playback functions
-        self._playback_thread = threading.Thread(name='Recorder-Playback-Play', daemon=True, target=self.callbackPlay)
-        self._playback_thread.start()
+        self._thread_playback = Thread(name='Recorder-Playback-Play', daemon=True, target=self._thread_playback_body)
+        self._thread_playback.start()
         if self._play_station_list_callback:
-            self._p_stations_thread = threading.Thread(name='Recorder-Playback-StationList', daemon=True, target=self.callbackPlayStationList)
-            self._p_stations_thread.start()
+            self._thread_pb_stations = Thread(name='Recorder-Playback-StationList', daemon=True, target=self._thread_pb_stations_body)
+            self._thread_pb_stations.start()
         if self._list_data:
             # Print some values about the recording
             print(
@@ -497,8 +534,32 @@ class Recorder:
                     hms_from_ts(self._p_lts, self._p_fts),
                 )
             )
+        return
 
-    def callbackPlay(self):
+    def playback_stop(self):
+        """
+        Stop playback and clear the playback state
+        """
+        pt = self._thread_playback
+        if pt:
+            self._thread_playback = None
+            self._playback_stop_flag.set()
+            self._playback_resume_flag.set() # Set resume flag incase playback was paused
+        return
+
+    def shutdown(self):
+        """
+        Initiate shutdown of our operations (and don't start anything new), 
+        but DO NOT BLOCK.
+        """
+        log.debug("recorder.shutdown - 1", 3)
+        self._shutdown.set()
+        log.debug("recorder.shutdown - 2", 3)
+        self.playback_stop()
+        log.debug("recorder.shutdown - 3", 3)
+        return
+
+    def _thread_playback_body(self):
         """
         Called by the playback thread `run` to playback recorded code.
         """
@@ -524,13 +585,13 @@ class Recorder:
                     # NOTE: Can't iterate over the file lines as it disables `tell()` and `seek()`.
                     line = self._p_fp.readline()
                     self._p_line_no += 1
-                while line:
+                while line and not self._shutdown.is_set():
                     # Get the file lock and read the contents of the line
                     with self._p_fileop_lock:
                         while self._playback_state == PlaybackState.paused:
                             self._playback_resume_flag.wait() # Wait for playback to be resumed
                             self._playback_state = PlaybackState.playing
-                        if self._playback_stop_flag.is_set():
+                        if self._playback_stop_flag.is_set() or self._shutdown.is_set():
                             # Playback stop was requested
                             self._playback_state = PlaybackState.idle
                             self._playback_resume_flag.clear()
@@ -580,7 +641,7 @@ class Recorder:
                                     if self._list_data:
                                         print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self._max_silence))
                                     pause = self._max_silence
-                                time.sleep(pause)
+                                self._playback_stop_flag.wait(pause)
                         if not self._speed_factor == 100:
                             sf = 1.0 / (self._speed_factor / 100.0)
                             code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]
@@ -605,11 +666,11 @@ class Recorder:
             with self._p_fileop_lock:
                 self._p_fp = None
             if self._list_data:
-                print("Playback done.")
+                print("Player done.")
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
-    def callbackPlayStationList(self):
+    def _thread_pb_stations_body(self):
         """
         Called by the station list thread run method to update a station list 
         via the registered callback. The station list is refreshed every 5 seconds.
@@ -617,12 +678,13 @@ class Recorder:
         try:
             if not self._play_station_list_callback:
                 return
-            while True:
+            while not self._shutdown.is_set():
                 for stn in self._p_stations:
                     self._play_station_list_callback(stn)
-                stop = self._playback_stop_flag.wait(5.0) # Wait until 'stop' flag is set or 5 seconds
+                stop = self._playback_stop_flag.is_set() # Wait until 'stop' flag is set or 5 seconds
                 if stop:
                     return # Stop signalled - return from run method
+                self._shutdown.wait(5.0)
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return

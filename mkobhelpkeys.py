@@ -31,6 +31,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import N, S, W, E
 
+from pykob import log
 
 
 class MKOBHelpKeys(tk.Toplevel):
@@ -53,42 +54,40 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree.configure(show="headings", selectmode="none")
 
         self._tree.insert("", tk.END, values=("ESC", "Toggle key open/closed"))
-        self._tree.insert(
-            "", tk.END, values=("Pause", "Toggle keyboard code sender on/off")
-        )
-        self._tree.insert(
-            "", tk.END, values=("F1", "Toggle keyboard code sender on/off")
-        )
-        self._tree.insert("", tk.END, values=("F2", "Toggle connect/disconnect"))
+        self._tree.insert("", tk.END, values=("Pause", "Toggle keyboard code sender on/off"))
+        self._tree.insert("", tk.END, values=("F1", "Toggle keyboard code sender on/off"))
         self._tree.insert("", tk.END, values=("F4", "Decrease speed"))
         self._tree.insert("", tk.END, values=("F5", "Increase speed"))
+        self._tree.insert("", tk.END, values=("F8", "Toggle connect/disconnect"))
         self._tree.insert("", tk.END, values=("F11", "Clear code reader window"))
-        self._tree.insert(
-            "", tk.END, values=("F12", "Clear keyboard code sender window")
-        )
+        self._tree.insert("", tk.END, values=("F12", "Clear keyboard code sender window"))
         self._tree.insert("", tk.END, values=("Next (Pg-Down)", "Decrease speed"))
         self._tree.insert("", tk.END, values=("Prior (Pg-Up)", "Increase speed"))
         #
-        self._tree.insert("", tk.END, values=("------", "-- Keyboard Code Sender (within text) --"))
+        self._tree.insert("", tk.END, values=("----------", "-- Keyboard Code Sender (within text) --"))
         self._tree.insert("", tk.END, values=("~", "Open the key"))
         self._tree.insert("", tk.END, values=("+", "Close the key"))
         #
-        self._tree.insert("", tk.END, values=("------", "-- Playback Control --"))
+        self._tree.insert("", tk.END, values=("----------", "-- Keyer (Active when key is open) --"))
+        self._tree.insert("", tk.END, values=("Shift+LEFT", "Dits"))
+        self._tree.insert("", tk.END, values=("Shift+RIGHT", "Dah (key down while pressed)"))
+        #
+        self._tree.insert("", tk.END, values=("----------", "-- Recording Playback Control --"))
         self._tree.insert("", tk.END, values=("Ctrl+S", "Stop recording playback"))
         self._tree.insert(
-            "", tk.END, values=("Ctrl+P", "Pause/Resume recording playback")
+            "", tk.END, values=("Ctrl+P", "Pause/Resume playback")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+H", "Move playback back 15 seconds")
+            "", tk.END, values=("Ctrl+H", "Move back 15 seconds")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+L", "Move playback forward 15 seconds")
+            "", tk.END, values=("Ctrl+L", "Move forward 15 seconds")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+J", "Move playback to start of current sender")
+            "", tk.END, values=("Ctrl+J", "Move to start of current sender")
         )
         self._tree.insert(
-            "", tk.END, values=("Ctrl+K", "Move playback to end of current sender")
+            "", tk.END, values=("Ctrl+K", "Move to end of current sender")
         )
 
         self._tree.grid(row=0, column=0, sticky=(N, E, S, W))
@@ -99,9 +98,18 @@ class MKOBHelpKeys(tk.Toplevel):
         self._tree["yscrollcommand"] = self._tree_vs.set
 
         self.update()
-        self.geometry("380x420+20+20")
         self.state("normal")
+#        self._set_win_size()
         self.__class__.active = True  # Indicate that the window is 'active'
+        self.after(80, self._set_win_size)
+        return
+
+    def _set_win_size(self):
+        w = self._tree.winfo_width()
+        ws = "{}".format(2 * w)
+        geo = "{}x{}+{}+{}".format(ws, "600", "40", "40")
+        self.geometry(geo)
+        return
 
     def destroy(self):
         # Restore the attribute on close.
