@@ -313,7 +313,7 @@ class KOB:
                     # Read the inputs to initialize them
                     self.__read_cts()
                     self.__read_dsr()
-                    # Check for loopback - The PyKOB interface loops-back data to identify itself. It uses CTS for the key.
+                    # Check for loopback - The minimal PyKOB interface loops-back data to identify itself. It uses CTS for the key.
                     self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
                     self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
                     self._hw_interface = HWInterface.SERIAL
