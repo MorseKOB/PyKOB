@@ -48,7 +48,7 @@ code being sounded without causing any sound to be produced.
 import sys
 import time
 from enum import Enum, IntEnum, unique
-from pykob import config, log, morse
+from pykob import config, log, morse, util
 from pykob.config import AudioType, InterfaceType
 import threading
 from threading import Event, RLock, Thread
@@ -220,7 +220,8 @@ class KOB:
         self._thread_keyer: Optional[Thread] = None
         self._thread_keyread: Optional[Thread] = None
         self._thread_powersave: Optional[Thread] = None
-        self._threadsStop: Event = Event()
+        self._threadsStop_KS: Event = Event()
+        self._threadsStop_keyer: Event = Event()
         #
         self._key_state_last_closed = False
         #
@@ -280,7 +281,7 @@ class KOB:
                 except:
                     self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
                     log.debug(traceback.format_exc(), 3)
-            if self._port_to_use and not gpio_module_available:
+            if not gpio_module_available and not self._port_to_use is None:
                 try:
                     import serial
 
@@ -319,7 +320,7 @@ class KOB:
                     self._hw_interface = HWInterface.SERIAL
                     log.debug("The serial interface is available/active and will be used.")
                     self._port.write(b"PyKOB\n")
-                    self._threadsStop.wait(0.5)
+                    self._threadsStop_KS.wait(0.5)
                     indata = self._port.readline()
                     if indata == b"PyKOB\n":
                         self._serial_key_read = self.__read_cts  # Use CTS to read the key
@@ -336,8 +337,19 @@ class KOB:
                     self._err_msg_hndlr("Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use))
                     log.debug(ex)
                     log.debug(traceback.format_exc(), 3)
+                pass
+            else:
+                # For one reason or another, we are not using GPIO or Serial.
+                self._hw_interface = HWInterface.NONE
+            if self._hw_interface == HWInterface.NONE:
+                # Clear out and set things to a specific set of values for
+                # consistency.
+                self._interface_type = InterfaceType.key_sounder
+                self._paddle_is_supported = False
+                self._port = None
+                self._port_to_use = None
             # Update closers states based on state of key
-            key_closed = False
+            key_closed = True
             if not self._hw_interface == HWInterface.NONE:
                 # Read the key
                 key_closed = self._key_is_closed()
@@ -370,7 +382,7 @@ class KOB:
         """
         if not self._shutdown.is_set() and self._hw_is_available():
             self.__start_hw_processing()
-        elif self._threadsStop.is_set() or not self._hw_is_available():
+        elif self._threadsStop_KS.is_set() or not self._hw_is_available():
             self.__stop_hw_processing()
         return
 
@@ -379,7 +391,7 @@ class KOB:
         Start our processing threads if needed.
         """
         if not self._shutdown.is_set() and self._hw_is_available():
-            self._threadsStop.clear()
+            self._threadsStop_KS.clear()
             self.power_save(False)
             if self._key_callback:
                 if not self._thread_keyread:
@@ -392,13 +404,13 @@ class KOB:
 
     def __start_keyer_processing(self) -> None:
         if not self._shutdown.is_set() and not self._thread_keyer:
-            self._threadsStop.clear()
+            self._threadsStop_keyer.clear()
             self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body)
             self._thread_keyer.start()
         return
 
     def __stop_hw_processing(self) -> None:
-        self._threadsStop.set()
+        self._threadsStop_KS.set()
         if self._thread_keyread and self._thread_keyread.is_alive():
             self._thread_keyread.join(timeout=2.0)
         if self._thread_powersave and self._thread_powersave.is_alive():
@@ -411,7 +423,7 @@ class KOB:
         """
         Called by the Keyer thread `run` to send automated dits/dah based on the mode.
         """
-        while not self._threadsStop.is_set() and not self._shutdown.is_set():
+        while not self._threadsStop_keyer.is_set() and not self._shutdown.is_set():
             code = self.keyer()
             if len(code) > 0:
                 if code[-1] == 1: # special code for closer/circuit closed
@@ -420,7 +432,7 @@ class KOB:
                 elif code[-1] == 2: # special code for closer/circuit open
                     pass
                     # self._set_key_closer_open(True)
-                if self._key_callback and not self._threadsStop.is_set():
+                if self._key_callback and not self._threadsStop_keyer.is_set():
                     self._key_callback(code)
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -429,14 +441,14 @@ class KOB:
         """
         Called by the KeyRead thread `run` to read code from the key.
         """
-        while not self._threadsStop.is_set() and self._hw_is_available() and not self._shutdown.is_set():
+        while not self._threadsStop_KS.is_set() and self._hw_is_available() and not self._shutdown.is_set():
             code = self.key()
             if len(code) > 0:
                 if code[-1] == 1: # special code for closer/circuit closed
                     self._set_key_closer_open(False)
                 elif code[-1] == 2: # special code for closer/circuit open
                     self._set_key_closer_open(True)
-                if self._key_callback and not self._threadsStop.is_set():
+                if self._key_callback and not self._threadsStop_KS.is_set():
                     self._key_callback(code)
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
@@ -445,12 +457,12 @@ class KOB:
         """
         Called by the PowerSave thread 'run' to control the power save (sounder energize)
         """
-        while not self._threadsStop.is_set() and not self._shutdown.is_set():
+        while not self._threadsStop_KS.is_set() and not self._shutdown.is_set():
             now = time.time()
             if self._sounder_power_save_secs > 0 and not self._power_saving:
                 if self._t_sounder_energized > 0 and (now - self._t_sounder_energized) > self._sounder_power_save_secs:
                     self.power_save(True)
-            self._threadsStop.wait(0.5)
+            self._threadsStop_KS.wait(0.5)
         log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
@@ -642,10 +654,10 @@ class KOB:
         if not synth_mode == synth_mode_was:
             log.debug("kob._update_modes: synth_mode changed", 4)
 
-        energize_sounder = (sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK)
+        energize_sounder = (not sounder_mode == SounderMode.DIS) and ((sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK))
         self._energize_hw_sounder(energize_sounder)
         if not (from_key_closer and self._virtual_closer_in_use):
-            energize_synth = (not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK)
+            energize_synth = (not synth_mode == SynthMode.DIS) and ((not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK))
             self._energize_synth(energize_synth, no_tone=True)
         log.debug("kob._update_modes: now {}:{}".format(self._sounder_mode.name, self._synth_mode.name), 2)
         return
@@ -754,6 +766,7 @@ class KOB:
         """
         if self._shutdown.is_set():
             return
+        port_to_use = util.str_none_or_value(port_to_use)
         if not (
                 self._interface_type == interface_type and
                 self._port_to_use == port_to_use and
@@ -821,7 +834,7 @@ class KOB:
         if self._shutdown.is_set():
             return code
         sleep_time = 0.001
-        while not self._threadsStop.is_set() and self._hw_is_available():
+        while not self._threadsStop_KS.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
             try:
                 kc = self._key_is_closed()
@@ -841,7 +854,7 @@ class KOB:
                 #
                 if self._sounder_mode == SounderMode.FK or self._synth_mode == SynthMode.FK:
                     self.energize_sounder(kc, CodeSource.key)
-                self._threadsStop.wait(DEBOUNCE)
+                self._threadsStop_KS.wait(DEBOUNCE)
                 if kc:
                     code += (-dt,)
                 elif self._circuit_is_closed:
@@ -858,7 +871,7 @@ class KOB:
                 return code
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
-            self._threadsStop.wait(sleep_time)
+            self._threadsStop_KS.wait(sleep_time)
         return code
 
     def keyer(self) -> tuple[int,...]:
@@ -871,7 +884,7 @@ class KOB:
             return code
         km1 = self.keyer_mode  # Use the property to employ the guard
         sleep_time = 0.001
-        while not self._threadsStop.is_set():
+        while not self._threadsStop_keyer.is_set():
             drive_sounder = ((self._sounder_mode == SounderMode.FK) or
                             (self._sounder_mode == SounderMode.SLC) or
                             (self._synth_mode == SynthMode.FK) or
@@ -882,7 +895,7 @@ class KOB:
                 # Still generating dits
                 if drive_sounder:
                     self.energize_sounder(self._keyer_dits_down, km[1])
-                self._threadsStop.wait(self.keyer_dit_len / 1000)
+                self._threadsStop_keyer.wait(self.keyer_dit_len / 1000)
                 klen = self.keyer_dit_len if self._keyer_dits_down else -self.keyer_dit_len
                 code += (klen,)
                 self._keyer_dits_down = not self._keyer_dits_down
@@ -898,7 +911,7 @@ class KOB:
                 if km[0] == KeyerMode.DITS:
                     # Start generating dits...
                     self._keyer_dits_down = True
-                    self._threadsStop.wait(self.keyer_dit_len / 2000)  # Delay 1/2 a dit len to allow for keyboard reaction
+                    self._threadsStop_keyer.wait(self.keyer_dit_len / 2000)  # Delay 1/2 a dit len to allow for keyboard reaction
                 else:  # DAH or IDLE
                     self._keyer_dits_down = False
                     if drive_sounder:
@@ -918,7 +931,7 @@ class KOB:
             if len(code) >= 50:  # code sequences can't have more than 50 elements
                 return code
             if km[0] == KeyerMode.IDLE:
-                self._threadsStop.wait(sleep_time)
+                self._threadsStop_keyer.wait(sleep_time)
         return code
 
     def keyer_mode_set(self, mode: KeyerMode, source: CodeSource):
@@ -965,7 +978,8 @@ class KOB:
         but DO NOT BLOCK.
         """
         self._shutdown.set()
-        self._threadsStop.set()
+        self._threadsStop_keyer.set()
+        self._threadsStop_KS.set()
         self.__stop_hw_processing()
         self._key_callback = None
         return
@@ -979,9 +993,6 @@ class KOB:
         if sound:
             self.power_save(False)
         for c in code:
-            if self._threadsStop.is_set():
-                self.energize_sounder(False, code_source, from_disconnect=True)
-                return
             t = time.time()
             if c < -3000:  # long pause, change of senders, or missing packet
                 c = -1
@@ -994,7 +1005,7 @@ class KOB:
                 self._t_soundcode_last_change = t
             else:
                 self._t_soundcode_last_change = tNext
-                self._threadsStop.wait(dt)
+                self._shutdown.wait(dt)
             if c > 1:  # end of (nonlatching) mark
                 if sound:
                     self.energize_sounder(False, code_source)

@@ -1350,17 +1350,19 @@ def process_config_arg(args) -> Config:
     cfg = Config()
     if hasattr(args, "pkcfg_filepath"):
         file_path = util.str_none_or_value(args.pkcfg_filepath)
-        if file_path:
+        if not file_path is None:
             file_path = file_path.strip()
             file_path = add_ext_if_needed(file_path)
             if not os.path.isfile(file_path):
                 raise FileNotFoundError("Configuration file '{}' does not exist.".format(file_path))
             cfg.load_config(file_path)
             cfg.set_using_global(False)
+            log.info("Using configuration file: {}".format(cfg.get_filepath()))
             return cfg
     #
     cfg.load_from_global()
     cfg.set_using_global(True)
+    log.info("Using global configuration for user: {} - ({})".format(config.user_name, config.user_config_file_path))
     return cfg
 
 def process_config_args(args, cfg:Config=None) -> Config:
@@ -1379,25 +1381,32 @@ def process_config_args(args, cfg:Config=None) -> Config:
     # Set config values if they were specified
     if hasattr(args, "logging_level"):
         if not args.logging_level is None:
+            log.debug("Config - applying 'logging-level'")
             n = args.logging_level
             cfg.logging_level = n if n >= log.LOGGING_MIN_LEVEL else log.LOGGING_MIN_LEVEL
     if hasattr(args, "audio_type"):
         if not args.audio_type is None:
+            log.debug("Config - applying 'audiotype'")
             cfg.audio_type = config.audio_type_from_str(args.audio_type)
     if hasattr(args, "auto_connect"):
         if not args.auto_connect is None:
+            log.debug("Config - applying 'autoconnect'")
             cfg.auto_connect = strtobool(args.auto_connect)
     if hasattr(args, "code_type"):
         if not args.code_type is None:
+            log.debug("Config - applying 'type'")
             cfg.code_type = config.codeTypeFromString(args.code_type)
     if hasattr(args, "interface_type"):
         if not args.interface_type is None:
+            log.debug("Config - applying 'interface'")
             cfg.interface_type = config.interface_type_from_str(args.interface_type)
     if hasattr(args, "invert_key_input"):
         if not args.invert_key_input is None:
+            log.debug("Config - applying 'iki'")
             cfg.invert_key_input = strtobool(args.invert_key_input)
     if hasattr(args, "min_char_speed"):
         if not args.min_char_speed is None:
+            log.debug("Config - applying 'charspeed'")
             n = args.min_char_speed
             if n < 5:
                 n = 5
@@ -1406,12 +1415,15 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.min_char_speed = n
     if hasattr(args, "local"):
         if not args.local is None:
+            log.debug("Config - applying 'local'")
             cfg.local = strtobool(args.local)
     if hasattr(args, "remote"):
         if not args.remote is None:
+            log.debug("Config - applying 'remote'")
             cfg.remote = strtobool(args.remote)
     if hasattr(args, "serial_port"):
         if not args.serial_port is None:
+            log.debug("Config - applying 'port'")
             s = util.str_none_or_value(args.serial_port)
             if not s or s.strip().upper() == 'NONE':
                 cfg.serial_port = None
@@ -1419,9 +1431,11 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 cfg.serial_port = s.strip()
     if hasattr(args, "gpio"):
         if not args.gpio is None:
+            log.debug("Config - applying 'gpio'")
             cfg.gpio = strtobool(args.gpio)
     if hasattr(args, "server_url"):
         if not args.server_url is None:
+            log.debug("Config - applying 'url'")
             s = util.str_none_or_value(args.server_url)
             if not s or s.strip().upper() == 'DEFAULT' or s.strip().upper() == 'NONE':
                 cfg.server_url = None
@@ -1429,25 +1443,31 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 cfg.server_url = s.strip()
     if hasattr(args, "sound"):
         if not args.sound is None:
+            log.debug("Config - applying 'sound'")
             cfg.sound = strtobool(args.sound)
     if hasattr(args, "sounder"):
         if not args.sounder is None:
+            log.debug("Config - applying 'sounder'")
             cfg.sounder = strtobool(args.sounder)
     if hasattr(args, "sounder_power_save"):
         if not args.sounder_power_save is None:
+            log.debug("Config - applying 'pwrsv'")
             n = args.sounder_power_save
             if n < 0:
                 n = 0
             cfg.sounder_power_save = n
     if hasattr(args, "spacing"):
         if not args.spacing is None:
+            log.debug("Config - applying 'spacing'")
             cfg.spacing = config.spacing_from_str(args.spacing)
     if hasattr(args, "station"):
         if not args.station is None:
+            log.debug("Config - applying 'station'")
             s = args.station.strip()
             cfg.station = s
     if hasattr(args, "text_speed"):
         if not args.text_speed is None:
+            log.debug("Config - applying 'textspeed'")
             n = args.text_speed
             if n < 5:
                 n = 5
@@ -1456,6 +1476,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.text_speed = n
     if hasattr(args, "wire"):
         if not args.wire is None:
+            log.debug("Config - applying 'wire'")
             n = args.wire
             if n < 0:
                 n = 0

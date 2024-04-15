@@ -5,7 +5,7 @@ from pykob.util import strtobool
 import re  # RegEx
 from typing import Any, Callable, Optional
 
-from pykob import config, log
+from pykob import config, log, util
 from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
 
@@ -79,9 +79,7 @@ class PreferencesWindow:
         self.root = tk.Toplevel()
         self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
-        cfgname = "Global" if cfg.using_global() else cfg.get_name()
-        if not cfgname:
-            cfgname = ""
+        cfgname = util.str_empty_or_value("Global" if cfg.using_global() else cfg.get_name())
         self.root.title("Preferences - {}".format(cfgname))
 
         # validators
