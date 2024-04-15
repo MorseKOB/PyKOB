@@ -20,7 +20,7 @@
             ]
         },
         {
-            "desc":"Play a recording and process a file, sending to Wire 230.",
+            "desc":"Play a recording and process a file, sending to Wire 91.",
             "args":[
                 "91", "--play", "mrt-session.pkrec", "--file", "mkob_learn/The quick brown fox.txt", "--repeat", "8"
             ]

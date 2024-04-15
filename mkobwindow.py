@@ -29,6 +29,7 @@ Create the main window for MKOB and lay out its widgets (controls).
 """
 from mkobactions import MKOBActions
 from mkobhelpkeys import MKOBHelpKeys
+from mkobhelpwires import MKOBHelpWires
 from mkobkeyboard import MKOBKeyboard
 from mkobmain import MKOBMain
 from mkobreader import MKOBReader
@@ -563,6 +564,7 @@ class MKOBWindow:
         self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
         self._kkb = MKOBKeyboard(self._ka, self)
         self._shortcuts_win = None
+        self._wires_win = None
 
         # validators
         self._digits_only_validator = root.register(self._validate_number_entry)
@@ -662,6 +664,7 @@ class MKOBWindow:
         # Help menu
         self._helpMenu = tk.Menu(self._menu)
         self._menu.add_cascade(label="Help", menu=self._helpMenu)
+        self._helpMenu.add_command(label="Active Wires", command=self._ka.doHelpWires)
         self._helpMenu.add_command(label="Keyboard Shortcuts", command=self._ka.doHelpShortcuts)
         self._helpMenu.add_separator()
         self._helpMenu.add_command(label="About", command=self._ka.doHelpAbout)
@@ -1168,6 +1171,14 @@ class MKOBWindow:
         return self._kkb
 
     @property
+    def mkactions(self) -> MKOBActions:
+        return self._ka
+
+    @property
+    def mkmain(self):
+        return self._km
+
+    @property
     def station_list_win(self):
         return self._txtStnList
 
@@ -1402,6 +1413,17 @@ class MKOBWindow:
         if not (self._shortcuts_win and MKOBHelpKeys.active):
             self._shortcuts_win = MKOBHelpKeys()
         self._shortcuts_win.focus()
+        return
+    
+    def show_wires(self):
+        """
+        Display the active wires from the KOBServer.
+        """
+        if self._shutdown.is_set():
+            return
+        if not (self._wires_win and MKOBHelpWires.active):
+            self._wires_win = MKOBHelpWires(self, self._cfg)
+        self._wires_win.focus()
         return
 
     def shutdown(self):

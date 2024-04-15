@@ -63,9 +63,10 @@ from sys import platform
 from threading import Event, Thread
 import time
 from time import sleep
+import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -134,13 +135,16 @@ class RawTerm:
                 self._impl = _GetchUnix(self._shutdown_event)
             except Exception as ex:
                 log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
+                log.debug(traceback.format_exc(), 3)
         elif platform in ("win32", "cygwin"):
             try:
                 self._impl = _GetchWindows(self._shutdown_event)
             except Exception as ex:
                 log.warn("Unable to set up direct keyboard access for {} ({})".format(platform, ex))
+                log.debug(traceback.format_exc(), 3)
         else:
             log.warn("The platform {} is not currently supported for direct keyboard access.".format(platform))
+            log.debug(traceback.format_exc(), 3)
         return
 
     def getch(self) -> str:
@@ -168,6 +172,7 @@ class _GetchUnix:
             log.warn("RawTerm cannot read the current terminal settings. "
                     + "The terminal will not be able to be restored when MRT terminates. "
                     + "Error: {}".format(ex))
+            log.debug(traceback.format_exc(), 3)
         try:
             tty.setraw(sys.stdin.fileno())
             attrs = termios.tcgetattr(self.fd)
@@ -177,6 +182,7 @@ class _GetchUnix:
             log.warn("RawTerm cannot set the terminal settings needed to read keys directly. "
                     + "MRT will not be able to support keyboard sending. "
                     + "Error: {}".format(ex))
+            log.debug(traceback.format_exc(), 3)
             # try to put the original back
             if self.original_settings:
                 try:
@@ -184,6 +190,7 @@ class _GetchUnix:
                 except Exception as ex:
                     log.warn("Terminal settings were not able to be restored. " +
                         "It is suggested that you close the terminal when done with MRT.")
+                    log.debug(traceback.format_exc(), 3)
                     pass
                 pass
             pass
@@ -206,6 +213,7 @@ class _GetchUnix:
             except Exception as ex:
                 log.warn("Terminal settings were not able to be restored. " +
                     "It is suggested that you close the terminal when done with MRT.")
+                log.debug(traceback.format_exc(), 3)
                 pass
             pass
         return
@@ -795,6 +803,7 @@ class Mrt:
                 print(
                     "<<< File sender encountered an error and will stop sending. Exception: {}"
                 ).format(ex)
+                log.debug(traceback.format_exc(), 3)
                 self._fst_stop.set()
             finally:
                 self._set_virtual_closer_closed(True)
@@ -831,6 +840,7 @@ class Mrt:
                     self._shutdown.wait(0.008)
                 except Exception as ex:
                     print("<<< Keyboard reader encountered an error and will stop reading. Error: {}".format(ex))
+                    log.debug(traceback.format_exc(), 3)
                     self._kbt_stop.set()
         finally:
             rawterm.exit()
@@ -991,6 +1001,7 @@ class MrtSelector:
             raise SelectorLoadSpecError(jde)
         except Exception as ex:
             log.debug(ex)
+            log.debug(traceback.format_exc(), 3)
             raise SelectorLoadError("Load selector error: {}".format(ex))
         return False
 
@@ -1187,8 +1198,10 @@ if __name__ == "__main__":
         print("Error loading selector - {}".format(sle))
     except Exception as ex:
         print("Error encountered: {}".format(ex))
+        log.debug(traceback.format_exc(), 3)
     except SystemExit as arg_err:
         print(arg_err)
+        log.debug(traceback.format_exc(), 3)
     finally:
         if mrt:
             mrt.exit()
