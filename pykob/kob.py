@@ -52,6 +52,7 @@ from pykob import config, log, morse
 from pykob.config import AudioType, InterfaceType
 import threading
 from threading import Event, RLock, Thread
+import traceback
 from typing import Any, Callable, Optional
 
 DEBOUNCE  = 0.018  # time to ignore transitions due to contact bounce (sec)
@@ -252,9 +253,8 @@ class KOB:
                     from pykob import audio
                     self._audio = audio.Audio(self._audio_type)
                 except ModuleNotFoundError:
-                    self._err_msg_hndlr(
-                        "Audio module is not available. The synth sounder and tone cannot be used."
-                    )
+                    self._err_msg_hndlr("Audio module is not available. The synth sounder and tone cannot be used.")
+                    log.debug(traceback.format_exc(), 3)
                     self._use_audio = False
         return
 
@@ -278,18 +278,18 @@ class KOB:
                     gpio_led = LED
                     gpio_button = Button
                 except:
-                    self._err_msg_hndlr(
-                        "Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder."
-                    )
+                    self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
+                    log.debug(traceback.format_exc(), 3)
             if self._port_to_use and not gpio_module_available:
                 try:
                     import serial
 
                     serial_module_available = True
                 except:
-                    self._err_msg_hndlr(
-                        "Module pySerial is not available. Serial interface cannot be used for a key/sounder."
-                    )
+                    self._err_msg_hndlr("Module pySerial is not available. Serial interface cannot be used for a key/sounder.")
+                    log.debug(traceback.format_exc(), 3)
+                pass
+            pass
             #
             # At this point, we have either the GPIO or the Serial module available, or none.
             #
@@ -304,13 +304,11 @@ class KOB:
                 except:
                     self._hw_interface = HWInterface.NONE
                     self._paddle_is_supported = False
-                    self._err_msg_hndlr(
-                        "Interface for key and/or sounder on GPIO not available. GPIO key/sounder will not function."
-                    )
+                    self._err_msg_hndlr("Interface for key and/or sounder on GPIO not available. GPIO key/sounder will not function.")
+                    log.debug(traceback.format_exc(), 3)
             elif serial_module_available:
                 try:
                     self._port = serial.Serial(self._port_to_use, timeout=0.5)
-                    self._port.open()
                     self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
                     # Read the inputs to initialize them
                     self.__read_cts()
@@ -335,10 +333,9 @@ class KOB:
                     self._hw_interface = HWInterface.NONE
                     self._serial_key_read = self.__read_nul
                     self._serial_pdl_dah = self.__read_nul
-                    self._err_msg_hndlr(
-                        "Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use)
-                    )
+                    self._err_msg_hndlr("Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use))
                     log.debug(ex)
+                    log.debug(traceback.format_exc(), 3)
             # Update closers states based on state of key
             key_closed = False
             if not self._hw_interface == HWInterface.NONE:
@@ -478,6 +475,7 @@ class KOB:
                     except OSError:
                         self._hw_interface = HWInterface.NONE
                         self._err_msg_hndlr("GPIO output error setting sounder state. Disabling interface.")
+                        log.debug(traceback.format_exc(), 3)
                 elif self._hw_interface == HWInterface.SERIAL:
                     try:
                         if self._port:
@@ -488,6 +486,7 @@ class KOB:
                     except OSError:
                         self._hw_interface = HWInterface.NONE
                         self._err_msg_hndlr("Serial RTS error setting sounder state. Disabling interface.")
+                        log.debug(traceback.format_exc(), 3)
                     pass
                 pass
             pass
@@ -507,9 +506,8 @@ class KOB:
                     self._play_clack_silence()
             except:
                 self._use_audio = False
-                self._err_msg_hndlr(
-                    "System audio error playing sounder state. Disabling synth sounder."
-                )
+                self._err_msg_hndlr("System audio error playing sounder state. Disabling synth sounder.")
+                log.debug(traceback.format_exc(), 3)
         return
 
     def _hw_is_available(self) -> bool:
@@ -529,6 +527,7 @@ class KOB:
             except:
                 self._hw_interface = HWInterface.NONE
                 self._err_msg_hndlr("GPIO interface read error. Disabling interface.")
+                log.debug(traceback.format_exc(), 3)
         elif self._hw_interface == HWInterface.SERIAL:
             try:
                 kc = self._serial_key_read()
@@ -536,6 +535,7 @@ class KOB:
             except:
                 self._hw_interface = HWInterface.NONE
                 self._err_msg_hndlr("Serial interface read error. Disabling interface.")
+                log.debug(traceback.format_exc(), 3)
         # Invert key state if configured to do so (ex: input is from a modem)
         if self._invert_key_input:
             kc = not kc
@@ -826,6 +826,7 @@ class KOB:
             try:
                 kc = self._key_is_closed()
             except(OSError):
+                log.debug(traceback.format_exc(), 3)
                 return code # Stop trying to process the key
             t = time.time()
             if kc != self._key_state_last_closed:
