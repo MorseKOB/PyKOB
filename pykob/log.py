@@ -61,38 +61,38 @@ def log(msg, type="", dt=None, level_threshold=INFO_LEVEL):
         sys.stdout.flush()
     return
 
-def logErr(msg):
+def logErr(msg, dt=None):
     global __logging_level
     if __logging_level >= ERROR_LEVEL:
-        dtstr = str(datetime.datetime.now())[:19]
+        dtstr = (str(datetime.datetime.now())[:19] + " ") if dt is None else ""
         typestr = "ERROR"
         log(msg, type=typestr, dt=dtstr) # Output to the normal output
-        sys.stderr.write('{0} {1}:\t{2}\n'.format(dtstr, typestr, msg))
+        sys.stderr.write('{0}{1}:\t{2}\n'.format(dtstr, typestr, msg))
         sys.stderr.flush()
     return
 
-def debug(msg, level=DEBUG_MIN_LEVEL):
+def debug(msg, level=DEBUG_MIN_LEVEL, dt=None):
     global __logging_level
     if __logging_level >= level:
-        log(msg, type="DEBUG[{}]".format(level), level_threshold=level)
+        log(msg, type="DEBUG[{}]".format(level), level_threshold=level, dt=dt)
     return
 
-def err(msg):
+def err(msg, dt=None):
     typ, val, trc = sys.exc_info()
-    logErr("{0}\n{1}".format(msg, val))
+    logErr("{0}\n{1}".format(msg, val), dt=dt)
     return
 
-def error(msg):
+def error(msg, dt=None):
     typ, val, trc = sys.exc_info()
-    logErr("{0}\n{1}".format(msg, val))
+    logErr("{0}\n{1}".format(msg, val), dt=dt)
     return
 
-def info(msg, ):
-    log(msg, type="INFO", level_threshold=INFO_LEVEL)
+def info(msg, dt=None):
+    log(msg, type="INFO", dt=dt, level_threshold=INFO_LEVEL)
     return
 
-def warn(msg):
-    log(msg, type="WARN", level_threshold=WARN_LEVEL)
+def warn(msg, dt=None):
+    log(msg, type="WARN", dt=dt, level_threshold=WARN_LEVEL)
     return
 
 def get_logging_level():

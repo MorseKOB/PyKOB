@@ -103,6 +103,9 @@ _WIRE_KEY = "WIRE"
 
 
 # Paths and Configurations
+global app_config_dir, app_config_file_path, app_config
+global user_config_dir, user_config_file_path, user_config
+#
 app_config_dir = None
 app_config_file_path = None
 app_config = None
@@ -722,8 +725,10 @@ def read_config():
     global system_name
     global system_version
     global app_config
+    global app_config_dir
     global app_config_file_path
     global user_config
+    global user_config_dir
     global user_config_file_path
     global user_home
     global user_name
@@ -785,10 +790,14 @@ def read_config():
         else:
             log.err("Unknown System name")
             exit
-
+        if user_config_dir is None:
+            user_config_dir = os.path.dirname(user_config_file_path)
+        if app_config_dir is None:
+            app_config_dir = os.path.dirname(app_config_file_path)
     except KeyError as ex:
         log.err("Key '{}' not found in environment.".format(ex.args[0]))
         exit
+    return
 
     create_config_files_if_needed()
 

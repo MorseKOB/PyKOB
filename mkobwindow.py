@@ -28,6 +28,7 @@ kobwindow.py
 Create the main window for MKOB and lay out its widgets (controls).
 """
 from mkobactions import MKOBActions
+from mkobenv import MKOBEnv
 from mkobhelpkeys import MKOBHelpKeys
 from mkobhelpwires import MKOBHelpWires
 from mkobkeyboard import MKOBKeyboard
@@ -509,7 +510,7 @@ class StatusBar:
         return
 
 class MKOBWindow:
-    def __init__(self, root, mkob_version_text, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
+    def __init__(self, root, mkob_version_text, cfg: Config, mkenv: MKOBEnv, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
 
         self._app_started: bool = False  # Flag that will be set True when MKOB triggers on_app_started
         self._root = root
@@ -554,6 +555,7 @@ class MKOBWindow:
         self._spacing = cfg.spacing
         self._ignore_morse_setting_change = False
         ## passed in
+        self._mkenv = mkenv
         self._sender_dt = sender_dt
         self._record_filepath = record_filepath
 
@@ -1120,7 +1122,7 @@ class MKOBWindow:
         # Set to disconnected state
         self.connected_set(False)
         # Now that the windows and controls are initialized, create our MKOBMain.
-        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._sender_dt, self._record_filepath)
+        self._km = MKOBMain(self._root, self._app_name_version, self._ka, self, self._cfg, self._mkenv, self._sender_dt, self._record_filepath)
         self._ka.start(self._km, self._kkb)
         self._kkb.start(self._km)
         self._km.start()

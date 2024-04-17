@@ -53,6 +53,12 @@ PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
+# SPECIAL Configuration Path values
+""" Use the user's global (non-named) configuration """
+CONFIG_PATH_GLOBAL = "GLOBAL"
+""" Use a new (default values) configuration """
+CONFIG_PATH_NEW = "NEW"
+
 def add_ext_if_needed(s: str) -> str:
     """
     Add the PyKOB Configuration file extension if needed.
@@ -1228,7 +1234,8 @@ class Config:
 #
 config_file_override = argparse.ArgumentParser(add_help=False)
 config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg_filepath",
-    help="Configuration file to use. If not specified, the global configuration is used.")
+    help="Configuration file to use. The special value 'GLOBAL' will use the global (un-named) "
+        + "configuration. The special value 'NEW' will use a new (defaults) configuration.")
 
 logging_level_override = argparse.ArgumentParser(add_help=False)
 logging_level_override.add_argument(
@@ -1336,39 +1343,82 @@ wire_override.add_argument("-W", "--wire", metavar="wire", dest="wire", type=int
 # Process the results from argparse.ArgumentParser.parse_args.
 # ########################################################################
 #
-def process_config_arg(args) -> Config:
+def process_config_arg(args, fallback=None) -> Config:
     """
     Process the argparse.ArgumentParser.parse_args result for the --config option.
 
+    fallback: str|None File path to a config file to use if one wasn't specified
+        in the arguments. If None is specified and there isn't one in the
+        arguments, the user's global configuration is used.
+
+    Special values of: 'GLOBAL' use the global configuration.
+                        'NEW' use a new (defaults) configuration.
+
     Returns: A Config instance that has been loaded from a configuration
-    file or from the global store.
+    file, the global store, or the defaults (new).
 
     Raises: FileNotFoundError if a config file is specified and it
     doesn't exist.
 
     """
     cfg = Config()
+    config_path: str = None
+    fallback_cfg = False
+    file_cfg = False
+    new_cfg = False
+    global_cfg = False
     if hasattr(args, "pkcfg_filepath"):
         file_path = util.str_none_or_value(args.pkcfg_filepath)
         if not file_path is None:
-            file_path = file_path.strip()
-            file_path = add_ext_if_needed(file_path)
-            if not os.path.isfile(file_path):
-                raise FileNotFoundError("Configuration file '{}' does not exist.".format(file_path))
-            cfg.load_config(file_path)
-            cfg.set_using_global(False)
-            log.info("Using configuration file: {}".format(cfg.get_filepath()))
-            return cfg
-    #
-    cfg.load_from_global()
-    cfg.set_using_global(True)
-    log.info("Using global configuration for user: {} - ({})".format(config.user_name, config.user_config_file_path))
+            config_path = file_path
+            file_cfg = True
+    if not file_cfg:
+        # A config file wasn't specified in the options. Is there one as a fallback
+        file_path = util.str_none_or_value(fallback)
+        if not file_path is None:
+            config_path = file_path
+            fallback_cfg = True
+    if file_cfg or fallback_cfg:
+        # A config path was specified, see if it is either of the 'special' values.
+        if config_path == CONFIG_PATH_GLOBAL:
+            global_cfg = True
+        elif config_path == CONFIG_PATH_NEW:
+            new_cfg = True
+    else:
+        # Neither a file path or a fallback were specified - use the global
+        global_cfg = True
+    if new_cfg:
+        log.info("Using a new configuration (default values).", dt="")
+    elif global_cfg:
+        cfg.load_from_global()
+        cfg.set_using_global(True)
+        log.info("Using global configuration for user: {} - ({})".format(config.user_name, config.user_config_file_path), dt="")
+    else:
+        # A path was specified and it's not one of the special values. See if it exists.
+        path = Path(add_ext_if_needed(config_path))
+        if not path.exists():
+            raise FileNotFoundError("Configuration file '{}' was not found.".format(path.resolve()))
+        config_path = path.resolve().__fspath__()
+        cfg.load_config(config_path)
+        cfg.set_using_global(False)
+        if file_cfg:
+            log.info("Using configuration file: {}".format(cfg.get_filepath()), dt="")
+        else:
+            log.info("Using configuration: {}".format(cfg.get_filepath()), dt="")
+    # We have the config to return
     return cfg
 
-def process_config_args(args, cfg:Config=None) -> Config:
+def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
     """
     Process the argparse.ArgumentParser.parse_args results for all of the
     configuration options.
+
+    cfg: Config instance to apply any option values to. If None, a Config instance
+        will be created from the config argument or the fallback path.
+
+    fallback: str|None File path to a config file to use if one wasn't specified
+        in the arguments. If None is specified and there isn't one in the
+        arguments, the user's global configuration is used.
 
     Return: A Config instance that has been loaded from a configuration file
     or the global store, and then has the specified values applied.
@@ -1377,7 +1427,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
     """
     if not cfg:
         # Get a Config instance to use as a base
-        cfg = process_config_arg(args)
+        cfg = process_config_arg(args, fallback)
     # Set config values if they were specified
     if hasattr(args, "logging_level"):
         if not args.logging_level is None:

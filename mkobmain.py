@@ -40,6 +40,7 @@ from typing import Optional
 from pykob import config, config2, kob, morse, internet, recorder, log
 from pykob.recorder import PlaybackState, Recorder
 from pykob.config2 import Config, ConfigLoadError
+from mkobenv import MKOBEnv
 from mkobkeytimewin import MKOBKeyTimeWin
 
 NNBSP = "\u202f"  # narrow no-break space
@@ -48,13 +49,14 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 
 
 class MKOBMain:
-    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
+    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, mkenv: MKOBEnv, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
         self.app_ver = app_ver
         self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
         self._cfg = cfg
+        self._mkenv = mkenv
         self._sender_dt = sender_dt
         self._set_on_cfg:bool = False # Flag to control setting values on our config
         self._code_type = None  # Set by do_morse_change
@@ -986,6 +988,8 @@ class MKOBMain:
                 self._update_from_config(self._cfg, config2.ChangeType.ANY)
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = self._cfg.get_filepath()
+                self._mkenv.save_env()
             except ConfigLoadError as err:
                 msg = "Unable to load configuration: {}".format(pf)
                 log.error("{}  Error: {}".format(msg, err))
@@ -1004,6 +1008,8 @@ class MKOBMain:
             self._update_from_config(self._cfg, config2.ChangeType.ANY)
             self._cfg.clear_dirty()
             self._kw.set_app_title()
+            self._mkenv.cfg_filepath = config2.CONFIG_PATH_GLOBAL
+            self._mkenv.save_env()
         except ConfigLoadError as err:
                 msg = "Unable to load Global configuration."
                 log.error("{}  Error: {}".format(msg, err))
@@ -1063,6 +1069,8 @@ class MKOBMain:
                 self._cfg.save_config(pf)
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = self._cfg.get_filepath()
+                self._mkenv.save_env()
             except Exception as err:
                 msg = "Unable to save configuration: {}".format(pf)
                 log.error("{}  Error: {}".format(msg, err))
@@ -1076,6 +1084,8 @@ class MKOBMain:
             if self._cfg.using_global():
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = config2.CONFIG_PATH_GLOBAL
+                self._mkenv.save_env()
         except Exception as err:
             msg = "Unable to save Global configuration."
             log.error("{}  Error: {}".format(msg, err))
