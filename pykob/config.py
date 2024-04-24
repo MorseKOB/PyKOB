@@ -91,6 +91,7 @@ _INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 _LOCAL_KEY = "LOCAL"
 _MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
+_NO_KEY_CLOSER_KEY = "NO_KEY_CLOSER"
 _REMOTE_KEY = "REMOTE"
 _SERVER_URL_KEY = "SERVER_URL"
 _SOUND_KEY = "SOUND"
@@ -103,6 +104,9 @@ _WIRE_KEY = "WIRE"
 
 
 # Paths and Configurations
+global app_config_dir, app_config_file_path, app_config
+global user_config_dir, user_config_file_path, user_config
+#
 app_config_dir = None
 app_config_file_path = None
 app_config = None
@@ -135,6 +139,7 @@ logging_level = log.INFO_LEVEL
 interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
+no_key_closer = False
 remote = True
 server_url = None
 sound = True
@@ -379,27 +384,6 @@ def set_local(l):
         log.err("LOCAL value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
 
-def set_remote(r):
-    """Enable/disable remote send
-
-    When remote send is enabled, the content will be sent to the
-    wire configured.
-
-    Parameters
-    ----------
-    r : str
-        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
-        will enable remote send. Values of `NO`|`OFF`|`FALSE` will disable remote send.
-    """
-
-    global remote
-    try:
-        remote = strtobool(str(r))
-        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, util.on_off_from_bool(remote))
-    except ValueError as ex:
-        log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
-        raise
-
 def set_min_char_speed(s: str):
     """Sets the minimum character speed in words per minute
 
@@ -427,6 +411,48 @@ def set_min_char_speed_int(si: int):
     global min_char_speed
     min_char_speed = si
     user_config.set(_CONFIG_SECTION, _MIN_CHAR_SPEED_KEY, str(min_char_speed))
+
+def set_no_key_closer(b):
+    """Enable/disable whether the (physical) key has a closer.
+
+    If the key doesn't have a physical closer, applications might adapt by
+    implementing some type of virtual closer.
+
+    Parameters
+    ----------
+    b : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will indicate the key has no closer. Values of `NO`|`OFF`|`FALSE` indicate a key with a closer.
+    """
+    global no_key_closer
+    try:
+        no_key_closer = strtobool(str(b))
+        user_config.set(_CONFIG_SECTION, _NO_KEY_CLOSER_KEY, util.on_off_from_bool(no_key_closer))
+    except ValueError as ex:
+        log.err("No key closer value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+    return
+
+def set_remote(r):
+    """Enable/disable remote send
+
+    When remote send is enabled, the content will be sent to the
+    wire configured.
+
+    Parameters
+    ----------
+    r : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable remote send. Values of `NO`|`OFF`|`FALSE` will disable remote send.
+    """
+    global remote
+    try:
+        remote = strtobool(str(r))
+        user_config.set(_CONFIG_SECTION, _REMOTE_KEY, util.on_off_from_bool(remote))
+    except ValueError as ex:
+        log.err("REMOTE value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+    return
 
 def set_serial_port(p):
     """Sets the name/path of the serial/tty port to use for a
@@ -684,6 +710,7 @@ def print_config():
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", util.on_off_from_bool(invert_key_input))
     print("Local copy:", util.on_off_from_bool(local))
+    print("No key closer:", util.true_false_from_bool(no_key_closer))
     print("Remote send:", util.on_off_from_bool(remote))
     print("KOB Server URL:", url)
     print("Sound:", util.on_off_from_bool(sound))
@@ -722,8 +749,10 @@ def read_config():
     global system_name
     global system_version
     global app_config
+    global app_config_dir
     global app_config_file_path
     global user_config
+    global user_config_dir
     global user_config_file_path
     global user_home
     global user_name
@@ -739,6 +768,7 @@ def read_config():
     global invert_key_input
     global local
     global min_char_speed
+    global no_key_closer
     global remote
     global server_url
     global sound
@@ -785,7 +815,10 @@ def read_config():
         else:
             log.err("Unknown System name")
             exit
-
+        if user_config_dir is None:
+            user_config_dir = os.path.dirname(user_config_file_path)
+        if app_config_dir is None:
+            app_config_dir = os.path.dirname(app_config_file_path)
     except KeyError as ex:
         log.err("Key '{}' not found in environment.".format(ex.args[0]))
         exit
@@ -801,6 +834,7 @@ def read_config():
         _LOCAL_KEY:"ON",
         _LOGGING_LEVEL_KEY:"0",
         _MIN_CHAR_SPEED_KEY:"18",
+        _NO_KEY_CLOSER_KEY:"OFF",
         _REMOTE_KEY:"ON",
         _SERVER_URL_KEY:"NONE",
         _SOUND_KEY:"ON",
@@ -809,7 +843,8 @@ def read_config():
         _SPACING_KEY:"NONE",
         _STATION_KEY:"",
         _WIRE_KEY:"101",
-        _TEXT_SPEED_KEY:"18"}
+        _TEXT_SPEED_KEY:"18"
+    }
     app_config_defaults = {"PORT":"", "GPIO":"OFF"}
 
     user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=_CONFIG_SECTION)
@@ -879,6 +914,9 @@ def read_config():
         __option = "Minimum character speed"
         __key = _MIN_CHAR_SPEED_KEY
         min_char_speed = user_config.getint(_CONFIG_SECTION, __key)
+        __option = "No key closer"
+        __key = _NO_KEY_CLOSER_KEY
+        no_key_closer = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Remote send"
         __key = _REMOTE_KEY
         remote = user_config.getboolean(_CONFIG_SECTION, __key)
@@ -985,6 +1023,16 @@ min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", default=min_char_speed, type=int,
 help="The minimum character speed to use in words per minute (used for Farnsworth timing).",
 metavar="wpm", dest="min_char_speed")
+
+no_key_closer_override = argparse.ArgumentParser(add_help=False)
+no_key_closer_override.add_argument(
+    "-X",
+    "--no-key-closer",
+    default=no_key_closer,
+    help="'TRUE' or 'FALSE' to indicate if the physical key does not have a closer.",
+    metavar="no-closer",
+    dest="no_key_closer",
+)
 
 remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument(

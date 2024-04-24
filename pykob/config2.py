@@ -53,6 +53,12 @@ PYKOB_CFG_EXT = ".pkcfg"
 VERSION = "2.0.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
+# SPECIAL Configuration Path values
+""" Use the user's global (non-named) configuration """
+CONFIG_PATH_GLOBAL = "GLOBAL"
+""" Use a new (default values) configuration """
+CONFIG_PATH_NEW = "NEW"
+
 def add_ext_if_needed(s: str) -> str:
     """
     Add the PyKOB Configuration file extension if needed.
@@ -111,6 +117,8 @@ class Config:
         self._p_interface_type: InterfaceType = InterfaceType.loop
         self._invert_key_input: bool = False
         self._p_invert_key_input: bool = False
+        self._no_key_closer: bool = False
+        self._p_no_key_closer: bool = False
         self._sound: bool = True
         self._p_sound: bool = True
         self._sounder: bool = False
@@ -160,6 +168,7 @@ class Config:
             config._SERIAL_PORT_KEY: self._set_serial_port,
             config._INTERFACE_TYPE_KEY: self._set_interface_type,
             config._INVERT_KEY_INPUT_KEY: self._set_invert_key_input,
+            config._NO_KEY_CLOSER_KEY: self._set_no_key_closer,
             config._SOUNDER_POWER_SAVE_KEY: self._set_sounder_power_save,
             config._AUTO_CONNECT_KEY: self._set_auto_connect,
             config._LOCAL_KEY: self._set_local,
@@ -337,6 +346,28 @@ class Config:
     @property
     def invert_key_input_changed(self) -> bool:
         return not self._invert_key_input == self._p_invert_key_input
+
+    @property
+    def no_key_closer(self) -> bool:
+        return self._no_key_closer
+    @no_key_closer.setter
+    def no_key_closer(self, v: bool) -> None:
+        x = self._no_key_closer
+        self._no_key_closer = v
+        if not v == x:
+            self._changed_hw()
+        return
+    def _set_no_key_closer(self, v: bool) -> None:
+        self.no_key_closer = v
+        return
+
+    @property
+    def no_key_closer_p(self) -> bool:
+        return self._p_no_key_closer
+
+    @property
+    def no_key_closer_changed(self) -> bool:
+        return not self._no_key_closer == self._p_no_key_closer
 
     @property
     def serial_port(self) -> str:
@@ -712,6 +743,7 @@ class Config:
         self._p_serial_port = self._serial_port
         self._p_interface_type = self._interface_type
         self._p_invert_key_input = self._invert_key_input
+        self._p_no_key_closer = self._no_key_closer
         self._p_sound = self._sound
         self._p_sounder = self._sounder
         self._p_sounder_power_save = self._sounder_power_save
@@ -749,6 +781,7 @@ class Config:
             muted_cfg.serial_port = cfg_src._serial_port
             muted_cfg.interface_type = cfg_src._interface_type
             muted_cfg.invert_key_input = cfg_src._invert_key_input
+            muted_cfg.no_key_closer = cfg_src._no_key_closer
             muted_cfg.sound = cfg_src._sound
             muted_cfg.sounder = cfg_src._sounder
             muted_cfg.sounder_power_save = cfg_src._sounder_power_save
@@ -781,6 +814,8 @@ class Config:
         if self.interface_type_changed:
             ct = ct | ChangeType.HARDWARE
         if self.invert_key_input_changed:
+            ct = ct | ChangeType.HARDWARE
+        if self.no_key_closer_changed:
             ct = ct | ChangeType.HARDWARE
         if self.sound_changed:
             ct = ct | ChangeType.HARDWARE
@@ -823,6 +858,7 @@ class Config:
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
             config._INVERT_KEY_INPUT_KEY: self._invert_key_input,
+            config._NO_KEY_CLOSER_KEY: self._no_key_closer,
             config._SOUNDER_POWER_SAVE_KEY: self._sounder_power_save,
             config._AUTO_CONNECT_KEY: self._auto_connect,
             config._LOGGING_LEVEL_KEY: self._logging_level,
@@ -886,7 +922,7 @@ class Config:
         if self._dirty:
             return True
         # Hardware Settings
-        if not self._p_audio_type == self._audio_type:
+        if  not self._p_audio_type == self._audio_type:
             return True
         if  not self._p_gpio == self._gpio:
             return True
@@ -895,6 +931,8 @@ class Config:
         if  not self._p_interface_type == self._interface_type:
             return True
         if  not self._p_invert_key_input == self._invert_key_input:
+            return True
+        if  not self._p_no_key_closer == self._no_key_closer:
             return True
         if  not self._p_sound == self._sound:
             return True
@@ -1003,6 +1041,7 @@ class Config:
                 muted_cfg.serial_port = config.serial_port
                 muted_cfg.interface_type = config.interface_type
                 muted_cfg.invert_key_input = config.invert_key_input
+                muted_cfg.no_key_closer = config.no_key_closer
                 muted_cfg.sound = config.sound
                 muted_cfg.audio_type = config.audio_type
                 muted_cfg.sounder = config.sounder
@@ -1036,6 +1075,7 @@ class Config:
             config.set_serial_port(self._serial_port)
             config.set_interface_type(self._interface_type.name)
             config.set_invert_key_input(self._invert_key_input)
+            config.set_no_key_closer(self._no_key_closer)
             config.set_sound(self._sound)
             config.set_sounder(self._sounder)
             config.set_sounder_power_save(str(self._sounder_power_save))
@@ -1075,6 +1115,7 @@ class Config:
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(util.on_off_from_bool(self._invert_key_input)), file=f)
+        print("No key closer: {}".format(util.true_false_from_bool(self._no_key_closer)), file=f)
         print("Sound: {}".format(util.on_off_from_bool(self._sound)), file=f)
         print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
         print("Sounder: {}".format(util.on_off_from_bool(self._sounder)), file=f)
@@ -1126,6 +1167,7 @@ class Config:
         self._serial_port = self._p_serial_port
         self._interface_type = self._p_interface_type
         self._invert_key_input = self._p_invert_key_input
+        self._no_key_closer = self._p_no_key_closer
         self._sound = self._p_sound
         self._sounder = self._p_sounder
         self._sounder_power_save = self._p_sounder_power_save
@@ -1228,7 +1270,8 @@ class Config:
 #
 config_file_override = argparse.ArgumentParser(add_help=False)
 config_file_override.add_argument("--config", metavar="config-file", dest="pkcfg_filepath",
-    help="Configuration file to use. If not specified, the global configuration is used.")
+    help="Configuration file to use. The special value 'GLOBAL' will use the global (un-named) "
+        + "configuration. The special value 'NEW' will use a new (defaults) configuration.")
 
 logging_level_override = argparse.ArgumentParser(add_help=False)
 logging_level_override.add_argument(
@@ -1272,6 +1315,10 @@ local_override.add_argument("-L", "--local", metavar="local-copy", dest="local",
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", metavar="wpm", dest="min_char_speed", type=int,
     help="The minimum character speed to use in words per minute.")
+
+no_key_closer_override = argparse.ArgumentParser(add_help=False)
+no_key_closer_override.add_argument("-X", "--no-key-closer", metavar="no-closer", dest="no_key_closer",
+    help="True/False to indicate if the physical key has a closer.")
 
 remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument(
@@ -1336,37 +1383,82 @@ wire_override.add_argument("-W", "--wire", metavar="wire", dest="wire", type=int
 # Process the results from argparse.ArgumentParser.parse_args.
 # ########################################################################
 #
-def process_config_arg(args) -> Config:
+def process_config_arg(args, fallback=None) -> Config:
     """
     Process the argparse.ArgumentParser.parse_args result for the --config option.
 
+    fallback: str|None File path to a config file to use if one wasn't specified
+        in the arguments. If None is specified and there isn't one in the
+        arguments, the user's global configuration is used.
+
+    Special values of: 'GLOBAL' use the global configuration.
+                        'NEW' use a new (defaults) configuration.
+
     Returns: A Config instance that has been loaded from a configuration
-    file or from the global store.
+    file, the global store, or the defaults (new).
 
     Raises: FileNotFoundError if a config file is specified and it
     doesn't exist.
 
     """
     cfg = Config()
+    config_path: str = None
+    fallback_cfg = False
+    file_cfg = False
+    new_cfg = False
+    global_cfg = False
     if hasattr(args, "pkcfg_filepath"):
         file_path = util.str_none_or_value(args.pkcfg_filepath)
-        if file_path:
-            file_path = file_path.strip()
-            file_path = add_ext_if_needed(file_path)
-            if not os.path.isfile(file_path):
-                raise FileNotFoundError("Configuration file '{}' does not exist.".format(file_path))
-            cfg.load_config(file_path)
-            cfg.set_using_global(False)
-            return cfg
-    #
-    cfg.load_from_global()
-    cfg.set_using_global(True)
+        if not file_path is None:
+            config_path = file_path
+            file_cfg = True
+    if not file_cfg:
+        # A config file wasn't specified in the options. Is there one as a fallback
+        file_path = util.str_none_or_value(fallback)
+        if not file_path is None:
+            config_path = file_path
+            fallback_cfg = True
+    if file_cfg or fallback_cfg:
+        # A config path was specified, see if it is either of the 'special' values.
+        if config_path == CONFIG_PATH_GLOBAL:
+            global_cfg = True
+        elif config_path == CONFIG_PATH_NEW:
+            new_cfg = True
+    else:
+        # Neither a file path or a fallback were specified - use the global
+        global_cfg = True
+    if new_cfg:
+        log.info("Using a new configuration (default values).", dt="")
+    elif global_cfg:
+        cfg.load_from_global()
+        cfg.set_using_global(True)
+        log.info("Using global configuration for user: {} - ({})".format(config.user_name, config.user_config_file_path), dt="")
+    else:
+        # A path was specified and it's not one of the special values. See if it exists.
+        path = Path(add_ext_if_needed(config_path))
+        if not path.exists():
+            raise FileNotFoundError("Configuration file '{}' was not found.".format(path.resolve()))
+        config_path = path.resolve().__fspath__()
+        cfg.load_config(config_path)
+        cfg.set_using_global(False)
+        if file_cfg:
+            log.info("Using configuration file: {}".format(cfg.get_filepath()), dt="")
+        else:
+            log.info("Using configuration: {}".format(cfg.get_filepath()), dt="")
+    # We have the config to return
     return cfg
 
-def process_config_args(args, cfg:Config=None) -> Config:
+def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
     """
     Process the argparse.ArgumentParser.parse_args results for all of the
     configuration options.
+
+    cfg: Config instance to apply any option values to. If None, a Config instance
+        will be created from the config argument or the fallback path.
+
+    fallback: str|None File path to a config file to use if one wasn't specified
+        in the arguments. If None is specified and there isn't one in the
+        arguments, the user's global configuration is used.
 
     Return: A Config instance that has been loaded from a configuration file
     or the global store, and then has the specified values applied.
@@ -1375,29 +1467,40 @@ def process_config_args(args, cfg:Config=None) -> Config:
     """
     if not cfg:
         # Get a Config instance to use as a base
-        cfg = process_config_arg(args)
+        cfg = process_config_arg(args, fallback)
     # Set config values if they were specified
     if hasattr(args, "logging_level"):
         if not args.logging_level is None:
+            log.debug("Config - applying 'logging-level'")
             n = args.logging_level
             cfg.logging_level = n if n >= log.LOGGING_MIN_LEVEL else log.LOGGING_MIN_LEVEL
     if hasattr(args, "audio_type"):
         if not args.audio_type is None:
+            log.debug("Config - applying 'audiotype'")
             cfg.audio_type = config.audio_type_from_str(args.audio_type)
     if hasattr(args, "auto_connect"):
         if not args.auto_connect is None:
+            log.debug("Config - applying 'autoconnect'")
             cfg.auto_connect = strtobool(args.auto_connect)
     if hasattr(args, "code_type"):
         if not args.code_type is None:
+            log.debug("Config - applying 'type'")
             cfg.code_type = config.codeTypeFromString(args.code_type)
     if hasattr(args, "interface_type"):
         if not args.interface_type is None:
+            log.debug("Config - applying 'interface'")
             cfg.interface_type = config.interface_type_from_str(args.interface_type)
     if hasattr(args, "invert_key_input"):
         if not args.invert_key_input is None:
+            log.debug("Config - applying 'iki'")
             cfg.invert_key_input = strtobool(args.invert_key_input)
+    if hasattr(args, "no_key_closer"):
+        if not args.no_key_closer is None:
+            log.debug("Config - applying 'no-key-closer'")
+            cfg.no_key_closer = strtobool(args.no_key_closer)
     if hasattr(args, "min_char_speed"):
         if not args.min_char_speed is None:
+            log.debug("Config - applying 'charspeed'")
             n = args.min_char_speed
             if n < 5:
                 n = 5
@@ -1406,12 +1509,15 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.min_char_speed = n
     if hasattr(args, "local"):
         if not args.local is None:
+            log.debug("Config - applying 'local'")
             cfg.local = strtobool(args.local)
     if hasattr(args, "remote"):
         if not args.remote is None:
+            log.debug("Config - applying 'remote'")
             cfg.remote = strtobool(args.remote)
     if hasattr(args, "serial_port"):
         if not args.serial_port is None:
+            log.debug("Config - applying 'port'")
             s = util.str_none_or_value(args.serial_port)
             if not s or s.strip().upper() == 'NONE':
                 cfg.serial_port = None
@@ -1419,9 +1525,11 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 cfg.serial_port = s.strip()
     if hasattr(args, "gpio"):
         if not args.gpio is None:
+            log.debug("Config - applying 'gpio'")
             cfg.gpio = strtobool(args.gpio)
     if hasattr(args, "server_url"):
         if not args.server_url is None:
+            log.debug("Config - applying 'url'")
             s = util.str_none_or_value(args.server_url)
             if not s or s.strip().upper() == 'DEFAULT' or s.strip().upper() == 'NONE':
                 cfg.server_url = None
@@ -1429,25 +1537,31 @@ def process_config_args(args, cfg:Config=None) -> Config:
                 cfg.server_url = s.strip()
     if hasattr(args, "sound"):
         if not args.sound is None:
+            log.debug("Config - applying 'sound'")
             cfg.sound = strtobool(args.sound)
     if hasattr(args, "sounder"):
         if not args.sounder is None:
+            log.debug("Config - applying 'sounder'")
             cfg.sounder = strtobool(args.sounder)
     if hasattr(args, "sounder_power_save"):
         if not args.sounder_power_save is None:
+            log.debug("Config - applying 'pwrsv'")
             n = args.sounder_power_save
             if n < 0:
                 n = 0
             cfg.sounder_power_save = n
     if hasattr(args, "spacing"):
         if not args.spacing is None:
+            log.debug("Config - applying 'spacing'")
             cfg.spacing = config.spacing_from_str(args.spacing)
     if hasattr(args, "station"):
         if not args.station is None:
+            log.debug("Config - applying 'station'")
             s = args.station.strip()
             cfg.station = s
     if hasattr(args, "text_speed"):
         if not args.text_speed is None:
+            log.debug("Config - applying 'textspeed'")
             n = args.text_speed
             if n < 5:
                 n = 5
@@ -1456,6 +1570,7 @@ def process_config_args(args, cfg:Config=None) -> Config:
             cfg.text_speed = n
     if hasattr(args, "wire"):
         if not args.wire is None:
+            log.debug("Config - applying 'wire'")
             n = args.wire
             if n < 0:
                 n = 0

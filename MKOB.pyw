@@ -32,15 +32,19 @@ influenced by the MorseKOB 2.5 application by Les Kerr.
 import argparse
 import tkinter as tk
 import sys
-from pykob import config2, log
+import traceback
+
+from pykob import config, config2, log
 from pykob import VERSION as PKVERSION
 import pkappargs
+from mkobenv import MKOBEnv
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
 __version__ = "4.3.1"
 VERSION = __version__
 MKOB_VERSION_TEXT = "MKOB " + VERSION
+
 print(MKOB_VERSION_TEXT)
 print(" Python: " + sys.version + " on " + sys.platform)
 print(" pykob: " + PKVERSION)
@@ -48,11 +52,13 @@ print(" Tcl/Tk: {}/{}".format(tk.TclVersion, tk.TkVersion))
 
 destoy_on_exit = True
 mkobwin: MKOBWindow = None
+mkobenv: MKOBEnv = None
 try:
     arg_parser = argparse.ArgumentParser(description="Morse KOB application. This provides a full graphical interface to "
             + "send and receive Morse over the internet, "
             + "as well as practice locally.\nFor a text-only (command line version), try 'MRT'. "
-            + "The Global Configuration is used unless a configuration file is specified.",
+            + "A configuration file can be specified using the '--config' option, otherwise the last "
+            + "configuration will be used.",
         parents= [
             config2.config_file_override,
             config2.logging_level_override,
@@ -61,8 +67,15 @@ try:
         ]
     )
     args = arg_parser.parse_args()
-    cfg = config2.process_config_args(args)
+
+    # Get the fallback config file path to use if needed.
+    env = MKOBEnv()
+
+    cfg = config2.process_config_args(args, fallback=env.cfg_filepath)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
+
+    # Save the filepath of the configuration we loaded
+    env.cfg_filepath = cfg.get_filepath()
 
     record_filepath = pkappargs.record_filepath_from_args(args)
     sender_dt = args.sender_dt
@@ -76,7 +89,7 @@ try:
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
     # Our content
-    mkobwin = MKOBWindow(root, MKOB_VERSION_TEXT, cfg, sender_dt, record_filepath)
+    mkobwin = MKOBWindow(root, MKOB_VERSION_TEXT, cfg, env, sender_dt, record_filepath)
 
     # Set a minsize for the window, and place it in the middle
     root.update()
@@ -96,7 +109,8 @@ except KeyboardInterrupt:
     print()
     sys.exit(0)
 except Exception as ex:
-    print("Error: {}".format(ex))
+    print("Error: {}\n".format(ex))
+    print(traceback.format_exc())
     sys.exit(1)
 finally:
     if mkobwin:

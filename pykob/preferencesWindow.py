@@ -5,7 +5,7 @@ from pykob.util import strtobool
 import re  # RegEx
 from typing import Any, Callable, Optional
 
-from pykob import config, log
+from pykob import config, log, util
 from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
 
@@ -79,9 +79,7 @@ class PreferencesWindow:
         self.root = tk.Toplevel()
         self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
-        cfgname = "Global" if cfg.using_global() else cfg.get_name()
-        if not cfgname:
-            cfgname = ""
+        cfgname = util.str_empty_or_value("Global" if cfg.using_global() else cfg.get_name())
         self.root.title("Preferences - {}".format(cfgname))
 
         # validators
@@ -134,6 +132,7 @@ class PreferencesWindow:
 
         # Add a pop-up menu with the list of available serial connections:
         self._serialPort = tk.StringVar()
+        self._serialPortEntered = False
         serialPortValues = []
         if SERIAL:
             systemSerialPorts = serial.tools.list_ports.comports()
@@ -208,10 +207,15 @@ class PreferencesWindow:
             variable=self._soundLocalCode,
         ).grid(row=7, column=0, padx=[22,0], sticky=tk.W)
 
-        # Add a single checkbox for the key inversion next to the "Separate key/sounder" option
+        # Add a single checkbox for the key has no closer option
+        self._noKeyCloser = tk.IntVar(value=self._cfg.no_key_closer)
+        ttk.Checkbutton(advancedlocalInterface, text="Key has no closer",
+                        variable=self._noKeyCloser).grid(row=8, column=0, padx=[22, 0], sticky=tk.W)
+
+        # Add a single checkbox for the key inversion option
         self._invertKeyInput = tk.IntVar(value=self._cfg.invert_key_input)
         ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
-                        variable=self._invertKeyInput).grid(row=8, column=0, padx=[22, 0], sticky=tk.W)
+                        variable=self._invertKeyInput).grid(row=9, column=0, padx=[22, 0], sticky=tk.W)
 
         basiclocalInterface.pack(fill=tk.BOTH)
         advancedlocalInterface.pack(fill=tk.BOTH)
@@ -561,6 +565,7 @@ class PreferencesWindow:
             muted_cfg.interface_type = config.interface_type_from_str(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
             muted_cfg.local = self._soundLocalCode.get()
             muted_cfg.invert_key_input = self._invertKeyInput.get()
+            muted_cfg.no_key_closer = self._noKeyCloser.get()
             muted_cfg.sound = self._useSystemSound.get()
             muted_cfg.audio_type = self._audioType
             muted_cfg.sounder = self._useLocalSounder.get()
