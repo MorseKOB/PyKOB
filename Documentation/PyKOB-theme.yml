@@ -1,0 +1,65 @@
+extends: default
+page:
+  layout: portrait
+  size: Letter
+  margin: [0.5in, 0.75in, 0.5in, 0.75in]
+  margin-inner: 1.5in
+  margin-outer: 1.0in
+title-page:
+  title:
+     font-size: 24
+     font_color: D32F2F
+  subtitle:
+     font-family: Noto Serif
+     font-size: 28
+     font-style: bold
+     font-color: D32F2F
+base:
+  font-family: Helvetica
+  font-color: 111111
+  font-size: 10.5
+  line-height-length: 14
+  line-height: $base-line-height-length / $base-font-size
+vertical-spacing: $base-line-height-length
+heading:
+  font-family: Helvetica
+  font-size: 14
+  font-style: bold
+  line-height: 1.2
+  margin-bottom: $vertical-spacing
+header:
+  font-size: 10
+  font_color: 777777
+  height: 1cm
+  recto:
+    center:
+      content: '_{organization}_'
+  verso:
+    center:
+      content: '_{organization}_'
+footer:
+  font-size: 11
+  font_color: 444444
+  height: 1cm
+  recto:
+    right:
+      content: '{chapter-title} | {page-number}'
+    left:
+      content: ''
+  verso:
+    left:
+      content: '{page-number} | {chapter-title}'
+    right:
+      content: ''
+table:
+  border-color: 888888
+  stripe-background-color: AAAAAA
+toc:
+  font-size: 10
+  title:
+    font-family: Noto Serif
+    font-size: 24
+  dot-leader:
+    font-color: 888888
+codespan:
+  background-color: dddddd
