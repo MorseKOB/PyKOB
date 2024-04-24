@@ -488,7 +488,7 @@ a.	Length is based on the key action duration.
 b.	Key down actions use a wide bar.
 c.	Key up actions use a thin line.
 d.	The color is based on the duration error:
-i.	Black: Less than ±10%
+e.	Black: Less than ±10%
 ii.	Lighter brown: -10% or more (negative error – too short)
 iii.	Darker brown: +10% or more (positive error – too long)
 iv.	Red: The value was too large to fit within the graph maximum
