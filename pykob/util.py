@@ -96,3 +96,19 @@ def strtobool (val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
+def true_false_from_bool(b:bool) -> str:
+    """
+    Return 'TRUE' if `b` is `True` and 'FALSE' if `b` is `False`
+
+    Parameters
+    ----------
+    b : boolean
+        The value to evaluate
+    Return
+    ------
+        'TRUE' for `True`, 'FALSE' for `False`
+    """
+    #print(b)
+    r = "TRUE" if b else "FALSE"
+    return r
+

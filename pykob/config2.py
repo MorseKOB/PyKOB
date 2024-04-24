@@ -117,6 +117,8 @@ class Config:
         self._p_interface_type: InterfaceType = InterfaceType.loop
         self._invert_key_input: bool = False
         self._p_invert_key_input: bool = False
+        self._no_key_closer: bool = False
+        self._p_no_key_closer: bool = False
         self._sound: bool = True
         self._p_sound: bool = True
         self._sounder: bool = False
@@ -166,6 +168,7 @@ class Config:
             config._SERIAL_PORT_KEY: self._set_serial_port,
             config._INTERFACE_TYPE_KEY: self._set_interface_type,
             config._INVERT_KEY_INPUT_KEY: self._set_invert_key_input,
+            config._NO_KEY_CLOSER_KEY: self._set_no_key_closer,
             config._SOUNDER_POWER_SAVE_KEY: self._set_sounder_power_save,
             config._AUTO_CONNECT_KEY: self._set_auto_connect,
             config._LOCAL_KEY: self._set_local,
@@ -343,6 +346,28 @@ class Config:
     @property
     def invert_key_input_changed(self) -> bool:
         return not self._invert_key_input == self._p_invert_key_input
+
+    @property
+    def no_key_closer(self) -> bool:
+        return self._no_key_closer
+    @no_key_closer.setter
+    def no_key_closer(self, v: bool) -> None:
+        x = self._no_key_closer
+        self._no_key_closer = v
+        if not v == x:
+            self._changed_hw()
+        return
+    def _set_no_key_closer(self, v: bool) -> None:
+        self.no_key_closer = v
+        return
+
+    @property
+    def no_key_closer_p(self) -> bool:
+        return self._p_no_key_closer
+
+    @property
+    def no_key_closer_changed(self) -> bool:
+        return not self._no_key_closer == self._p_no_key_closer
 
     @property
     def serial_port(self) -> str:
@@ -718,6 +743,7 @@ class Config:
         self._p_serial_port = self._serial_port
         self._p_interface_type = self._interface_type
         self._p_invert_key_input = self._invert_key_input
+        self._p_no_key_closer = self._no_key_closer
         self._p_sound = self._sound
         self._p_sounder = self._sounder
         self._p_sounder_power_save = self._sounder_power_save
@@ -755,6 +781,7 @@ class Config:
             muted_cfg.serial_port = cfg_src._serial_port
             muted_cfg.interface_type = cfg_src._interface_type
             muted_cfg.invert_key_input = cfg_src._invert_key_input
+            muted_cfg.no_key_closer = cfg_src._no_key_closer
             muted_cfg.sound = cfg_src._sound
             muted_cfg.sounder = cfg_src._sounder
             muted_cfg.sounder_power_save = cfg_src._sounder_power_save
@@ -787,6 +814,8 @@ class Config:
         if self.interface_type_changed:
             ct = ct | ChangeType.HARDWARE
         if self.invert_key_input_changed:
+            ct = ct | ChangeType.HARDWARE
+        if self.no_key_closer_changed:
             ct = ct | ChangeType.HARDWARE
         if self.sound_changed:
             ct = ct | ChangeType.HARDWARE
@@ -829,6 +858,7 @@ class Config:
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
             config._INVERT_KEY_INPUT_KEY: self._invert_key_input,
+            config._NO_KEY_CLOSER_KEY: self._no_key_closer,
             config._SOUNDER_POWER_SAVE_KEY: self._sounder_power_save,
             config._AUTO_CONNECT_KEY: self._auto_connect,
             config._LOGGING_LEVEL_KEY: self._logging_level,
@@ -892,7 +922,7 @@ class Config:
         if self._dirty:
             return True
         # Hardware Settings
-        if not self._p_audio_type == self._audio_type:
+        if  not self._p_audio_type == self._audio_type:
             return True
         if  not self._p_gpio == self._gpio:
             return True
@@ -901,6 +931,8 @@ class Config:
         if  not self._p_interface_type == self._interface_type:
             return True
         if  not self._p_invert_key_input == self._invert_key_input:
+            return True
+        if  not self._p_no_key_closer == self._no_key_closer:
             return True
         if  not self._p_sound == self._sound:
             return True
@@ -1009,6 +1041,7 @@ class Config:
                 muted_cfg.serial_port = config.serial_port
                 muted_cfg.interface_type = config.interface_type
                 muted_cfg.invert_key_input = config.invert_key_input
+                muted_cfg.no_key_closer = config.no_key_closer
                 muted_cfg.sound = config.sound
                 muted_cfg.audio_type = config.audio_type
                 muted_cfg.sounder = config.sounder
@@ -1042,6 +1075,7 @@ class Config:
             config.set_serial_port(self._serial_port)
             config.set_interface_type(self._interface_type.name)
             config.set_invert_key_input(self._invert_key_input)
+            config.set_no_key_closer(self._no_key_closer)
             config.set_sound(self._sound)
             config.set_sounder(self._sounder)
             config.set_sounder_power_save(str(self._sounder_power_save))
@@ -1081,6 +1115,7 @@ class Config:
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(util.on_off_from_bool(self._invert_key_input)), file=f)
+        print("No key closer: {}".format(util.true_false_from_bool(self._no_key_closer)), file=f)
         print("Sound: {}".format(util.on_off_from_bool(self._sound)), file=f)
         print("Audio Type: {}".format(self._audio_type.name.upper()), file=f)
         print("Sounder: {}".format(util.on_off_from_bool(self._sounder)), file=f)
@@ -1132,6 +1167,7 @@ class Config:
         self._serial_port = self._p_serial_port
         self._interface_type = self._p_interface_type
         self._invert_key_input = self._p_invert_key_input
+        self._no_key_closer = self._p_no_key_closer
         self._sound = self._p_sound
         self._sounder = self._p_sounder
         self._sounder_power_save = self._p_sounder_power_save
@@ -1279,6 +1315,10 @@ local_override.add_argument("-L", "--local", metavar="local-copy", dest="local",
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
 min_char_speed_override.add_argument("-c", "--charspeed", metavar="wpm", dest="min_char_speed", type=int,
     help="The minimum character speed to use in words per minute.")
+
+no_key_closer_override = argparse.ArgumentParser(add_help=False)
+no_key_closer_override.add_argument("-X", "--no-key-closer", metavar="no-closer", dest="no_key_closer",
+    help="True/False to indicate if the physical key has a closer.")
 
 remote_override = argparse.ArgumentParser(add_help=False)
 remote_override.add_argument(
@@ -1454,6 +1494,10 @@ def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
         if not args.invert_key_input is None:
             log.debug("Config - applying 'iki'")
             cfg.invert_key_input = strtobool(args.invert_key_input)
+    if hasattr(args, "no_key_closer"):
+        if not args.no_key_closer is None:
+            log.debug("Config - applying 'no-key-closer'")
+            cfg.no_key_closer = strtobool(args.no_key_closer)
     if hasattr(args, "min_char_speed"):
         if not args.min_char_speed is None:
             log.debug("Config - applying 'charspeed'")

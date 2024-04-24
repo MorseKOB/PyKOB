@@ -143,6 +143,7 @@ class MKOBMain:
                 audioType=cfg.audio_type,
                 useSounder=cfg.sounder,
                 invertKeyInput=cfg.invert_key_input,
+                noKeyCloser=cfg.no_key_closer,
                 soundLocal=cfg.local,
                 sounderPowerSaveSecs=cfg.sounder_power_save,
                 virtual_closer_in_use=True,
@@ -942,7 +943,7 @@ class MKOBMain:
                 if cfg.sound_changed or cfg.audio_type_changed:
                     kob_.change_audio(cfg.sound, cfg.audio_type)
                 if cfg.interface_type_changed or cfg.serial_port_changed or cfg.gpio_changed:
-                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder)
+                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
                 elif cfg.sounder_changed:
                     kob_.use_sounder = cfg.sounder
         finally:
@@ -1144,7 +1145,7 @@ class MKOBMain:
         self._sender_ID = None
         dirpath, filename = os.path.split(self._player_file_to_play)
         msg = "Playing: {}".format(filename)
-        self._ka.trigger_reader_append_text("[{}\n".format(msg))
+        self._ka.trigger_reader_append_text("[{}]\n".format(msg))
         self._ka.trigger_status_msg_set(msg)
         plyr = self.Player
         if plyr:

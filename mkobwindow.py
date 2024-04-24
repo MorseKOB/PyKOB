@@ -35,7 +35,7 @@ from mkobkeyboard import MKOBKeyboard
 from mkobmain import MKOBMain
 from mkobreader import MKOBReader
 from mkobstationlist import MKOBStationList
-from pykob import config, config2, log
+from pykob import config, config2, log, util
 from pykob import VERSION as PKVERSION
 from pykob.config2 import Config
 from pykob.internet import PORT_DEFAULT
@@ -1356,11 +1356,15 @@ class MKOBWindow:
     def set_app_title(self):
         if self._shutdown.is_set():
             return
+        n = " "
         cfg_modified_attrib = "*" if self._cfg.is_dirty() else ""
         # If our config has a filename, display it as part of our title
         name = self._cfg.get_name()
         if not self._cfg.using_global():
-            n = " - " + name
+            name = util.str_none_or_value(name)
+            if not name is None:
+                n = " - " + name
+            pass
         else:
             n = " - Global"
         self._root.title(self._app_name_version + n + cfg_modified_attrib)
