@@ -35,6 +35,7 @@ import sys
 import time
 import threading
 from threading import Event, Thread
+import traceback
 from typing import Optional
 
 from pykob import log
@@ -172,6 +173,9 @@ class Selector:
         self.shutdown()
         if self._thread_port_checker and self._thread_port_checker.is_alive():
             self._thread_port_checker.join(timeout=2.0)
+        if self._port and not self._port.closed:
+            self._port.close()
+            self._port = None
 
     def shutdown(self):
         """

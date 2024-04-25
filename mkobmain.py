@@ -40,6 +40,7 @@ from typing import Optional
 from pykob import config, config2, kob, morse, internet, recorder, log
 from pykob.recorder import PlaybackState, Recorder
 from pykob.config2 import Config, ConfigLoadError
+from mkobenv import MKOBEnv
 from mkobkeytimewin import MKOBKeyTimeWin
 
 NNBSP = "\u202f"  # narrow no-break space
@@ -48,13 +49,14 @@ UNLATCH_CODE = (-0x7FFF, +2)  # code sequence to unlatch (open)
 
 
 class MKOBMain:
-    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
+    def __init__(self, tkroot, app_ver, mkactions, mkwindow, cfg: Config, mkenv: MKOBEnv, sender_dt: bool, record_filepath: Optional[str]=None) -> None:
         self.app_ver = app_ver
         self._app_started: bool = False  # Set true by call from MKWindow when everything is started
         self._tkroot = tkroot
         self._ka = mkactions
         self._kw = mkwindow
         self._cfg = cfg
+        self._mkenv = mkenv
         self._sender_dt = sender_dt
         self._set_on_cfg:bool = False # Flag to control setting values on our config
         self._code_type = None  # Set by do_morse_change
@@ -141,6 +143,7 @@ class MKOBMain:
                 audioType=cfg.audio_type,
                 useSounder=cfg.sounder,
                 invertKeyInput=cfg.invert_key_input,
+                noKeyCloser=cfg.no_key_closer,
                 soundLocal=cfg.local,
                 sounderPowerSaveSecs=cfg.sounder_power_save,
                 virtual_closer_in_use=True,
@@ -940,7 +943,7 @@ class MKOBMain:
                 if cfg.sound_changed or cfg.audio_type_changed:
                     kob_.change_audio(cfg.sound, cfg.audio_type)
                 if cfg.interface_type_changed or cfg.serial_port_changed or cfg.gpio_changed:
-                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder)
+                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
                 elif cfg.sounder_changed:
                     kob_.use_sounder = cfg.sounder
         finally:
@@ -986,6 +989,8 @@ class MKOBMain:
                 self._update_from_config(self._cfg, config2.ChangeType.ANY)
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = self._cfg.get_filepath()
+                self._mkenv.save_env()
             except ConfigLoadError as err:
                 msg = "Unable to load configuration: {}".format(pf)
                 log.error("{}  Error: {}".format(msg, err))
@@ -1004,6 +1009,8 @@ class MKOBMain:
             self._update_from_config(self._cfg, config2.ChangeType.ANY)
             self._cfg.clear_dirty()
             self._kw.set_app_title()
+            self._mkenv.cfg_filepath = config2.CONFIG_PATH_GLOBAL
+            self._mkenv.save_env()
         except ConfigLoadError as err:
                 msg = "Unable to load Global configuration."
                 log.error("{}  Error: {}".format(msg, err))
@@ -1063,6 +1070,8 @@ class MKOBMain:
                 self._cfg.save_config(pf)
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = self._cfg.get_filepath()
+                self._mkenv.save_env()
             except Exception as err:
                 msg = "Unable to save configuration: {}".format(pf)
                 log.error("{}  Error: {}".format(msg, err))
@@ -1076,6 +1085,8 @@ class MKOBMain:
             if self._cfg.using_global():
                 self._cfg.clear_dirty()
                 self._kw.set_app_title()
+                self._mkenv.cfg_filepath = config2.CONFIG_PATH_GLOBAL
+                self._mkenv.save_env()
         except Exception as err:
             msg = "Unable to save Global configuration."
             log.error("{}  Error: {}".format(msg, err))
@@ -1134,7 +1145,7 @@ class MKOBMain:
         self._sender_ID = None
         dirpath, filename = os.path.split(self._player_file_to_play)
         msg = "Playing: {}".format(filename)
-        self._ka.trigger_reader_append_text("[{}\n".format(msg))
+        self._ka.trigger_reader_append_text("[{}]\n".format(msg))
         self._ka.trigger_status_msg_set(msg)
         plyr = self.Player
         if plyr:

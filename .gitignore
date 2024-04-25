@@ -33,7 +33,7 @@ pyinstall/w/MKOB/
 Fp-info-cache
 
 # temporary
-~$*.docx
+~$*.*
 *.bak
 
 # Runtime output

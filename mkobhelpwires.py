@@ -231,10 +231,12 @@ class MKOBHelpWires(tk.Toplevel):
             self._refresh_after = None
         iid = self._tree.selection()
         item = self._tree.item(iid)
-        selected_wire = item['values'][0]
-        if not selected_wire == self._mkwin.wire_number:
-            # Trigger an event to change our wire to the one selected
-            self._mkwin.wire_number = selected_wire
+        values = item['values']
+        if len(values) > 0:
+            selected_wire = values[0]
+            if not selected_wire == self._mkwin.wire_number:
+                # Trigger an event to change our wire to the one selected
+                self._mkwin.wire_number = selected_wire
         # Reenable our update
         self._refresh_after = self.after(UPDATE_PERIOD, self._get_active_wires)
         return
@@ -248,7 +250,8 @@ class MKOBHelpWires(tk.Toplevel):
 
     def destroy(self):
         # Restore the attribute on close.
-        self.after_cancel(self._refresh_after)
+        if not self._refresh_after is None:
+            self.after_cancel(self._refresh_after)
         self._refresh_after = None
         self._tree = None
         self.__class__.active = False
