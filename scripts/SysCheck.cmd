@@ -6,7 +6,7 @@ py --version 2>NUL
 if errorlevel 1 goto errorNoPython
 
 :: Reaching here means Python is installed.
-py ../SysCheck.py
+py SysCheck.py
 goto end
 
 :errorNoPython
