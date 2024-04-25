@@ -23,16 +23,55 @@
 #
 # ############################################################################
 #
-# Makefile to create a binary package of PyKOB using Nuitka.
+# Makefile to create:
+#  * A binary package of PyKOB (MKOB, MRT, Configure, ...) using Nuitka.
+#  * The manuals (pdf from the adoc)
 #
+AWK			?= awk
+GREP		?= grep
+KILL		?= kill
+KILL_FLAGS	?= -f
+PDFGEN		?= asciidoctor-pdf
+PR			?= pr
+PS			?= ps
+PS_FLAGS	?= -W
+PS_FIELDS	?= "9 47 100"
+SHELL		:= /bin/bash
+SORT		?= sort
 
+DOC_DIR		:= Documentation
+MKOB_DIR	:= MKOB
+MRT_DIR		:= MRT
 
+MKOB_MANUAL	:= $(DOC_DIR)/$(MKOB_DIR)/User-Manual-MKOB4.pdf
+MRT_MANUAL	:= $(DOC_DIR)/$(MRT_DIR)/User-Manual-MRT.pdf
 
-# help - The default goal (to let people know what this Makefile can do)
+# macros
+#
+# $(call kill-program,awk-pattern)
+define kill-program
+	@ $(PS) $(PS_FLAGS) |										\
+	$(AWK) 'BEGIN	{ FIELDWIDTHS = $(PS_FIELDS) }				\
+		/$1/	{												\
+						print "Killing " $$3;					\
+						system( "$(KILL) $(KILL_FLAGS) " $$1 )	\
+					}'
+endef
+
+.PHONY: all
+all: docs
+
+# help - Print a list of all targets in this makefile
 .PHONY: help
 help:
-	@$(MAKE) --print-data-base --question no-such-target |\
-	$(GREP) -v -e '^no-such-target' -e '^makefile' | \
+	@$(MAKE_COMMAND) --print-data-base | \
+	$(GREP) -v -e '^makefile' | \
 	$(AWK) '/^[^.%][-A-Za-z0-9_]*:/ { print substr($$1, 1, length($$1)-1) }' | \
 	$(SORT) | \
-	$(PR) --omit-pagination --width=80 --columns=4 \
+	$(PR) --omit-pagination --width=80 --columns=4
+
+.PHONY: docs
+docs: $(MKOB_MANUAL)
+
+%.pdf: %.adoc
+	$(PDFGEN) $<
