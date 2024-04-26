@@ -27,24 +27,30 @@
 #  * A binary package of PyKOB (MKOB, MRT, Configure, ...) using Nuitka.
 #  * The manuals (pdf from the adoc)
 #
-AWK			?= awk
-GREP		?= grep
-KILL		?= kill
-KILL_FLAGS	?= -f
-PDFGEN		?= asciidoctor-pdf
-PR			?= pr
-PS			?= ps
-PS_FLAGS	?= -W
-PS_FIELDS	?= "9 47 100"
-SHELL		:= /bin/bash
-SORT		?= sort
+AWK				?= awk
+GREP			?= grep
+KILL			?= kill
+KILL_FLAGS		?= -f
+PDFGEN			?= asciidoctor-pdf
+PR				?= pr
+PS				?= ps
+PS_FLAGS		?= -W
+PS_FIELDS		?= "9 47 100"
+PYTHON			?= /c/Program\ Files/Python311/python.exe
+PY2EXE			?= $(PYTHON) -m nuitka
+SHELL			:= /bin/bash
+SORT			?= sort
 
-DOC_DIR		:= Documentation
-MKOB_DIR	:= MKOB
-MRT_DIR		:= MRT
+DOC_DIR			?= Documentation
+MKOB_DIR		?= MKOB
+MRT_DIR			?= MRT
 
 MKOB_MANUAL	:= $(DOC_DIR)/$(MKOB_DIR)/User-Manual-MKOB4.pdf
 MRT_MANUAL	:= $(DOC_DIR)/$(MRT_DIR)/User-Manual-MRT.pdf
+
+PYKOBEXE_FLAGS	?= --standalone --include-data-dir=resources=resources --include-data-dir=pykob/data=data\
+	--include-data-dir=pykob/resources=resources
+MKOBEXE_FLAGS	?= $(PYKOBEXE_FLAGS) --enable-plugin=tk-inter
 
 # macros
 #
@@ -75,3 +81,6 @@ docs: $(MKOB_MANUAL)
 
 %.pdf: %.adoc
 	$(PDFGEN) $<
+
+mkob.exe: mkob.pyw
+	$(PY2EXE) $(MKOBEXE_FLAGS) $^

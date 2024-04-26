@@ -4,7 +4,9 @@
 
 # Build and Output
 build*/
+*.build/
 dist*/
+*.dist/
 zips/
 __pycache__/
 pyinstall/w/Configure/
