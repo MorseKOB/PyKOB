@@ -3,6 +3,7 @@
 .vscode/
 
 # Build and Output
+bin/
 build*/
 *.build/
 dist*/

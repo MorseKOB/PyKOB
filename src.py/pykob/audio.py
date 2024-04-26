@@ -34,7 +34,7 @@ from pykob import log
 from pykob.config import AudioType
 from threading import Event, Thread
 from time import sleep
-from typing import Any, List
+from typing import List
 
 class Audio:
     FRAMES_PER_BUFFER = 16
@@ -140,6 +140,7 @@ class Audio:
         self._shutdown.set()
         return
 
+''' Commented out to avoid pygame and its dependencies being included in binary builds.
 class Audio2:
 
     def __init__(self, audio_type: AudioType = AudioType.SOUNDER):
@@ -201,3 +202,4 @@ class Audio2:
         """
         self._shutdown.set()
         return
+'''

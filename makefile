@@ -37,7 +37,7 @@ PS				?= ps
 PS_FLAGS		?= -W
 PS_FIELDS		?= "9 47 100"
 PYTHON			?= /c/Program\ Files/Python311/python.exe
-PY2EXE			?= $(PYTHON) -m nuitka
+PY2BIN			?= $(PYTHON) -m nuitka
 SHELL			:= /bin/bash
 SORT			?= sort
 
@@ -48,9 +48,19 @@ MRT_DIR			?= MRT
 MKOB_MANUAL	:= $(DOC_DIR)/$(MKOB_DIR)/User-Manual-MKOB4.pdf
 MRT_MANUAL	:= $(DOC_DIR)/$(MRT_DIR)/User-Manual-MRT.pdf
 
-PYKOBEXE_FLAGS	?= --standalone --include-data-dir=resources=resources --include-data-dir=pykob/data=data\
-	--include-data-dir=pykob/resources=resources
-MKOBEXE_FLAGS	?= $(PYKOBEXE_FLAGS) --enable-plugin=tk-inter
+NUITKA_FLAGS	?= --warn-implicit-exceptions --warn-unusual-code
+
+BIN_OUTDIR	?= --output-dir=../bin
+
+PYKOB_BIN_FLAGS	?= --standalone\
+	--include-data-dir=resources=resources\
+	--include-data-dir=pykob/data=pykob/data\
+	--include-data-dir=pykob/resources=pykob/resources\
+	$(BIN_OUTDIR)
+
+CONFIGURE_BIN_FLAGS		?= $(PYKOB_BIN_FLAGS) --enable-console --enable-plugin=tk-inter
+MKOB_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS) --enable-plugin=tk-inter
+MRT_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS) --enable-console
 
 # macros
 #
@@ -64,9 +74,6 @@ define kill-program
 					}'
 endef
 
-.PHONY: all
-all: docs
-
 # help - Print a list of all targets in this makefile
 .PHONY: help
 help:
@@ -76,11 +83,35 @@ help:
 	$(SORT) | \
 	$(PR) --omit-pagination --width=80 --columns=4
 
+.PHONY: all
+all: docs
+
+.PHONY: clean_bin
+clean_mkob: clean_bld_dirs clean_dist_dirs
+
+.PHONY: clean_bld_dirs
+clean_bld_dirs:
+	rm -rf $(BIN_OUTDIR)/configure.build
+	rm -rf $(BIN_OUTDIR)/mkob.build
+	rm -rf $(BIN_OUTDIR)/mrt.build
+
+.PHONY: clean_dist_dirs
+clean_dist_dirs:
+	rm -rf $(BIN_OUTDIR)/configure.dist
+	rm -rf $(BIN_OUTDIR)/mkob.dist
+	rm -rf $(BIN_OUTDIR)/mrt.dist
+
 .PHONY: docs
 docs: $(MKOB_MANUAL)
 
 %.pdf: %.adoc
 	$(PDFGEN) $<
 
-mkob.exe: mkob.pyw
-	$(PY2EXE) $(MKOBEXE_FLAGS) $^
+configure.exe: Configure.py
+	$(PY2BIN) $(CONFIGURE_BIN_FLAGS) $^
+
+mkob.exe: MKOB.pyw
+	$(PY2BIN) $(MKOB_BIN_FLAGS) $^
+
+mrt.exe: MRT.py
+	$(PY2BIN) $(MRT_BIN_FLAGS) $^
