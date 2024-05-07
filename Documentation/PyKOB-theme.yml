@@ -1,4 +1,4 @@
-extends: default
+extends: default-sans-with-font-fallbacks
 page:
   layout: portrait
   size: Letter

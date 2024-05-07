@@ -12,6 +12,8 @@ zips/
 __pycache__/
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
+*.pyd
+*.pyi
 # Ignore generated *.cmd and *.exe files. If they are needed, include them with a '!' line.
 *.cmd
 *.exe
