@@ -39,11 +39,14 @@ PS				?= ps
 PS_FLAGS		?= -W
 PS_FIELDS		?= "9 47 100"
 PYTHON			?= /c/Program\ Files/Python311/python.exe
-PY2BIN			?= $(PYTHON) -m nuitka
+PY2BIN_FAC		?= $(PYTHON) /Users/aesil/code/Nuitka-factory/Nuitka/bin/nuitka
+PY2BIN_REL		?= $(PYTHON) -m nuitka
+PY2BIN			?= $(PY2BIN_FAC)
 SHELL			:= /bin/bash
 SORT			?= sort
 #
 PY_BIN_EXT		:= .pyd
+PY_BIN_INC_EXT	:= .pyi
 
 DOC_DIR			?= Documentation
 
@@ -55,21 +58,24 @@ MRT_MANUAL		:= $(DOC_DIR)/MRT/User-Manual-MRT.pdf
 NUITKA_FLAGS	?= --warn-implicit-exceptions --warn-unusual-code
 
 BIN_DIR		?= bin
-SRCPY_DIR	?= src.py
+SRC_PY_DIR	?= src.py
 
-PYKOB_BIN_DEBUG_FLAGS	?= --enable-console\
+PYKOB_BIN_DEBUG_FLAGS	?= \
 	--force-stdout-spec=exe.out.txt\
 	--force-stderr-spec=exe.err.txt\
-	--trace\
-	--python-flag=-v --debugger
+	--debug\
+	--python-flag=-v
+#	--trace
 
 PYKOB_BIN_FLAGS	?= --standalone\
-	--include-data-dir=$(SRCPY_DIR)/pykob/data=pykob/data\
-	--include-data-dir=$(SRCPY_DIR)/pykob/resources=pykob/resources\
+	--include-data-dir=$(SRC_PY_DIR)/pykob/data=pykob/data\
+	--include-data-dir=$(SRC_PY_DIR)/pykob/resources=pykob/resources\
 	--output-dir=$(BIN_DIR)\
 	$(PYKOB_BIN_DEBUG_FLAGS)
 
 PYKOB_PACKAGE_FLAGS	?= --module src.py/pykob --include-package=pykob\
+	--include-module=socket\
+	--include-module=ctypes\
 	--output-dir=$(BIN_DIR)\
 	$(PYKOB_BIN_DEBUG_FLAGS)
 
@@ -82,15 +88,20 @@ CONFIGURE_BIN_FLAGS		?= $(PYKOB_BIN_FLAGS) --enable-console --enable-plugin=tk-i
 MKOB_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS)\
 	--enable-console\
 	--enable-plugin=tk-inter\
-	--include-data-dir=$(SRCPY_DIR)/resources=resources
+	--include-data-dir=$(SRC_PY_DIR)/resources=resources
 ## MRT
 MRT_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS) --enable-console
+## Sample
+SAMPLE_BIN_FLAGS		?= $(PYKOB_BIN_FLAGS) --enable-console
 
 # pykob binary package file
 PYKOB_PKG_BIN		?= $(BIN_DIR)/pykob.cp311-win_amd64.pyd
 
 vpath %.py		src.py
 vpath %.pyw		src.py
+
+%.pdf: %.adoc
+	$(PDFGEN) $<
 
 # macros
 #
@@ -113,46 +124,75 @@ help:
 	$(SORT) | \
 	$(PR) --omit-pagination --width=80 --columns=4
 
+# Currently 'all' is just the documentation. It will become everything (binaries, docs, installers)
+# once the kinks are ironed out of the binaries.
+#
 .PHONY: all
 all: docs
 
 .PHONY: clean_all_bin
-clean_all_bin: clean_bld_dirs clean_dist_dirs
+clean_all_bin: clean_bld_dirs clean_dist_dirs clean_pkg_dir
+	rm $(BIN_DIR)/*
 
 .PHONY: clean_bld_dirs
 clean_bld_dirs:
 	rm -rf $(BIN_DIR)/Configure.build
 	rm -rf $(BIN_DIR)/MKOB.build
 	rm -rf $(BIN_DIR)/MRT.build
+	rm -rf $(BIN_DIR)/pykob.build
+	rm -rf $(BIN_DIR)/Sample.build
 
 .PHONY: clean_dist_dirs
 clean_dist_dirs:
 	rm -rf $(BIN_DIR)/Configure.dist
 	rm -rf $(BIN_DIR)/MKOB.dist
 	rm -rf $(BIN_DIR)/MRT.dist
+	rm -rf $(BIN_DIR)/Sample.dist
+
+.PHONY: clean_pkg_dir
+clean_pkg_dir:
+	rm -rf $(BIN_DIR)/pkg
 
 .PHONY: docs
 docs: $(MKOB_MANUAL)
 
 $(MKOB_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME)
 
-%.pdf: %.adoc
-	$(PDFGEN) $<
-
 .PHONY: bins
-bins: pykob Configure MKOB MRT
+bins: pykob Configure MKOB MRT Sample
+
+.PHONY: package_bins
+package_bins:
+	mkdir $(BIN_DIR)/pkg
+	cp -r $(BIN_DIR)/Configure.dist/* $(BIN_DIR)/pkg
+	cp -r $(BIN_DIR)/MKOB.dist/* $(BIN_DIR)/pkg
+	cp -r $(BIN_DIR)/MRT.dist/* $(BIN_DIR)/pkg
+	cp -r $(BIN_DIR)/Sample.dist/* $(BIN_DIR)/pkg
+
+# The following PHONY targets will be replaced by true targets given time
+# to build out the proper names and dependencies.
 
 .PHONY: pykob
 pykob:
 	$(PY2BIN) $(PYKOB_PACKAGE_FLAGS)
+	cp $(BIN_DIR)/pykob.pyi $(SRC_PY_DIR)
+	cp $(BIN_DIR)/pykob.*.pyd $(SRC_PY_DIR)/pykob.pyd
 
+.PHONY: Configure
 Configure: Configure.py
 	$(PY2BIN) $(CONFIGURE_BIN_FLAGS) $<
 
+.PHONY: MKOB
 MKOB: MKOB.pyw pykob
 	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(MKOB_BIN_FLAGS) $<
-	$(CP) $(PYKOB_PKG_BIN) $(BIN_DIR)/$@.dist/pykob$(PY_BIN_EXT)
+	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
 
+.PHONY: MRT
 MRT: MRT.py pykob
 	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(MRT_BIN_FLAGS) $<
-	$(CP) $(PYKOB_PKG_BIN) $(BIN_DIR)/$@.dist/pykob$(PY_BIN_EXT)
+	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
+
+.PHONY: Sample
+Sample: Sample.py pykob
+	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(SAMPLE_BIN_FLAGS) $<
+	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
