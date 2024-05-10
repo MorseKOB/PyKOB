@@ -57,47 +57,60 @@ MRT_MANUAL		:= $(DOC_DIR)/MRT/User-Manual-MRT.pdf
 
 NUITKA_FLAGS	?= --warn-implicit-exceptions --warn-unusual-code
 
-BIN_DIR		?= bin
-SRC_PY_DIR	?= src.py
+BIN_DIR			?= bin
+SRC_PY_DIR		?= src.py
+SRC_PYKOB_DIR	?= src.pykob
 
-PYKOB_BIN_DEBUG_FLAGS	?= \
+APP_BIN_DEBUG_FLAGS	?= \
 	--force-stdout-spec=exe.out.txt\
 	--force-stderr-spec=exe.err.txt\
 	--debug\
 	--python-flag=-v
 #	--trace
 
-PYKOB_BIN_FLAGS	?= --standalone\
-	--include-data-dir=$(SRC_PY_DIR)/pykob/data=pykob/data\
-	--include-data-dir=$(SRC_PY_DIR)/pykob/resources=pykob/resources\
-	--output-dir=$(BIN_DIR)\
-	$(PYKOB_BIN_DEBUG_FLAGS)
+PYKOB_BIN_DEBUG_FLAGS	?= \
+	--debug\
+	--python-flag=-v
+#	--trace
 
-PYKOB_PACKAGE_FLAGS	?= --module src.py/pykob --include-package=pykob\
+APP_BIN_FLAGS	?= --standalone\
+	--include-data-dir=$(SRC_PYKOB_DIR)/pykob/data=pykob/data\
+	--include-data-dir=$(SRC_PYKOB_DIR)/pykob/resources=pykob/resources\
+	--output-dir=$(BIN_DIR)\
+#	$(APP_BIN_DEBUG_FLAGS)
+
+PYKOB_PACKAGE_FLAGS	?= --module $(SRC_PYKOB_DIR)/pykob --include-package=pykob\
 	--include-module=socket\
 	--include-module=ctypes\
 	--output-dir=$(BIN_DIR)\
-	$(PYKOB_BIN_DEBUG_FLAGS)
+#	$(PYKOB_BIN_DEBUG_FLAGS)
 
-NO_INC_PYKOB_FLAGS	?= --nofollow-import-to=pykob
+#NO_INC_PYKOB_FLAGS	?= --nofollow-import-to=pykob
 
 # Utility and Application Bin-Build flags
 ## Configure
-CONFIGURE_BIN_FLAGS		?= $(PYKOB_BIN_FLAGS) --enable-console --enable-plugin=tk-inter
+CONFIGURE_BIN_FLAGS		?= $(APP_BIN_FLAGS)\
+	--enable-console\
+	--enable-plugin=tk-inter
+
 ## MKOB
-MKOB_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS)\
+MKOB_BIN_FLAGS			?= $(APP_BIN_FLAGS)\
 	--enable-console\
 	--enable-plugin=tk-inter\
 	--include-data-dir=$(SRC_PY_DIR)/resources=resources
+
 ## MRT
-MRT_BIN_FLAGS			?= $(PYKOB_BIN_FLAGS) --enable-console
+MRT_BIN_FLAGS			?= $(APP_BIN_FLAGS) --enable-console
+
 ## Sample
-SAMPLE_BIN_FLAGS		?= $(PYKOB_BIN_FLAGS) --enable-console
+SAMPLE_BIN_FLAGS		?= $(APP_BIN_FLAGS) --enable-console
 
 # pykob binary package file
-PYKOB_PKG_BIN		?= $(BIN_DIR)/pykob.cp311-win_amd64.pyd
+PYKOB_PKG_BIN_FILE		?= $(BIN_DIR)/pykob.cp311-win_amd64.pyd
 
+vpath pykob/%.py	src.pykob
 vpath %.py		src.py
+vpath %.pyd		src.py
 vpath %.pyw		src.py
 
 %.pdf: %.adoc
@@ -173,26 +186,31 @@ package_bins:
 # to build out the proper names and dependencies.
 
 .PHONY: pykob
-pykob:
-	$(PY2BIN) $(PYKOB_PACKAGE_FLAGS)
-	cp $(BIN_DIR)/pykob.pyi $(SRC_PY_DIR)
-	cp $(BIN_DIR)/pykob.*.pyd $(SRC_PY_DIR)/pykob.pyd
+pykob: pykob.pyd
 
 .PHONY: Configure
 Configure: Configure.py
 	$(PY2BIN) $(CONFIGURE_BIN_FLAGS) $<
+	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
 
 .PHONY: MKOB
-MKOB: MKOB.pyw pykob
-	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(MKOB_BIN_FLAGS) $<
+MKOB: MKOB.pyw #pykob
+	$(PY2BIN) $(MKOB_BIN_FLAGS) $<
 	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
 
 .PHONY: MRT
-MRT: MRT.py pykob
-	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(MRT_BIN_FLAGS) $<
+MRT: MRT.py #pykob
+	$(PY2BIN) $(MRT_BIN_FLAGS) $<
 	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
 
 .PHONY: Sample
-Sample: Sample.py pykob
-	$(PY2BIN) $(NO_INC_PYKOB_FLAGS) $(SAMPLE_BIN_FLAGS) $<
+Sample: Sample.py #pykob
+	$(PY2BIN) $(SAMPLE_BIN_FLAGS) $<
 	$(CP) $(SRC_PY_DIR)/pykob.py* $(BIN_DIR)/$@.dist
+
+pykob.pyd: $(PYKOB_PKG_BIN_FILE)
+	cp $(BIN_DIR)/pykob.pyi $(SRC_PY_DIR)
+	cp $(PYKOB_PKG_BIN_FILE) $(SRC_PY_DIR)/pykob.pyd
+
+$(PYKOB_PKG_BIN_FILE): # TODO: generate dependencies.
+	$(PY2BIN) $(PYKOB_PACKAGE_FLAGS)

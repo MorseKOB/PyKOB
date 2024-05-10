@@ -18,6 +18,8 @@ pyinstall/w/MKOB/
 *.cmd
 *.exe
 !nuitka_*.cmd
+!src.py/pykob.pyd
+!src.py/pykob.pyi
 
 # Generated / Intermediate
 **/CMakeCache.txt
