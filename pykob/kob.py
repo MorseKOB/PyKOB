@@ -311,6 +311,7 @@ class KOB:
             elif serial_module_available:
                 try:
                     self._port = serial.Serial(self._port_to_use, timeout=0.5)
+                    self._port.write_timeout = 1
                     self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
                     # Read the inputs to initialize them
                     self.__read_cts()
@@ -319,7 +320,6 @@ class KOB:
                     self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
                     self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
                     self._hw_interface = HWInterface.SERIAL
-                    log.debug("The serial interface is available/active and will be used.")
                     self._port.write(b"PyKOB\n")
                     self._threadsStop_KS.wait(0.5)
                     indata = self._port.readline()
