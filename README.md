@@ -232,7 +232,7 @@ working correctly.
 ## Run MKOB
 Once you are up and running, you can run:
 
-`python3 MKOB.pyw`
+`python3 MKOB.py`
 
 This is the GUI application that will let you connect to the MorseKOB Server 
 wires. Within MKOB, you can use `File > Preferences` to view and change the 

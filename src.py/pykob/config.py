@@ -103,9 +103,6 @@ _WIRE_KEY = "WIRE"
 
 
 # Paths and Configurations
-global app_config_dir, app_config_file_path, app_config
-global user_config_dir, user_config_file_path, user_config
-#
 app_config_dir = None
 app_config_file_path = None
 app_config = None

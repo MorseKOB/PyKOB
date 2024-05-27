@@ -30,22 +30,12 @@ logs status, debug and error messages.
 import sys
 import datetime
 
-global __logging_level
 __logging_level = 0
 
-global DEBUG_MIN_LEVEL
 DEBUG_MIN_LEVEL = 1
-
-global INFO_LEVEL
 INFO_LEVEL = 0
-
-global WARN_LEVEL
 WARN_LEVEL = -1
-
-global ERROR_LEVEL
 ERROR_LEVEL = -2
-
-global LOGGING_MIN_LEVEL
 """ Minimum logging level. This disables all logging. """
 LOGGING_MIN_LEVEL = -3
 

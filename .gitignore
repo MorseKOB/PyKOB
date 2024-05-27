@@ -17,9 +17,6 @@ pyinstall/w/MKOB/
 # Ignore generated *.cmd and *.exe files. If they are needed, include them with a '!' line.
 *.cmd
 *.exe
-!nuitka_*.cmd
-!src.py/pykob.pyd
-!src.py/pykob.pyi
 
 # Generated / Intermediate
 **/CMakeCache.txt
@@ -63,8 +60,6 @@ Capture-Replay/*.txt
 *.pkrec
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
-# Include anything that is put into the doc and mkob_learn folders
-!doc/*.mrtsel
-!doc/*.pkcfg
-!doc/*pkrec
-!mkob_learn/*.pkrec
+# Include anything that is put into the Documentation and mkob_learn folders
+!Documentation/*
+!src.py/mkob_learn/*
