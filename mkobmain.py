@@ -874,7 +874,7 @@ class MKOBMain:
         else:
             sp = spacing
         if sp > 100:
-            txt = "" if char == "__" else " * "
+            txt = "" if char == "__" else '\u0320'  # 0320 is a 'combining' underline.
         ## ZZZ Temporarily disable 'intelligent' spacing
         ##    elif sp > 10:
         ##        txt = "     "

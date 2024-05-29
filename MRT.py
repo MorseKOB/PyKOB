@@ -66,7 +66,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.3.4'
+__version__ = '1.3.5'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -1111,13 +1111,23 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     )
     if allow_selector:
         arg_parser.add_argument(
-            "--selector",
+            "--Selector",
             nargs=2,
-            metavar="port specfile",
-            dest="selector_args",
+            metavar=("port","specfile"),
+            dest="Selector_args",
             help="Use a PyKOB Selector to run MRT with different options based on " +
                 "the MRT Selector Specification file 'specfile' and the current selector " +
-                "setting of a selector connected to port 'port'."
+                "setting of a selector connected to port 'port'. Exit with an error if " +
+                "the port cannot be found (the selector is not available). SEE: '--selector' " +
+                "to specify a selector, but run normally if the port cannot be found."
+        )
+        arg_parser.add_argument(
+            "--selector",
+            nargs=2,
+            metavar=("port","specfile"),
+            dest="selector_args",
+            help="Same as '--Selector' except that MRT will run normally if the selector port " +
+                "cannot be found/used."
         )
     arg_parser.add_argument("wire", nargs='?', type=int,
         help="Wire to connect to. If specified, this is used rather than the configured wire. " +
@@ -1135,10 +1145,17 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     repeat_delay = args.repeat_delay
     selector_specpath = None
     selector_port = None
+    selector_optional = True  # Don't require that a selector be accessible
     if hasattr(args, "selector_args"):
         if args.selector_args:
             selector_port = args.selector_args[0]
             selector_specpath = args.selector_args[1]
+        pass
+    if hasattr(args, "Selector_args"):
+        if args.Selector_args:
+            selector_port = args.Selector_args[0]
+            selector_specpath = args.Selector_args[1]
+            selector_optional = False  # Require a selector, error out if not
         pass
     sender_dt = args.sender_dt
     #
@@ -1146,9 +1163,21 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     if selector_specpath and (play_filepath or sendtext_filepath):
         raise Exception("Cannot specify a recording or a file to process when using a Selector. ")
 
+    selector = None
     #
     # If we have a selector spec path, create a selector to return
-    selector = None if not selector_specpath else MrtSelector(selector_port, selector_specpath, cfg)
+    if selector_specpath:
+        try:
+            selector = MrtSelector(selector_port, selector_specpath, cfg)
+        except SelectorLoadError as ex:
+            # If a selector is not optional, exit with an error, else return a 'plain' MRT
+            if not selector_optional:
+                raise ex
+            else:
+                log.info("Selector not useable. Continuing with basic operation.", dt="")
+                selector = None
+            pass
+        pass
 
     mrt = None if not selector is None else Mrt(
         MRT_VERSION_TEXT,
