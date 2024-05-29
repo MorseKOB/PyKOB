@@ -454,7 +454,7 @@ class Reader:
             self._nChars = 0
             cb = self._char_callback
             if self._latched and cb:
-                cb('_', float(spacing) / (3 * self._truDot) - 1)
+                cb('\n_', float(spacing) / (3 * self._truDot) - 1)
         return
 
     def decodeChar(self, nextSpace):
