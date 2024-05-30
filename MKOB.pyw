@@ -41,7 +41,7 @@ from mkobenv import MKOBEnv
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
-__version__ = "4.3.1"
+__version__ = "4.3.2"
 VERSION = __version__
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 

@@ -235,7 +235,7 @@ class Reader:
     `__init__` definition below).
     """
 
-    def __init__(self, wpm=20, cwpm=0, codeType=config.CodeType.american, callback=None):
+    def __init__(self, wpm=20, cwpm=0, codeType=config.CodeType.american, callback=None, decode_at_detected=False):
         self._codeType  = codeType     # American or International
         self.setWPM(wpm, cwpm)
         self._codeBuf   = ['', '']     # code elements for two characters
@@ -243,6 +243,7 @@ class Reader:
         self._markBuf   = [0, 0]       # length of last dot or dash in character
         self._nChars    = 0            # number of complete characters in buffer
         self._char_callback  = callback     # function to call when character decoded
+        self._decode_at_detected = decode_at_detected
         self._shutdown  = Event()      # Used to cancel running threads and shutdown operations
         self._flusher   = None         # holds Timer (thread) to call flush if no code received
         self._latched   = False        # True if cicuit has been latched closed by a +1 code element
@@ -420,6 +421,14 @@ class Reader:
                         self._d_dotLen = self._d_truDot
                         self._d_wpm = int(2400.0 / du_len)
                         self._d_update_missed = 0
+                    pass
+                pass
+            pass
+        #
+        # If the decode_at_detected option is on and the detected WPM is different than
+        # the current WPM/CPM, set the WPM/CPM.
+        if self._decode_at_detected and not self._d_wpm == self._wpm:
+            self.setWPM(self._d_wpm)
         return
 
     def _flushHandler(self):
