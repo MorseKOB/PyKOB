@@ -66,7 +66,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.3.5'
+__version__ = '1.3.6'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -487,7 +487,8 @@ class Mrt:
             wpm=self._cfg.text_speed,
             cwpm=self._cfg.min_char_speed,
             codeType=self._cfg.code_type,
-            callback=self._reader_callback
+            callback=self._reader_callback,
+            decode_at_detected=self._cfg.decode_at_detected
             )
         if sys.stdin.isatty():
             # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
@@ -647,6 +648,8 @@ class Mrt:
             print("Not connecting to a wire.")
         else:
             print("Connecting to wire: " + str(self._wire))
+        if self._cfg.decode_at_detected:
+            print("Using the detected incoming character speed for decoding.")
         print("Connecting as Station/Office: " + self._our_office_id)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if self._cfg.invert_key_input:

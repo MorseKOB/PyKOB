@@ -104,6 +104,7 @@ def main(argv):
                     config2.sounder_override,
                     config2.sounder_pwrsv_override,
                     config2.code_type_override,
+                    config2.decode_at_detected_override,
                     config2.min_char_speed_override,
                     config2.text_speed_override,
                     config2.spacing_override,

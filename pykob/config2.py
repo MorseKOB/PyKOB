@@ -23,13 +23,13 @@ SOFTWARE.
 """
 
 """
-config class module
+config2 class module
 
 Class that holds current configuration values and can read and write to
 configuration files. It can read and write the global configuration information
 but is intended to be used for newer multiple-configuration operation. This is
 to allow users to have multiple configuration files and select between them,
-or to run multiple copies of the applications simultaniously with different
+or to run multiple copies of the applications simultaneously with different
 configurations for each (something that can't be done with the current 'global'
 config module).
 
@@ -50,7 +50,7 @@ from pykob.config import AudioType, CodeType, InterfaceType, Spacing
 from pykob.util import strtobool
 
 PYKOB_CFG_EXT = ".pkcfg"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
 # SPECIAL Configuration Path values
@@ -106,7 +106,7 @@ class Config:
     def __init__(self) -> None:
         self._version: str = VERSION
         self._version_loaded: Optional[str] = None
-        # Hardware Settings
+        ## Hardware Settings
         self._audio_type: AudioType = AudioType.SOUNDER
         self._p_audio_type: AudioType = AudioType.SOUNDER
         self._gpio: bool = False
@@ -125,16 +125,20 @@ class Config:
         self._p_sounder: bool = False
         self._sounder_power_save: int = 0
         self._p_sounder_power_save: int = 0
-        # Morse Settings
+        ## Morse Settings
         self._code_type: CodeType = CodeType.american
         self._p_code_type: CodeType = CodeType.american
+        #  type: bool
+        self._decode_at_detected = False
+        #  type: bool
+        self._p_decode_at_detected = False
         self._min_char_speed: int = 18
         self._p_min_char_speed: int = 18
         self._spacing: Spacing = Spacing.none
         self._p_spacing: Spacing = Spacing.none
         self._text_speed: int = 18
         self._p_text_speed: int = 18
-        # Operational Settings
+        ## Operational Settings
         self._auto_connect: bool = False
         self._p_auto_connect: bool = False
         self._logging_level: int = 0
@@ -180,6 +184,7 @@ class Config:
             config._STATION_KEY: self._set_station,
             config._WIRE_KEY: self._set_wire,
             config._CODE_TYPE_KEY: self._set_code_type,
+            config._DECODE_AT_DETECTED_KEY: self._set_decode_at_detected,
             config._MIN_CHAR_SPEED_KEY: self._set_min_char_speed,
             config._SPACING_KEY: self._set_spacing,
             config._TEXT_SPEED_KEY: self._set_text_speed,
@@ -489,6 +494,33 @@ class Config:
         return not self._code_type == self._p_code_type
 
     @property
+    def decode_at_detected(self):
+        # type: ()->bool
+        return self._decode_at_detected
+    @decode_at_detected.setter
+    def decode_at_detected(self, v):
+        # type: (bool)->None
+        x = self._decode_at_detected
+        self._decode_at_detected = v
+        if not v == x:
+            self._changed_morse()
+        return
+    def _set_decode_at_detected(self, v):
+        # type: (bool)->None
+        self._decode_at_detected = v
+        return
+
+    @property
+    def decode_at_detected_p(self):
+        # type: ()->bool
+        return self._p_decode_at_detected
+
+    @property
+    def decode_at_detected_changed(self):
+        # type: ()->bool
+        return not self._decode_at_detected == self._p_decode_at_detected
+
+    @property
     def min_char_speed(self) -> int:
         return self._min_char_speed
     @min_char_speed.setter
@@ -749,6 +781,7 @@ class Config:
         self._p_sounder_power_save = self._sounder_power_save
         # Morse Settings
         self._p_code_type = self._code_type
+        self._p_decode_at_detected = self._decode_at_detected
         self._p_min_char_speed = self._min_char_speed
         self._p_spacing = self._spacing
         self._p_text_speed = self._text_speed
@@ -787,6 +820,7 @@ class Config:
             muted_cfg.sounder_power_save = cfg_src._sounder_power_save
             # Morse Settings
             muted_cfg.code_type = cfg_src._code_type
+            muted_cfg.decode_at_detected = cfg_src.decode_at_detected
             muted_cfg.min_char_speed = cfg_src._min_char_speed
             muted_cfg.spacing = cfg_src._spacing
             muted_cfg.text_speed = cfg_src._text_speed
@@ -824,6 +858,8 @@ class Config:
         if self.sounder_power_save_changed:
             ct = ct | ChangeType.HARDWARE
         if self.code_type_changed:
+            ct = ct | ChangeType.MORSE
+        if self.decode_at_detected_changed:
             ct = ct | ChangeType.MORSE
         if self.min_char_speed_changed:
             ct = ct | ChangeType.MORSE
@@ -870,6 +906,7 @@ class Config:
             config._STATION_KEY: self._station,
             config._WIRE_KEY: self._wire,
             config._CODE_TYPE_KEY: self._code_type.name.upper(),
+            config._DECODE_AT_DETECTED_KEY: self._decode_at_detected,
             config._MIN_CHAR_SPEED_KEY: self._min_char_speed,
             config._SPACING_KEY: self._spacing.name.upper(),
             config._TEXT_SPEED_KEY: self._text_speed
@@ -942,6 +979,8 @@ class Config:
             return True
         # Morse Settings
         if  not self._p_code_type == self._code_type:
+            return True
+        if  not self._p_decode_at_detected == self._decode_at_detected:
             return True
         if  not self._p_min_char_speed == self._min_char_speed:
             return True
@@ -1048,6 +1087,7 @@ class Config:
                 muted_cfg.sounder_power_save = config.sounder_power_save
                 # Morse Settings
                 muted_cfg.code_type = config.code_type
+                muted_cfg.decode_at_detected = config.decode_at_detected
                 muted_cfg.min_char_speed = config.min_char_speed
                 muted_cfg.spacing = config.spacing
                 muted_cfg.text_speed = config.text_speed
@@ -1089,6 +1129,7 @@ class Config:
             config.set_wire_int(self._wire)
             # Morse Settings
             config.set_code_type(self._code_type.name)
+            config.set_decode_at_detected(self._decode_at_detected)
             config.set_min_char_speed_int(self._min_char_speed)
             config.set_spacing(self._spacing.name)
             config.set_text_speed_int(self._text_speed)
@@ -1127,6 +1168,7 @@ class Config:
         print("Station: '{}'".format(util.str_none_or_value(self._station)), file=f)
         print("--------------------", file=f)
         print("Code type: {}".format(self._code_type.name.upper()), file=f)
+        print("Decode using the detected speed: {}".format(util.on_off_from_bool(self._decode_at_detected)))
         print("Character speed: {}".format(self._min_char_speed), file=f)
         print("Words per min speed: {}".format(self._text_speed), file=f)
         print("Spacing: {}".format(self._spacing.name.upper()), file=f)
@@ -1173,6 +1215,7 @@ class Config:
         self._sounder_power_save = self._p_sounder_power_save
         # Morse Settings
         self._code_type = self._p_code_type
+        self._decode_at_detected = self._p_decode_at_detected
         self._min_char_speed = self._p_min_char_speed
         self._spacing = self._p_spacing
         self._text_speed = self._p_text_speed
@@ -1288,7 +1331,7 @@ audio_type_override.add_argument(
     "--audiotype",
     metavar="audio-type",
     dest="audio_type",
-    help="The audio type (SOUNDER|TONE) to use.",
+    help="The audio type: (SOUNDER|TONE) to use.",
 )
 
 auto_connect_override = argparse.ArgumentParser(add_help=False)
@@ -1298,11 +1341,17 @@ auto_connect_override.add_argument("-C", "--autoconnect", metavar="auto-connect"
 
 code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", metavar="code-type", dest="code_type",
-    help="The code type (AMERICAN|INTERNATIONAL) to use.")
+    help="The code type: (AMERICAN|INTERNATIONAL) to use.")
+
+decode_at_detected_override = argparse.ArgumentParser(add_help=False)
+decode_at_detected_override.add_argument("-D", "--decode-at-detected", metavar="use-detected-speed", dest="decode_at_detected",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to enable/disable decoding Morse at the detected speed. When disabled, decoding uses " +
+    "the configured character speed.")
 
 interface_type_override = argparse.ArgumentParser(add_help=False)
 interface_type_override.add_argument("-I", "--interface", metavar="interface-type", dest="interface_type",
-    help="The interface type (KEY_SOUNDER|LOOP|KEYER) to use.")
+    help="The interface type: (KEY_SOUNDER|LOOP|KEYER) to use.")
 
 invert_key_input_override = argparse.ArgumentParser(add_help=False)
 invert_key_input_override.add_argument("-M", "--iki", metavar="invert-key-input", dest="invert_key_input",
@@ -1486,6 +1535,10 @@ def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
         if not args.code_type is None:
             log.debug("Config - applying 'type'")
             cfg.code_type = config.codeTypeFromString(args.code_type)
+    if hasattr(args, "decode_at_detected"):
+        if not args.decode_at_detected is None:
+            log.debug("Config - applying 'decode-at-detected'")
+            cfg.decode_at_detected = strtobool(args.decode_at_detected)
     if hasattr(args, "interface_type"):
         if not args.interface_type is None:
             log.debug("Config - applying 'interface'")

@@ -63,6 +63,7 @@ class MKOBMain:
         self._cwpm = 0  # Set by do_morse_change
         self._twpm = 0  # Set by do_morse_change
         self._spacing = None  # Set by do_morse_change
+        self._decode_at_detected = False  # Set by do_morse_change
         self._record_file_initial = record_filepath
 
         self._key_graph_win = None
@@ -505,7 +506,8 @@ class MKOBMain:
         cwpm = self._kw.cwpm
         twpm = self._kw.twpm
         spacing = self._kw.spacing
-        self.set_morse(code_type, cwpm, twpm, spacing)
+        decode_at_detected = self._cfg.decode_at_detected
+        self.set_morse(code_type, cwpm, twpm, spacing, decode_at_detected)
         return
 
     def emit_code(self, code, code_source, sound_it=True, closer_open=True, done_callback=None):
@@ -667,7 +669,7 @@ class MKOBMain:
                 self._key_graph_win.key_opened()
         return
 
-    def set_morse(self, code_type:config.CodeType, cwpm:int, twpm:int, spacing:config.Spacing):
+    def set_morse(self, code_type:config.CodeType, cwpm:int, twpm:int, spacing:config.Spacing, decode_at_detected:bool):
         if cwpm < 5:
             cwpm = 5
         if cwpm > 45:
@@ -681,11 +683,13 @@ class MKOBMain:
         if (not cwpm == self._cwpm)\
         or (not twpm == self._twpm)\
         or (not code_type == self._code_type)\
-        or (not spacing == self._spacing):
+        or (not spacing == self._spacing)\
+        or (not decode_at_detected == self._decode_at_detected):
             self._code_type = code_type
             self._cwpm = cwpm
             self._twpm = twpm
             self._spacing = spacing
+            self._decode_at_detected = decode_at_detected
             if self._set_on_cfg:
                 self._cfg.code_type = code_type
                 self._cfg.min_char_speed = cwpm
@@ -704,6 +708,7 @@ class MKOBMain:
                     cwpm=cwpm,
                     codeType=code_type,
                     callback=self._reader_callback,
+                    decode_at_detected=decode_at_detected
                 )
             kob_ = self._kob
             if kob_:
@@ -927,6 +932,7 @@ class MKOBMain:
                     cfg.min_char_speed,
                     cfg.text_speed,
                     cfg.spacing,
+                    cfg.decode_at_detected
                 )
             if ct & config2.ChangeType.OPERATIONS:
                 self._kw.office_id = cfg.station
