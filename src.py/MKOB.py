@@ -44,8 +44,9 @@ from mkobenv import MKOBEnv
 import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
+COMPILE_INFO = globals().get("__compiled__")
 __version__ = "4.4.0"
-VERSION = __version__
+VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 
 print(MKOB_VERSION_TEXT)
@@ -91,12 +92,15 @@ try:
 
     log.set_logging_level(cfg.logging_level)
     log.debug("MKOB: Logging level: {}".format(cfg.logging_level))
+    log.debug("Compiled: {}".format(COMPILE_INFO), 2, dt="")
 
     root = tk.Tk(className="MKOB")
     icon_file = "resources/MKOB-Logo.png"
+    icon_file_exists = False
     if (path.isfile(icon_file)):
         icon = tk.PhotoImage(file=icon_file)
         root.iconphoto(True, icon)
+        icon_file_exists = True
     root.rowconfigure(0, weight=1)
     root.columnconfigure(0, weight=1)
     # Our content
@@ -107,6 +111,10 @@ try:
     root.geometry("+30+30")
     root.state('normal')
 
+    if cfg.logging_level > 5:
+        print("Globals:")
+        for k, v in list(globals().items()):
+            print("    '{}'='{}'".format(str(k), str(v)))
     if cfg.logging_level > 9:
         mkw.print_hierarchy(root)
 

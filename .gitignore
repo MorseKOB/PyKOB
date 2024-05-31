@@ -12,6 +12,7 @@ zips/
 __pycache__/
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
+nuitka-crash-report.xml
 *.pyd
 *.pyi
 # Ignore generated *.cmd and *.exe files. If they are needed, include them with a '!' line.

@@ -42,7 +42,6 @@ from pykob import config, config2, internet, log
 from pykob.config2 import Config
 
 
-global ROOT, SUBROOT, TEXT, UPDATE_PERIOD
 ROOT = "root"
 SUBROOT = "subroot"
 TEXT = "text"

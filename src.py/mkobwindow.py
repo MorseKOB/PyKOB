@@ -51,7 +51,6 @@ from tkinter import ttk
 import tkinter.scrolledtext as tkst
 from typing import Optional
 
-global TEXT
 TEXT = "text"
 
 def print_hierarchy(w, depth=0):
