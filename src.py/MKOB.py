@@ -78,8 +78,8 @@ try:
     # Get the startup config file path to use if needed.
     env = MKOBEnv()
 
-    startup_cfg_path = env.cfg_filepath if path.isfile(env.cfg_filepath) else None
     # Make sure it exists
+    startup_cfg_path = env.cfg_filepath if (not env.cfg_filepath is None and path.isfile(env.cfg_filepath)) else None
 
     cfg = config2.process_config_args(args, fallback=startup_cfg_path)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.

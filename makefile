@@ -43,22 +43,27 @@
 #  (in fact, all of the bin and build directories) are excluded from Git.
 #  But they will be kept up to date from changes in the original Python Source.
 #
+# The Makefile is for GNU Make. On Windows, it is expected that Cygwin is used.
+# On Mac and Linux, it is expected that Bash shell is available. The path to
+# the shell is set using the *SHELL* variable.
+#
 
 # Cygwin path conversions for use when programs need a full path.
 ifdef COMSPEC
-  cygpath-mixed			= $(shell cygpath -m "$1")
-  cygpath-unix			= $(shell cygpath -u "$1")
-  drive-letter-to-slash	= /$(subst :,,$1)
-  PYTHON				?= .venv/Scripts/python.exe
-  EXEC_EXT				:= .exe
+    cygpath-mixed			= $(shell cygpath -m "$1")
+    cygpath-unix			= $(shell cygpath -u "$1")
+    drive-letter-to-slash	= /$(subst :,,$1)
+    PYTHON					?= .venv/Scripts/python.exe
+    EXEC_EXT				:= .exe
 else
-  cygpath-mixed			= $1
-  cygpath-unix			= $1
-  drive-letter-to-slash	= $1
-  PYTHON				?= .venv/bin/python3
-  EXEC_EXT				:= .bin
+    cygpath-mixed			= $1
+    cygpath-unix			= $1
+    drive-letter-to-slash	= $1
+    PYTHON				    ?= .venv/bin/python3
+    EXEC_EXT				:= .bin
 endif
 
+NUITKA_FACTORY_BIN	?= /c/Users/aesil/code/Nuitka-factory/Nuitka/bin/nuitka
 AWK				?= awk
 CP				?= cp
 CP_RECURSE		?= $(CP) -rup
@@ -73,11 +78,13 @@ PR				?= pr
 PS				?= ps
 PS_FLAGS		?= -W
 PS_FIELDS		?= "9 47 100"
-PY2BIN_FAC		?= $(PYTHON) c:/Users/aesil/code/Nuitka-factory/Nuitka/bin/nuitka
+PY2BIN_FAC		?= $(PYTHON) $(NUITKA_FACTORY_BIN)
 PY2BIN_REL		?= $(PYTHON) -m nuitka
 PY2BIN			?= $(PY2BIN_REL)
 SHELL			:= /bin/bash
 SORT			?= sort
+WIN_INST_COMPILE	?= "/c/Program Files (x86)/NSIS/makensis.exe"
+
 
 # ### Documentation Section                                          ###
 
@@ -90,23 +97,21 @@ MRT_MANUAL		:= $(DOC_DIR)MRT/User-Manual-MRT.pdf
 
 # ### Binary Executable Section                                      ###
 
-NUITKA_FLAGS	?= --warn-implicit-exceptions --warn-unusual-code --msvc=latest
+NUITKA_FLAGS_ALL		?= --warn-implicit-exceptions --warn-unusual-code --msvc=latest
 
 BIN_DIR					?= bin/
-PACKAGE_DIR				?= $(BIN_DIR)pkg/
 #
 BUILD_SRC_DIR			?= build/src/
-BUILD_SRC_CONFIGURE_DIR	?= build/src/configure/
+BUILD_SRC_APPS_DIR		?= build/src/apps/
 BUILD_SRC_PYKOB_DIR		?= build/src/pykob/
-BUILD_SRC_MKOB_DIR		?= build/src/mkob/
-BUILD_SRC_MRT_DIR		?= build/src/mrt/
 BUILD_SRC_UTILS_DIR		?= build/src/utils/
+# Dist directory (extension)
+DIST_DIR_EXT			?= .dist/
 
 APP_BUILD_SRC_DIRS	:= \
     $(BUILD_SRC_DIR) \
-    $(BUILD_SRC_CONFIGURE_DIR) \
-	$(BUILD_SRC_MKOB_DIR) \
-	$(BUILD_SRC_MRT_DIR) \
+    $(BUILD_SRC_APPS_DIR) \
+	$(BUILD_SRC_PYKOB_DIR) \
 	$(BUILD_SRC_UTILS_DIR)
 
 REQUIRED_BIN_DIRS	:= $(BIN_DIR) $(APP_BUILD_SRC_DIRS)
@@ -124,9 +129,9 @@ SRC_PYKOB_DIR		?= $(SRC_PY_DIR)$(PYKOB_DIR)
 SRC_PYKOB_DATA_DIR	:= $(SRC_PYKOB_DIR)data/
 SRC_PYKOB_RES_DIR	:= $(SRC_PYKOB_DIR)resources/
 
-SRC_PYKOB			:= $(SRC_PYKOB_DIR)*.py
-SRC_PYKOB_DATA		:= $(SRC_PYKOB_DATA_DIR)*
-SRC_PYKOB_RESOURCES	:= $(SRC_PYKOB_RES_DIR)*
+SRC_PYKOB_SHELL				:= $(SRC_PYKOB_DIR)*.py
+SRC_PYKOB_DATA_SHELL		:= $(SRC_PYKOB_DATA_DIR)*
+SRC_PYKOB_RESOURCES_SHELL	:= $(SRC_PYKOB_RES_DIR)*
 
 ORIGINAL_SRC_CONFIGURE		:= $(SRC_PY_DIR)Configure.py  # Have this as its own app.
 ORIGINAL_SRC_MKOB			:= $(SRC_PY_DIR)MKOB.py $(SRC_PY_DIR)mkob%.py
@@ -142,42 +147,45 @@ APP_BIN_DEBUG_FLAGS	?= \
 	--force-stdout-spec=exe.out.txt\
 	--force-stderr-spec=exe.err.txt\
 	--debug\
-	--python-flag=-v\
+	--python-flag=-v
 #	--trace
 
 PYKOB_BIN_DEBUG_FLAGS	?= \
 	--debug\
-	--python-flag=-v\
+	--python-flag=-v
 #	--trace
 
-COMMON_BIN_FLAGS	?= --python-flag=no_annotations --python-flag=no_docstrings
+COMMON_BIN_FLAGS	:= #--python-flag=no_annotations --python-flag=no_docstrings
 
-APP_BIN_FLAGS	?= $(NUITKA_FLAGS) $(COMMON_BIN_FLAGS) --standalone\
-	--output-dir=$(BIN_DIR)\
+APP_BIN_FLAGS		:= $(NUITKA_FLAGS_ALL) $(COMMON_BIN_FLAGS)\
+	--standalone\
+	--enable-plugin=tk-inter\
+	--output-dir=$(BIN_DIR)
 #	$(APP_BIN_DEBUG_FLAGS)
 
-PKAPPARGS_PACKAGE_FLAGS	?= --module $(NUITKA_FLAGS) $(COMMON_BIN_FLAGS)\
+PKAPPARGS_PACKAGE_FLAGS	?= --module $(NUITKA_FLAGS_ALL) $(COMMON_BIN_FLAGS)\
 	--follow-import-to=argparse\
 	--output-dir=$(BIN_DIR)\
 	$(SRC_PKAPPARGS)
 
-PYKOB_PACKAGE_FLAGS	?=  --module $(NUITKA_FLAGS) $(COMMON_BIN_FLAGS)\
+### pkappargs binary package file
+PKAPPARGS_PKG_BIN_FILE	?= $(BIN_DIR)pkappargs.cp311-win_amd64.pyd
+
+PYKOB_PACKAGE_FLAGS	?=  --module $(NUITKA_FLAGS_ALL) $(COMMON_BIN_FLAGS)\
 	--include-package=pykob\
 	--include-module=socket\
 	--include-module=ctypes\
+	--enable-plugin=tk-inter\
 	--output-dir=$(BIN_DIR)\
 	$(SRC_PYKOB_DIR)
 #	$(PYKOB_BIN_DEBUG_FLAGS)
-
-### pkappargs binary package file
-PKAPPARGS_PKG_BIN_FILE	?= $(BIN_DIR)pkappargs.cp311-win_amd64.pyd
 
 ### pykob binary package file
 PYKOB_PKG_BIN_FILE		?= $(BIN_DIR)pykob.cp311-win_amd64.pyd
 
 ## Applications and Utilities Bin-Build flags
 ### Configure
-CONFIGURE_DIST			:= $(BIN_DIR)Configure.dist
+CONFIGURE_DIST			:= $(BIN_DIR)Configure$(DIST_DIR_EXT)
 ifdef COMSPEC
   CONFIGURE_EXEC		:= $(CONFIGURE_DIST)Configure.exe
   CONFIGURE_ICON		:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)mkob-icon.ico
@@ -186,11 +194,12 @@ else
   CONFIGURE_ICON		:=
 endif
 CONFIGURE_BIN_FLAGS		?= $(APP_BIN_FLAGS)\
-	--enable-console\
-	--enable-plugin=tk-inter
+	--include-module=tkinter.ttk\
+	--enable-console
+
 
 ### MKOB
-MKOB_DIST				:= $(BIN_DIR)MKOB.dist
+MKOB_DIST				:= $(BIN_DIR)MKOB$(DIST_DIR_EXT)
 MKOB_LOGO				:= --include-data-files=$(SRC_PY_RES_DIR)MKOB-Logo.png=resources/
 ifdef COMSPEC
   MKOB_EXEC				:= $(MKOB_DIST)MKOB.exe
@@ -203,11 +212,11 @@ endif
 MKOB_BIN_FLAGS			?= $(APP_BIN_FLAGS)\
 	$(MKOB_ICON)\
 	$(MKOB_LOGO)\
-	--enable-console\
-	--enable-plugin=tk-inter
+	--include-module=tkinter.ttk\
+	--enable-console
 
 ### MRT
-MRT_DIST				:= $(BIN_DIR)MRT.dist
+MRT_DIST				:= $(BIN_DIR)MRT$(DIST_DIR_EXT)
 ifdef COMSPEC
   MRT_EXEC				:= $(MRT_DIST)MRT.exe
   MRT_ICON				:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)mrt-icon.ico
@@ -220,27 +229,44 @@ MRT_BIN_FLAGS			?= $(APP_BIN_FLAGS) $(MRT_ICON) --enable-console
 ### Utilities
 UTILITIES_BIN_FLAGS		?= $(APP_BIN_FLAGS) --enable-console
 
+# ### Windows Installer Section                                  	 ###
+
+INSTALLER_SRC_DIR		?= src.install/
+INSTALLER_WIN_DIR		?= $(INSTALLER_SRC_DIR)win/
+PACKAGE_DIR				?= $(BIN_DIR)pkg/
+PACKAGE_CORE_DIR		?= $(PACKAGE_DIR)core/
+PACKAGE_DOCS_DIR		?= $(PACKAGE_DIR)docs/
+PACKAGE_UTILS_DIR		?= $(PACKAGE_DIR)utils/
+WIN_INST_CP_OPTS		?= /V2
+
+REQUIRED_PACKAGE_DIRS	:= \
+    $(PACKAGE_DIR) \
+    $(PACKAGE_CORE_DIR) \
+	$(PACKAGE_DOCS_DIR) \
+	$(PACKAGE_UTILS_DIR)
+
 
 #
 vpath pykob/%.py	$(SRC_PYKOB_DIR)
-vpath Configure.py	$(BUILD_SRC_CONFIGURE_DIR)
-vpath MKOB.py		$(BUILD_SRC_MKOB_DIR)
-vpath mkob%.py		$(BUILD_SRC_MKOB_DIR)
-vpath MRT.py		$(BUILD_SRC_MRT_DIR)
+vpath Configure.py	$(BUILD_SRC_APPS_DIR)
+vpath MKOB.py		$(BUILD_SRC_APPS_DIR)
+vpath mkob%.py		$(BUILD_SRC_APPS_DIR)
+vpath MRT.py		$(BUILD_SRC_APPS_DIR)
 vpath %.py			$(BUILD_SRC_UTILS_DIR)
 vpath %.pyd			$(BIN_DIR)
-vpath %$(EXEC_EXT)	$(BIN_DIR)%.dist
+vpath %$(EXEC_EXT)	$(BIN_DIR)%$(DIST_DIR_EXT)
 
 
 # Executable rules
 #
-%.py: $(SRC_PY_DIR)/%.py
-	$(call utils-build-src)
+## Utilities original source to build source
+$(BUILD_SRC_UTILS_DIR)%.py: $(SRC_PY_DIR)%.py
+	$(call utils-build-src $(notdir $<))
 
-# Utilities Executable rules
-%$(EXEC_EXT): %.py $(BUILD_SRC_UTILS_DIR)pykob.pyd
+## Utilities Executable rules
+%$(EXEC_EXT): $(BUILD_SRC_UTILS_DIR)%.py $(BUILD_SRC_UTILS_DIR)pykob.pyd
 	$(PY2BIN) $(UTILITIES_BIN_FLAGS) $(BUILD_SRC_UTILS_DIR)$(notdir $<)
-	$(call pykob-to-dist,$(dir $@))
+	$(call pykob-to-dist,$@)
 
 
 # Executable build macros
@@ -248,7 +274,7 @@ vpath %$(EXEC_EXT)	$(BIN_DIR)%.dist
 ## Copy pkappargs module to a build source dir.
 ## $(call pkappargs-to-build-src,build_src_dir)
 define pkappargs-to-build-src
-    @echo !!! Copy the pkappargs binary into source dir: $1
+    @echo !!! Copy the pkappargs binary into source dir: \'$1\'
     $(CP_UPDATE) $(BIN_DIR)/pkappargs.pyi $1
 	$(CP_TOFILE) $(PKAPPARGS_PKG_BIN_FILE) $1/pkappargs.pyd
 endef
@@ -256,37 +282,40 @@ endef
 ## Copy the pkappargs module and the data and resources to a 'dist' dir.
 ## $(call pkappargs-to-dist,dist_dir)
 define pkappargs-to-dist
-    @echo !!! Copy the pkappargs binary into dist dir: $1
-    $(CP_UPDATE) $(BIN_DIR)/pkappargs.pyi $1
-	$(CP_TOFILE) $(PKAPPARGS_PKG_BIN_FILE) $1/pkappargs.pyd
+	$(eval DD = $(BIN_DIR)$(basename $(notdir $1))$(DIST_DIR_EXT))
+    @echo !!! Copy the pkappargs binary into dist dir: \'$(DD)\'
+    $(CP_UPDATE) $(BIN_DIR)/pkappargs.pyi $(DD)
+	$(CP_TOFILE) $(PKAPPARGS_PKG_BIN_FILE) $(DD)/pkappargs.pyd
 endef
 
 ## Copy pykob module to a build source dir.
 ## $(call pykob-to-build-src,build_src_dir)
 define pykob-to-build-src
-    @echo !!! Copy the pykob binary into $1
-    $(CP_UPDATE) $(BIN_DIR)/pykob.pyi $1
+    @echo !!! Copy the pykob binary into: \'$1\' \(pykob-to-build-src\)
+    $(CP_UPDATE) $(BIN_DIR)pykob.pyi $1
 	$(CP_TOFILE) $(PYKOB_PKG_BIN_FILE) $1pykob.pyd
 endef
 
 ## Copy the pykob module and the data and resources to a 'dist' dir.
 ## $(call pykob-to-dist,dist_dir)
 define pykob-to-dist
-    @echo !!! Copy the pykob binary, data, and resources into $1
-    $(CP_UPDATE) $(BIN_DIR)pykob.pyi $1
-	$(CP_TOFILE) $(PYKOB_PKG_BIN_FILE) $1/pykob.pyd
-	$(MKDIR) $1/$(PYKOB_DATA_DIR)
-	$(CP_RECURSE) $(SRC_PYKOB_DATA) $1/$(PYKOB_DATA_DIR)
-	$(MKDIR) $1/$(PYKOB_RESOURCES_DIR)
-	$(CP_RECURSE) $(SRC_PYKOB_RESOURCES) $1/$(PYKOB_RESOURCES_DIR)
+	$(eval DD = $(BIN_DIR)$(basename $(notdir $1))$(DIST_DIR_EXT))
+    @echo !!! Copy the pykob binary, data, and resources into: \'$(DD)\' \(pykob-to-dist\)
+    $(CP_UPDATE) $(BIN_DIR)pykob.pyi $(DD)
+	$(CP_TOFILE) $(PYKOB_PKG_BIN_FILE) $(DD)pykob.pyd
+	$(MKDIR) $(DD)/$(PYKOB_DATA_DIR)
+	$(CP_RECURSE) $(SRC_PYKOB_DATA_SHELL) $(DD)$(PYKOB_DATA_DIR)
+	$(MKDIR) $(DD)/$(PYKOB_RESOURCES_DIR)
+	$(CP_RECURSE) $(SRC_PYKOB_RESOURCES_SHELL) $(DD)$(PYKOB_RESOURCES_DIR)
 endef
 
 ## Create the build utility build source directory and copy the
 ## original source into is.
-## $(call utility-build-source)
+## $(call utility-build-source pyfile.py)
 define utils-build-src
+    @echo !!! Copy the utilities source into: \'$1\' \(utils-build-src\)
 	$(shell [[ -d $(BUILD_SRC_UTILS_DIR) ]] || mkdir -p $(BUILD_SRC_UTILS_DIR);) \
-	$(CP_UPDATE) $(ORIGINAL_SRC_UTILS_SHELL) $(BUILD_SRC_UTILS_DIR)
+	$(CP_UPDATE) $(SRC_PY_DIR)$1: $(BUILD_SRC_UTILS_DIR)
 endef
 
 # General purpose macros
@@ -323,11 +352,11 @@ all: docs
 
 .PHONY: clean_all_bin
 clean_all_bin: clean_bld_dirs clean_bld_src_dirs clean_dist_dirs clean_pkg_dir
-	rm -f $(BIN_DIR)/*
+	rm -f $(BIN_DIR)*
 
 .PHONY: clean_bld_dirs
 clean_bld_dirs:
-	rm -rf $(BIN_DIR)/*.build
+	rm -rf $(BIN_DIR)*.build
 
 .PHONY: clean_bld_src_dirs
 clean_bld_src_dirs:
@@ -335,7 +364,7 @@ clean_bld_src_dirs:
 
 .PHONY: clean_dist_dirs
 clean_dist_dirs:
-	rm -rf $(BIN_DIR)/*.dist
+	rm -rf $(BIN_DIR)*$(DIST_DIR_EXT)
 
 .PHONY: clean_pkg_dir
 clean_pkg_dir:
@@ -346,27 +375,29 @@ docs: $(MKOB_MANUAL)
 
 $(MKOB_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
 
+$(MRT_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
+
 .PHONY: bins
 bins: pykob Configure MKOB MRT
 
-.PHONY: package_bins
-package_bins:
-	$(MKDIR) $(PACKAGE_DIR)
-	$(CP_RECURSE) $(BIN_DIR)/Configure.dist/* $(PACKAGE_DIR)
-	$(CP_RECURSE) $(BIN_DIR)/MKOB.dist/* $(PACKAGE_DIR)
-	$(CP_RECURSE) $(BIN_DIR)/MRT.dist/* $(PACKAGE_DIR)
+.PHONY: installer
+installer:
+	$(WIN_INST_COMPILE) $(WIN_INST_CP_OPTS) $(INSTALLER_WIN_DIR)mkobsuite_win.nsi
 
-.PHONY: setup_build_src
-setup_build_src:
-	$(shell for d in $(REQUIRED_BIN_DIRS);	\
-			do										\
-				[[ -d $$d ]] || mkdir -p $$d;		\
-			done)
-	$(CP) -rup $(ORIGINAL_SRC_CONFIGURE) $(BUILD_SRC_CONFIGURE_DIR)
-	$(CP) -rup $(ORIGINAL_SRC_MKOB_SHELL) $(BUILD_SRC_MKOB_DIR)
-	$(CP) -rup $(ORIGINAL_SRC_MRT) $(BUILD_SRC_MRT_DIR)
-	$(CP) -rup $(ORIGINAL_SRC_UTILS_SHELL) $(BUILD_SRC_UTILS_DIR)
+.PHONY: package_for_inst
+package_for_inst: PKG_DIRS := $(shell for d in $(REQUIRED_PACKAGE_DIRS); \
+							do									\
+								[[ -d $$d ]] || mkdir -p $$d;	\
+							done;)
 
+package_for_inst: pykob Configure MKOB MRT docs
+	@echo !!! Copy all Dist dirs into PKG for the installer.
+	$(CP_RECURSE) $(CONFIGURE_DIST)* $(PACKAGE_CORE_DIR)
+	$(CP_RECURSE) $(MKOB_DIST)* $(PACKAGE_CORE_DIR)
+	$(CP_RECURSE) $(MRT_DIST)* $(PACKAGE_CORE_DIR)
+	$(CP_RECURSE) $(MKOB_MANUAL) $(PACKAGE_DOCS_DIR)
+#	$(CP_RECURSE) $(MRT_MANUAL) $(PACKAGE_DOCS_DIR)
+	$(CP_RECURSE) bin/Syscheck.dist/* $(PACKAGE_UTILS_DIR)
 
 # The following PHONY targets will be replaced by true targets given time
 # to build out the proper names and dependencies.
@@ -385,6 +416,9 @@ MKOB: $(MKOB_EXEC) ;
 .PHONY: MRT
 MRT: $(MRT_EXEC) ;
 
+.PHONY: SYSCHECK
+SYSCHECK: Syscheck.exe ;
+
 # #############################################################################
 #
 # True targets
@@ -395,41 +429,44 @@ $(CONFIGURE_EXEC): CONFIG_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;								\
-						$(CP) -rup $(ORIGINAL_SRC_CONFIGURE) $(BUILD_SRC_CONFIGURE_DIR))
+						$(CP) -rup $(ORIGINAL_SRC_CONFIGURE) $(BUILD_SRC_APPS_DIR))
 
-$(CONFIGURE_EXEC): $(BUILD_SRC_CONFIGURE_DIR)/Configure.py pykob.pyd
-	$(call pykob-to-build-src,$(BUILD_SRC_CONFIGURE_DIR))
+$(CONFIGURE_EXEC): $(BUILD_SRC_APPS_DIR)Configure.py $(BUILD_SRC_APPS_DIR)pykob.pyd
+	$(call pykob-to-build-src,$(BUILD_SRC_APPS_DIR))
 	$(PY2BIN) $(CONFIGURE_BIN_FLAGS) $<
-	$(call pykob-to-dist,$(dir $@))
+	$(call pykob-to-dist,$@)
 
 
 $(MKOB_EXEC): MKOB_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;								\
-						$(CP) -rup $(ORIGINAL_SRC_MKOB_SHELL) $(BUILD_SRC_MKOB_DIR))
+						$(CP) -rup $(ORIGINAL_SRC_MKOB_SHELL) $(BUILD_SRC_APPS_DIR))
 
-$(MKOB_EXEC): MKOB.py $(BUILD_SRC_MKOB_DIR)/%.py  pkappargs.pyd pykob.pyd
-	$(call pykob-to-build-src,$(BUILD_SRC_MKOB_DIR))
-	$(call pkappargs-to-build-src,$(BUILD_SRC_MKOB_DIR))
+$(MKOB_EXEC): MKOB.py $(BUILD_SRC_APPS_DIR)pkappargs.pyd $(BUILD_SRC_APPS_DIR)pykob.pyd
 	$(PY2BIN) $(MKOB_BIN_FLAGS) $<
-	$(call pykob-to-dist,$(dir $@))
-	$(call pkappargs-to-dist,$(dir $@))
+	$(call pykob-to-dist,$@)
+	$(call pkappargs-to-dist,$@)
 
 
 $(MRT_EXEC): MRT_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;								\
-						$(CP) -rup $(ORIGINAL_SRC_MRT) $(BUILD_SRC_MRT_DIR))
+						$(CP) -rup $(ORIGINAL_SRC_MRT) $(BUILD_SRC_APPS_DIR))
 
-$(MRT_EXEC): MRT.py pkappargs.pyd pykob.pyd
-	$(call pykob-to-build-src,$(BUILD_SRC_MRT_DIR))
-	$(call pkappargs-to-build-src,$(BUILD_SRC_MRT_DIR))
+$(MRT_EXEC): MRT.py $(BUILD_SRC_APPS_DIR)pkappargs.pyd $(BUILD_SRC_APPS_DIR)pykob.pyd
 	$(PY2BIN) $(MRT_BIN_FLAGS) $<
-	$(call pykob-to-dist,$(dir $@))
-	$(call pkappargs-to-dist,$(dir $@))
+	$(call pykob-to-dist,$@)
+	$(call pkappargs-to-dist,$@)
 
+Syscheck.exe: UTILS_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
+							do									\
+								[[ -d $$d ]] || mkdir -p $$d;	\
+							done;								\
+						$(CP) -rup $(ORIGINAL_SRC_UTILS_SHELL) $(BUILD_SRC_UTILS_DIR))
+
+Syscheck.exe: $(BUILD_SRC_UTILS_DIR)Syscheck.py $(BUILD_SRC_UTILS_DIR)pykob.pyd
 
 pkappargs.pyd: $(PKAPPARGS_PKG_BIN_FILE)
 	$(CP) $< $(dir $<)$@
@@ -437,11 +474,17 @@ pkappargs.pyd: $(PKAPPARGS_PKG_BIN_FILE)
 $(PKAPPARGS_PKG_BIN_FILE): $(SRC_PY_PKAPPARGS)
 	$(PY2BIN) $(PKAPPARGS_PACKAGE_FLAGS)
 
+$(BUILD_SRC_APPS_DIR)pkappargs.pyd: pkappargs.pyd
+	$(call pkappargs-to-build-src,$(BUILD_SRC_APPS_DIR))
+
 pykob.pyd: $(PYKOB_PKG_BIN_FILE)
 	$(CP) $< $(dir $<)$@
+
+$(BUILD_SRC_APPS_DIR)pykob.pyd: pykob.pyd
+	$(call pykob-to-build-src,$(BUILD_SRC_APPS_DIR))
 
 $(BUILD_SRC_UTILS_DIR)pykob.pyd: pykob.pyd
 	$(call pykob-to-build-src,$(BUILD_SRC_UTILS_DIR))
 
-$(PYKOB_PKG_BIN_FILE): $(SRC_PY_PYKOB) $(SRC_PYKOB_DATA) $(SRC_PYKOB_RESOURCES)
+$(PYKOB_PKG_BIN_FILE): $(SRC_PY_PYKOB) $(SRC_PYKOB_DATA_SHELL) $(SRC_PYKOB_RESOURCES_SHELL)
 	$(PY2BIN) $(PYKOB_PACKAGE_FLAGS)
