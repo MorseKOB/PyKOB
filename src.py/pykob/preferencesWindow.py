@@ -391,6 +391,16 @@ class PreferencesWindow:
             if self._cfg.code_type.name.upper() == self.CODE_TYPE_SETTINGS[codeTypeRadioButton].upper():
                 self._codeType.set(codeTypeRadioButton + 1)
 
+        # Checkbox for Decode at Detected Speed option
+        ttk.Label(codeOptions, text=" ").grid(row=8, column=0) # a row of padding
+        # Add a checkbox for the 'Automatically connect at startup' option
+        self._decodeAtDetected = tk.IntVar(value=self._cfg.decode_at_detected)
+        bdecodeatdetected = ttk.Checkbutton(
+            codeOptions,
+            text="Decode Morse using detected speed",
+            variable=self._decodeAtDetected,
+        ).grid(row=9, column=0)
+
         # codeOptions.grid(row=2, column=0, columnspan=4, pady=6, sticky=tk.W)
         codeOptions.pack(fill=tk.BOTH)
 
@@ -562,12 +572,12 @@ class PreferencesWindow:
                 muted_cfg.serial_port = sp
             # Config 'interface_type' is the 'equipment type' here (Loop, Key&Sounder, keyer)
             muted_cfg.interface_type = config.interface_type_from_str(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
-            muted_cfg.local = self._soundLocalCode.get()
-            muted_cfg.invert_key_input = self._invertKeyInput.get()
-            muted_cfg.no_key_closer = self._noKeyCloser.get()
-            muted_cfg.sound = self._useSystemSound.get()
+            muted_cfg.local = bool(self._soundLocalCode.get())
+            muted_cfg.invert_key_input = bool(self._invertKeyInput.get())
+            muted_cfg.no_key_closer = bool(self._noKeyCloser.get())
+            muted_cfg.sound = bool(self._useSystemSound.get())
             muted_cfg.audio_type = self._audioType
-            muted_cfg.sounder = self._useLocalSounder.get()
+            muted_cfg.sounder = bool(self._useLocalSounder.get())
             muted_cfg.sounder_power_save = int(self._sounderPowerSave.get())
             host = self._serverUrl.get().strip()
             port = self._portNumber.get().strip()
@@ -577,10 +587,11 @@ class PreferencesWindow:
             if len(surl) < 1:
                 surl = None
             muted_cfg.server_url = surl
-            muted_cfg.remote = self._transmitToRemoteStations.get()
+            muted_cfg.remote = bool(self._transmitToRemoteStations.get())
             muted_cfg.station = self._stationID.get()
             muted_cfg.wire = int(self._wireNumber.get())
-            muted_cfg.auto_connect = self._autoConnectAtStartup.get()
+            muted_cfg.auto_connect = bool(self._autoConnectAtStartup.get())
+            muted_cfg.decode_at_detected = bool(self._decodeAtDetected.get())
             muted_cfg.text_speed = int(self._textSpeed.get())
             muted_cfg.min_char_speed = int(self._dotSpeed.get())
             muted_cfg.spacing = config.spacing_from_str(self.CHARACTER_SPACING_SETTINGS[self._characterSpacing.get() - 1])

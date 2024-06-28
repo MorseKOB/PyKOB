@@ -1,6 +1,7 @@
 # IDE/OS files
 .DS_Store
 .vscode/
+.venv/
 
 # Build and Output
 bin/

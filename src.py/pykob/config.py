@@ -85,6 +85,7 @@ _GPIO_KEY = "GPIO"
 _AUDIO_TYPE_KEY = "AUDIO_TYPE"
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
 _CODE_TYPE_KEY = "CODE_TYPE"
+_DECODE_AT_DETECTED_KEY = "DECODE_AT_DETECTED"
 _LOGGING_LEVEL_KEY = "LOGGING_LEVEL"
 _INTERFACE_TYPE_KEY = "INTERFACE_TYPE"
 _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
@@ -131,6 +132,7 @@ gpio = False
 audio_type = AudioType.SOUNDER
 auto_connect = False
 code_type = CodeType.american
+decode_at_detected = False
 logging_level = log.INFO_LEVEL
 interface_type = InterfaceType.loop
 invert_key_input = False
@@ -321,6 +323,29 @@ def interface_type_from_str(s):
         log.err(msg)
         raise ValueError(msg)
 
+def set_decode_at_detected(b):
+    """
+    Enable/disable decoding at the detected speed.
+
+    When enabled, the detected incoming code speed is used for the Morse Reader (decoder).
+    When disabled, the configured code character speed (keyboard sender speed) is used
+    for the Morse Reader (this is how MorseKOB and older versions of PyKOB operate).
+
+    Parameters
+    ----------
+    b : string 'true/false'
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable decoding at the detected speed. Values of `NO`|`OFF`|`FALSE` 
+        will decode at the configured character speed.
+    """
+    global decode_at_detected
+    try:
+        decode_at_detected = strtobool(str(b))
+        user_config.set(_CONFIG_SECTION, _DECODE_AT_DETECTED_KEY, util.on_off_from_bool(decode_at_detected))
+    except ValueError as ex:
+        log.err("DECODE AT DETECTED value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+    return
 
 def set_interface_type(s):
     """Sets the Interface Type (for Key-Sounder, Loop or Keyer)
@@ -703,6 +728,7 @@ def print_config():
     print("Audio type:", audio_type.name.upper())
     print("Auto Connect to Wire:", util.on_off_from_bool(auto_connect))
     print("Code type:", code_type.name.upper())
+    print("Decode using detected speed:", util.on_off_from_bool(decode_at_detected))
     print("Interface type:", interface_type.name.upper())
     print("Invert key input:", util.on_off_from_bool(invert_key_input))
     print("Local copy:", util.on_off_from_bool(local))
@@ -759,6 +785,7 @@ def read_config():
     global audio_type
     global auto_connect
     global code_type
+    global decode_at_detected
     global logging_level
     global interface_type
     global invert_key_input
@@ -825,6 +852,7 @@ def read_config():
         _AUDIO_TYPE_KEY:"SOUNDER",
         _AUTO_CONNECT_KEY:"OFF",
         _CODE_TYPE_KEY:"AMERICAN",
+        _DECODE_AT_DETECTED_KEY:"OFF",
         _INTERFACE_TYPE_KEY:"LOOP",
         _INVERT_KEY_INPUT_KEY:"OFF",
         _LOCAL_KEY:"ON",
@@ -837,7 +865,7 @@ def read_config():
         _SOUNDER_KEY:"OFF",
         _SOUNDER_POWER_SAVE_KEY:"60",
         _SPACING_KEY:"NONE",
-        _STATION_KEY:"",
+        _STATION_KEY:"Configure your office/station ID",
         _WIRE_KEY:"101",
         _TEXT_SPEED_KEY:"18"
     }
@@ -887,9 +915,9 @@ def read_config():
             code_type = CodeType.international
         else:
             raise ValueError(_code_type)
-        __option = "Logging Level"
-        __key = _LOGGING_LEVEL_KEY
-        logging_level = user_config.getint(_CONFIG_SECTION, __key)
+        __option = "Decode at detected speed"
+        __key = _DECODE_AT_DETECTED_KEY
+        decode_at_detected = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Interface type"
         __key = _INTERFACE_TYPE_KEY
         _interface_type = (user_config.get(_CONFIG_SECTION, __key)).upper()
@@ -907,6 +935,9 @@ def read_config():
         __option = "Local copy"
         __key = _LOCAL_KEY
         local = user_config.getboolean(_CONFIG_SECTION, __key)
+        __option = "Logging Level"
+        __key = _LOGGING_LEVEL_KEY
+        logging_level = user_config.getint(_CONFIG_SECTION, __key)
         __option = "Minimum character speed"
         __key = _MIN_CHAR_SPEED_KEY
         min_char_speed = user_config.getint(_CONFIG_SECTION, __key)
@@ -988,14 +1019,9 @@ code_type_override = argparse.ArgumentParser(add_help=False)
 code_type_override.add_argument("-T", "--type", default=code_type.name.upper(),
 help="The code type (AMERICAN|INTERNATIONAL) to use.", metavar="code-type", dest="code_type")
 
-logging_level_override = argparse.ArgumentParser(add_help=False)
-logging_level_override.add_argument(
-    "--logging-level",
-    metavar="logging-level",
-    dest="logging_level",
-    type=int,
-    help="Logging level. A value of '0' disables DEBUG output, '-1' disables INFO, '-2' disables WARN, '-3' disables ERROR. Higher values above '0' enable more DEBUG output."
-)
+decode_at_detected_override = argparse.ArgumentParser(add_help=False)
+decode_at_detected_override.add_argument("-D", "--decode-at-detected", default=decode_at_detected,
+help="True/False to Enable/Disable decoding Morse at the detected speed.", metavar="use-detected-speed", dest="decode_at_detected")
 
 interface_type_override = argparse.ArgumentParser(add_help=False)
 interface_type_override.add_argument("-I", "--interface", default=interface_type.name.upper(),
@@ -1013,6 +1039,15 @@ local_override.add_argument(
     help="'ON' or 'OFF' to Enable/Disable sounding of local code.",
     metavar="local-copy",
     dest="local",
+)
+
+logging_level_override = argparse.ArgumentParser(add_help=False)
+logging_level_override.add_argument(
+    "--logging-level",
+    metavar="logging-level",
+    dest="logging_level",
+    type=int,
+    help="Logging level. A value of '0' disables DEBUG output, '-1' disables INFO, '-2' disables WARN, '-3' disables ERROR. Higher values above '0' enable more DEBUG output."
 )
 
 min_char_speed_override = argparse.ArgumentParser(add_help=False)
