@@ -73,6 +73,8 @@ GREP			?= grep
 KILL			?= kill
 KILL_FLAGS		?= -f
 MKDIR			?= mkdir -p
+MV				?= mv
+MV_FORCE		?= mv --force --backup=none
 PDFGEN			?= asciidoctor-pdf
 PR				?= pr
 PS				?= ps
@@ -175,7 +177,6 @@ PYKOB_PACKAGE_FLAGS	?=  --module $(NUITKA_FLAGS_ALL) $(COMMON_BIN_FLAGS)\
 	--include-package=pykob\
 	--include-module=socket\
 	--include-module=ctypes\
-	--enable-plugin=tk-inter\
 	--output-dir=$(BIN_DIR)\
 	$(SRC_PYKOB_DIR)
 #	$(PYKOB_BIN_DEBUG_FLAGS)
@@ -380,9 +381,10 @@ $(MRT_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
 .PHONY: bins
 bins: pykob Configure MKOB MRT
 
-.PHONY: installer
-installer:
+.PHONY: installer_win
+installer_win:
 	$(WIN_INST_COMPILE) $(WIN_INST_CP_OPTS) $(INSTALLER_WIN_DIR)mkobsuite_win.nsi
+	$(MV_FORCE) $(INSTALLER_WIN_DIR)mkobsuite-install.exe $(BIN_DIR)
 
 .PHONY: package_for_inst
 package_for_inst: PKG_DIRS := $(shell for d in $(REQUIRED_PACKAGE_DIRS); \

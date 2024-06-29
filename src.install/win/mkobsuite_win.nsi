@@ -36,7 +36,7 @@ SOFTWARE.
 ; GUID to use if needed: {76FE1177-7936-4E3F-B0C7-FADC19636D71}
 ;
 !define Our_guid {76FE1177-7936-4E3F-B0C7-FADC19636D71}
-!define Folder_name mkob_suite
+!define Folder_name MKOB-Suite
 !define Regkey "Software\${Name}"
 ;
 ; Packaged binaries (files to install) directory
@@ -58,7 +58,7 @@ SOFTWARE.
   Unicode False  # Unicode installer will not work on Windows 95/98/ME
 
   ;Default installation folder
-  InstallDir "$LOCALAPPDATA\${Folder_name}"
+  InstallDir "$PROFILE\${Folder_name}"
 
   ;Get installation folder from registry if available
   InstallDirRegKey HKCU ${Regkey} "Install_Dir"
