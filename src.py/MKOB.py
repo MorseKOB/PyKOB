@@ -30,7 +30,8 @@ Python Morse Code Sending, Receiving, and Learning/Training application
 influenced by the MorseKOB 2.5 application by Les Kerr.
 """
 import argparse
-from os import path
+from os import path as path_func
+from sys import path
 from sys import exit as sys_exit
 from sys import platform as sys_platform
 from sys import version as sys_version
@@ -79,7 +80,7 @@ try:
     env = MKOBEnv()
 
     # Make sure it exists
-    startup_cfg_path = env.cfg_filepath if (not env.cfg_filepath is None and path.isfile(env.cfg_filepath)) else None
+    startup_cfg_path = env.cfg_filepath if (not env.cfg_filepath is None and path_func.isfile(env.cfg_filepath)) else None
 
     cfg = config2.process_config_args(args, fallback=startup_cfg_path)
     cfg.clear_dirty()  # Assume that what they loaded is what they want.
@@ -95,9 +96,12 @@ try:
     log.debug("Compiled: {}".format(COMPILE_INFO), 2, dt="")
 
     root = tk.Tk(className="MKOB")
-    icon_file = "resources/MKOB-Logo.png"
+    script_dir = path[0]
+    script_dir = script_dir + "/" if ((not script_dir is None) and (not script_dir == "")) else ""
+    log.debug(" Running from: {}".format(script_dir), 2, dt="")
+    icon_file = script_dir + "resources/MKOB-Logo.png"
     icon_file_exists = False
-    if (path.isfile(icon_file)):
+    if (path_func.isfile(icon_file)):
         icon = tk.PhotoImage(file=icon_file)
         root.iconphoto(True, icon)
         icon_file_exists = True
@@ -132,8 +136,13 @@ except Exception as ex:
     print(traceback.format_exc())
     sys_exit(1)
 finally:
-    if mkobwin:
-        mkobwin.exit(destoy_on_exit)
-    print("~73")
-sys_exit(0)
+    try:
+        if mkobwin:
+            mkobwin.exit(destoy_on_exit)
+        print("~73")
+        sys_exit(0)
+    except BaseException:
+        sys_exit(0)
+    sys_exit(0)
+
 

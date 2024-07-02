@@ -99,7 +99,8 @@ MRT_MANUAL		:= $(DOC_DIR)MRT/User-Manual-MRT.pdf
 
 # ### Binary Executable Section                                      ###
 
-NUITKA_FLAGS_ALL		?= --warn-implicit-exceptions --warn-unusual-code --msvc=latest
+#NUITKA_FLAGS_ALL		?= --warn-implicit-exceptions --warn-unusual-code --msvc=latest
+NUITKA_FLAGS_ALL		?= --deployment --msvc=latest
 
 BIN_DIR					?= bin/
 #
@@ -157,7 +158,7 @@ PYKOB_BIN_DEBUG_FLAGS	?= \
 	--python-flag=-v
 #	--trace
 
-COMMON_BIN_FLAGS	:= #--python-flag=no_annotations --python-flag=no_docstrings
+COMMON_BIN_FLAGS	:= --python-flag=no_annotations --python-flag=no_docstrings
 
 APP_BIN_FLAGS		:= $(NUITKA_FLAGS_ALL) $(COMMON_BIN_FLAGS)\
 	--standalone\
@@ -189,12 +190,13 @@ PYKOB_PKG_BIN_FILE		?= $(BIN_DIR)pykob.cp311-win_amd64.pyd
 CONFIGURE_DIST			:= $(BIN_DIR)Configure$(DIST_DIR_EXT)
 ifdef COMSPEC
   CONFIGURE_EXEC		:= $(CONFIGURE_DIST)Configure.exe
-  CONFIGURE_ICON		:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)mkob-icon.ico
+  CONFIGURE_ICON		:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)Configure.ico
 else
   CONFIGURE_EXEC		:= $(CONFIGURE_DIST)Configure.bin
   CONFIGURE_ICON		:=
 endif
 CONFIGURE_BIN_FLAGS		?= $(APP_BIN_FLAGS)\
+	$(CONFIGURE_ICON)\
 	--include-module=tkinter.ttk\
 	--enable-console
 
@@ -229,6 +231,16 @@ MRT_BIN_FLAGS			?= $(APP_BIN_FLAGS) $(MRT_ICON) --enable-console
 
 ### Utilities
 UTILITIES_BIN_FLAGS		?= $(APP_BIN_FLAGS) --enable-console
+SYSCHECK_DIST			:= $(BIN_DIR)Syscheck$(DIST_DIR_EXT)
+ifdef COMSPEC
+  SYSCHECK_EXEC			:= $(SYSCHECK_DIST)Syscheck.exe
+  SYSCHECK_ICON			:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)SysCheck.ico
+else
+  SYSCHECK_EXEC			:= $(MRT_DIST)Syscheck.bin
+  SYSCHECK_ICON			:=
+endif
+SYSCHECK_BIN_FLAGS		?= $(APP_BIN_FLAGS) $(SYSCHECK_ICON) --enable-console
+
 
 # ### Windows Installer Section                                  	 ###
 
@@ -349,7 +361,7 @@ help:
 # once the kinks are ironed out of the binaries.
 #
 .PHONY: all
-all: docs
+all: docs package_for_installer
 
 .PHONY: clean_all_bin
 clean_all_bin: clean_bld_dirs clean_bld_src_dirs clean_dist_dirs clean_pkg_dir
@@ -374,32 +386,33 @@ clean_pkg_dir:
 .PHONY: docs
 docs: $(MKOB_MANUAL)
 
-$(MKOB_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
-
-$(MRT_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
-
 .PHONY: bins
 bins: pykob Configure MKOB MRT
 
 .PHONY: installer_win
+#installer_win: INSTALLER_NAME := $(shell date +'mkobsuite-install-%Y%m%d.exe')
+installer_win: MKOB_SUITE_VERSION := $(shell sed 's/\./_/g' mkobversion.txt)
 installer_win:
 	$(WIN_INST_COMPILE) $(WIN_INST_CP_OPTS) $(INSTALLER_WIN_DIR)mkobsuite_win.nsi
-	$(MV_FORCE) $(INSTALLER_WIN_DIR)mkobsuite-install.exe $(BIN_DIR)
+	$(MV_FORCE) $(INSTALLER_WIN_DIR)mkobsuite-install.exe $(BIN_DIR)mkobsuite-$(MKOB_SUITE_VERSION)-install.exe
 
-.PHONY: package_for_inst
-package_for_inst: PKG_DIRS := $(shell for d in $(REQUIRED_PACKAGE_DIRS); \
+.PHONY: package_for_installer
+package_for_installer: PKG_DIRS := $(shell for d in $(REQUIRED_PACKAGE_DIRS); \
 							do									\
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;)
 
-package_for_inst: pykob Configure MKOB MRT docs
+package_for_installer: pykob Configure MKOB MRT Syscheck docs
 	@echo !!! Copy all Dist dirs into PKG for the installer.
 	$(CP_RECURSE) $(CONFIGURE_DIST)* $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(MKOB_DIST)* $(PACKAGE_CORE_DIR)
+	$(CP_RECURSE) $(SRC_PY_DIR)mkob_learn $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(MRT_DIST)* $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(MKOB_MANUAL) $(PACKAGE_DOCS_DIR)
 #	$(CP_RECURSE) $(MRT_MANUAL) $(PACKAGE_DOCS_DIR)
 	$(CP_RECURSE) bin/Syscheck.dist/* $(PACKAGE_UTILS_DIR)
+	@echo !!! Copy Windows DLLs into the PKG for the installer.
+	$(CP) $(INSTALLER_WIN_DIR)api-ms-win-core-path-l1-1-0.dll $(PACKAGE_CORE_DIR)
 
 # The following PHONY targets will be replaced by true targets given time
 # to build out the proper names and dependencies.
@@ -418,14 +431,20 @@ MKOB: $(MKOB_EXEC) ;
 .PHONY: MRT
 MRT: $(MRT_EXEC) ;
 
-.PHONY: SYSCHECK
-SYSCHECK: Syscheck.exe ;
+.PHONY: Syscheck
+Syscheck: $(SYSCHECK_EXEC) ;
 
 # #############################################################################
 #
 # True targets
 #
 # #############################################################################
+
+$(MKOB_MANUAL): $(DOC_DIR)MKOB/User-Manual-MKOB4.adoc  mkobversion.txt $(MANUAL_SETTINGS) $(PyKOB_THEME)
+	$(PDFGEN) $<
+
+$(MRT_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
+
 
 $(CONFIGURE_EXEC): CONFIG_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
@@ -445,8 +464,11 @@ $(MKOB_EXEC): MKOB_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							done;								\
 						$(CP) -rup $(ORIGINAL_SRC_MKOB_SHELL) $(BUILD_SRC_APPS_DIR))
 
+$(MKOB_EXEC): MKOB_DIST_DIR := $(BIN_DIR)MKOB$(DIST_DIR_EXT)
 $(MKOB_EXEC): MKOB.py $(BUILD_SRC_APPS_DIR)pkappargs.pyd $(BUILD_SRC_APPS_DIR)pykob.pyd
 	$(PY2BIN) $(MKOB_BIN_FLAGS) $<
+	$(MKDIR) $(MKOB_DIST_DIR)resources
+	$(CP) $(SRC_PY_RES_DIR)MKOB-Logo.png $(MKOB_DIST_DIR)resources
 	$(call pykob-to-dist,$@)
 	$(call pkappargs-to-dist,$@)
 
@@ -462,13 +484,16 @@ $(MRT_EXEC): MRT.py $(BUILD_SRC_APPS_DIR)pkappargs.pyd $(BUILD_SRC_APPS_DIR)pyko
 	$(call pykob-to-dist,$@)
 	$(call pkappargs-to-dist,$@)
 
-Syscheck.exe: UTILS_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
+$(SYSCHECK_EXEC): UTILS_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;								\
 						$(CP) -rup $(ORIGINAL_SRC_UTILS_SHELL) $(BUILD_SRC_UTILS_DIR))
 
-Syscheck.exe: $(BUILD_SRC_UTILS_DIR)Syscheck.py $(BUILD_SRC_UTILS_DIR)pykob.pyd
+$(SYSCHECK_EXEC): $(BUILD_SRC_UTILS_DIR)Syscheck.py $(BUILD_SRC_UTILS_DIR)pykob.pyd
+	$(PY2BIN) $(SYSCHECK_BIN_FLAGS) $<
+	$(call pykob-to-dist,$@)
+	$(call pkappargs-to-dist,$@)
 
 pkappargs.pyd: $(PKAPPARGS_PKG_BIN_FILE)
 	$(CP) $< $(dir $<)$@

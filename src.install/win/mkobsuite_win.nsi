@@ -111,6 +111,9 @@ Section "Utilities"
   ; Put utilities files there
   File /r "${Package_utils_dir}*.*"
 
+  ; Flag that utilities were installed
+  !define Utils_Installed
+
 SectionEnd
 
 ; Optional section - Documentation (can be disabled by the user)
@@ -127,17 +130,23 @@ Section "Documentation"
 
 SectionEnd
 
-; Optional section - Start Menu Items (can be disabled by the user)
-Section "Start Menu Shortcuts"
+; Optional section - Desktop and Start Menu Items (can be disabled by the user)
+Section "Desktop & Start Menu Shortcuts"
+
+  SetOutPath "$INSTDIR"
 
   CreateDirectory "$SMPROGRAMS\${Folder_name}"
   CreateShortcut "$SMPROGRAMS\${Folder_name}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
   CreateShortcut "$SMPROGRAMS\${Folder_name}\Configure.lnk" "$INSTDIR\Configure.exe" "--gui"
   CreateShortcut "$SMPROGRAMS\${Folder_name}\MKOB.lnk" "$INSTDIR\MKOB.exe" "" "" 0 SW_SHOWMINIMIZED
+  CreateShortcut "$DESKTOP\MKOB.lnk" "$INSTDIR\MKOB.exe" "" "" 0 SW_SHOWMINIMIZED
   !ifdef Docs_Installed
     CreateShortcut "$SMPROGRAMS\${Folder_name}\MKOB User Manual.lnk" "$INSTDIR\Documentation\User-Manual-MKOB4.pdf"
   !endif
   CreateShortcut "$SMPROGRAMS\${Folder_name}\MRT.lnk" "$INSTDIR\MRT.exe"
+  !ifdef Utils_Installed
+    CreateShortcut "$SMPROGRAMS\${Folder_name}\SysCheck.lnk" "$INSTDIR\SysCheck.exe"
+  !endif
 
 SectionEnd
 
@@ -157,7 +166,7 @@ Section "Uninstall"
 
   ; Remove shortcuts, if any
   Delete "$SMPROGRAMS\${Folder_name}\*.lnk"
-
+  Delete "$DESKTOP\MKOB.lnk"
   ; Remove directories
   RMDir /r "$SMPROGRAMS\${Folder_name}"
   RMDir /r "$INSTDIR"
