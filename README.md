@@ -15,6 +15,12 @@ included. The applications and utilites can be used to learn/practice
 copying and sending code. The applications and some of the utilites can also
 connect to a KOB Server to recieve wire feeds and communicate with others.
 
+**Windows Installer for *MKOB Suite***
+
+For Windows, executables have been created for the main applications and utilities and
+packaged as a Windows Installer. You can get it here: https://www.aesilky.com/morse
+
+
 **Note:**
  **For those that are familiar with this Repo, see the section on the reorganization**
 
