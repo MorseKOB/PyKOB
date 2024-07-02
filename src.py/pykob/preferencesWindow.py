@@ -23,7 +23,6 @@ try:
 except ModuleNotFoundError:
     SERIAL = False
 
-global preferencesDialog
 preferencesDialog = None                # Force creation of a new dialog when first invoked
 
 class PreferencesWindow:

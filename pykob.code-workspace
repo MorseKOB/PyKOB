@@ -6,11 +6,25 @@
 	],
 	"settings": {
 		"cSpell.words": [
+			"COMPANYNAME",
 			"Farnsworth",
+			"HKCU",
+			"hndlr",
 			"imagesdir",
+			"insertmacro",
 			"Instructograph",
 			"Jepson",
 			"keyer",
+			"Keyer",
+			"keyread",
+			"LOCALAPPDATA",
+			"mkobsuite",
+			"nonfacing",
+			"NSIS",
+			"REGKEY",
+			"STARTMENUPAGE",
+			"UNPAGE",
+			"VALUENAME",
 			"vibroplex"
 		]
 	}

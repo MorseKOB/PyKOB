@@ -43,7 +43,6 @@ The files are INI format with the values in a section named "PYKOB".
 """
 import argparse
 import configparser
-import getpass
 import os
 import platform
 import pykob
@@ -105,9 +104,6 @@ _WIRE_KEY = "WIRE"
 
 
 # Paths and Configurations
-global app_config_dir, app_config_file_path, app_config
-global user_config_dir, user_config_file_path, user_config
-#
 app_config_dir = None
 app_config_file_path = None
 app_config = None
@@ -808,7 +804,7 @@ def read_config():
 
     # Get the system data
     try:
-        user_name = getpass.getuser()
+        user_name = os.getlogin()
         user_home = os.path.expanduser('~')
         os_name = os.name
         system_name = platform.system()

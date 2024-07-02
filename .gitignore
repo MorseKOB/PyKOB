@@ -4,12 +4,18 @@
 .venv/
 
 # Build and Output
+bin/
 build*/
+*.build/
 dist*/
+*.dist/
 zips/
 __pycache__/
 pyinstall/w/Configure/
 pyinstall/w/MKOB/
+nuitka-crash-report.xml
+*.pyd
+*.pyi
 # Ignore generated *.cmd and *.exe files. If they are needed, include them with a '!' line.
 *.cmd
 *.exe
@@ -56,8 +62,6 @@ Capture-Replay/*.txt
 *.pkrec
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
-# Include anything that is put into the doc and mkob_learn folders
-!doc/*.mrtsel
-!doc/*.pkcfg
-!doc/*pkrec
-!mkob_learn/*.pkrec
+# Include anything that is put into the Documentation and mkob_learn folders
+!Documentation/*
+!src.py/mkob_learn/*

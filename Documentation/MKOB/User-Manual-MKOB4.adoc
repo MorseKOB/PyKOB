@@ -19,7 +19,7 @@ We are not so lucky these days as many of the old pros are gone.
 (((MorseKOB, MorseKOB 2.5)))
 ((MorseKOB)) by Les Kerr, originally written for Windows only, allowed us to learn, and more importantly USE, landline telegraphy!
 
-Now rebuilt from scratch and updated, MKOB v4 (((MKOB, MKOB4))) runs on most computers big and small. With this program it is possible to once again hear the sounds of the Telegraph sounder as messages come in from distant places. It can be adjusted to make learning to read and send the code easier and, when you are ready, to connect to others over the Internet.
+Now rebuilt from scratch and updated, MKOB v4 (((MKOB, MKOB v4)))(((MKOB, MKOB4))) runs on most computers big and small. With this program it is possible to once again hear the sounds of the Telegraph sounder as messages come in from distant places. It can be adjusted to make learning to read and send the code easier and, when you are ready, to connect to others over the Internet.
 
 Welcome to the world of Landline Telegraphy and thanks for helping to keep "The sound of Morse Alive".
 
@@ -27,8 +27,7 @@ Welcome to the world of Landline Telegraphy and thanks for helping to keep "The 
 73 (Telegrapher's code for Best Wishes)
 Ciao
 
-
-[preface]
+[preface%nonfacing]
 = Preface
 
 Like all computer programs ((MKOB)) has lots of configuration settings and tricks for making the best use of it.
@@ -38,26 +37,27 @@ Don't let the apparent complexity intimidate you. At its heart ((MKOB)) is simpl
 
 The Quick Start portion will get you up and running fast and when you want to do a bit more, dig into the details in the User's Guide portion.
 
-NOTE: Although MKOB's functionality, and many of the user actions, are similar to ((MorseKOB 2.5)), it is not identical, and it is not intended to be. This document describes the functionality and user actions of the ((MKOB4)) application and, typically, does not compare ((MKOB4)) to ((MorseKOB 2.5)). Knowledge of the ((MorseKOB 2.5)) application is not assumed or required.
+NOTE: Although MKOB's functionality, and many of the user actions, are similar to MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))), it is not identical, and it is not intended to be. This document describes the functionality and user actions of the MKOB4(((MKOB,MKOB4))) application and, typically, does not compare MKOB4(((MKOB,MKOB4))) to MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))). Knowledge of the MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))) application is not assumed or required.
 
 == Related Components
-=== ((PyKOB))
-((MKOB)) uses the ((PyKOB)) modules. ((PyKOB)) consists of a number of modules that provide different aspects of handling code, the physical key and sounder, internet connection to a KOBServer instance, system audio to simulate a sounder or provide tone, configuration and logging capabilities, and more. When updating ((MKOB)), it is advisable to get the latest (associated) release of ((PyKOB)) as well.
+=== pykob Package
+((MKOB)) uses the *((pykob))* package(((package, pykob))) of modules. The ((pykob)) package consists of a number of modules that provide different aspects of handling code, the physical key and sounder, internet connection to a KOBServer instance, system audio to simulate a sounder or provide tone, configuration and logging capabilities, and more. When updating ((MKOB)), it is advisable to get the latest (associated) release of ((pykob)) as well.
 
 === MRT (Morse Receive & Transmit - Marty)
 (((MRT, Morse Receive & Transmit)))
-((MRT)) is a command-line/terminal application that is similar to ((MKOB)) in its ability to receive and send code. However, it is completely text based, allowing it to be run via a remote terminal connection to a system, or even automatically in the background (headless). It uses the same ((PyKOB)) configurations as ((MKOB)) (and the utility applications). In addition, it has a few options that allow it to support displays and similar applications.
+((MRT)) is a command-line/terminal application that is similar to ((MKOB)) in its ability to receive and send code. However, it is completely text based, allowing it to be run via a remote terminal connection to a system, or even automatically in the background (headless). It uses the same ((pykob)) configurations as ((MKOB)) (and the utility applications). In addition, it has a few options that allow it to support displays and similar applications.
 
 There is a separate document that describes ((MRT)) and its options.
 
 === Utilities
-The ((PyKOB)) package also includes a number of utility applications. The README file included in the package contains a short description of each of the utility applications.
+The ((pykob)) package also includes a number of utility applications. The README file included in the package contains a short description of each of the utility applications.
 
 
 = Quick Start
 
 Get started with ((MKOB)) and have some fun. Once you've had a chance to try things out, make sure to read the User's Guide portion to get the most out of ((MKOB)).
 
+[%nonfacing]
 == Main Screen
 The main screen of the ((MKOB)) app looks like this on Windows.footnote:screenshots[Screenshots are from the Windows platform. The interface looks similar on Mac and Linux platforms.]
 
@@ -82,17 +82,19 @@ Two control sections:
 
 = User's Guide
 
+[%nonfacing]
 == Landline, Closed Circuit, Telegraphy
 NOTE: Even if you are very familiar with Landline Telegraphy, it is suggested that you at least read through the section <<Circuit and Key Closer and MKOB’s Virtual Closer>> to get the best results and experience using ((MKOB)).
 
 This section provides a very brief description of Landline, Closed Circuit, Telegraphy, that is important for the effective, and enjoyable, use of the ((MKOB)) application.
 
-One of the primary features of ((MKOB)) (and the ((PyKOB)) modules and ((MRT))) is support for interfacing to a physical ‘closed’/’loop’ telegraph circuit and simulating the operation of a loop telegraph circuit locally and connected to a KOBServer hub via the internet.
+One of the primary features of ((MKOB)) (and the ((pykob)) modules and ((MRT))) is support for interfacing to a physical ‘closed’/’loop’ telegraph circuit and simulating the operation of a loop telegraph circuit locally and connected to a KOBServer hub via the internet.
 
 This simulates the operation of Landline-Telegraphy and a closed-loop circuit as used by virtually every railroad, Western Union, and many other communication services in the United States, and in fact, North America and beyond, when telegraphy was THE means of communication. In fact, for railroads, that lasted well into the 1960’s (and in some areas, even into the 70’s).
 
 Describing closed loop, landline, telegraphy is not the focus of this document. There are a number of sources available online or at the library that describe it. However, there is one aspect of closed loop, landline, telegraphy that is critical to understand for successful use of ((MKOB)) (and ((MRT)) and some of the utilities), and for connecting to a KOBServer and communicating with others – that is the aspect of the circuit being open or closed, and use of the Closer on the telegraph key.
 
+[%nonfacing]
 == Telegraph Key Closer
 Landline telegraphy relies on a connection between each and every station in the network. Again, it is beyond the scope/intention of this document to describe how this was achieved, but you can think of it (in concept anyway) like the lighting wiring in your house. Power goes through the wall switches in the room (sometimes multiple for 3/multi-way switches) and is connected to the lights. When all the switches are closed the lights are on. If any of the switches are open the lights are off.
 
@@ -114,6 +116,7 @@ The flow for communicating using landline telegraphy is:
 * When you finish sending your message, close your key. That will energize the circuit causing all the sounders to produce the distinctive ‘click’.
 * This process repeats, for each operator that sends a message.
 
+[%nonfacing]
 == Circuit and Key Closer and MKOB’s Virtual Closer
 (Important for using ((MKOB)))
 
@@ -125,10 +128,11 @@ In addition, the Virtual Closer can actually be used to override the state of th
 
 Understanding the functionality and use of the Virtual Closer in ((MKOB)) is important to the successful (and enjoyable) operation of the application and communicating on wires with others in the best simulation of a true landline telegraph circuit using the world-wide connectivity afforded by the internet. Could Morse and Vail have ever envisioned this?!
 
-=== Comparison to ((MorseKOB 2.5))
-This is the one place where the operation of ((MKOB)) will be compared to that of ((MorseKOB 2.5)). If you do not have experience with ((MorseKOB 2.5)) you can skip the rest of this section.
+[%nonfacing]
+=== Comparison to MorseKOB 2.5(((MorseKOB, MorseKOB 2.5)))
+This is the one place where the operation of ((MKOB)) will be compared to that of MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))). If you do not have experience with MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))) you can skip the rest of this section.
 
-((MorseKOB 2.5)) doesn’t track the state of the physical key’s closer in its interface. It treats its keyboard sender, its system (computer) audio sounder, and its Circuit Closer checkbox as a ‘separate circuit’ that is connected in series with the connected physical key and sounder (loop) and the KOBServer wire (circuit) that others are also connected into.
+MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))) doesn’t track the state of the physical key’s closer in its interface. It treats its keyboard sender, its system (computer) audio sounder, and its Circuit Closer checkbox as a ‘separate circuit’ that is connected in series with the connected physical key and sounder (loop) and the KOBServer wire (circuit) that others are also connected into.
 
 The operation of the Virtual Closer in ((MKOB)) was designed to allow the use of a physical key and sounder, with occasional use of the Keyboard Sender without requiring interaction with the ((MKOB)) user interface. The circuit is opened and closed using the physical key’s closer and, when needed, text can be entered using the keyboard, then you can go directly back to the physical key to continue sending. When you are done, you close the key’s closer, and you are ready to receive code from the other operators connected to the wire.
 
@@ -137,15 +141,18 @@ If you don’t have a physical key and/or sounder connected, that’s fine. Just
 == Overview
 The functionality of ((MKOB)) will be covered in sections relating to the sections and controls on the screens.
 
+[%nonfacing]
 == Main Sections and Controls
 
 .Main ((MKOB)) app screen
 [.text-center]
 image::mkob-main-ui-annotated.png[Main Screen]
 
+[%nonfacing]
 === Code Reader (Copy)
 Copied (decoded) code is displayed in this window. Code is copied from the local key and from stations on the wire when connected. The name of the sending station is displayed at the beginning of a new line when the sender changes. The Reader window is also occasionally used to display information from the ((MKOB)) application to the user.
 
+[%nonfacing]
 === Active Offices (Stations)
 Offices that are currently connected to the wire are listed in this window. When not connected, this station will be listed in this window when code is sent from it.
 
@@ -157,21 +164,27 @@ The order of the offices and the formatting used can be helpful when connected t
 
 This ordering can help if you are the current sender and you are trying to decide who to turn the wire over to next. It is important to realize that the order is based on activity seen since you connected. The wire traffic doesn’t contain history information, and therefore it is possible that an office listed near the top and indented, has actually sent some information before you connected to the wire. However, it can still be helpful, especially if you have been connected to the wire for a while.
 
+[%nonfacing]
 === Keyboard Sender
 Text entered in this window, either from the keyboard or loaded from a file, will be coded at the current character/text speed when the Keyboard Code Sender (Enable) checkbox is checked, and the key is open (either the physical key or the virtual key by unchecking the Key Closed checkbox). The Repeat checkbox will cause the sender to repeat when it reaches the end of the text.
 
 You can use the cursor keys or click with the mouse to move the position of coding when the sender is enabled, or the text insert position when the sender is disabled.
 
+[%nonfacing]
 === Office (Station) Name
 Text entry field used to enter/display the name of this office/station. The office/station name is used when you connect to a wire on a KOBServer. The Office/Station name can also be set in the Preferences dialog.
 
+[%nonfacing]
 === Key Closed (checkbox)
 Indicates the state of the physical and/or virtual key, open/closed. It can be used to control the state of the circuit, overriding the physical key, if one is being used.
 
+[%nonfacing]
 === Speed
 This is the character speed used for sending from the Keyboard Sender and ‘Keyer’ keys (Shift-Left and Shift-Right when the Keyboard Sender is enabled), and for decoding (copying) incoming code. See the section in Preferences about character speed, text speed, and spacing, for information on how to use Farnsworth.
 
+[%nonfacing]
 == Menu Bar
+[%nonfacing]
 === File Menu
 The file menu contains four sections.
 
@@ -225,6 +238,7 @@ Save the current configuration as the global configuration.
 ===== Exit
 Exit ((MKOB)).
 
+[%nonfacing]
 === Tools Menu
 ==== Application Tools and Utilities
 ===== Show Packets
@@ -239,6 +253,7 @@ The Key Timing Graph gives a visual representation of the key press and release 
 
 Refer to the separate Key Timing Graph section for more information.
 
+[%nonfacing]
 === Help Menu
 ==== Helpful Information and Actions
 ===== Active Wires
@@ -252,13 +267,15 @@ Opens a separate window that displays the keyboard shortcuts available in ((MKOB
 image::mkob-keyboard-shortcuts.png[Keyboard shortcuts, 50%]
 
 ===== About
-Lists version information for ((MKOB)), ((PyKOB)), and some of the primary modules used.
+Lists version information for ((MKOB)), ((pykob)), and some of the primary modules used.
 
+[%nonfacing]
 == Preferences
 All of the application preferences (also referred to as the configuration) can be set using the Preferences Dialog accessed using the File:Preferences… menu. They can also be listed and set using the Configure.py command line utility. Some of the configuration can also be set using the operational controls in the interface.
 
 The Preferences dialog contains three tabs that help organize the application settings.
 
+[%nonfacing]
 === Base
 Application hardware configuration.
 
@@ -285,6 +302,7 @@ This checkbox enables the use of the system sound to simulate a sounder or provi
 * Use local sounder:
 This checkbox enables the use of the local sounder (when one is connected). Disabling the local sounder can be helpful when one wants to practice without disturbing others. The system sound can be used with headphones while still being able to use the physical key. This even works with most loop interfaces and a KOB.
 
+[%nonfacing]
 === Morse Code
 Controls the Keyboard Sender sending and Code Reader decoding.
 
@@ -312,6 +330,7 @@ The speeds and spacing option can be set in the main application interface.
 ** *American* – Use American (Landline) Morse when sending from the Keyboard or decoding in the Reader.
 ** *International* – Use International (Continental) code when sending from the Keyboard or decoding in the Reader.
 
+[%nonfacing]
 === Advanced
 Controls other aspects of the application that are less frequently changed.
 
@@ -374,6 +393,7 @@ The *Level* value for this configuration setting is used to control what is logg
 * *-3* – Do not log any information (completely silent).
 * *1* (and greater) – Log Error, Warn, and Info level information, as well as Debug information designated as Level-X, where X is equal to or less than the value specified. The higher the number, the more debugging information that will be logged.
 
+[%nonfacing]
 === Cancel, Apply, Save
 The buttons at the bottom allow you to:
 
@@ -397,8 +417,8 @@ Starting ((MKOB)) with a Specific Configuration (and multiple instances)
 
 Multiple instances of ((MKOB)) can be running at the same time using different configurations to connect to different servers, different wires, or use different connected equipment.
 
-(((PyKOB)))
-This is done with a single installation of ((MKOB)) (PyKOB). There is no need to install ((MKOB)) (PyKOB) multiple times.
+(((pykob)))
+This is done with a single installation of ((MKOB)) (pykob). There is no need to install ((MKOB)) (pykob) multiple times.
 
 The command line option of interest is:
 * *--config config-file*
@@ -408,6 +428,7 @@ Without this command line option, ((MKOB)) uses the last configuration loaded or
 
 If you intend to run multiple instances, and you are using a physical key/sounder. You will need to make sure that you specify different Serial Port values for each instance (if you have multiple interfaces connected) or specify None for the additional instances. If you don’t do this, ((MKOB)) will still function, but you will receive an error dialog when the additional instances start, letting you know that the interface is busy/not available.
 
+[%nonfacing]
 == Typical Configurations
 Here are recommendations for Preference/Configuration settings for some typical combinations of equipment.
 
@@ -451,6 +472,7 @@ Using most of the available Loop interfaces and a KOB, ((MKOB)) allows you to di
 
 Plug in your headphones/earbuds and start keying. No excuse now!
 
+[%nonfacing]
 == Key Timing Graph
 The Key Timing graph can be used for:
 * Practice and improvement of your keying.
@@ -500,7 +522,9 @@ Local sources include a connected key, text entered in the Keyboard Sender windo
 
 It is important to understand that the graph is not decoding Morse. It is selecting the expected element based on the duration of the key action, given the configured code speed (WPM). Therefore, it is possible to get a sequence of elements that do not represent a valid Morse character. For example, you might get a sequence of: ●▭●▭● (dit, intra-char-space, dit, intra-char-space, dit - which isn’t a valid character) if you were attempting to key an ‘S’ and your element spacing was slightly too long. You can monitor the Reader window in the main window to see what the Morse Reader/Decoder recognized your code as.
 
+[%nonfacing]
 == Recording and Playing Back Sessions
+[%nonfacing]
 === Record
 You can start recording a session using the File:Record menu entry. That will start recording the current session using an automatically generated file name (based on the current date and time). The name of the file will be presented in a dialog box and displayed in the ((MKOB)) status bar.
 
@@ -508,6 +532,7 @@ Once the recording is started, all code activity (local and from the connected w
 
 The recording can be stopped using the File:End Recording menu entry or when ((MKOB)) is closed.
 
+[%nonfacing]
 === Play Recording
 A recording is loaded to play using the File:Play… menu entry. The menu entry opens a file selection dialog that is used to select a .pkrec (or a recording .json file). When a recording file is selected, ((MKOB)) will start reproducing the session. That includes listing the Offices/Stations that were involved in the session, reproducing the code (as it was sent), and cycling the Offices window through the active senders.
 
@@ -559,8 +584,10 @@ There isn’t a control to move to the previous sender. However, the combination
 Will typically do it. This will move to the start of the current sender, then move back 15 seconds (which should be back into the previous sender), then move to the start of that sender.
 (File an enhancement issue if that doesn’t work for you 😊)
 
+ifeval::["{backend}" == "pdf"]
 [index]
 = Index
+endif::[]
 
 [colophon]
 = Colophon
@@ -573,7 +600,7 @@ Copyright (c) 2020-24 PyKOB - MorseKOB in Python
 This document is authored using *asciidoc*, and the pdf version rendered through
 *asciidoctor-pdf*, to create a manual that is more readable and more pleasing to the eye.
 
-[dedication]
+[dedication%nonfacing]
 = Dedication
 The team would like to thank everybody who through comments, criticism and suggestions has helped to make the ((MKOB)) application and this document better and more usable.
 

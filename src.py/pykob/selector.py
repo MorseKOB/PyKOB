@@ -47,7 +47,6 @@ try:
 except:
     log.err("Module pySerial is not available. Selector cannot be used.")
 
-global POLE_CYCLE_TIME_MIN
 POLE_CYCLE_TIME_MIN = 0.01
 
 @unique

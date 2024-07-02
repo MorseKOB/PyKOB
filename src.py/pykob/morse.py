@@ -32,7 +32,6 @@ import sys
 import codecs
 from pathlib import Path
 from threading import current_thread, Event, Timer
-import traceback
 from pykob import config, log
 
 DOTSPERWORD = 45     # dot units per word, including all spaces (MORSE is 43, PARIS is 47)
