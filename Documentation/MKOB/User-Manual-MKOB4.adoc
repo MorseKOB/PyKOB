@@ -150,12 +150,18 @@ image::mkob-main-ui-annotated.png[Main Screen]
 
 [%nonfacing]
 === Code Reader (Copy)
-Copied (decoded) code is displayed in this window. Code is copied from the local key and from stations on the wire when connected. The name of the sending station is displayed at the beginning of a new line when the sender changes. The Reader window is also occasionally used to display information from the ((MKOB)) application to the user.
+Copied (decoded) code is displayed in this window. Code is copied from the local key and from stations on the wire when connected. The Reader window is also occasionally used to display information from the ((MKOB)) application to the user. (((Code Reader)))
+
+==== Code Format and Information Display
+Some information about the received code and some formatting is performed by the Reader as the code is displayed.
+
+When you connect to a wire and code is first received, the Office/Station ID of the sender is printed within angle brackets - _<Office ID>_. The Office/Station ID is also printed when the sender changes. When a paragraph mark ('=') is received the Reader will go to a new line on the next non paragraph mark received. When the sender closes their key an underscore is printed. When you disconnect from a wire (or get disconnected) _pass:['#####']_ is printed. If the reader detects that the spacing of a character isn't as expected it displays the character with a small under-tick(((under-tick, Code Reader))).
 
 [%nonfacing]
 === Active Offices (Stations)
 Offices that are currently connected to the wire are listed in this window. When not connected, this station will be listed in this window when code is sent from it.
 
+==== Order and Format of Listed Offices
 The order of the offices and the formatting used can be helpful when connected to a chat-type wire with a number of offices connected. The offices are listed as follows:
 
 * The top/first office is the current sender.
@@ -591,7 +597,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((MKOB)) Version 4.3.
+This document reflects the features of ((MKOB)) Version 4.4.
+Edit date: 7-2-2024
 
 MIT License
 
