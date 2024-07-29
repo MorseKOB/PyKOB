@@ -181,7 +181,7 @@ class Selector:
             if sn.endswith(sdsel_sn_end):
                 sdsel_port_id = sp.device
                 log.debug("SD-Selector found on: {}".format(sp.device), 3)
-            break
+                break
         if sdsel_port_id is None:
             raise SDSelectorNotFound()
         port = serial.Serial(sdsel_port_id)
