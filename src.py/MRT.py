@@ -46,7 +46,7 @@ from pykob.internet import Internet
 from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 from pykob.recorder import Recorder
-from pykob.selector import Selector, SelectorMode, SelectorChange
+from pykob.selector import Selector, SelectorMode, SelectorChange, SEL_FIND_SDSEL
 import pkappargs
 
 import argparse
@@ -66,7 +66,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -879,6 +879,7 @@ class SelectorMrtLoadError(SelectorLoadError):
 
 class SelectorMrtArgumentsError(SelectorMrtLoadError):
     pass
+
 class SelectorMrtFileNotFound(SelectorMrtLoadError):
     pass
 
@@ -1123,7 +1124,9 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
                 "the MRT Selector Specification file 'specfile' and the current selector " +
                 "setting of a selector connected to port 'port'. Exit with an error if " +
                 "the port cannot be found (the selector is not available). SEE: '--selector' " +
-                "to specify a selector, but run normally if the port cannot be found."
+                "to specify a selector, but run normally if the port cannot be found. " +
+                "The special 'port' value of '" + SEL_FIND_SDSEL + "' can be used to look " +
+                "for a SilkyDESIGN Selector Switch rather than using a specific port."
         )
         arg_parser.add_argument(
             "--selector",

@@ -25,10 +25,15 @@ SOFTWARE.
     Selector -
     Class that monitors a full UART interface for one of four handshake
     signals being active. Or a value from 0 to 15 (0x00 - 0xFF) using the
-    handshake signals: RI(bit-3) CD(bit-2) DSR(bit-1) CTS(bit-0)
+    four handshake signals as binary: RI(bit-3) CD(bit-2) DSR(bit-1) CTS(bit-0)
 
     The value can be read as needed and a callback can be supplied that is
     called when the value changes.
+
+    The 'port_to_use' can be a serial port specification
+        (COMx on Windows, /dev/tty... on *nix/Mac)
+    or the special value 'SDSEL' (Silky-DESIGN Selector) to find a
+    serial port with a serial number ending in '_AESSEL' ('_AESSELA' on Windows)
 """
 from enum import Enum, IntEnum, unique
 import sys
@@ -40,9 +45,13 @@ from typing import Optional
 
 from pykob import log
 
+SEL_FIND_SDSEL = "SDSEL"
+SEL_SDSEL_SN_END = "_AESSEL"
+
 serialModuleAvailable = False
 try:
     import serial
+    import serial.tools.list_ports
     serialModuleAvailable = True
 except:
     log.err("Module pySerial is not available. Selector cannot be used.")
@@ -60,6 +69,9 @@ class SelectorChange(IntEnum):
     OneOfFour = 1
     Binary = 2
     BinaryAnd1of4 = 3
+
+class SDSelectorNotFound(Exception):
+    pass
 
 class SelectorLoadError(Exception):
     def __init__(self, port:Optional[str]=None, ex:Optional[Exception]=None):
@@ -153,6 +165,28 @@ class Selector:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
 
+    def _find_sdsel(self):
+        """
+        Look for a Silky-DESIGN Selector, by searching for a serial port with a serial
+        number that ends in '_AESSEL' ('_AESSELA' on Windows).
+        If found, return the Serial.port.
+
+        Raise SDSelectorNotFound if a SD-Selector can't be found
+        """
+        sdsel_sn_end = SEL_SDSEL_SN_END if not sys.platform == 'win32' else SEL_SDSEL_SN_END  + "A"
+        sdsel_port_id = None
+        systemSerialPorts = serial.tools.list_ports.comports()
+        for sp in systemSerialPorts:
+            sn = sp.serial_number if sp.serial_number else ""
+            if sn.endswith(sdsel_sn_end):
+                sdsel_port_id = sp.device
+                log.debug("SD-Selector found on: {}".format(sp.device), 3)
+                break
+        if sdsel_port_id is None:
+            raise SDSelectorNotFound()
+        port = serial.Serial(sdsel_port_id)
+        return port
+
     @property
     def binary_value(self):
         return self._binary_value
@@ -186,7 +220,10 @@ class Selector:
 
     def start(self):
         try:
-            self._port = serial.Serial(self._portToUse)
+            if self._portToUse == SEL_FIND_SDSEL:
+                self._port = self._find_sdsel()
+            else:
+                self._port = serial.Serial(self._portToUse)
             self._thread_port_checker.start()
             log.debug("The port '{}' for the Selector is available.".format(self._portToUse))
         except Exception as ex:
