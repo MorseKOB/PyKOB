@@ -8,10 +8,12 @@ from typing import Any, Callable, Optional
 from pykob import config, log, util
 from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
+from pykob.kob import PORT_FIND_SDIF_KEY
 
 GUI = True                              # Hope for the best...
 try:
     import tkinter as tk
+    import tkinter.messagebox as msgbox
     from tkinter import ttk
 except ModuleNotFoundError:
     GUI = False
@@ -34,9 +36,10 @@ class PreferencesWindow:
     cfg: Configuration to use. If 'None', the global configuration will be used.
 
     """
-    def __init__(self, cfg:Config, callback=None, quitWhenDismissed:bool=False, allowApply:bool=False, saveIfRequested:bool=True):
+    def __init__(self, cfg:Config, appVer=None, callback=None, quitWhenDismissed:bool=False, allowApply:bool=False, saveIfRequested:bool=True):
         if not GUI:
             return  # Tkinter isn't available, so we can't run.
+        self._app_ver = appVer
         self._callback = callback
         self._quitOnExit = quitWhenDismissed
         self._cfg = cfg
@@ -79,7 +82,7 @@ class PreferencesWindow:
         self.root.withdraw()  # Hide until built
         self.root.resizable(False, False)
         cfgname = util.str_empty_or_value("Global" if cfg.using_global() else cfg.get_name())
-        self.root.title("Preferences - {}".format(cfgname))
+        self.root.title("{} - {}".format(self._app_ver, cfgname))
 
         # validators
         self._digits_only_validator = self.root.register(self._validate_number_entry)
@@ -123,33 +126,39 @@ class PreferencesWindow:
                                 sticky=tk.W)
         # Initialize the interface type to its default value of 'None':
         self._interfaceType.set(self.NONE_HW_INTERFACE + 1)
-        # GPIO takes precidence over serial
-        if self._cfg.gpio:
+        # GPIO takes precedence over serial
+        if self._cfg.use_gpio:
             self._interfaceType.set(self.GPIO_HW_INTERFACE + 1)
-        elif self._cfg.serial_port:
+        elif self._cfg.use_serial and self._cfg.serial_port:
             self._interfaceType.set(self.SERIAL_HW_INTERFACE + 1)
 
-        # Add a pop-up menu with the list of available serial connections:
+        # Add a combo-box with the list of available serial ports:
         self._serialPort = tk.StringVar()
-        self._serialPortEntered = False
-        serialPortValues = []
+        self._serialPortFound = False
+        self._serialPortValues = []
         if SERIAL:
             systemSerialPorts = serial.tools.list_ports.comports()
             for sp in systemSerialPorts:
                 log.debug("preferencesWindow - Serial Port: dev='{}' name='{}' id='{}' desc='{}' mfg='{}' SN='{}' prod='{}'".format(
                     sp.device, sp.name, sp.hwid, sp.description, sp.manufacturer, sp.serial_number, sp.product))
-                serialPortValues += [sp.device]
+                self._serialPortValues += [sp.device]
         serialPortMenu = ttk.Combobox(basiclocalInterface,
-                                      width=30,
-                                      textvariable=self._serialPort,
-                                      state='readonly' if SERIAL else 'disabled',
-                                      values=serialPortValues).grid(row=3,
+                                        width=30,
+                                        textvariable=self._serialPort,
+                                        state='normal' if SERIAL else 'disabled',
+                                        values=self._serialPortValues).grid(row=3,
                                                                     column=2, columnspan=4,
                                                                     sticky=tk.W)
-        for serial_device in serialPortValues:
+        for serial_device in self._serialPortValues:
             # If port device  matches this radio button, update the selected value
             if self._cfg.serial_port == serial_device:
                 self._serialPort.set(serial_device)
+                self._serialPortFound = True
+                break
+        if not self._serialPortFound:
+            # The current serial_port value in the config isn't one of the ports found.
+            # Just set the value as a text value
+            self._serialPort.set(self._cfg.serial_port)
 
         # Label the equipment type:
         ttk.Label(basiclocalInterface, text="Equipment type:").grid(row=7, rowspan=3, column=0, sticky=tk.NE)
@@ -562,14 +571,36 @@ class PreferencesWindow:
                 self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1]))
             it = self._interfaceType.get() - 1
             if it == self.NONE_HW_INTERFACE:
-                muted_cfg.gpio = False
-                muted_cfg.serial_port = None
+                muted_cfg.use_gpio = False
+                muted_cfg.use_serial = False
             elif it == self.GPIO_HW_INTERFACE:
-                muted_cfg.gpio = True
+                muted_cfg.use_serial = False
+                muted_cfg.use_gpio = True
             else:
-                muted_cfg.gpio = False
-                sp = self._serialPort.get()
+                muted_cfg.use_serial = True
+                muted_cfg.use_gpio = False
+            sp = util.str_none_or_value(self._serialPort.get())
+            set_value = False
+            if not sp == muted_cfg.serial_port:
+                # The port value has changed
+                if sp == PORT_FIND_SDIF_KEY or sp is None:
+                    # They entered the special 'find' key value or they cleared the value
+                    set_value = True
+                else:
+                    # See if it exists...
+                    for serial_device in self._serialPortValues:
+                        if sp == serial_device:
+                            self._serialPortFound = True
+                            set_value = True
+                            break
+                    if not self._serialPortFound:
+                        # The port value entered isn't currently available. Ask if they really want to set it...
+                        msg = "The serial port value entered was not found on this system. Use anyway?"
+                        set_value = msgbox.askyesno(parent=self.root, title=self._app_ver + " - Use port?", message=msg)
+            if set_value:
                 muted_cfg.serial_port = sp
+                if sp is None:
+                    muted_cfg.use_serial = False
             # Config 'interface_type' is the 'equipment type' here (Loop, Key&Sounder, keyer)
             muted_cfg.interface_type = config.interface_type_from_str(self.EQUIPMENT_TYPE_SETTINGS[self._equipmentType.get() - 1])
             muted_cfg.local = bool(self._soundLocalCode.get())

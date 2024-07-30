@@ -139,7 +139,7 @@ class MKOBMain:
             self._kob = kob.KOB(
                 interfaceType=cfg.interface_type,
                 portToUse=cfg.serial_port,
-                useGpio=cfg.gpio,
+                useGpio=cfg.use_gpio,
                 useAudio=cfg.sound,
                 audioType=cfg.audio_type,
                 useSounder=cfg.sounder,
@@ -948,8 +948,8 @@ class MKOBMain:
                 kob_.sounder_power_save_secs = cfg.sounder_power_save
                 if cfg.sound_changed or cfg.audio_type_changed:
                     kob_.change_audio(cfg.sound, cfg.audio_type)
-                if cfg.interface_type_changed or cfg.serial_port_changed or cfg.gpio_changed:
-                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
+                if cfg.interface_type_changed or cfg.serial_port_changed or cfg.use_gpio_changed:
+                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.use_gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
                 elif cfg.sounder_changed:
                     kob_.use_sounder = cfg.sounder
         finally:

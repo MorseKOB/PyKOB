@@ -59,6 +59,8 @@ DEBOUNCE  = 0.018  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.800  # length of mark to signal circuit closure (sec)
 
+PORT_FIND_SDIF_KEY = "SDIF"
+
 log.debug("Platform: {}".format(sys.platform))
 if sys.platform == 'win32':
     from ctypes import windll

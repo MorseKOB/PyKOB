@@ -59,7 +59,7 @@ app_ver = "SchedFeed {}".format(VERSION)
 log.log(app_ver)
 
 PORT = config.serial_port # serial port for KOB interface
-USEGPIO = config.gpio
+USEGPIO = config.use_gpio
 USESOUNDER = config.sounder
 USESOUND = config.sound # whether to enable computer sound for sounder
 AUDIOTYPE = config.audio_type

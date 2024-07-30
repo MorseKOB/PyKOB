@@ -50,7 +50,7 @@ from pykob.config import AudioType, CodeType, InterfaceType, Spacing
 from pykob.util import strtobool
 
 PYKOB_CFG_EXT = ".pkcfg"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 _PYKOB_CFG_VERSION_KEY = "PYKOB_CFG_VERSION"
 
 # SPECIAL Configuration Path values
@@ -107,68 +107,119 @@ class Config:
         self._version: str = VERSION
         self._version_loaded: Optional[str] = None
         ## Hardware Settings
-        self._audio_type: AudioType = AudioType.SOUNDER
-        self._p_audio_type: AudioType = AudioType.SOUNDER
-        self._gpio: bool = False
-        self._p_gpio: bool = False
-        self._serial_port: Optional[str] = None
-        self._p_serial_port: Optional[str] = None
-        self._interface_type: InterfaceType = InterfaceType.loop
-        self._p_interface_type: InterfaceType = InterfaceType.loop
-        self._invert_key_input: bool = False
-        self._p_invert_key_input: bool = False
-        self._no_key_closer: bool = False
-        self._p_no_key_closer: bool = False
-        self._sound: bool = True
-        self._p_sound: bool = True
-        self._sounder: bool = False
-        self._p_sounder: bool = False
-        self._sounder_power_save: int = 0
-        self._p_sounder_power_save: int = 0
+        # type: AudioType
+        self._audio_type = AudioType.SOUNDER
+        # type: AudioType
+        self._p_audio_type = AudioType.SOUNDER
+        # type: bool
+        self._use_gpio = False
+        # type: bool
+        self._p_use_gpio = False
+        # type: bool
+        self._use_serial = False
+        # type: bool
+        self._p_use_serial = False
+        # type: Optional[str]
+        self._serial_port = None
+        # type: Optional[str]
+        self._p_serial_port = None
+        # type: InterfaceType
+        self._interface_type = InterfaceType.loop
+        # type: InterfaceType
+        self._p_interface_type = InterfaceType.loop
+        # type: bool
+        self._invert_key_input = False
+        # type: bool
+        self._p_invert_key_input = False
+        # type: bool
+        self._no_key_closer = False
+        # type: bool
+        self._p_no_key_closer = False
+        # type: bool
+        self._sound = True
+        # type: bool
+        self._p_sound = True
+        # type: bool
+        self._sounder = False
+        # type: bool
+        self._p_sounder = False
+        # type: int
+        self._sounder_power_save = 0
+        # type: int
+        self._p_sounder_power_save = 0
         ## Morse Settings
-        self._code_type: CodeType = CodeType.american
-        self._p_code_type: CodeType = CodeType.american
+        # type: CodeType
+        self._code_type = CodeType.american
+        # type: CodeType
+        self._p_code_type = CodeType.american
         #  type: bool
         self._decode_at_detected = False
         #  type: bool
         self._p_decode_at_detected = False
-        self._min_char_speed: int = 18
-        self._p_min_char_speed: int = 18
-        self._spacing: Spacing = Spacing.none
-        self._p_spacing: Spacing = Spacing.none
-        self._text_speed: int = 18
-        self._p_text_speed: int = 18
+        # type: int
+        self._min_char_speed = 18
+        # type: int
+        self._p_min_char_speed = 18
+        # type: Spacing
+        self._spacing = Spacing.none
+        # type: Spacing
+        self._p_spacing = Spacing.none
+        # type: int
+        self._text_speed = 18
+        # type: int
+        self._p_text_speed = 18
         ## Operational Settings
-        self._auto_connect: bool = False
-        self._p_auto_connect: bool = False
-        self._logging_level: int = 0
-        self._p_logging_level: int = 0
-        self._local: bool = True
-        self._p_local: bool = True
-        self._remote: bool = True
-        self._p_remote: bool = True
-        self._server_url: Optional[str] = None
-        self._p_server_url: Optional[str] = None
+        # type: bool
+        self._auto_connect = False
+        # type: bool
+        self._p_auto_connect = False
+        # type: int
+        self._logging_level = 0
+        # type: int
+        self._p_logging_level = 0
+        # type: bool
+        self._local = True
+        # type: bool
+        self._p_local = True
+        # type: bool
+        self._remote = True
+        # type: bool
+        self._p_remote = True
+        # type: Optional[str]
+        self._server_url = None
+        # type: Optional[str]
+        self._p_server_url = None
         self._station: str = ""
         self._p_station: str = ""
-        self._wire: int = 0
-        self._p_wire: int = 0
+        # type: int
+        self._wire = 0
+        # type: int
+        self._p_wire = 0
         #
         # Change tracking
-        self._hw_chng: bool = False
-        self._morse_chng: bool = False
-        self._ops_chng: bool = False
-        self._saved_chng: bool = False
-        self._pause_notify: int = 0
+        # type: bool
+        self._hw_chng = False
+        # type: bool
+        self._morse_chng = False
+        # type: bool
+        self._ops_chng = False
+        # type: bool
+        self._saved_chng = False
+        # type: int
+        self._pause_notify = 0
         #
         # Our operational values
         self._dirty = False
-        self._filepath: Optional[str] = None  # The path used to load or last saved to
-        self._using_global: bool = False
+        # type: Optional[str]
+        self._filepath = None  # The path used to load or last saved to
+        # type: bool
+        self._using_global = False
         #
         # Key to property setter dictionary
-        self._key_prop_setters: dict[str,Any] = {
-            config._GPIO_KEY: self._set_gpio,
+        # type: dict[str,Any]
+        self._key_prop_setters = {
+            config._USE_GPIO_KEY: self._set_use_gpio,
+            config._USE_SERIAL_KEY: self._set_use_serial,
             config._SERIAL_PORT_KEY: self._set_serial_port,
             config._INTERFACE_TYPE_KEY: self._set_interface_type,
             config._INVERT_KEY_INPUT_KEY: self._set_invert_key_input,
@@ -192,7 +243,8 @@ class Config:
         }
         #
         # Listeners is a dictionary of Callable(int) keys and int (ChangeType...) values.
-        self._change_listeners: dict[Callable[[int],None],int] = {}  # Start out empty
+        # type: dict[Callable[[int],None],int]
+        self._change_listeners = {}  # Start out empty
         return
 
     def _notify_listeners(self):
@@ -285,25 +337,25 @@ class Config:
         return not self._audio_type == self._p_audio_type
 
     @property
-    def gpio(self) -> bool:
-        return self._gpio
-    @gpio.setter
-    def gpio(self, v: bool) -> None:
-        x = self._gpio
-        self._gpio = v
+    def use_gpio(self) -> bool:
+        return self._use_gpio
+    @use_gpio.setter
+    def use_gpio(self, v: bool) -> None:
+        x = self._use_gpio
+        self._use_gpio = v
         if not v == x:
             self._changed_hw()
         return
-    def _set_gpio(self, v: bool) -> None:
-        self.gpio = v
+    def _set_use_gpio(self, v: bool) -> None:
+        self.use_gpio = v
         return
 
     @property
-    def gpio_p(self) -> bool:
-        return self._p_gpio
+    def use_gpio_p(self) -> bool:
+        return self._p_use_gpio
     @property
-    def gpio_changed(self) -> bool:
-        return not self._gpio == self._p_gpio
+    def use_gpio_changed(self) -> bool:
+        return not self._use_gpio == self._p_use_gpio
 
     @property
     def interface_type(self) -> InterfaceType:
@@ -373,6 +425,27 @@ class Config:
     @property
     def no_key_closer_changed(self) -> bool:
         return not self._no_key_closer == self._p_no_key_closer
+
+    @property
+    def use_serial(self) -> bool:
+        return self._use_serial
+    @use_serial.setter
+    def use_serial(self, v: bool) -> None:
+        x = self._use_serial
+        self._use_serial = v
+        if not v == x:
+            self._changed_hw()
+        return
+    def _set_use_serial(self, v: bool) -> None:
+        self.use_serial = v
+        return
+
+    @property
+    def use_serial_p(self) -> bool:
+        return self._p_use_serial
+    @property
+    def use_serial_changed(self) -> bool:
+        return not self._use_serial == self._p_use_serial
 
     @property
     def serial_port(self) -> str:
@@ -771,7 +844,8 @@ class Config:
         """
         # Hardware Settings
         self._p_audio_type = self._audio_type
-        self._p_gpio = self._gpio
+        self._p_use_gpio = self._use_gpio
+        self._p_use_serial = self._use_serial
         self._p_serial_port = self._serial_port
         self._p_interface_type = self._interface_type
         self._p_invert_key_input = self._invert_key_input
@@ -810,7 +884,8 @@ class Config:
             # Use the 'properties' to set the values in order to properly flag changes
             # Hardware Settings
             muted_cfg.audio_type = cfg_src._audio_type
-            muted_cfg.gpio = cfg_src._gpio
+            muted_cfg.use_gpio = cfg_src._use_gpio
+            muted_cfg.use_serial = cfg_src._use_serial
             muted_cfg.serial_port = cfg_src._serial_port
             muted_cfg.interface_type = cfg_src._interface_type
             muted_cfg.invert_key_input = cfg_src._invert_key_input
@@ -841,7 +916,7 @@ class Config:
         ct = 0
         if self.audio_type_changed:
             ct = ct | ChangeType.HARDWARE
-        if self.gpio_changed:
+        if self.use_gpio_changed:
             ct = ct | ChangeType.HARDWARE
         if self.serial_port_changed:
             ct = ct | ChangeType.HARDWARE
@@ -890,7 +965,8 @@ class Config:
         data = {
             _PYKOB_CFG_VERSION_KEY: self._version,
             config._AUDIO_TYPE_KEY: self._audio_type.name.upper(),
-            config._GPIO_KEY: self._gpio,
+            config._USE_GPIO_KEY: self._use_gpio,
+            config._USE_SERIAL_KEY: self._use_serial,
             config._SERIAL_PORT_KEY: self._serial_port,
             config._INTERFACE_TYPE_KEY: self._interface_type.name.upper(),
             config._INVERT_KEY_INPUT_KEY: self._invert_key_input,
@@ -961,7 +1037,9 @@ class Config:
         # Hardware Settings
         if  not self._p_audio_type == self._audio_type:
             return True
-        if  not self._p_gpio == self._gpio:
+        if  not self._p_use_gpio == self._use_gpio:
+            return True
+        if  not self._p_use_serial == self._use_serial:
             return True
         if  not self._p_serial_port == self._serial_port:
             return True
@@ -1040,18 +1118,30 @@ class Config:
                             log.warn("No configuration version information found in {}".format(fp))
                         else:
                             log.debug("Loading configuration version: {}  This version: {}".format(muted_cfg._version_loaded, VERSION))
+                        # Older configs only had the serial port value not the 'use serial' flag.
+                        # Keep track of whether we get the SERIAL key/value. If we don't and there
+                        # is a serial port value (non None), then enable Serial.
+                        has_use_serial = False
                         for key, value in data.items():
                             if _PYKOB_CFG_VERSION_KEY == key:
                                 pass
                             else:
                                 try:
                                     muted_cfg._key_prop_setters[key](value)
+                                    if key == config._USE_SERIAL_KEY:
+                                        has_use_serial = True
                                 except KeyError as ke:
                                     log.warn("Loading configuration file: {}  Unknown property: {}  With value: {}".format(filename, key, value))
                                     errors += 1
                                 pass
                             pass
                         #
+                        if not has_use_serial:
+                            # The config didn't have the 'use serial' key/value, so set it True if
+                            # there was a Serial Port value and 'use gpio' is False.
+                            if (not muted_cfg.use_gpio) and (not muted_cfg.serial_port is None):
+                                muted_cfg._set_use_serial(True)
+                            pass
                         muted_cfg.set_filepath(filepath)
                     pass
                 else:
@@ -1076,7 +1166,8 @@ class Config:
             with self.notification_pauser() as muted_cfg:
                 # Use the 'properties' to set the values in order to properly flag changes
                 # Hardware Settings
-                muted_cfg.gpio = config.gpio
+                muted_cfg.use_gpio = config.use_gpio
+                muted_cfg.use_serial = config.use_serial
                 muted_cfg.serial_port = config.serial_port
                 muted_cfg.interface_type = config.interface_type
                 muted_cfg.invert_key_input = config.invert_key_input
@@ -1111,7 +1202,8 @@ class Config:
         try:
             # Hardware Settings
             config.set_audio_type(self._audio_type.name)
-            config.set_gpio(self._gpio)
+            config.set_use_gpio(self._use_gpio)
+            config.set_use_serial(self._use_serial)
             config.set_serial_port(self._serial_port)
             config.set_interface_type(self._interface_type.name)
             config.set_invert_key_input(self._invert_key_input)
@@ -1151,8 +1243,9 @@ class Config:
         url = url if url else ''
         f = file
         print("======================================", file=f)
-        print("GPIO interface (Raspberry Pi): {}".format(util.on_off_from_bool(self._gpio)), file=f)
-        print("Serial serial_port: '{}'".format(self._serial_port), file=f)
+        print("GPIO interface (Raspberry Pi): {}".format(util.on_off_from_bool(self._use_gpio)), file=f)
+        print("Serial interface: {}".format(util.on_off_from_bool(self._use_serial)), file=f)
+        print(" Serial port: '{}'".format(self._serial_port), file=f)
         print("--------------------------------------", file=f)
         print("Interface type: {}".format(self._interface_type.name.upper()), file=f)
         print("Invert key input: {}".format(util.on_off_from_bool(self._invert_key_input)), file=f)
@@ -1205,7 +1298,8 @@ class Config:
     def restore_config(self, clear_dirty:bool=True):
         # Hardware Settings
         self._audio_type = self._p_audio_type
-        self._gpio = self._p_gpio
+        self._use_gpio = self._p_use_gpio
+        self._use_serial = self._p_use_serial
         self._serial_port = self._p_serial_port
         self._interface_type = self._p_interface_type
         self._invert_key_input = self._p_invert_key_input
@@ -1382,14 +1476,20 @@ server_url_override = argparse.ArgumentParser(add_help=False)
 server_url_override.add_argument("-U", "--url", metavar="url", dest="server_url",
     help="The KOB Server URL to use (or 'NONE' to use the default).")
 
+use_serial_override = argparse.ArgumentParser(add_help=False)
+use_serial_override.add_argument("-P", "--serial", metavar="serial", dest="use_serial",
+    choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
+    help="'ON' or 'OFF' to indicate whether the Serial key/sounder interface should be used. " +
+        "GPIO takes priority over the Serial interface if both are specified.")
+
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", metavar="portname", dest="serial_port",
     help="The name of the serial port to use (or 'NONE').")
 
-gpio_override = argparse.ArgumentParser(add_help=False)
-gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="gpio",
+use_gpio_override = argparse.ArgumentParser(add_help=False)
+use_gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="use_gpio",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used." +
+    help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used. " +
         "GPIO takes priority over the serial interface if both are specified.")
 
 sound_override = argparse.ArgumentParser(add_help=False)
@@ -1408,7 +1508,7 @@ sounder_override.add_argument(
 )
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
-sounder_pwrsv_override.add_argument("-P", "--pwrsv", metavar="seconds", dest="sounder_power_save", type=int,
+sounder_pwrsv_override.add_argument("--power-save", "--pwrsv", metavar="seconds", dest="sounder_power_save", type=int,
     help="The sounder power-save delay in seconds, or '0' to disable power-save.")
 
 spacing_override = argparse.ArgumentParser(add_help=False)
@@ -1568,6 +1668,10 @@ def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
         if not args.remote is None:
             log.debug("Config - applying 'remote'")
             cfg.remote = strtobool(args.remote)
+    if hasattr(args, "use_serial"):
+        if not args.use_serial is None:
+            log.debug("Config - applying 'use_serial'")
+            cfg.use_serial = strtobool(args.use_serial)
     if hasattr(args, "serial_port"):
         if not args.serial_port is None:
             log.debug("Config - applying 'port'")
@@ -1576,10 +1680,10 @@ def process_config_args(args, cfg:Config=None, fallback=None) -> Config:
                 cfg.serial_port = None
             else:
                 cfg.serial_port = s.strip()
-    if hasattr(args, "gpio"):
-        if not args.gpio is None:
-            log.debug("Config - applying 'gpio'")
-            cfg.gpio = strtobool(args.gpio)
+    if hasattr(args, "use_gpio"):
+        if not args.use_gpio is None:
+            log.debug("Config - applying 'use_gpio'")
+            cfg.use_gpio = strtobool(args.use_gpio)
     if hasattr(args, "server_url"):
         if not args.server_url is None:
             log.debug("Config - applying 'url'")

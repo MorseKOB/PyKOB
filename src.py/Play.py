@@ -62,8 +62,9 @@ def callbackPlayFinished():
 try:
     arg_parser = argparse.ArgumentParser(description="MorseKOB record player", parents= [
         config2.interface_type_override,
+        config2.use_serial_override,
         config2.serial_port_override,
-        config2.gpio_override,
+        config2.use_gpio_override,
         config2.sound_override,
         config2.audio_type_override,
         config2.sounder_override,
@@ -86,7 +87,7 @@ try:
 
     interface_type = cfg.interface_type
     port = cfg.serial_port              # serial port for KOB/sounder interface
-    useGpio = cfg.gpio                  # use GPIO (Raspberry Pi)
+    useGpio = cfg.use_gpio                  # use GPIO (Raspberry Pi)
     sound = cfg.sound                   # use audio
     audio_type = cfg.audio_type         # Sounder or Tone
     sounder = cfg.sounder               # use the physical sounder

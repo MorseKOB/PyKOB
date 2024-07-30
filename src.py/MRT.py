@@ -459,7 +459,7 @@ class Mrt:
         self._kob = kob.KOB(
             interfaceType=self._cfg.interface_type,
             portToUse=self._cfg.serial_port,
-            useGpio=self._cfg.gpio,
+            useGpio=self._cfg.use_gpio,
             useAudio=self._cfg.sound,
             audioType=self._cfg.audio_type,
             useSounder=self._cfg.sounder,
@@ -1078,7 +1078,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
         parents= [
             config2.sound_override,
             config2.sounder_override,
-            config2.gpio_override,
+            config2.use_gpio_override,
+            config2.use_serial_override,
             config2.serial_port_override,
             config2.station_override,
             config2.min_char_speed_override,

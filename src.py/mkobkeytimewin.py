@@ -178,13 +178,13 @@ class MKOBKeyTimeWin(tk.Toplevel):
         bar = fc * fl
         return "{0}{1}{2}".format(lc, bar, tc)
 
-    def _gen_line_text(self, indicator, val, exp, err, like):
+    def _gen_line_text(self, indicator, val, expected, err, like):
         sign = '\u2191' if val < 0 else '\u2193'
         value = int(abs(val))
         err_sign = '-' if err < 0 else ' '
         error = abs(err)
-        return "{0}{1:2d} ({2:4d}) {3}{4:4d} {5}{6:6.1%} {7}".format(
-            indicator, self._wpm, exp, sign, value, err_sign, error, like)
+        return "{0}{1:2d} ({2:6d}) {3}{4:6d} {5}{6:6.1%} {7}".format(
+            indicator, self._wpm, expected, sign, value, err_sign, error, like)
 
     def key_closed(self):
         """

@@ -35,7 +35,7 @@ from pykob import config
 myKOB = None
 try:
     port = config.serial_port
-    use_gpio = config.gpio
+    use_gpio = config.use_gpio
     hwtype = config.interface_type
     sound = config.sound
     sounder = config.sounder

@@ -26,6 +26,17 @@
 			"UNPAGE",
 			"VALUENAME",
 			"vibroplex"
-		]
+		],
+		"terminal.integrated.automationProfile.windows": {
+			"overrideName": "Cygwin",
+			"path": "C:\\usr\\cygwin\\bin\\bash.exe",
+			"args": [
+				"--login",
+        		"-i"
+			],
+			"env": {
+				"CHERE_INVOKING": "1"
+			}
+		}
 	}
 }

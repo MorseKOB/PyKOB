@@ -71,8 +71,9 @@ try:
     arg_parser = argparse.ArgumentParser(description="Monitors a KOB wire, and displays decoded text.", \
         parents=\
         [\
+        config.use_serial_override, \
         config.serial_port_override, \
-        config.gpio_override, \
+        config.use_gpio_override, \
         config.code_type_override, \
         config.interface_type_override, \
         config.sound_override, \

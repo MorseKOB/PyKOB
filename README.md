@@ -215,6 +215,18 @@ folder/directory structure) into a folder.
 PyKOB will run with just the base Python (3.11) installation, However, you
 will probably want to install these libraries to get the most out of it.
 
+You can use a Python virtual environment. There is a *requirements.txt*
+file in the root directory. It can be used to configure the virtual
+environment using the command
+
+``` shell
+pip install -r requirements.txt
+```
+
+Using a Python virtual environment is a great way to do development or to
+run tests. If you would rather configure the system Python environment,
+follow the following steps.
+
 To use the system sound (to simulate a sounder) you will need **PyAudio**.
 To interface with a key & sounder, you will need **pySerial**
 Follow the instructions here:

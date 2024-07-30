@@ -77,7 +77,7 @@ try:
 
     VERSION = '1.5'
     PORT    = config.serial_port # serial port for KOB interface
-    USEGPIO = config.gpio # use the GPIO on Raspberry Pi
+    USEGPIO = config.use_gpio # use the GPIO on Raspberry Pi
     SOUND   = config.sound # whether to enable computer sound for sounder
     SOUNDER = config.sounder # whether to enable a physical sounder
     HWTYPE  = config.interface_type # the key&sounder interface type

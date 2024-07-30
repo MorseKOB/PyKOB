@@ -36,7 +36,8 @@ from pykob.config2 import Config
 import mkobevents
 
 class MKOBActions():
-    def __init__(self, mkwindow, mksl, mkrdr, cfg:Config) -> None:
+    def __init__(self, appver, mkwindow, mksl, mkrdr, cfg:Config) -> None:
+        self._app_ver = appver
         self._cfg = cfg
         self._preferencesDialog = None
         self._km = None # Set in start
@@ -103,6 +104,7 @@ class MKOBActions():
             cfg = self._km.preferences_opening()
             self._preferencesDialog = preferencesWindow.PreferencesWindow(
                 cfg,
+                appVer=self._app_ver,
                 callback=self._preferencesDialogDismissed,
                 quitWhenDismissed=False,
                 allowApply=True,
