@@ -173,7 +173,7 @@ class Selector:
 
         Raise SDSelectorNotFound if a SD-Selector can't be found
         """
-        sdsel_sn_end = SEL_SDSEL_SN_END if not sys.platform == 'win32' else SEL_SDSEL_SN_END  + "A"
+        sdsel_sn_end = SEL_SDSEL_SN_END if not (sys.platform == 'win32' or sys.platform == 'cygwin') else SEL_SDSEL_SN_END  + "A"
         sdsel_port_id = None
         systemSerialPorts = serial.tools.list_ports.comports()
         for sp in systemSerialPorts:

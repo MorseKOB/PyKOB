@@ -337,7 +337,7 @@ def set_decode_at_detected(b):
     ----------
     b : string 'true/false'
         The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
-        will enable decoding at the detected speed. Values of `NO`|`OFF`|`FALSE` 
+        will enable decoding at the detected speed. Values of `NO`|`OFF`|`FALSE`
         will decode at the configured character speed.
     """
     global decode_at_detected
@@ -867,7 +867,7 @@ def read_config():
             # We are on a Windows system
             user_config_file_path = os.path.join(os.environ["LOCALAPPDATA"], os.path.normcase(os.path.join(_APP_NAME, userConfigFileName)))
             app_config_file_path = os.path.join(os.environ["ProgramData"], os.path.normcase(os.path.join(_APP_NAME, app_configFileName)))
-        elif platform_name.startswith("linux") or platform_name.startswith("darwin"): 
+        elif platform_name.startswith("linux") or platform_name.startswith("darwin"):
             # We are on a Linux or Mac system
             user_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), userConfigFileName)))
             app_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), app_configFileName)))
@@ -1145,8 +1145,14 @@ use_serial_override.add_argument(
 )
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", default=serial_port,
-help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+serial_port_override.add_argument(
+    "-p",
+    "--port",
+    default=serial_port,
+    help="The name/ID of the serial port to use, or the special value 'SDIF' to try to find a SilkyDESIGN-Interface, or 'NONE'.",
+    metavar="portname",
+    dest="serial_port"
+)
 
 use_gpio_override = argparse.ArgumentParser(add_help=False)
 use_gpio_override.add_argument(

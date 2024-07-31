@@ -18,6 +18,8 @@ It accepts optional arguments to (among other things...):
 * Specify a speed other than the one configured: `-t wpm`, `--textspeed wpm`
 * Use an MRT Selector device (hardware) to switch between different operation
   settings: `--selector port mrt-selector-spec`
+  'port' can be the special value _SDSEL_ which indicates that MRT should search for a SilkyDESIGN-Selector.
+  'mrt-selector-spec' is a JSON file that defines different configurations to be used. Refer to **MRT-Selector-Spec.md** for details.
 * Connect to a wire other than the one configured: (positional argument)
 
 For a full list of options and descriptions, use the `--help` command line option.

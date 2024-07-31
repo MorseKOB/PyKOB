@@ -134,7 +134,9 @@ This is the one place where the operation of ((MKOB)) will be compared to that o
 
 MorseKOB 2.5(((MorseKOB, MorseKOB 2.5))) doesn’t track the state of the physical key’s closer in its interface. It treats its keyboard sender, its system (computer) audio sounder, and its Circuit Closer checkbox as a ‘separate circuit’ that is connected in series with the connected physical key and sounder (loop) and the KOBServer wire (circuit) that others are also connected into.
 
-The operation of the Virtual Closer in ((MKOB)) was designed to allow the use of a physical key and sounder, with occasional use of the Keyboard Sender without requiring interaction with the ((MKOB)) user interface. The circuit is opened and closed using the physical key’s closer and, when needed, text can be entered using the keyboard, then you can go directly back to the physical key to continue sending. When you are done, you close the key’s closer, and you are ready to receive code from the other operators connected to the wire.
+The operation of the Virtual Closer in ((MKOB)) was designed to allow the use of a physical key and sounder, with occasional use of the ((Keyboard Sender)) without requiring interaction with the ((MKOB)) user interface. The circuit is opened and closed using the physical key’s closer and, when needed, text can be entered using the keyboard, then you can go directly back to the physical key to continue sending. When you are done, you close the key’s closer, and you are ready to receive code from the other operators connected to the wire.
+
+However, when using a ((KOB/Loop)) you need to have the physical key closed in order for the sounder to sound. If you want to send from the ((Keyboard Sender)) and hear the code on the sounder, you can leave the physical key closed and uncheck the ((Key Closed)) box and then send from the keyboard. Opening and closing the physical key will once again sync up the Key Closed state in the interface to the state of the key. Similarly, with the key's closer open, you can check the Key Closed box and ((MKOB)) will treat the circuit as closed. Again, closing the key will re-sync the interface to the state of the key.
 
 If you don’t have a physical key and/or sounder connected, that’s fine. Just use the Virtual Closer, the Keyboard Sender, and the System sound.
 
@@ -220,10 +222,10 @@ End recording of the current session.
 Allows selecting a ((PyKOB)) recording file (.pkrec or .json file). The selected recording file will start playing. Refer to the Record & Playback section for more information about controlling playback.
 
 ==== Section 3 - Application Preferences (Configuration)
-Operations pertaining to application preferences (configuration).
+Operations pertaining to application preferences (configuration)(((configuration, aka preferences))).
 
 ===== Preferences…
-Opens the Preferences dialog to allow setting preference/configuration options. Refer to the Preferences section for more information.
+Opens the ((Preferences)) dialog to allow setting preference/((configuration)) options. Refer to the Preferences section for more information.
 
 ===== Load…
 Allows selecting a configuration file that is then loaded and used as the current configuration.
@@ -263,7 +265,7 @@ Refer to the separate Key Timing Graph section for more information.
 === Help Menu
 ==== Helpful Information and Actions
 ===== Active Wires
-Opens a separate window that displays the currently active wires on the KOBServer. The list can be used to select a wire to connect to (single click) and to connect (double click). If al-ready connected, it will switch the wire.
+Opens a separate window that displays the currently active wires on the KOBServer. The list can be used to select a wire to connect to (single click) and to connect (double click). If already connected, it will switch the wire.
 
 ===== Keyboard Shortcuts
 Opens a separate window that displays the keyboard shortcuts available in ((MKOB)).
@@ -277,7 +279,7 @@ Lists version information for ((MKOB)), ((pykob)), and some of the primary modul
 
 [%nonfacing]
 == Preferences
-All of the application preferences (also referred to as the configuration) can be set using the Preferences Dialog accessed using the File:Preferences… menu. They can also be listed and set using the Configure.py command line utility. Some of the configuration can also be set using the operational controls in the interface.
+All of the application preferences (also referred to as the configuration) can be set using the Preferences Dialog accessed using the File:Preferences… menu. They can also be listed and set using the *((Configure))* (((Configure, Command line utility))) command line utility. Some of the configuration can also be set using the operational controls in the interface.
 
 The Preferences dialog contains three tabs that help organize the application settings.
 
@@ -292,9 +294,11 @@ image::preferences-base.png[Base Hardware/Equipment Preferences, 50%]
 ==== Local Interface
 Specifies the interface to a physical key and sounder.
 
-* Key and sounder interface:
-** None – No interface is to be used
-** Serial Port – A serial interface to either a key, a sounder, or a KOB, is used. The drop-down menu contains a list of serial devices found.
+* ((Key and sounder interface)):
+** None (((None, interface)))– No interface is to be used
+** Serial Port (((Serial, interface)))– A serial interface to either a key, a sounder, or a KOB, is used. The drop-down menu contains a list of serial devices found. An interface value that isn't currently available (or doesn't show up) can be entered manually.
++
+The special value _SDIF_ (((SDIF, SilkyDESIGN-Interface))) can be manually entered to have MKOB look for a SilkyDESIGN-Interface when it runs.
 ** GPIO (Raspberry Pi) – The GPIO on a Raspberry Pi is used to interface to a key, a sounder, or a KOB.
 * Equipment type:
 ** Local loop (key and sounder connected in series) – This is often considered ‘the traditional configuration’, as it is how actual telegraph stations were set up. This requires a special loop interface in order to be able to detect the key as well as drive the sounder with them connected in series. This is how a KOB (Key on Board) is wired.
@@ -304,9 +308,11 @@ Specifies the interface to a physical key and sounder.
 This checkbox enables the use of the system sound to simulate a sounder or provide a tone.
 ** Type: drop-down selection of
 *** Sounder – Provide a simulated sounder (‘click’ (down), ‘clack’ (up))
-*** Tone – Use a radio-style tone (on/off)
+*** Tone – Use a radio-style (CW) ((tone)) (((tone, system sound)))
 * Use local sounder:
 This checkbox enables the use of the local sounder (when one is connected). Disabling the local sounder can be helpful when one wants to practice without disturbing others. The system sound can be used with headphones while still being able to use the physical key. This even works with most loop interfaces and a KOB.
+
+**New in MKOB ((version 4.4.1))**, the ((Key and sounder interface)) can be set to _None_ (((None, interface))) while selecting/retaining a value for the port (the value in the entry field). This allows disabling the interface while keeping the port value for later use.
 
 [%nonfacing]
 === Morse Code
@@ -322,6 +328,8 @@ The Farnsworth Method is a technique to aid in learning to copy code. Using the 
 ** *Character speed*: The speed the characters will be sent and decoded at
 ** *Text (word) speed*: The speed the overall text will be delivered at
 The text speed will always be less than or equal to the character speed.
++
+The speeds and spacing option (((Farnsworth, speed and spacing))) can also be set in the main application interface.
 
 * *Farnsworth spacing*:
 Controls where space (additional time) will be added to effectively slow down the overall speed of the delivered text.
@@ -329,12 +337,16 @@ Controls where space (additional time) will be added to effectively slow down th
 ** *None* – No additional space will be added. Selecting this will disable the Text (word) speed selector, as the overall speed will be the character speed.
 ** *Between characters* – Space, as needed, will be inserted between each character sent.
 ** *Between words* – Space, as needed, will be only be inserted between words. Words themselves, will be delivered at the full character speed.
-
-The speeds and spacing option can be set in the main application interface.
++
+The speeds and spacing option (((Farnsworth, speed and spacing))) can also be set in the main application interface.
 
 * *Morse code type*:
 ** *American* – Use American (Landline) Morse when sending from the Keyboard or decoding in the Reader.
 ** *International* – Use International (Continental) code when sending from the Keyboard or decoding in the Reader.
+
+* *((Decode Morse at detected speed))*:
+** When checked, MKOB will use the speed that it is detecting for the incoming code to decode and display the text.
+** When unchecked, MKOB will use the configured speed (the *Character speed*) to decode and display the text.
 
 [%nonfacing]
 === Advanced
@@ -348,10 +360,11 @@ image::preferences-advanced.png[Advanced Preferences, 50%]
 Additional control of the local, physical, interface.
 
 * *Key and sounder interface*:
-** *Sounder power save (seconds)* 
-Since a closed-loop telegraph has the sounder energized whenever it is idle, this feature allows power to be saved and the risk of fire to be reduced, by de-energizing the sounder after a period of no activity. When the specified number of seconds elapses with no activity of the sounder, the sounder will be powered off. Any activity, whether received from a connected wire or initiated on the local key or Keyboard Sender, will re-energize the sounder and normal operation will continue.
+** *Sounder power save (seconds)*
+Since a closed-loop telegraph has the sounder energized whenever it is idle, this feature allows power to be saved by de-energizing the sounder after a period of no activity. When the specified number of seconds elapses with no activity of the sounder, the sounder will be powered off. Any activity, whether received from a connected wire or initiated on the ((local key)) or ((Keyboard Sender)), will re-energize the sounder (((sounder, re-energize))) and normal operation will continue. This can be very helpful when the KOB/loop is being powered by a battery.
++
+A value of zero (0) disables this functionality.(((Sounder power save, disable)))
 
-A value of zero (0) disables this functionality.
 ** *Sound local code*:
 This enables/disables the sounding of code keyed locally, from either the physical key or from the Keyboard Sender.
 ** *Invert key input*:
@@ -367,8 +380,8 @@ If the Server or Port (or both) are cleared, the application will use the defaul
 The Wire number can be set in the main application interface.
 * *Office/Station ID*: The Office ID used when connecting to the KOBServer Wire
 For an individual, this is typically a two-letter designator that identifies your office/station, followed by some brief space or comma separated information that may be interesting to others. For example, your initials, your location, etc. When selecting a designator, it is good practice to observe the active wires for a while and do your best to select something not being used by someone else.
-
 For a feed of some type, this is a description of the feed, including a designator identifying who is providing it. If you are interested in providing a feed, please contact the MTC to get a Wire allocated, and be added to the wire plan.
+
 * *Automatically connect at startup*: This causes ((MKOB)) to connect to the configured wire as soon as it is started, without requiring the Connect button to be pressed.
 * *Transmit to wire (to remote stations)*:
 Transmit keyed code from either the physical key or the Keyboard Sender to the KOBServer wire (when connected). Sending to the wire is typically what is desired, but this option can be used as a safeguard to keep you from accidentally sending code when you are practicing.
@@ -377,19 +390,20 @@ Transmit keyed code from either the physical key or the Keyboard Sender to the K
 Configuration for controlling the amount of logging sent to the console.
 
 * *Level*: The desired level of logging information
+
 Information is logged at four (4) main levels:
 
 *Error* – This is information that represents a serious error in the application operation. This generally means that some aspect of the application is not functioning and might even result in the application terminating.
-This is Level -3 (minus 3)
+This is Level -3 (minus 3)(((Error -3, Level)))
 
-*Warn* – This is information about something that might cause, or by causing, the application to not operate as intended/desired.
-This is Level -2 (minus 2)
+*Warn* – This is information about something that might cause, or be causing, the application to not operate as intended/desired.
+This is Level -2 (minus 2)(((Warn -2, Level)))
 
 *Info* – This is information about the operation, configuration, or other aspect of the application or environment that might be interesting or helpful.
-This is Level -1 (minus 1)
+This is Level -1 (minus 1)(((Info -1, Level)))
 
-*Debug* – Debugging information is actually provided at a number of levels and it intended to help in troubleshooting problems in the operation of the application.
-This is Level 1+ (1 and greater)
+*Debug* – Debugging information is actually provided at a number of levels and is intended to help in troubleshooting problems in the operation of the application.
+This is Level 1+ (1 and greater)(((Debug 1+, Level)))
 
 The *Level* value for this configuration setting is used to control what is logged:
 
@@ -397,18 +411,21 @@ The *Level* value for this configuration setting is used to control what is logg
 * *-1* – Log Error and Warn level information. Do not log Info or Debug information.
 * *-2* – Log Error level information. Do not log Warn, Info or Debug information.
 * *-3* – Do not log any information (completely silent).
-* *1* (and greater) – Log Error, Warn, and Info level information, as well as Debug information designated as Level-X, where X is equal to or less than the value specified. The higher the number, the more debugging information that will be logged.
+* *1* (and greater) – Log Error, Warn, and Info level information, as well as Debug information designated as Level-X, where X is equal to or less than the value specified. The higher the number, the more debugging information that will be logged.(((higher number, Level, Debug)))
 
 [%nonfacing]
 === Cancel, Apply, Save
-The buttons at the bottom allow you to:
+The buttons at the bottom all close the Preferences dialog. They allow you to:
 
-* *Cancel* – Close the Preferences dialog without making any changes to the active configuration (even if changes have been made within the dialog).
+* *Cancel* – Do not make any changes to the active configuration (even if changes have been made within the dialog).
 * *Apply* – Apply changes that have been made to the active configuration, but do not save them. This is often used when making temporary changes, or when you want to save a new configuration based on the active/current configuration. To do that, refer to the additional information below.
 * *Save* – Apply changes that have been made to the active configuration and save the changes out to the current configuration (a named configuration file or the global configuration).
 
-Creating a New Configuration or Updating an Existing Configuration
-Using the Preferences dialog and the File menu, new named configurations can be created or an existing configuration can be updated. The steps are:
+[%nonfacing]
+== Creating a ((New Configuration)) or ((Updating an Existing Configuration))(((Configuration, New)))(((Configuration, Update existing)))
+Using the Preferences dialog and the File menu, new named configurations can be created or an existing configuration can be updated.
+
+The steps are:
 
 1.	Start with an existing configuration. Do this by loading a configuration file or the global configuration using the File menu.
 2.	Use the Preferences dialog to make any changes desired.
@@ -416,15 +433,17 @@ Using the Preferences dialog and the File menu, new named configurations can be 
 4.	Use the File:Save As… to save a named configuration file, or…
 5.	Use the File:Save Global to save to the global configuration.
 
-The Configure.py command line utility can also read from one configuration, make changes, and save to a different configuration. Use the `--help` command line option of the Configure utility to see information about its operation.
+The *((Configure))* (((Configure, Command line utility))) command line utility can also read from one configuration, make changes, and save to a different configuration. Use the `--help` command line option of the Configure utility to see information about its operation.
 
-Starting ((MKOB)) with a Specific Configuration (and multiple instances)
+[%nonfacing]
+== Starting ((MKOB)) with a ((Specific Configuration)) (and multiple instances)(((multiple instances, MKOB)))
+
 ((MKOB)) provides command line options that allow starting with a specific configuration. The option can be used to create desktop shortcuts or scripts that run ((MKOB)) in a specific way.
 
 Multiple instances of ((MKOB)) can be running at the same time using different configurations to connect to different servers, different wires, or use different connected equipment.
 
 (((pykob)))
-This is done with a single installation of ((MKOB)) (pykob). There is no need to install ((MKOB)) (pykob) multiple times.
+This is done with a single installation of ((MKOB)) (pykob). There is no need to install ((MKOB)) (pykob) multiple times.(((no need, install multiple copies)))
 
 The command line option of interest is:
 * *--config config-file*
@@ -441,41 +460,51 @@ Here are recommendations for Preference/Configuration settings for some typical 
 Of course, these are not all the possibilities, but these are some of the most common.
 
 Physical KOB (Key on Board) device connected using a ‘loop’ interface:
-1.	Select the serial port used to connect the interface.
-2.	Select ‘Local loop’ as the equipment type.
-3.	Uncheck ‘Use system sound’.
+
+.	Select the serial port used to connect the interface.
+.	Select ‘Local loop’ as the equipment type.
+.	Check ‘Use local sounder’.
+.	Uncheck ‘Use system sound’.
 
 Physical Key & Sounder connected through the interface, but not connected in series:
-1.	Select the serial port used to connect the interface.
-2.	Select ‘Separate key and sounder’ as the equipment type.
-3.	Uncheck ‘Use system sound’.
+
+.	Select the serial port used to connect the interface.
+.	Select ‘Separate key and sounder’ as the equipment type.
+.	Check ‘Use local sounder’.
+.	Uncheck ‘Use system sound’.
 
 Physical Key connected to the DSR line of a serial port (no sounder):
-1.	Select the serial port used to connect the interface.
-2.	Select ‘Separate key and sounder’ as the equipment type.
-3.	Uncheck ‘Use local sounder’.
-4.	Check ‘Use system sound’ to provide the synthesized sounder.
-5.	(optionally select ‘Tone’ rather than ‘Sounder’)
+
+.	Select the serial port used to connect the interface.
+.	Select ‘Separate key and sounder’ as the equipment type.
+.	Uncheck ‘Use local sounder’.
+.	Check ‘Use system sound’ to provide the synthesized sounder.
+.	(if using ((International Code)), optionally select ‘Tone’ rather than ‘Sounder’)(((tone, International Code)))
 
 Physical Sounder connected through an interface to the RTS line of a serial port (no key):
-1.	Select the serial port used to connect the interface.
-2.	Select ‘Separate key and sounder’ as the equipment type.
-3.	Uncheck ‘Use system sound’.
+
+.	Select the serial port used to connect the interface.
+.	Select ‘Separate key and sounder’ as the equipment type.
+.	Check ‘Use local sounder’.
+.	Uncheck ‘Use system sound’.
 
 No Physical Equipment:
-1.	Select ‘None’ for ‘Key and sounder interface’.
-2.	Uncheck ‘Use local sounder’.
-3.	Check ‘Use system sound’ to provide the synthesized sounder.
-4.	(optionally select ‘Tone’ rather than ‘Sounder’)
 
-Physical KOB connected using a ‘loop’ interface – with ‘private’ practice:
-Using most of the available Loop interfaces and a KOB, ((MKOB)) allows you to disable the sounder, use the system sound (allowing you to use headphones), and still be able to key using the physical key on the KOB! This allows you to practice your physical keying without disturbing others in your house, even though your equipment is a Loop and KOB!!!
+.	Select ‘None’ for ‘Key and sounder interface’.
+.	Uncheck ‘Use local sounder’.
+.	Check ‘Use system sound’ to provide the synthesized sounder.
+.	(if using ((International Code)), optionally select ‘Tone’ rather than ‘Sounder’)(((tone, International Code)))
 
-1.	Select the serial port used to connect the interface.
-2.	Select ‘Local loop’ as the equipment type.
-3.	Uncheck ‘Use local sounder’.
-4.	Check ‘Use system sound’.
+Physical KOB connected using a ‘loop’ interface – for ‘private’ practice:
 
+TIP: If using the Les, Chip, or SilkyDESIGN Loop interfaces footnote:loopinterfaces[The Les (circuit), Chip interface, and SilkyDESIGN interface have been use to demonstrate this functionality. It is possible that other KOB/Loop interfaces will also work in this manner. If you have a different interface, and it works in this way, let us know and it will be noted.]
+and a KOB, ((MKOB)) allows you to disable the sounder, use the system sound (allowing you to use headphones), and still be able to key using the physical key on the KOB! This allows you to practice your physical keying without disturbing others in your house, even though your equipment is a Loop and KOB!!!
+
+.	Select the serial port used to connect the interface.
+.	Select ‘Local loop’ as the equipment type.
+.	Uncheck ‘Use local sounder’.
+.	Check ‘Use system sound’.
++
 Plug in your headphones/earbuds and start keying. No excuse now!
 
 [%nonfacing]
@@ -532,7 +561,7 @@ It is important to understand that the graph is not decoding Morse. It is select
 == Recording and Playing Back Sessions
 [%nonfacing]
 === Record
-You can start recording a session using the File:Record menu entry. That will start recording the current session using an automatically generated file name (based on the current date and time). The name of the file will be presented in a dialog box and displayed in the ((MKOB)) status bar.
+You can start recording a session using the File:Record menu entry. That will start recording the current session using an automatically generated file name (based on the current date and time). The name of the file will be presented in a dialog box and displayed in the ((MKOB)) status bar. The recording will be stored in the folder containing MKOB.(((recording, file location)))
 
 Once the recording is started, all code activity (local and from the connected wire) will be recorded.
 
@@ -549,7 +578,7 @@ A recording is loaded to play using the File:Play… menu entry. The menu entry 
 
 ((MKOB)) compresses long periods of ‘dead’/idle space (silence) down to five (5) seconds of re-produced idle time. The Play utility allows adjusting the period of idle time that is reproduced (allowing for exact reproduction of the recorded session).
 
-Recording playback is treated like local keying, except that it will not send to a wire. If ((MKOB)) is currently connected to a wire, it will disconnect before playing a recording. Connecting is disabled while a recording is playing. This is done to avoid the recording being misconstrued by others as a live session. To provide a recording on a live wire, you can use the Feed utility (part of the ((PyKOB)) package). That allows you to provide a feed sourced from a recording, but it identifies the feed as the source rather than the individual offices that contributed to the recording. This is how Wire-134 is sourced from the recording of Instructograph Tape 5.
+Recording playback is treated like local keying, except that it will not send to a wire. If ((MKOB)) is currently connected to a wire, it will disconnect before playing a recording. Connecting is disabled while a recording is playing. This is done to avoid the recording being misconstrued by others as a live session. To provide a recording on a live wire, you can use the *((Feed))* utility (part of the ((PyKOB)) package). That allows you to provide a feed sourced from a recording, but it identifies the feed as the source rather than the individual offices that contributed to the recording. This is how Wire-134 is sourced from the recording of Instructograph Tape 5.
 
 ==== Playback Control
 During playback, keyboard keys can be used to pause, move, and stop playback.
@@ -597,8 +626,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((MKOB)) Version 4.4.
-Edit date: 7-2-2024
+This document reflects the features of ((MKOB)) ((Version 4.4.1))
+Edit date: 7-30-2024
 
 MIT License
 

@@ -38,6 +38,7 @@ import tkinter.messagebox as msgbox
 from typing import Optional
 
 from pykob import config, config2, kob, morse, internet, recorder, log
+from pykob.preferencesWindow import PreferencesWindow
 from pykob.recorder import PlaybackState, Recorder
 from pykob.config2 import Config, ConfigLoadError
 from mkobenv import MKOBEnv
@@ -138,6 +139,7 @@ class MKOBMain:
                 self._kob.shutdown()
             self._kob = kob.KOB(
                 interfaceType=cfg.interface_type,
+                useSerial=cfg.use_serial,
                 portToUse=cfg.serial_port,
                 useGpio=cfg.use_gpio,
                 useAudio=cfg.sound,
@@ -915,7 +917,7 @@ class MKOBMain:
         """
         return self._key_graph_win and MKOBKeyTimeWin.active
 
-    def _update_from_config(self, cfg:Config, ct:config2.ChangeType):
+    def _update_from_config(self, cfg, ct): # type: (Config, config2.ChangeType) -> None
         log.debug("MKMain._update_from_config. CT:{}".format(ct), 2)
         try:
             kob_ = self.Kob
@@ -948,21 +950,21 @@ class MKOBMain:
                 kob_.sounder_power_save_secs = cfg.sounder_power_save
                 if cfg.sound_changed or cfg.audio_type_changed:
                     kob_.change_audio(cfg.sound, cfg.audio_type)
-                if cfg.interface_type_changed or cfg.serial_port_changed or cfg.use_gpio_changed:
-                    kob_.change_hardware(cfg.interface_type, cfg.serial_port, cfg.use_gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
+                if cfg.interface_type_changed or cfg.use_serial_changed or cfg.serial_port_changed or cfg.use_gpio_changed:
+                    kob_.change_hardware(cfg.interface_type, cfg.use_serial, cfg.serial_port, cfg.use_gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
                 elif cfg.sounder_changed:
                     kob_.use_sounder = cfg.sounder
         finally:
             self._set_on_cfg = True
         return
 
-    def preferences_closed(self, prefsDialog):
+    def preferences_closed(self, prefsDialog): # type: (PreferencesWindow) -> None
         """
         The preferences (config) window returned.
         """
         log.debug("MKMain.preferences_closed.")
         if not prefsDialog.cancelled:
-            cfg_from_prefs:Config = prefsDialog.cfg
+            cfg_from_prefs = prefsDialog.cfg  # type: Config
             ct = cfg_from_prefs.get_changes_types()
             log.debug("mkm - Preferences Dialog closed. Change types: {}".format(ct), 1)
             if not ct == 0:

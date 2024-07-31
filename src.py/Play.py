@@ -86,6 +86,7 @@ try:
     log.debug("Starting Play")
 
     interface_type = cfg.interface_type
+    useSerial = cfg.use_serial
     port = cfg.serial_port              # serial port for KOB/sounder interface
     useGpio = cfg.use_gpio                  # use GPIO (Raspberry Pi)
     sound = cfg.sound                   # use audio
@@ -105,7 +106,7 @@ try:
         log.err("Recording file not found: {}".format(playback_file))
         sys.exit(1)
 
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound, audioType=audio_type, useSounder=sounder, interfaceType=interface_type)
+    myKOB = kob.KOB(useSerial=useSerial, portToUse=port, useGpio=useGpio, useAudio=sound, audioType=audio_type, useSounder=sounder, interfaceType=interface_type)
 
     myRecorder = recorder.Recorder(None, playback_file, play_code_callback=callbackPlay, play_finished_callback=callbackPlayFinished, station_id="PyKOB Player")
     myRecorder.playback_start(list_data=args.list_data, max_silence=args.max_silence, speed_factor=args.speed_factor)

@@ -918,6 +918,8 @@ class Config:
             ct = ct | ChangeType.HARDWARE
         if self.use_gpio_changed:
             ct = ct | ChangeType.HARDWARE
+        if self.use_serial_changed:
+            ct = ct | ChangeType.HARDWARE
         if self.serial_port_changed:
             ct = ct | ChangeType.HARDWARE
         if self.interface_type_changed:
@@ -1479,12 +1481,12 @@ server_url_override.add_argument("-U", "--url", metavar="url", dest="server_url"
 use_serial_override = argparse.ArgumentParser(add_help=False)
 use_serial_override.add_argument("-P", "--serial", metavar="serial", dest="use_serial",
     choices=["ON", "On", "on", "YES", "Yes", "yes", "OFF", "Off", "off", "NO", "No", "no"],
-    help="'ON' or 'OFF' to indicate whether the Serial key/sounder interface should be used. " +
+    help="'ON' or 'OFF' to indicate whether a Serial key/sounder interface should be used. " +
         "GPIO takes priority over the Serial interface if both are specified.")
 
 serial_port_override = argparse.ArgumentParser(add_help=False)
 serial_port_override.add_argument("-p", "--port", metavar="portname", dest="serial_port",
-    help="The name of the serial port to use (or 'NONE').")
+    help="The name/ID of the serial port to use, or the special value 'SDIF' to try to find a SilkyDESIGN-Interface, or 'NONE'.")
 
 use_gpio_override = argparse.ArgumentParser(add_help=False)
 use_gpio_override.add_argument("-g", "--gpio", metavar="gpio", dest="use_gpio",

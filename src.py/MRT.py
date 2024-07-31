@@ -458,6 +458,7 @@ class Mrt:
 
         self._kob = kob.KOB(
             interfaceType=self._cfg.interface_type,
+            useSerial=self._cfg.use_serial,
             portToUse=self._cfg.serial_port,
             useGpio=self._cfg.use_gpio,
             useAudio=self._cfg.sound,
