@@ -79,8 +79,9 @@ _APP_NAME = "pykob"
 # INI Section
 _CONFIG_SECTION = "PYKOB"
 # System/Machine INI file Parameters/Keys
+_USE_SERIAL_KEY = "SERIAL"
 _SERIAL_PORT_KEY = "PORT"
-_GPIO_KEY = "GPIO"
+_USE_GPIO_KEY = "GPIO"
 # User INI file Parameters/Keys
 _AUDIO_TYPE_KEY = "AUDIO_TYPE"
 _AUTO_CONNECT_KEY = "AUTO_CONNECT"
@@ -125,8 +126,9 @@ user_home = None
 user_name = None
 
 # Machine/System Settings
+use_serial = False   # Indicates if serial should be used (prior only used None port value)
 serial_port = None
-gpio = False
+use_gpio = False
 
 # User Settings
 audio_type = AudioType.SOUNDER
@@ -335,7 +337,7 @@ def set_decode_at_detected(b):
     ----------
     b : string 'true/false'
         The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
-        will enable decoding at the detected speed. Values of `NO`|`OFF`|`FALSE` 
+        will enable decoding at the detected speed. Values of `NO`|`OFF`|`FALSE`
         will decode at the configured character speed.
     """
     global decode_at_detected
@@ -475,6 +477,31 @@ def set_remote(r):
         raise
     return
 
+def set_use_serial(s):
+    """Sets the key/sounder interface to Serial
+
+    When set to `True` via a value of "TRUE"/"ON"/"YES"/(or True) the application should
+    use the serial port configured via `set_serial_port`. Even if True, if the serial
+    port value is `None` the serial will not be used.
+
+    Parameters
+    ----------
+    s : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will enable Serial interface and disable GPIO. Values of `NO`|`OFF`|`FALSE` will disable serial.
+    """
+
+    global use_serial
+    try:
+        use_serial = strtobool(str(s))
+        if use_serial:
+            set_use_gpio(False)
+        app_config.set(_CONFIG_SECTION, _USE_SERIAL_KEY, util.on_off_from_bool(use_serial))
+    except ValueError as ex:
+        log.err("Serial value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+    return
+
 def set_serial_port(p):
     """Sets the name/path of the serial/tty port to use for a
     key+sounder/loop interface
@@ -487,9 +514,12 @@ def set_serial_port(p):
 
     global serial_port
     serial_port = util.str_none_or_value(p)
+    if serial_port is None:
+        set_use_serial(False)
     app_config.set(_CONFIG_SECTION, _SERIAL_PORT_KEY, serial_port)
+    return
 
-def set_gpio(s):
+def set_use_gpio(s):
     """Sets the key/sounder interface to Raspberry Pi GPIO
 
     When set to `True` via a value of "TRUE"/"ON"/"YES" the application should
@@ -499,14 +529,16 @@ def set_gpio(s):
     ----------
     s : str
         The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
-        will enable GPIO interface. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
+        will enable GPIO interface and disable Serial. Values of `NO`|`OFF`|`FALSE` will disable GPIO.
         Serial port will become active (if configured for sounder = ON)
     """
 
-    global gpio
+    global use_gpio
     try:
-        gpio = strtobool(str(s))
-        app_config.set(_CONFIG_SECTION, _GPIO_KEY, util.on_off_from_bool(gpio))
+        use_gpio = strtobool(str(s))
+        if use_gpio:
+            set_use_serial(False)
+        app_config.set(_CONFIG_SECTION, _USE_GPIO_KEY, util.on_off_from_bool(use_gpio))
     except ValueError as ex:
         log.err("GPIO value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
         raise
@@ -722,8 +754,9 @@ def print_config():
     url = util.str_none_or_value(server_url)
     url = url if url else ''
     print("======================================")
-    print("Serial serial_port: '{}'".format(serial_port))
-    print("GPIO interface (Raspberry Pi):", util.on_off_from_bool(gpio))
+    print("Serial interface:", util.on_off_from_bool(use_serial))
+    print("Serial port: '{}'".format(serial_port))
+    print("GPIO interface (Raspberry Pi):", util.on_off_from_bool(use_gpio))
     print("--------------------------------------")
     print("Audio type:", audio_type.name.upper())
     print("Auto Connect to Wire:", util.on_off_from_bool(auto_connect))
@@ -779,8 +812,9 @@ def read_config():
     global user_home
     global user_name
     #
+    global use_serial
     global serial_port
-    global gpio
+    global use_gpio
     #
     global audio_type
     global auto_connect
@@ -829,22 +863,30 @@ def read_config():
         app_configFileName = "config2_app.ini"
 
         # Create the user and application configuration paths
-        if system_name == "Windows":
+        if platform_name == "win32" or platform_name == "cygwin":
+            # We are on a Windows system
             user_config_file_path = os.path.join(os.environ["LOCALAPPDATA"], os.path.normcase(os.path.join(_APP_NAME, userConfigFileName)))
             app_config_file_path = os.path.join(os.environ["ProgramData"], os.path.normcase(os.path.join(_APP_NAME, app_configFileName)))
-        elif system_name == "Linux" or system_name == "Darwin": # Linux or Mac
+        elif platform_name.startswith("linux") or platform_name.startswith("darwin"):
+            # We are on a Linux or Mac system
             user_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), userConfigFileName)))
             app_config_file_path = os.path.join(user_home, os.path.normcase(os.path.join(".{}".format(_APP_NAME), app_configFileName)))
         else:
-            log.err("Unknown System name")
-            exit
+            log.err("Unknown Platform name: '{}'".format(platform_name))
+            sys.exit(1)
         if user_config_dir is None:
-            user_config_dir = os.path.dirname(user_config_file_path)
+            if not user_config_file_path is None:
+                user_config_dir = os.path.dirname(user_config_file_path)
+            else:
+                user_config_dir = ""
         if app_config_dir is None:
-            app_config_dir = os.path.dirname(app_config_file_path)
+            if not app_config_file_path is None:
+                app_config_dir = os.path.dirname(app_config_file_path)
+            else:
+                app_config_dir = ""
     except KeyError as ex:
         log.err("Key '{}' not found in environment.".format(ex.args[0]))
-        exit
+        sys.exit(1)
 
     create_config_files_if_needed()
 
@@ -869,7 +911,11 @@ def read_config():
         _WIRE_KEY:"101",
         _TEXT_SPEED_KEY:"18"
     }
-    app_config_defaults = {"PORT":"", "GPIO":"OFF"}
+    app_config_defaults = {
+        _USE_SERIAL_KEY:"OFF",
+        _SERIAL_PORT_KEY:"",
+        _USE_GPIO_KEY:"OFF"
+    }
 
     user_config = configparser.ConfigParser(defaults=user_config_defaults, allow_no_value=True, default_section=_CONFIG_SECTION)
     app_config = configparser.ConfigParser(defaults=app_config_defaults, allow_no_value=True, default_section=_CONFIG_SECTION)
@@ -881,15 +927,22 @@ def read_config():
         ###
         # Get the System (App) config values
         ###
-        serial_port = app_config.get(_CONFIG_SECTION, _SERIAL_PORT_KEY)
-        # If there isn't a PORT value set PORT to None
+        __option = "Serial interface"
+        __key = _USE_SERIAL_KEY
+        use_serial = app_config.getboolean(_CONFIG_SECTION, __key)
+        __option = "Serial Port"
+        __key = _SERIAL_PORT_KEY
+        serial_port = app_config.get(_CONFIG_SECTION, __key)
+        # If there isn't a PORT value set PORT to None and disable Serial
         if not serial_port:
             serial_port = None
-
+            use_serial = False
         # GPIO (Raspberry Pi)
         __option = "GPIO interface"
-        __key = _GPIO_KEY
-        gpio = app_config.getboolean(_CONFIG_SECTION, __key)
+        __key = _USE_GPIO_KEY
+        use_gpio = app_config.getboolean(_CONFIG_SECTION, __key)
+        if use_gpio:
+            use_serial = False  # Use GPIO takes priority
 
         ###
         # Get the User config values
@@ -1079,20 +1132,38 @@ server_url_override = argparse.ArgumentParser(add_help=False)
 server_url_override.add_argument("-U", "--url", default=server_url,
 help="The KOB Server URL to use (or 'NONE' to use the default).", metavar="url", dest="server_url")
 
-serial_port_override = argparse.ArgumentParser(add_help=False)
-serial_port_override.add_argument("-p", "--port", default=serial_port,
-help="The name of the serial port to use (or 'NONE').", metavar="portname", dest="serial_port")
+use_serial_override = argparse.ArgumentParser(add_help=False)
+use_serial_override.add_argument(
+    "-P",
+    "--serial",
+    default="ON" if use_serial else "OFF",
+    choices=["ON","On","on","YES","Yes","yes","OFF","Off","off","NO","No","no"],
+    help="'ON' or 'OFF' to indicate whether a Serial key/sounder interface should be used.\
+ GPIO takes priority over the Serial interface if both are specified.",
+    metavar="serial",
+    dest="use_serial",
+)
 
-gpio_override = argparse.ArgumentParser(add_help=False)
-gpio_override.add_argument(
+serial_port_override = argparse.ArgumentParser(add_help=False)
+serial_port_override.add_argument(
+    "-p",
+    "--port",
+    default=serial_port,
+    help="The name/ID of the serial port to use, or the special value 'SDIF' to try to find a SilkyDESIGN-Interface, or 'NONE'.",
+    metavar="portname",
+    dest="serial_port"
+)
+
+use_gpio_override = argparse.ArgumentParser(add_help=False)
+use_gpio_override.add_argument(
     "-g",
     "--gpio",
-    default="ON" if gpio else "OFF",
+    default="ON" if use_gpio else "OFF",
     choices=["ON","On","on","YES","Yes","yes","OFF","Off","off","NO","No","no"],
     help="'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi) key/sounder interface should be used.\
- GPIO takes priority over the serial interface if both are specified.",
+ GPIO takes priority over the Serial interface if both are specified.",
     metavar="gpio",
-    dest="gpio",
+    dest="use_gpio",
 )
 
 sound_override = argparse.ArgumentParser(add_help=False)
@@ -1108,7 +1179,7 @@ help="'ON' or 'OFF' to indicate whether to use sounder if 'gpio' or `port` is co
 metavar="sounder", dest="sounder")
 
 sounder_pwrsv_override = argparse.ArgumentParser(add_help=False)
-sounder_pwrsv_override.add_argument("-P", "--pwrsv", default=sounder_power_save, type=int,
+sounder_pwrsv_override.add_argument("--power-save", "--pwrsv", default=sounder_power_save, type=int,
 help="The sounder power-save delay in seconds, or '0' to disable power-save.",
 metavar="seconds", dest="sounder_power_save")
 

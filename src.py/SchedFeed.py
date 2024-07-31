@@ -58,8 +58,9 @@ VERSION = "1.4"
 app_ver = "SchedFeed {}".format(VERSION)
 log.log(app_ver)
 
+USESERIAL = config.use_serial
 PORT = config.serial_port # serial port for KOB interface
-USEGPIO = config.gpio
+USEGPIO = config.use_gpio
 USESOUNDER = config.sounder
 USESOUND = config.sound # whether to enable computer sound for sounder
 AUDIOTYPE = config.audio_type
@@ -81,7 +82,7 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #for m in msgs:
 #    print(m[0], m[1])  # uncomment to display sorted message list
 
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
+myKOB = kob.KOB(useSerial=USESERIAL, portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
 if WIRE:
     myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
     myInternet.connect(WIRE)

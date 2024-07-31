@@ -40,8 +40,9 @@ import pykob
 from pykob import config,newsreader, morse, kob
 
 SOURCE   = 'https://www.ansa.it/sito/ansait_rss.xml'  # news feed
+USESERIAL = config.use_serial
 PORT = config.serial_port # serial port for KOB interface
-USEGPIO = config.gpio
+USEGPIO = config.use_gpio
 USESOUNDER = config.sounder
 USESOUND = config.sound # whether to enable computer sound for sounder
 AUDIOTYPE = config.audio_type
@@ -54,7 +55,7 @@ CODETYPE = config.code_type
 CODESPACING = config.spacing
 
 mySender = morse.Sender(WPM, CWPM, CODETYPE, CODESPACING)
-myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
+myKOB = kob.KOB(useSerial=USESERIAL, portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
 
 try:
     while True:

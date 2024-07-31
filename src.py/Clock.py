@@ -133,14 +133,15 @@ try:
 
     arg_parser = argparse.ArgumentParser(description="Morse Cuckoo Clock", parents=\
      [\
-      config.serial_port_override, \
-      config.gpio_override, \
-      config.code_type_override, \
-      config.sound_override, \
-      config.sounder_override, \
-      config.spacing_override, \
-      config.min_char_speed_override, \
-      config.text_speed_override])
+        config.use_serial_override, \
+        config.serial_port_override, \
+        config.use_gpio_override, \
+        config.code_type_override, \
+        config.sound_override, \
+        config.sounder_override, \
+        config.spacing_override, \
+        config.min_char_speed_override, \
+        config.text_speed_override])
     arg_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements (24-hour value 0-2400)", metavar="time", dest="Begin")
     arg_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements  (24-hour value 0-2400)", metavar="time", dest="End")
     arg_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
@@ -148,8 +149,9 @@ try:
     arg_parser.add_argument("--record", action='store_true', default=False, help="Record the code to the `Clock.'ts'.json` file", dest="Record")
     args = arg_parser.parse_args()
     
+    useSerial = strtobool(args.use_serial)
     port = args.serial_port # serial port for KOB interface
-    useGpio = strtobool(args.gpio) # True to use GPIO interface
+    useGpio = strtobool(args.use_gpio) # True to use GPIO interface
     if (args.text_speed < 1) or (args.text_speed > 50):
         print("text_speed specified must be between 1 and 50")
         sys.exit(1)
@@ -185,7 +187,7 @@ try:
         targetFileName = "Clock." + str(ts) + ".json"
         myRecorder = recorder.Recorder(targetFileName, None, station_id="Clock")
     
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
+    myKOB = kob.KOB(useSerial=useSerial, portToUse=port, useGpio=useGpio, useAudio=sound)
     mySender = morse.Sender(text_speed)
     
     # Announce the current time right now

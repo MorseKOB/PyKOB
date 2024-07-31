@@ -255,6 +255,7 @@ log.log('Starting ' + app_ver)
 try:
     arg_parser = argparse.ArgumentParser(description="Morse wire feed",
         parents= [
+            config.use_serial_override,
             config.serial_port_override,
             config.code_type_override,
             config.interface_type_override,
@@ -328,7 +329,8 @@ try:
     mySender = morse.Sender(wpm, cwpm, codeType=code_type)
     myInternet = internet.Internet(idText, appver=app_ver, server_url=config.server_url)
     audio_setting = strtobool(str(args.sound))
-    myKOB = kob.KOB(portToUse=args.serial_port, interfaceType=args.interface_type, useAudio=audio_setting)
+
+    myKOB = kob.KOB(useSerial=args.use_serial, portToUse=args.serial_port, interfaceType=args.interface_type, useAudio=audio_setting)
 
     myInternet.connect(wire)
 

@@ -31,8 +31,11 @@ Provides a Command Line Interface (CLI) the the pykob.config module.
 """
 import argparse
 from pykob.util import strtobool
-import os.path
+from pykob import log
+from pykob import VERSION as PKVERSION
+from os import path as path_func
 import sys
+from sys import path
 from typing import Optional
 
 GUI = True                              # Hope for the best
@@ -44,6 +47,11 @@ except ModuleNotFoundError:
 from pykob import config, config2
 from pykob.config2 import Config
 from pykob import preferencesWindow
+
+COMPILE_INFO = globals().get("__compiled__")
+__version__ = PKVERSION
+VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
+CONFIGURE_VERSION_TEXT = "Configure " + VERSION
 
 NONE_CFG_VALUE = "NONE"
 
@@ -62,9 +70,6 @@ def stringOrNone(s:str) -> Optional[str]:
     """
     r = None if s.upper() == "NONE" else s
     return r
-
-def _doFilePreferences():
-    prefs = preferencesWindow.PreferencesWindow()
 
 def _doFileExit():
     sys.exit(0)
@@ -92,7 +97,8 @@ def main(argv):
                     config2.station_override,
                     config2.wire_override,
                     config2.auto_connect_override,
-                    config2.gpio_override,
+                    config2.use_gpio_override,
+                    config2.use_serial_override,
                     config2.serial_port_override,
                     config2.interface_type_override,
                     config2.invert_key_input_override,
@@ -152,7 +158,7 @@ def main(argv):
             load_from_global = args.global_load
             save_only_to_global = args.global_only_save
             save_to_global = save_only_to_global
-            if os.path.isfile(file_path):
+            if path_func.isfile(file_path):
                 # The file exists. Load it unless 'load_from_global'. Then apply any changes.
                 if not load_from_global:
                     cfg.load_config(file_path)
@@ -186,7 +192,16 @@ def main(argv):
 
     if GUI and args.gui_config:
         try:
-            root = tk.Tk()
+            root = tk.Tk(className="Configure")
+            script_dir = path[0]
+            script_dir = script_dir + "/" if ((not script_dir is None) and (not script_dir == "")) else ""
+            log.debug(" Running from: {}".format(script_dir), 2, dt="")
+            icon_file = script_dir + "resources/Configure-Logo.png"
+            icon_file_exists = False
+            if (path_func.isfile(icon_file)):
+                icon = tk.PhotoImage(file=icon_file)
+                root.iconphoto(True, icon)
+                icon_file_exists = True
             root.overrideredirect(False)
             root.withdraw()
 
@@ -196,7 +211,7 @@ def main(argv):
             menu.add_cascade(label='File', menu=fileMenu)
             fileMenu.add_command(label='Quit', command=_doFileExit)
 
-            prefs = preferencesWindow.PreferencesWindow(cfg, quitWhenDismissed=True)
+            prefs = preferencesWindow.PreferencesWindow(cfg, appVer=CONFIGURE_VERSION_TEXT, quitWhenDismissed=True)
             prefs.display()
         except KeyboardInterrupt:
             print()

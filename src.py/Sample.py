@@ -60,8 +60,9 @@ try:
     arg_parser = argparse.ArgumentParser(description=__description, \
         parents=\
         [\
+        config.use_serial_override, \
         config.serial_port_override, \
-        config.gpio_override, \
+        config.use_gpio_override, \
         config.code_type_override, \
         config.interface_type_override, \
         config.sound_override, \
@@ -78,6 +79,7 @@ try:
 
     args = arg_parser.parse_args()
 
+    useSerial = strtobool(args.use_serial)
     port = args.serial_port # serial port for KOB interface
     repeat = args.repeat
     sound = strtobool(args.sound)
@@ -85,9 +87,9 @@ try:
     if (text_speed < 1) or (text_speed > 50):
         print("text_speed specified must be between 1 and 50")
         sys.exit(1)
-    useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
+    useGpio = strtobool(args.use_gpio) # Use GPIO (Raspberry Pi)
 
-    myKOB = kob.KOB(portToUse=port, useGpio=useGpio, useAudio=sound)
+    myKOB = kob.KOB(useSerial=useSerial, portToUse=port, useGpio=useGpio, useAudio=sound)
     mySender = morse.Sender(text_speed)
 
     # Print some info in case people don't use the help

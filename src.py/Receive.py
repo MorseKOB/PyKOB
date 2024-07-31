@@ -71,8 +71,9 @@ try:
     arg_parser = argparse.ArgumentParser(description="Monitors a KOB wire, and displays decoded text.", \
         parents=\
         [\
+        config.use_serial_override, \
         config.serial_port_override, \
-        config.gpio_override, \
+        config.use_gpio_override, \
         config.code_type_override, \
         config.interface_type_override, \
         config.sound_override, \
@@ -85,8 +86,9 @@ try:
         help='Wire to monitor. If specified, this is used rather than the configured wire.')
     args = arg_parser.parse_args()
 
+    useSerial = strtobool(args.use_serial)
     port = args.serial_port # serial port for KOB interface
-    useGpio = strtobool(args.gpio) # Use GPIO (Raspberry Pi)
+    useGpio = strtobool(args.use_gpio) # Use GPIO (Raspberry Pi)
 
     office_id = args.station # the Station/Office ID string to attach with
     code_type = config.codeTypeFromString(args.code_type)

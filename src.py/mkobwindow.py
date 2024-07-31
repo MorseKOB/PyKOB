@@ -562,7 +562,7 @@ class MKOBWindow:
         self._km = None
         self._krdr = MKOBReader(self)
         self._ksl = MKOBStationList(self)
-        self._ka = MKOBActions(self, self._ksl, self._krdr, self._cfg)
+        self._ka = MKOBActions(mkob_version_text, self, self._ksl, self._krdr, self._cfg)
         self._kkb = MKOBKeyboard(self._ka, self)
         self._shortcuts_win = None
         self._wires_win = None

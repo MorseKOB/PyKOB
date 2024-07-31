@@ -76,8 +76,9 @@ try:
     from pykob import config,log, kob, internet
 
     VERSION = '1.5'
+    USESERIAL = config.use_serial
     PORT    = config.serial_port # serial port for KOB interface
-    USEGPIO = config.gpio # use the GPIO on Raspberry Pi
+    USEGPIO = config.use_gpio # use the GPIO on Raspberry Pi
     SOUND   = config.sound # whether to enable computer sound for sounder
     SOUNDER = config.sounder # whether to enable a physical sounder
     HWTYPE  = config.interface_type # the key&sounder interface type
@@ -98,7 +99,7 @@ try:
     else:
         wire = None
 
-    myKOB = kob.KOB(portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND, useSounder=SOUNDER, interfaceType=HWTYPE)
+    myKOB = kob.KOB(useSerial=USESERIAL, portToUse=PORT, useGpio=USEGPIO, useAudio=SOUND, useSounder=SOUNDER, interfaceType=HWTYPE)
 
     if wire:
         myInternet = internet.Internet(idText, appver=app_ver, server_url=config.server_url)

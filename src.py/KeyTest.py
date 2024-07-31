@@ -34,14 +34,15 @@ from pykob import config
 
 myKOB = None
 try:
+    use_serial = config.use_serial
     port = config.serial_port
-    use_gpio = config.gpio
+    use_gpio = config.use_gpio
     hwtype = config.interface_type
     sound = config.sound
     sounder = config.sounder
     audio_type = config.audio_type
 
-    myKOB = kob.KOB(useAudio=sound, audioType=audio_type, useSounder=sounder, portToUse=port, useGpio=use_gpio, interfaceType=hwtype)
+    myKOB = kob.KOB(useAudio=sound, audioType=audio_type, useSounder=sounder, useSerial=use_serial, portToUse=port, useGpio=use_gpio, interfaceType=hwtype)
     while True:
         print(myKOB.key())
 except KeyboardInterrupt:
