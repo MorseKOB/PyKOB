@@ -1,3 +1,10 @@
+# This is a recording of Instructograph Tape 5
+// Railroad Business
+
+### It is also used to test the pykob.recorder class, and therefore
+// has these beginning comment lines in different (acceptable) styles.
+    // This comment is indented - for testing. The following has some whitespace (only)
+      
 {"ts": 1609968468077, "w": 0, "s": "", "o": 1, "t": "", "c": [-42431, 2]}
 {"ts": 1609968469082, "w": 0, "s": "", "o": "", "t": "_", "c": []}
 {"ts": 1609968482817, "w": 0, "s": "", "o": 1, "t": "", "c": [-14517, 34, -51, 32]}

@@ -46,6 +46,7 @@ recordings in addition to making recordings.
 """
 import json
 import queue
+import re  # RegEx
 import threading
 import time
 from datetime import datetime, timedelta
@@ -494,25 +495,38 @@ class Recorder:
             while line:
                 try:
                     fpos = fp.tell()
-                    data = json.loads(line)
-                    ts = data['ts']
-                    wire = data['w']
-                    station = data['s']
-                    ts = data['ts']
-                    station = data['s']
-                    # Store the file position and timestamp in the index to use
-                    # for seeking to a line based on time or line number
-                    self._p_fpts_index.append((ts,fpos,station != previous_station))
-                    previous_station = station
-                    # Get the first and last timestamps from the recording
-                    if self._p_fts == -1 or ts < self._p_fts:
-                        self._p_fts = ts # Set the 'first' timestamp
-                    if self._p_lts < ts:
-                        self._p_lts = ts
+                    # JSON doesn't support blank lines or comments, so check the line
+                    # and skip line processing if blank or has a leading '#' or '//'
+                    # The 5 lines in the block comment below are used to test the REGEX.
+                    '''
+                    This line shouldn't match, the next 4 should.
+
+                    
+                    # one form of comment
+                    // the other form of comment
+                    '''
+                    ex = re.compile(r"^(\s*|(\s*(#|(//)+).*)?)$")
+                    m = ex.match(line)
+                    if not m:
+                        data = json.loads(line)
+                        ts = data['ts']
+                        wire = data['w']
+                        station = data['s']
+                        ts = data['ts']
+                        station = data['s']
+                        # Store the file position and timestamp in the index to use
+                        # for seeking to a line based on time or line number
+                        self._p_fpts_index.append((ts,fpos,station != previous_station))
+                        previous_station = station
+                        # Get the first and last timestamps from the recording
+                        if self._p_fts == -1 or ts < self._p_fts:
+                            self._p_fts = ts # Set the 'first' timestamp
+                        if self._p_lts < ts:
+                            self._p_lts = ts
+                        # Generate the station list from the recording
+                        self._p_stations.add(station)
                     # Update the number of lines
                     self._p_lines +=1
-                    # Generate the station list from the recording
-                    self._p_stations.add(station)
                     # Read the next line
                     line = fp.readline()
                 except Exception as ex:
@@ -587,6 +601,7 @@ class Recorder:
                     self._p_line_no += 1
                 while line and not self._shutdown.is_set():
                     # Get the file lock and read the contents of the line
+                    line_is_comment = False
                     with self._p_fileop_lock:
                         while self._playback_state == PlaybackState.paused:
                             self._playback_resume_flag.wait() # Wait for playback to be resumed
@@ -596,63 +611,79 @@ class Recorder:
                             self._playback_state = PlaybackState.idle
                             self._playback_resume_flag.clear()
                             return
-                        data = json.loads(line)
-                        #
-                        code = data['c']        # Code sequence
-                        ts = data['ts']         # Timestamp
-                        wire = data['w']        # Wire number
-                        station = data['s']     # Station ID
-                        source = data['o']      # Source/Origin (numeric value from kob.CodeSource)
-                        pblts = self._p_pblts
-                        self._p_pblts = ts
-                        # Done with lock
+                        # JSON doesn't support blank lines or comments, so check the line
+                        # and skip line processing if blank or has a leading '#' or '//'
+                        # The 5 lines in the block comment below are used to test the REGEX.
+                        '''
+                        This line shouldn't match, the next 4 should.
 
+                        
+                        # one form of comment
+                        // the other form of comment
+                        '''
+                        ex = re.compile(r"^(\s*|(\s*(#|(//)+).*)?)$")
+                        m = ex.match(line)
+                        if m:
+                            line_is_comment = True
+                        else:
+                            data = json.loads(line)
+                            #
+                            code = data['c']        # Code sequence
+                            ts = data['ts']         # Timestamp
+                            wire = data['w']        # Wire number
+                            station = data['s']     # Station ID
+                            source = data['o']      # Source/Origin (numeric value from kob.CodeSource)
+                            pblts = self._p_pblts
+                            self._p_pblts = ts
+                            # Done with lock
                     try:
-                        if pblts < 0:
-                            pblts = ts
-                        if self._list_data:
-                            print(date_time_from_ts(ts), line, end='')
-                        if code == []:  # Ignore empty code packets
-                            continue
-                        codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
-                        # For short pauses (< 2 sec), `KOB.sounder` can handle them more precisely.
-                        # However the way `KOB.sounder` handles longer pauses, although it makes sense for
-                        # real-time transmissions, is flawed for playback. Better to handle long pauses here.
-                        # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
-                        # handling in `KOB.sounder`.
-                        #
-                        # Also check for station change code sequence. If so, pause for recorded timestamp difference
-                        if self._playback_state == PlaybackState.playing:
-                            pause = 0
-                            if codePause == 32.767 and len(code) > 1 and code[1] == 2:
-                                # Probable sender change. See if it is...
-                                if not station == self._player_station_id:
-                                    if self._list_data:
-                                        print("Sender change.")
-                                    pause = round((ts - pblts)/1000, 4)
-                            elif codePause > 2.0 and codePause < 32.767:
-                                # Long pause in sent code
-                                pause = round((((ts - pblts)/1000) - 2.0), 4) # Subtract 2 seconds so kob has some to handle
-                                code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
-                            if pause > 0:
-                                # Long pause or a station/sender change.
-                                # For very long delays, sleep a maximum of `max_silence` seconds
-                                if self._max_silence > 0 and pause > self._max_silence:
-                                    if self._list_data:
-                                        print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self._max_silence))
-                                    pause = self._max_silence
-                                self._playback_stop_flag.wait(pause)
-                        if not self._speed_factor == 100:
-                            sf = 1.0 / (self._speed_factor / 100.0)
-                            code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]
-                        self.wire = wire
-                        if self._play_wire_callback:
-                            self._play_wire_callback(wire)
-                        self._player_station_id = station
-                        if self._play_sender_id_callback:
-                            self._play_sender_id_callback(station)
-                        if self._play_code_callback:
-                            self._play_code_callback(code)
+                        if not line_is_comment:
+                            if pblts < 0:
+                                pblts = ts
+                            if self._list_data:
+                                print(date_time_from_ts(ts), line, end='')
+                            if code == []:  # Ignore empty code packets
+                                continue
+                            codePause = -code[0] / 1000.0  # delay since end of previous code sequence and beginning of this one
+                            # For short pauses (< 2 sec), `KOB.sounder` can handle them more precisely.
+                            # However the way `KOB.sounder` handles longer pauses, although it makes sense for
+                            # real-time transmissions, is flawed for playback. Better to handle long pauses here.
+                            # A pause of 0x3777 ms is a special case indicating a discontinuity and requires special
+                            # handling in `KOB.sounder`.
+                            #
+                            # Also check for station change code sequence. If so, pause for recorded timestamp difference
+                            if self._playback_state == PlaybackState.playing:
+                                pause = 0
+                                if codePause == 32.767 and len(code) > 1 and code[1] == 2:
+                                    # Probable sender change. See if it is...
+                                    if not station == self._player_station_id:
+                                        if self._list_data:
+                                            print("Sender change.")
+                                        pause = round((ts - pblts)/1000, 4)
+                                elif codePause > 2.0 and codePause < 32.767:
+                                    # Long pause in sent code
+                                    pause = round((((ts - pblts)/1000) - 2.0), 4) # Subtract 2 seconds so kob has some to handle
+                                    code[0] = -2000  # Change pause in code sequence to 2 seconds since the rest is handled
+                                if pause > 0:
+                                    # Long pause or a station/sender change.
+                                    # For very long delays, sleep a maximum of `max_silence` seconds
+                                    if self._max_silence > 0 and pause > self._max_silence:
+                                        if self._list_data:
+                                            print("Realtime pause of {} seconds being reduced to {} seconds".format(pause, self._max_silence))
+                                        pause = self._max_silence
+                                    self._playback_stop_flag.wait(pause)
+                            if not self._speed_factor == 100:
+                                sf = 1.0 / (self._speed_factor / 100.0)
+                                code[:] = [round(sf * c) if (c < 0 or c > 2) and c != -32767 else c for c in code]
+                            self.wire = wire
+                            if self._play_wire_callback:
+                                self._play_wire_callback(wire)
+                            self._player_station_id = station
+                            if self._play_sender_id_callback:
+                                self._play_sender_id_callback(station)
+                            if self._play_code_callback:
+                                self._play_code_callback(code)
+                        pass
                     finally:
                         # Read the next line to be ready to continue the processing loop.
                         with self._p_fileop_lock:
