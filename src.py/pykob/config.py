@@ -126,7 +126,7 @@ user_home = None
 user_name = None
 
 # Machine/System Settings
-use_serial = False   # Indicates if serial should be used (prior only used None port value)
+use_serial = True   # Indicates if serial should be used (prior only used None port value)
 serial_port = None
 use_gpio = False
 
