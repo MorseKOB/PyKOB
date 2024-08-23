@@ -590,7 +590,7 @@ class KOB:
         kc = True
         if self._hw_interface == HWInterface.GPIO:
             try:
-                kc = not (self._gpio_key_read.is_pressed)
+                kc = self._gpio_key_read.is_pressed
                 pass
             except:
                 self._hw_interface = HWInterface.NONE
