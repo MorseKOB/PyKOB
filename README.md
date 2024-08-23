@@ -345,12 +345,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Licenses for included/references Libraries/Modules
+## Licenses for referenced Libraries/Modules
 
-These applications/libraries/modules rely on other libraries/modules.
+The PyKOB applications/utilities/modules rely on other libraries/modules.
 Refer to `LICENSE-MODULES` for the license details of these libraries/modules.
 
 No modifications have been made to these libraries/modules and they are not
 included with this distribution, and therefore must be provided by the user of
-these applications/libraries/modules for proper operation. Refer to the library/module
+these applications/utilities/modules for proper operation. Refer to the library/module
 documentation for details of installing the library/module.
