@@ -38,7 +38,7 @@ The keyer/paddle has 3 states:
     2. Send dits
     3. Send dah (until state changes to Idle or Send dits)
 A method is also provided to change the state from other sources, for example the
-keyboard. Note that a keyer/paddle will not have closer, and therefore, the
+keyboard. Note that a keyer/paddle will not have a closer, and therefore, the
 virtual closer will need to be used.
 
 The `sound_code` method can also be used to appropriately spend time based on the
