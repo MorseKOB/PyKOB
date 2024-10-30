@@ -25,10 +25,11 @@ SOFTWARE.
 from pykob import kob, log
 
 from enum import Enum, IntEnum, unique
-from idlelib.redirector import WidgetRedirector
 from threading import Event, Lock, Thread
 import time
-from tkinter import EventType, END, INSERT
+from tkinter import EventType, TclError, END, INSERT
+# from idlelib.redirector import WidgetRedirector
+from pykob.util import WidgetRedirector
 from typing import Optional
 
 HIGHLIGHT = 'highlight'

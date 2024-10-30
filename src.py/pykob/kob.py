@@ -38,13 +38,14 @@ The keyer/paddle has 3 states:
     2. Send dits
     3. Send dah (until state changes to Idle or Send dits)
 A method is also provided to change the state from other sources, for example the
-keyboard. Note that a keyer/paddle will not have closer, and therefore, the
+keyboard. Note that a keyer/paddle will not have a closer, and therefore, the
 virtual closer will need to be used.
 
 The `sound_code` method can also be used to appropriately spend time based on the
 code being sounded without causing any sound to be produced.
 
 """
+import re  # RegEx
 import sys
 import time
 from enum import Enum, IntEnum, unique
@@ -321,19 +322,29 @@ class KOB:
                     if self._port_to_use == PORT_FIND_SDIF_KEY:
                         """
                         Look for a Silky-DESIGN Interface, by searching for a serial port with a serial
-                        number that ends in '_AES' ('_AESA' on Windows).
+                        number that ends in '_AESnnn' (nnn is the unit number '_AESnnnA' on Windows).
+                        Note: Early SD interfaces didn't have a unit number (nnn), and SilkyDESIGN-Selector
+                            switches have a serial number like '_AESSEL'. So it is important to find
+                            interfaces and not selector switches.
                         If found, set the port ID.
                         Else, indicate a warning
                         """
-                        sdif_sn_end = SDIF_SN_END if not (sys.platform == 'win32' or sys.platform == 'cygwin') else SDIF_SN_END  + "A"
+                        log.debug("Try to find SD-Interface on serial.")
+                        re1 = re.compile(r"_AES([0-9]*)")
+                        re2 = re.compile(r"_AESSEL")
                         sdif_port_id = None
                         systemSerialPorts = serial.tools.list_ports.comports()
                         for sp in systemSerialPorts:
                             sn = sp.serial_number if sp.serial_number else ""
-                            if sn.endswith(sdif_sn_end):
-                                sdif_port_id = sp.device
-                                log.debug("SD-Interface found on: {}".format(sp.device), 3)
-                                break
+                            m = re1.search(sn)
+                            if m:
+                                # Found an SD device, make sure it's not a Selector
+                                if not re2.search(sn):
+                                    sdif_port_id = sp.device
+                                    unit = m.group(1)
+                                    us = "" if not unit or len(unit) < 1 else " {}".format(unit)
+                                    log.info("SD-Interface{} found on: {}".format(us, sp.device), dt="")
+                                    break
                         self._port_to_use = sdif_port_id
                         if self._port_to_use is None:
                             self._err_msg_hndlr("An SD-Interface was not found. Key/sounder will not function.")
@@ -579,7 +590,7 @@ class KOB:
         kc = True
         if self._hw_interface == HWInterface.GPIO:
             try:
-                kc = not (self._gpio_key_read.is_pressed())
+                kc = self._gpio_key_read.is_pressed
                 pass
             except:
                 self._hw_interface = HWInterface.NONE

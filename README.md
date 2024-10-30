@@ -168,6 +168,10 @@ versions) and installer, and to unclutter the root directory.
 The *src.py* directory contains all (only) the Python files needed to run the
 applications and utilities. So, to run the Python version, start there.
 
+Also, the **MKOB** source changed from *MKOB.pyw* to *MKOB.py*. This was done
+because the `.pyw` extension causes some libraries to be pulled into the
+binary that aren't needed for this application.
+
 # Documentation
 
 Unfortunately, the documentation is a bit lacking, but it is being worked on.
@@ -243,18 +247,23 @@ Follow the instructions here:
 
 The best thing to run first is **SysCheck**. That will display information about
 the system, Python, the libraries used, and the serial devices (if you are going to
-use an interface to a physical key and/or sounder). It is simple to run:
+use an interface to a physical key and/or sounder).
+
+It is simple to run:
+
+- Open a Command/Terminal window in the PyKOB folder
+- (I suggest running) `python3 --version` (to make sure you are running a 3.11.xx  or later version)
+- If your Python version is not 3.11.xx or later you will need to upgrade it.
+- Then
 
 ``` shell
+cd src.py
 python3 SysCheck.py
 ```
 
 Next, it is suggested that you set all of the configuration options before running
 any of the Morse utilities or MKOB/MRT for the first time. To do that:
 
-- Open a Command/Terminal window in the PyKOB folder
-- (I suggest running) `python3 --version` (to make sure you are running a 3.11.xx  or later version)
-- If your Python version is not 3.11.xx or later you will need to upgrade it.
 - Run: `python3 Configure.py`
   That will list the current configuration. Since this is a new installation,
   the settings will all be the defaults.
@@ -270,8 +279,8 @@ python3 Configure.py --gui
 ## Run 'Sample.py'
 
 Once you have the settings you want, you are ready to run any of the utilities,
-or the MKOB application. The 'utilities' are in the root folder. The utilities
-start with a capitol letter - for example:
+or the MKOB application. The 'utilities' are in the base source folder (*src.py*).
+The utilities start with a capitol letter - for example:
 
 ``` shell
 python3 Sample.py
@@ -336,12 +345,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Licenses for included/references Libraries/Modules
+## Licenses for referenced Libraries/Modules
 
-These applications/libraries/modules rely on other libraries/modules.
+The PyKOB applications/utilities/modules rely on other libraries/modules.
 Refer to `LICENSE-MODULES` for the license details of these libraries/modules.
 
 No modifications have been made to these libraries/modules and they are not
 included with this distribution, and therefore must be provided by the user of
-these applications/libraries/modules for proper operation. Refer to the library/module
+these applications/utilities/modules for proper operation. Refer to the library/module
 documentation for details of installing the library/module.
