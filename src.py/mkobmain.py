@@ -151,6 +151,7 @@ class MKOBMain:
                 sounderPowerSaveSecs=cfg.sounder_power_save,
                 virtual_closer_in_use=True,
                 err_msg_hndlr=self._kob_err_msg_hndlr,
+                status_msg_hndlr=self._kob_status_msg_hndlr,
                 keyCallback=self._from_key
             )
             self._kob.virtual_closer_is_open = vcloser
@@ -275,6 +276,11 @@ class MKOBMain:
     def _kob_err_msg_hndlr(self, msg:str) -> None:
         log.warn(msg)
         msgbox.showwarning(title=self.app_ver, message=msg)
+        return
+    
+    def _kob_status_msg_hndlr(self, msg):  # type: (str) -> None
+        log.debug(msg, 5)
+        self._ka.trigger_status_msg_set(msg)
         return
 
     def _net_err_msg_hndlr(self, msg:str) -> None:

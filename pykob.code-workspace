@@ -37,6 +37,7 @@
 			"env": {
 				"CHERE_INVOKING": "1"
 			}
-		}
+		},
+		"makefile.configureOnOpen": false
 	}
 }

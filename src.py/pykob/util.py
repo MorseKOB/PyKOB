@@ -39,9 +39,8 @@ classes have a comment indicating such.
 LICENSE: Python Software Foundation (PSF)
 
 """
-from typing import Optional
 
-def on_off_from_bool(b:bool) -> str:
+def on_off_from_bool(b):  # type:(bool) -> str
     """
     Return 'ON' if `b` is `True` and 'OFF' if `b` is `False`
 
@@ -57,7 +56,7 @@ def on_off_from_bool(b:bool) -> str:
     r = "ON" if b else "OFF"
     return r
 
-def str_empty_or_value(s:str) -> str:
+def str_empty_or_value(s):  # type:(str) -> str
     """
     Return an empty string ("") if `s` is None or the string value otherwise.
 
@@ -71,7 +70,7 @@ def str_empty_or_value(s:str) -> str:
     """
     return s if not s is None else ""
 
-def str_none_or_value(s:str) -> Optional[str]:
+def str_none_or_value(s):  # type:(str) -> (str|None)
     """
     Return `None` if `s` is None, empty, or the value 'NONE', else the string value.
 
@@ -87,7 +86,7 @@ def str_none_or_value(s:str) -> Optional[str]:
     return r
 
 
-def strtobool (val):
+def strtobool(val):  # type:(str) -> bool
     """
     (from distutils) Convert a string representation of truth to true (1) or false (0).
 
@@ -103,7 +102,7 @@ def strtobool (val):
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
-def true_false_from_bool(b:bool) -> str:
+def true_false_from_bool(b):  # type:(bool) -> str
     """
     Return 'TRUE' if `b` is `True` and 'FALSE' if `b` is `False`
 

@@ -29,8 +29,7 @@ from threading import Event, Lock, Thread
 import time
 from tkinter import EventType, TclError, END, INSERT
 # from idlelib.redirector import WidgetRedirector
-from pykob.util import WidgetRedirector
-from typing import Optional
+from pykob.util import WidgetRedirector     # Now included in `util` since IDLE isn't on Linux
 
 HIGHLIGHT = 'highlight'
 MARK_SEND = 'send'
@@ -60,7 +59,7 @@ class MKOBKeyboard():
         return
 
     def _keyboard_send_complete(self):
-        log.debug("mkkb._keyboard_send_complete", 3)
+        log.debug("mkkb._keyboard_send_complete", 4)
         with self._send_guard:
             self._kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
             self._last_send_pos = self._kw.keyboard_win.index(MARK_SEND)
@@ -77,7 +76,7 @@ class MKOBKeyboard():
             return  # Do normal processing if the Virtual Key is closed
         if ((event.type == EventType.KeyPress and not self._in_key_press.is_set())
             or (event.type == EventType.KeyRelease and self._in_key_press.is_set())):
-            kob_: Optional[kob.KOB] = self._km.Kob
+            kob_ = self._km.Kob  # type: (kob.KOB | None)
             if event.type == EventType.KeyPress:
                 self._in_key_press.set()
                 if not kob_ is None:
@@ -86,7 +85,7 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB shift-left: {}".format(event), 3)
+            log.debug("mkkb: KB shift-left: {}".format(event), 4)
         return "break"  # Don't perform normal processing
 
     def _on_shift_cursor_right(self, event):
@@ -95,7 +94,7 @@ class MKOBKeyboard():
         if ((event.type == EventType.KeyPress and not self._in_key_press.is_set())
             or (event.type == EventType.KeyRelease and self._in_key_press.is_set())):
             now = time.time()
-            kob_: Optional[kob.KOB] = self._km.Kob
+            kob_ = self._km.Kob  # type: (kob.KOB | None)
             if event.type == EventType.KeyPress:
                 self._in_key_press.set()
                 if not kob_ is None:
@@ -104,13 +103,13 @@ class MKOBKeyboard():
                 self._in_key_press.clear()
                 if not kob_ is None:
                     kob_.keyer_mode_set(kob.KeyerMode.IDLE, kob.CodeSource.keyboard)
-            log.debug("KB shift-right: {}".format(event), 3)
+            log.debug("mkkb: KB shift-right: {}".format(event), 4)
         return "break"  # Don't perform normal processing
 
     def _on_delete(self, *args):
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB delete: {}:{} {}".format(ip, ms, args), 4)
+        log.debug("mkkb: KB delete: {}:{} {}".format(ip, ms, args), 4)
         r = None
         try:
             r = self.original_delete(*args)
@@ -119,13 +118,13 @@ class MKOBKeyboard():
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
         self._ka.trigger_keyboard_send()
-        log.debug("KB delete end insert/send point: {}:{}".format(ip, ms), 4)
+        log.debug("mkkb: KB delete [end i:s]: {}:{}".format(ip, ms), 5)
         return r
 
     def _on_insert(self, *args):
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
-        log.debug("KB insert: {}:{} {}".format(ip, ms, args), 4)
+        log.debug("mkkb: KB insert: {}:{} {}".format(ip, ms, args), 4)
         s = args[1]
         r = None
         try:
@@ -135,7 +134,7 @@ class MKOBKeyboard():
         ip = self._kw.keyboard_win.index(INSERT)
         ms = self._kw.keyboard_win.index(MARK_SEND)
         self._ka.trigger_keyboard_send()
-        log.debug("KB insert end [i:s]: {}:{}".format(ip, ms), 4)
+        log.debug("mkkb: KB insert [end i:s]: {}:{}".format(ip, ms), 5)
         return r
 
     def _on_mark(self, *args):
@@ -156,7 +155,7 @@ class MKOBKeyboard():
         sline = int(msl[0])
         schar = int(msl[1])
         en = self._enabled
-        log.debug("KB mark [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 4)
+        log.debug("mkkb._on_mark: [i:s]:en={} op={} mark={} pos={} [{}:{}] {}".format(en, op, mark, pos, ip, ms, args), 5)
         if op == 'set' and mark == INSERT and not pos == MARK_SEND:
             if (not en) or (en and ((iline < sline) or (iline == sline and ichar < schar))):
                 self._kw.keyboard_win.tag_remove(HIGHLIGHT, MARK_SEND)
@@ -171,11 +170,11 @@ class MKOBKeyboard():
                 self._kw.keyboard_win.tag_add(HIGHLIGHT, MARK_SEND)
                 ms = self._kw.keyboard_win.index(MARK_SEND)
                 self._ka.trigger_keyboard_send()
-        log.debug("KB mark end [i:s]: {}:{}".format(ip, ms), 4)
+        log.debug("mkkb._on_mark: [end i:s]: {}:{}".format(ip, ms), 5)
         return r
 
     def _on_right_click(self, event):
-        log.debug("KB mrc: {}".format(event), 4)
+        log.debug("mkkb: right-click: {}".format(event), 4)
         pos = "@{},{}".format(event.x, event.y)
         self._kw.keyboard_win.mark_set(MARK_SEND, pos)
         return
@@ -219,7 +218,7 @@ class MKOBKeyboard():
         """
         km_isa = self._km.internet_station_active
         log.debug("mkkb.handle_keyboard_send: KM.ISA:{} Enabled:{} Waiting on sent:{}".format(
-            km_isa, self._enabled, self._waiting_for_sent_code.is_set()), 3)
+            km_isa, self._enabled, self._waiting_for_sent_code.is_set()), 4)
 
         if km_isa:
             self._km.tkroot.after(800, self.handle_keyboard_send)
@@ -265,9 +264,10 @@ class MKOBKeyboard():
         send_at_eof = self._kw.keyboard_win.compare(MARK_SEND, '>=', 'end-1c')
         with open(fp, 'r') as f:
             self._kw.keyboard_win.insert(INSERT, f.read())
+            log.debug("mkkb: File inserted.", 2)
         if send_at_eof:
             # The sender was at the end
-            log.debug("File inserted with the sender at the end.")
+            log.debug("mkkb: File inserted with the sender at the end.", 3)
         self._kw.give_keyboard_focus()
         return
 

@@ -44,6 +44,7 @@ import traceback
 from typing import Optional
 
 from pykob import log
+from pykob import serial as pkserial
 
 SEL_FIND_SDSEL = "SDSEL"
 SEL_SDSEL_SN_END = "_AESSEL"

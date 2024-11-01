@@ -50,6 +50,7 @@ import sys
 import time
 from enum import Enum, IntEnum, unique
 from pykob import config, log, morse, util
+from pykob import serial as pkserial
 from pykob.config import AudioType, InterfaceType
 import threading
 from threading import Event, RLock, Thread
@@ -59,9 +60,6 @@ from typing import Any, Callable
 DEBOUNCE  = 0.018  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.800  # length of mark to signal circuit closure (sec)
-
-PORT_FIND_SDIF_KEY = "SDIF"
-SDIF_SN_END = "_AES"
 
 log.debug("Platform: {}".format(sys.platform))
 if sys.platform == "win32" or sys.platform == "cygwin":
@@ -168,7 +166,7 @@ class KOB:
             self, interfaceType=InterfaceType.loop, useSerial=False, portToUse=None,
             useGpio=False, useAudio=False, audioType=AudioType.SOUNDER, useSounder=False, invertKeyInput=False,
             noKeyCloser=False, soundLocal=True, sounderPowerSaveSecs=0,
-            virtual_closer_in_use=False, err_msg_hndlr=None, keyCallback=None):
+            virtual_closer_in_use=False, err_msg_hndlr=None, status_msg_hndlr=None, keyCallback=None):
         # type: (InterfaceType, bool, str|None, bool, bool, AudioType, bool, bool, bool, bool, int, bool, Callable, Callable) -> None
         """
         When PyKOB code is not running, the physical sounder (if connected) is not powered by
@@ -180,6 +178,7 @@ class KOB:
         self._invert_key_input = invertKeyInput     # type: bool
         self._no_key_closer = noKeyCloser           # type: bool
         self._err_msg_hndlr = err_msg_hndlr if err_msg_hndlr else log.warn  # type: Callable  # Function that can take a string
+        self._status_msg_hndlr = status_msg_hndlr if status_msg_hndlr else self.__str_sync  # type: Callable  # Function that can take a string
         self._use_serial = useSerial                # type: bool
         self._port_to_use = portToUse               # type: str
         self._sound_local = soundLocal              # type: bool
@@ -190,12 +189,15 @@ class KOB:
         self._use_sounder = useSounder              # type: bool
         self._virtual_closer_in_use = virtual_closer_in_use  # type: bool  # The owning code will drive the VC
         #
+        self._pkserial = pkserial()                 # type: PKSerial
         self._shutdown = Event()                    # type: Event
         self._hw_interface = HWInterface.NONE       # type: HWInterface
         self._gpio_key_read = self.__read_nul       # type: Callable
         self._gpio_pdl_dah = self.__read_nul        # type: Callable
         self._gpio_sndr_drive = None                # type: Callable|None
         self._port = None                           # type: 'serial.Serial'|None
+        self._port_errors_consec = 0                # type: int  # Count of the number of serial port errors in a row
+        self._port_errors_total = 0                 # type: int  # Count of the number of serial port errors
         self._serial_key_read = self.__read_nul     # type: Callable  # Read a NUL key. Changed in HW Init if interface is configured.
         self._serial_pdl_dah = self.__read_nul      # type: Callable  # Read a NUL paddle dah (dash).
         self._audio = None                          # type: audio.Audio|None
@@ -277,9 +279,9 @@ class KOB:
             return
         with self._sounder_guard:
             gpio_module_available = False
+            serial_support_available = False
             gpio_led = None
             gpio_button = None
-            serial_module_available = False
             if self._use_gpio:
                 try:
                     from gpiozero import LED, Button
@@ -291,13 +293,9 @@ class KOB:
                     self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
                     log.debug(traceback.format_exc(), 3)
             elif self._use_serial and not self._port_to_use is None:
-                try:
-                    import serial
-                    import serial.tools.list_ports
-
-                    serial_module_available = True
-                except:
-                    self._err_msg_hndlr("Module 'pySerial' is not available. Serial interface cannot be used for a key/sounder.")
+                serial_support_available = self._pkserial.serial_intrfc_available()
+                if not serial_support_available:
+                    self._err_msg_hndlr("Serial interface is not available. Key/sounder cannot by used.")
                     log.debug(traceback.format_exc(), 3)
                 pass
             pass
@@ -311,13 +309,13 @@ class KOB:
                     self._gpio_sndr_drive = gpio_led(26)  # GPIO26 used to drive sounder.
                     self._hw_interface = HWInterface.GPIO
                     self._paddle_is_supported = True
-                    log.debug("The GPIO interface is available/active and will be used.")
+                    log.debug("The GPIO interface is available/active and will be used.", 1)
                 except:
                     self._hw_interface = HWInterface.NONE
                     self._paddle_is_supported = False
                     self._err_msg_hndlr("Interface for key and/or sounder on GPIO not available. GPIO key/sounder will not function.")
                     log.debug(traceback.format_exc(), 3)
-            elif serial_module_available:
+            elif serial_support_available:
                 try:
                     if self._port_to_use == PORT_FIND_SDIF_KEY:
                         """
@@ -349,7 +347,7 @@ class KOB:
                         if self._port_to_use is None:
                             self._err_msg_hndlr("An SD-Interface was not found. Key/sounder will not function.")
                     if not self._port_to_use is None:
-                        self._port = serial.Serial(self._port_to_use, timeout=0.5)
+                        self._port = pkserial.PKSerial(self._port_to_use, timeout=0.5)
                         self._port.write_timeout = 1
                         self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
                         # Read the inputs to initialize them
@@ -370,9 +368,12 @@ class KOB:
                         else:
                             self._paddle_is_supported = True
                             log.debug("KOB Serial Interface is 'full' type (key/pdl-dit on DSR, pdl-dah on CTS).")
+                        self._port_errors_consec = 0
+                        self._port_errors_total = 0
                     pass
                 except Exception as ex:
                     self._hw_interface = HWInterface.NONE
+                    self._port = None
                     self._serial_key_read = self.__read_nul
                     self._serial_pdl_dah = self.__read_nul
                     self._err_msg_hndlr("Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use))
@@ -389,7 +390,6 @@ class KOB:
                 self._no_key_closer = True
                 self._paddle_is_supported = False
                 self._port = None
-                self._port_to_use = None
             # Update closers states based on state of key
             key_closed = True
             if not (self._hw_interface == HWInterface.NONE or self._no_key_closer):
@@ -461,6 +461,13 @@ class KOB:
             self._thread_powersave.join(timeout=2.0)
         self._thread_keyread = None
         self._thread_powersave = None
+        return
+
+    def __str_sync(s):  # type: (str) -> None
+        """
+        Function that will consume (sync) a string value.
+        """
+        pass
         return
 
     def _thread_keyer_body(self): # type: () -> None
@@ -594,16 +601,28 @@ class KOB:
                 pass
             except:
                 self._hw_interface = HWInterface.NONE
-                self._err_msg_hndlr("GPIO interface read error. Disabling interface.")
+                self._err_msg_hndlr("Error reading key on GPIO interface. Disabling interface.")
                 log.debug(traceback.format_exc(), 3)
         elif self._hw_interface == HWInterface.SERIAL:
-            try:
-                kc = self._serial_key_read()
+            if self._port_errors_consec > 0 and self._port_to_use:
+                self._threadsStop_KS.wait(0.5)  # Wait 1/2 second before trying again
+            for retry in range(3):
+                try:
+                    kc = self._serial_key_read()
+                    self._port_errors_consec = 0
+                    break
+                except:
+                    self._port_errors_total += 1
+                    self._port_errors_consec += 1
+                    if self._port_errors_total == 1:
+                        self._err_msg_hndlr("Error reading key. Check interface.")
+                        log.debug(traceback.format_exc(), 3)
+                    else:
+                        self._status_msg_hndlr("Error reading key")
+                        log.debug("Error reading key ({} total)".format(self._port_errors_total), 3)
+                    self._threadsStop_KS.wait(0.25)  # Wait 1/4 second before trying again
                 pass
-            except:
-                self._hw_interface = HWInterface.NONE
-                self._err_msg_hndlr("Serial interface read error. Disabling interface.")
-                log.debug(traceback.format_exc(), 3)
+            pass
         # Invert key state if configured to do so (ex: input is from a modem)
         if self._invert_key_input:
             kc = not kc
@@ -768,6 +787,18 @@ class KOB:
         if not on == was:
             self._no_key_closer = on
             self._update_modes()
+        return
+
+    @property
+    def serial_errors_consecutive(self):  # type: () -> int
+        return self._port_errors_consec
+
+    @property
+    def serial_errors_total(self):  # type: () -> int
+        return self._port_errors_total
+    def clear_serial_error_count(self):  # type: () -> None
+        self._port_errors_consec = 0
+        self._port_errors_total = 0
         return
 
     @property

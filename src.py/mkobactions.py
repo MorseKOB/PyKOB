@@ -530,7 +530,7 @@ class MKOBActions():
         self._kw.event_generate(mkobevents.EVENT_STATUS_MSG_CLEAR, when='tail')
         return
 
-    def trigger_status_msg_set(self, msg: str):
+    def trigger_status_msg_set(self, msg):  # type: (str) -> None
         """
         Generate an event to set the status message on the main window.
         """
