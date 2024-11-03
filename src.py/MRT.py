@@ -1083,7 +1083,7 @@ class MrtSelector:
         return
 
 def status_msg_handler(msg):
-    log.log("\n{}".format(msg), dt="")
+    log.log("\n{}\n".format(msg), dt="")
     return
 
 def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:

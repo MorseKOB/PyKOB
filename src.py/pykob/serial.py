@@ -81,7 +81,8 @@ class PKSerial:
             self._err_callback("Serial module not available")
         self._port = None                           # type: pyserial.Serial|None
         self._port_name_used = None                 # type: str|None
-        self._raise_op_error = None                 # type: str|None
+        self._op_error = None                       # type: str|None
+        self._op_error_prev = None                  # type: str|None
         self._op_err_has_been_thrown = self._retries_enabled  # type: bool  # If retries are enabled, don't throw ex from ctor
         self._module_ex_has_been_thrown = False     # type: bool
         self._reconnect_needed = False              # type: bool
@@ -131,15 +132,13 @@ class PKSerial:
 
     @property
     def cd(self):  # type () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_cd
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.cd
                 self._lg_cd = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_cd
         return s
 
     @property
@@ -154,48 +153,41 @@ class PKSerial:
 
     @property
     def cts(self):  # type: () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_cts
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.cts
                 self._lg_cts = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_cts
         return s
 
     @property
     def dsr(self):  # type: () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_dsr
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.dsr
                 self._lg_dsr = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_dsr
         return s
 
     @property
     def dtr(self):  # type: () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_dtr
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.dtr
                 self._lg_dtr = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_dtr
         return s
 
     @dtr.setter
     def dtr(self, value):  # type: (bool) -> None
-        self._chk_for_err()
         self._lg_dtr = value
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 self._port.dtr = value
             except Exception as ex:
@@ -204,35 +196,30 @@ class PKSerial:
 
     @property
     def ri(self):  # type: () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_ri
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.ri
                 self._lg_ri = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_ri
         return s
 
     @property
     def rts(self):  # type: () -> bool
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_rts
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.rts
                 self._lg_rts = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_rts
         return s
 
     @rts.setter
     def rts(self, value):  # type: (bool) -> None
-        self._chk_for_err()
         self._lg_rts = value
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 self._port.rts = value
             except Exception as ex:
@@ -241,22 +228,19 @@ class PKSerial:
 
     @property
     def timeout(self):  # Type: () -> float
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_timeout
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.timeout
                 self._lg_timeout = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_timeout
         return s
 
     @timeout.setter
     def timeout(self, value):  # Type: (float) -> None
-        self._chk_for_err()
         self._lg_timeout = value
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 self._port.timeout = value
             except Exception as ex:
@@ -265,22 +249,19 @@ class PKSerial:
 
     @property
     def write_timeout(self):  # Type: () -> float
-        self._chk_for_err()
-        if self._port is not None:
+        s = self._lg_write_timeout
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 s = self._port.write_timeout
                 self._lg_write_timeout = s
             except Exception as ex:
                 self._set_error(ex)
-        else:
-            s = self._lg_write_timeout
         return s
 
     @write_timeout.setter
     def write_timeout(self, value):  # type: (float) -> None
-        self._chk_for_err()
         self._lg_write_timeout = value
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 self._port.write_timeout = value
             except Exception as ex:
@@ -297,12 +278,13 @@ class PKSerial:
                 self._port.close()
             except Exception as ex:
                 self._set_error(ex)
+            finally:
+                self._port = None
         return
 
     def readline(self):  # type: () -> bytes
-        self._chk_for_err()
         read = bytes()
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 read = self._port.readline()
             except Exception as ex:
@@ -310,9 +292,8 @@ class PKSerial:
         return read
 
     def write(self, data):  # type: (bytes|bytearray) -> int
-        self._chk_for_err()
         written = 0
-        if self._port is not None:
+        if (not self._chk_for_err()) and self._port is not None:
             try:
                 written = self._port.write(data)
             except Exception as ex:
@@ -324,13 +305,17 @@ class PKSerial:
     # ### Internal Methods                                                ###
     # #######################################################################
 
-    def _chk_for_err(self):  # type: () -> None # raises PKSerialError
-        if self._raise_op_error is not None:
+    def _chk_for_err(self):  # type: () -> bool # raises PKSerialError
+        if self._op_error is not None:
             self._reconnect_needed = True
-            if not self._op_err_has_been_thrown and not self._retries_enabled:
-                self._op_err_has_been_thrown = True
-                raise PKSerialPortError(self._raise_op_error)
-        return
+            if not self._op_error == self._op_error_prev:
+                self._op_error_prev == self._op_error
+                if not self._op_err_has_been_thrown and not self._retries_enabled:
+                    self._op_err_has_been_thrown = True
+                    raise PKSerialPortError(self._op_error)
+                pass
+            return True
+        return False
 
     def _enable_retries(self):  # type: () -> None
         if self.serial_available and self._retries_enabled and not self._shutdown.is_set():
@@ -385,13 +370,13 @@ class PKSerial:
                         sdif_port_id = sp.device
                         unit = m.group(1)
                         us = "" if not unit or len(unit) < 1 else " {}".format(unit)
-                        log.info("SD-{}{} found on: {}".format(sd_type, us, sp.device), dt="")
+                        log.log("\nSD-{}{} found on: {}\n".format(sd_type, us, sp.device), dt="")
                         break
             self._port_to_use = sdif_port_id
             if self._port_to_use is None:
                 msg = "An SD-{} was not found.".format(sd_type)
                 if not self._reconnect_needed:
-                    self._raise_op_error = msg
+                    self._op_error = msg
                 return
             pass
         try:
@@ -400,14 +385,15 @@ class PKSerial:
             self._port.timeout = self._lg_timeout
             self._port.write_timeout = self._lg_write_timeout
             self._port_name_used = self._port_to_use
-            self._raise_op_error = None
+            self._op_error = None
+            self._op_error_prev = None
             self._op_err_has_been_thrown = False
             if self._reconnect_needed:
                 self._status_callback("Port '{}' connected".format(self._port_to_use))
                 self._reconnect_needed = False
         except Exception as ex:
             msg = "Error opening port '{}': {}".format(self._port_to_use, ex)
-            self._raise_op_error = msg
+            self._op_error = msg
         return
 
     def _port_still_available(self, name):  # type: (str) -> bool
@@ -421,7 +407,7 @@ class PKSerial:
         return False
 
     def _set_error(self, ex):  # type: (Exception) -> None
-        self._raise_op_error = "PKSerial Error: {}".format(ex)
+        self._op_error = "PKSerial Error: {}".format(ex)
         if self._port:
             try:
                 self._port.close()
@@ -430,12 +416,12 @@ class PKSerial:
             finally:
                 self._port = None
                 self._reconnect_needed = True
-        if not self._op_err_has_been_thrown:
-            self._err_callback(self._raise_op_error)
+        if not self._op_err_has_been_thrown and not self._retries_enabled:
+            self._err_callback(self._op_error)
             self._op_err_has_been_thrown = True
             raise(PKSerialPortError(ex))
         else:
-            self._status_callback(self._raise_op_error)
+            self._status_callback(self._op_error)
         return
 
     def _thread_portchk_body(self):  # type: () -> None
@@ -443,6 +429,7 @@ class PKSerial:
         Called by the Port Check thread 'run' to assure the port is alive, or
         to retry opening it.
         """
+        pass  # Breakpoint location for entering
         while not self._shutdown.is_set():
             now = time.time()
             if now - self._portchk_t > 3.2:
@@ -459,7 +446,7 @@ class PKSerial:
                         self._port.close()
                         self._port = None
                         msg = "Port {} not available".format(self._port_name_used)
-                        self._raise_op_error = "PKSerial Error: {}".format(msg)
+                        self._op_error = "PKSerial Error: {}".format(msg)
                     pass
                 pass
             self._shutdown.wait(0.5)

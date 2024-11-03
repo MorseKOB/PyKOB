@@ -212,7 +212,7 @@ class Selector:
             if self._port.port_name_used is not None:
                 log.debug("The port '{}' for the Selector is available.".format(self._port.port_name_used))
             else:
-                log.log("Serial port '{}' problem. Will retry connection in the background.\n".format(self._portToUse), dt=)
+                log.log("Serial port '{}' problem. Will retry connection in the background.\n".format(self._portToUse), dt="")
         except Exception as ex:
             log.debug("Selector exception: {}".format(ex))
             if self._retries_enabled:

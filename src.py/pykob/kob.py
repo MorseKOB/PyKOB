@@ -420,7 +420,7 @@ class KOB:
         self._thread_powersave = None
         return
 
-    def __str_sync(s):  # type: (str) -> None
+    def __str_sync(self, s):  # type: (str) -> None
         """
         Function that will consume (sync) a string value.
         """
