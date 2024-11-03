@@ -1,0 +1,11 @@
+{
+  "python.terminal.activateEnvironment": true,
+  "editor.wordWrap": "off",
+  "editor.wordWrapColumn": 132,
+  "editor.minimap.maxColumn": 80,
+  "jupyter.interactiveWindow.viewColumn": "secondGroup",
+  "cSpell.words": [
+    "pygame",
+    "Scriptable"
+  ]
+}

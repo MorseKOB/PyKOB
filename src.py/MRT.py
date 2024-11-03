@@ -900,10 +900,12 @@ class MrtSelector:
         return s
 
 
-    def __init__(self, selector_port, selector_file_path, cfg:Optional[Config]=None) -> None:
+    def __init__(self, selector_port, selector_file_path, cfg:Optional[Config]=None, status_msg_hdlr=None, enable_retries=False) -> None:
         self._selector_file_path = MrtSelector.add_ext_if_needed(selector_file_path)
         self._selector_port: str = selector_port
         self._cfg: Optional[Config] = cfg
+        self._status_msg_hdlr = status_msg_hdlr
+        self._enable_retries = enable_retries
 
         self._selector_type: Optional[SelectorType] = None
         self._selector_specs: Optional[list[Optional[dict[str,Optional[list[str]]]]]] = None
@@ -984,7 +986,13 @@ class MrtSelector:
                     log.debug("MrtSelector.load_selector - Mrt Specs: {}".format(selections))
                     #
                     # Create the selector
-                    self._selector = Selector(self._selector_port, self._selector_type.mode, on_change=self._on_selection_changed)
+                    self._selector = Selector(
+                        self._selector_port,
+                        self._selector_type.mode,
+                        on_change=self._on_selection_changed,
+                        status_msg_hdlr=self._status_msg_hdlr,
+                        retries_enabled=self._enable_retries
+                    )
                     #
                     # Try to load an Mrt for each spec
                     for n in range(0, len(self._selector_specs)):
@@ -1073,6 +1081,10 @@ class MrtSelector:
             self.exit()
             log.debug("MrtSelector.run - done")
         return
+
+def status_msg_handler(msg):
+    log.log("\n{}\n".format(msg), dt="")
+    return
 
 def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
@@ -1176,7 +1188,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     # If we have a selector spec path, create a selector to return
     if selector_specpath:
         try:
-            selector = MrtSelector(selector_port, selector_specpath, cfg)
+            selector = MrtSelector(selector_port, selector_specpath, cfg, status_msg_hdlr=status_msg_handler, enable_retries=selector_optional)
         except SelectorLoadError as ex:
             # If a selector is not optional, exit with an error, else return a 'plain' MRT
             if not selector_optional:

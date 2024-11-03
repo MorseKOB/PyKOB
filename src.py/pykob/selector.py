@@ -44,18 +44,13 @@ import traceback
 from typing import Optional
 
 from pykob import log
+from pykob import serial as pkserial
 
-SEL_FIND_SDSEL = "SDSEL"
-SEL_SDSEL_SN_END = "_AESSEL"
-
-serialModuleAvailable = False
-try:
-    import serial
-    import serial.tools.list_ports
-    serialModuleAvailable = True
-except:
+serialModuleAvailable = pkserial.SERIAL_AVAILABLE
+if not serialModuleAvailable:
     log.err("Module pySerial is not available. Selector cannot be used.")
 
+SEL_FIND_SDSEL = pkserial.PORT_FIND_SDSEL_KEY
 POLE_CYCLE_TIME_MIN = 0.01
 
 @unique
@@ -90,13 +85,15 @@ class SelectorLoadError(Exception):
 
 class Selector:
     def __init__(self, portToUse:str, mode:SelectorMode=SelectorMode.OneOfFour,
-            pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None) -> None:
+            pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None, status_msg_hdlr=None, retries_enabled=False) -> None:
+        self._status_msg_hdlr = status_msg_hdlr if status_msg_hdlr is not None else self._null_status_hdlr
         self._portToUse = portToUse
         self._port = None
         self._mode = mode
         self._pole_cycle_time = pole_cycle_time if pole_cycle_time >= POLE_CYCLE_TIME_MIN else POLE_CYCLE_TIME_MIN
         self._steady_time = steady_time
         self._on_change = on_change
+        self._retries_enabled = retries_enabled
         self._one_of_four = 0
         self._binary_value = 0
         self._raw_value = 0
@@ -104,6 +101,10 @@ class Selector:
         #
         self._shutdown = Event()
         self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_body)
+
+    def _null_status_hdlr(self, msg):  # type: (str|None) -> None
+        log.debug("Selector status: {}".format(msg), 5)
+        return
 
     def _thread_port_checker_body(self):
         """
@@ -114,78 +115,59 @@ class Selector:
             oof_changed = False
             binary_changed = False
             while not self._shutdown.is_set():
-                b0 = 1 if self._port.cts else 0
-                b1 = 2 if self._port.dsr else 0
-                b2 = 4 if self._port.cd else 0
-                b3 = 8 if self._port.ri else 0
-                rval = (b3+b2+b1+b0)
-                if not rval == self._raw_value:
-                    self._raw_value = rval
-                    values_need_updating = True
-                    self._t_last_change = time.time()
-                else:
-                    # The value read is the same as last time
-                    # see if enough time has passed to record it.
-                    now = time.time()
-                    if (now - self._t_last_change) >= self._steady_time:
-                        if values_need_updating:
-                            if not self._binary_value == rval:
-                                self._binary_value = rval
-                                binary_changed = True
-                            # 1 of 4 only if a single bit is set
-                            oof = 0
-                            if rval == 1:
-                                oof = 1
-                            elif rval == 2:
-                                oof = 2
-                            elif rval == 4:
-                                oof = 3
-                            elif rval == 8:
-                                oof = 4
-                            if not oof == self._one_of_four:
-                                self._one_of_four = oof
-                                oof_changed = True
-                            # Call On-Change?
-                            if self._on_change:
-                                if (oof_changed and self._mode == SelectorMode.OneOfFour):
-                                    self._on_change(SelectorChange.OneOfFour, self._one_of_four)
-                                else:
-                                    change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
-                                        (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
-                                    if (binary_changed and self._mode == SelectorMode.Binary):
-                                        self._on_change(change, self._binary_value)
+                if self._port and not self._port.closed:
+                    b0 = 1 if self._port.cts else 0
+                    b1 = 2 if self._port.dsr else 0
+                    b2 = 4 if self._port.cd else 0
+                    b3 = 8 if self._port.ri else 0
+                    rval = (b3+b2+b1+b0)
+                    if not rval == self._raw_value:
+                        self._raw_value = rval
+                        values_need_updating = True
+                        self._t_last_change = time.time()
+                    else:
+                        # The value read is the same as last time
+                        # see if enough time has passed to record it.
+                        now = time.time()
+                        if (now - self._t_last_change) >= self._steady_time:
+                            if values_need_updating:
+                                if not self._binary_value == rval:
+                                    self._binary_value = rval
+                                    binary_changed = True
+                                # 1 of 4 only if a single bit is set
+                                oof = 0
+                                if rval == 1:
+                                    oof = 1
+                                elif rval == 2:
+                                    oof = 2
+                                elif rval == 4:
+                                    oof = 3
+                                elif rval == 8:
+                                    oof = 4
+                                if not oof == self._one_of_four:
+                                    self._one_of_four = oof
+                                    oof_changed = True
+                                # Call On-Change?
+                                if self._on_change:
+                                    if (oof_changed and self._mode == SelectorMode.OneOfFour):
+                                        self._on_change(SelectorChange.OneOfFour, self._one_of_four)
                                     else:
-                                        self._on_change(change, (self._binary_value, self._one_of_four))
-                            # Clear the flags
-                            values_need_updating = False
-                            oof_changed = False
-                            binary_changed = False
+                                        change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
+                                            (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
+                                        if (binary_changed and self._mode == SelectorMode.Binary):
+                                            self._on_change(change, self._binary_value)
+                                        else:
+                                            self._on_change(change, (self._binary_value, self._one_of_four))
+                                # Clear the flags
+                                values_need_updating = False
+                                oof_changed = False
+                                binary_changed = False
                     self._shutdown.wait(self._pole_cycle_time)
+                pass
+            pass
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
         return
-
-    def _find_sdsel(self):
-        """
-        Look for a Silky-DESIGN Selector, by searching for a serial port with a serial
-        number that ends in '_AESSEL' ('_AESSELA' on Windows).
-        If found, return the Serial.port.
-
-        Raise SDSelectorNotFound if a SD-Selector can't be found
-        """
-        sdsel_sn_end = SEL_SDSEL_SN_END if not (sys.platform == 'win32' or sys.platform == 'cygwin') else SEL_SDSEL_SN_END  + "A"
-        sdsel_port_id = None
-        systemSerialPorts = serial.tools.list_ports.comports()
-        for sp in systemSerialPorts:
-            sn = sp.serial_number if sp.serial_number else ""
-            if sn.endswith(sdsel_sn_end):
-                sdsel_port_id = sp.device
-                log.debug("SD-Selector found on: {}".format(sp.device), 3)
-                break
-        if sdsel_port_id is None:
-            raise SDSelectorNotFound()
-        port = serial.Serial(sdsel_port_id)
-        return port
 
     @property
     def binary_value(self):
@@ -207,7 +189,7 @@ class Selector:
         if self._thread_port_checker and self._thread_port_checker.is_alive():
             self._thread_port_checker.join(timeout=2.0)
         if self._port and not self._port.closed:
-            self._port.close()
+            self._port.exit()
             self._port = None
 
     def shutdown(self):
@@ -220,16 +202,28 @@ class Selector:
 
     def start(self):
         try:
-            if self._portToUse == SEL_FIND_SDSEL:
-                self._port = self._find_sdsel()
+            self._port = pkserial.PKSerial(
+                self._portToUse, 
+                err_callback=self._status_msg_hdlr, 
+                status_callback=self._status_msg_hdlr, 
+                enable_retries=self._retries_enabled
+            )
+            v = self._port.cts  # Do a read to see if there are any errors
+            if self._port.port_name_used is not None:
+                log.debug("The port '{}' for the Selector is available.".format(self._port.port_name_used))
             else:
-                self._port = serial.Serial(self._portToUse)
-            self._thread_port_checker.start()
-            log.debug("The port '{}' for the Selector is available.".format(self._portToUse))
+                log.log("Serial port '{}' problem. Will retry connection in the background.\n".format(self._portToUse), dt="")
         except Exception as ex:
-            log.log("Serial port '{}' not available. The Selector will not function.\n".format(self._portToUse), dt="")
             log.debug("Selector exception: {}".format(ex))
-            raise SelectorLoadError(self._portToUse, ex)
+            if self._retries_enabled:
+                log.log("Serial port '{}' error. Will retry connection in the background.\n".format(self._portToUse), dt="")
+            else:
+                log.log("Serial port '{}' error. Selector cannot be used.\n".format(self._portToUse), dt="")
+                raise SDSelectorNotFound(ex)
+        finally:
+            if self._port is not None:
+                self._thread_port_checker.start()
+        return
 
 """
 Test code
