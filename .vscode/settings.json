@@ -7,5 +7,6 @@
   "cSpell.words": [
     "pygame",
     "Scriptable"
-  ]
+  ],
+  "makefile.configureOnOpen": false
 }
