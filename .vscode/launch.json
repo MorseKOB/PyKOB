@@ -1,0 +1,77 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Current w/args",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                "xyz"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MKOB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MKOB.py",
+            "args": [
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MRT",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MRT.py",
+            "args": [
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MRT w/Sel",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MRT.py",
+            "args": [
+                "--selector", "SDSEL", "mrt_sel_spec.mrtsel"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Configure",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/Configure.py",
+            "args": [
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Cfg-GUI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/Configure.py",
+            "args": ["--gui"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
