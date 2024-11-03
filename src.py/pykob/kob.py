@@ -111,7 +111,6 @@ class SynthMode(IntEnum):
 # ####################################################################
 
 class KOB:
-
     #
     # The tables below are the modes the sounder/synth can be in given the control inputs.
     #
@@ -189,15 +188,13 @@ class KOB:
         self._use_sounder = useSounder              # type: bool
         self._virtual_closer_in_use = virtual_closer_in_use  # type: bool  # The owning code will drive the VC
         #
-        self._pkserial = pkserial()                 # type: PKSerial
+        self._pkserial = pkserial.PKSerial()        # type: PKSerial
         self._shutdown = Event()                    # type: Event
         self._hw_interface = HWInterface.NONE       # type: HWInterface
         self._gpio_key_read = self.__read_nul       # type: Callable
         self._gpio_pdl_dah = self.__read_nul        # type: Callable
         self._gpio_sndr_drive = None                # type: Callable|None
         self._port = None                           # type: 'serial.Serial'|None
-        self._port_errors_consec = 0                # type: int  # Count of the number of serial port errors in a row
-        self._port_errors_total = 0                 # type: int  # Count of the number of serial port errors
         self._serial_key_read = self.__read_nul     # type: Callable  # Read a NUL key. Changed in HW Init if interface is configured.
         self._serial_pdl_dah = self.__read_nul      # type: Callable  # Read a NUL paddle dah (dash).
         self._audio = None                          # type: audio.Audio|None
@@ -293,7 +290,7 @@ class KOB:
                     self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
                     log.debug(traceback.format_exc(), 3)
             elif self._use_serial and not self._port_to_use is None:
-                serial_support_available = self._pkserial.serial_intrfc_available()
+                serial_support_available = self._pkserial.serial_available
                 if not serial_support_available:
                     self._err_msg_hndlr("Serial interface is not available. Key/sounder cannot by used.")
                     log.debug(traceback.format_exc(), 3)
@@ -317,68 +314,28 @@ class KOB:
                     log.debug(traceback.format_exc(), 3)
             elif serial_support_available:
                 try:
-                    if self._port_to_use == PORT_FIND_SDIF_KEY:
-                        """
-                        Look for a Silky-DESIGN Interface, by searching for a serial port with a serial
-                        number that ends in '_AESnnn' (nnn is the unit number '_AESnnnA' on Windows).
-                        Note: Early SD interfaces didn't have a unit number (nnn), and SilkyDESIGN-Selector
-                            switches have a serial number like '_AESSEL'. So it is important to find
-                            interfaces and not selector switches.
-                        If found, set the port ID.
-                        Else, indicate a warning
-                        """
-                        log.debug("Try to find SD-Interface on serial.")
-                        re1 = re.compile(r"_AES([0-9]*)")
-                        re2 = re.compile(r"_AESSEL")
-                        sdif_port_id = None
-                        systemSerialPorts = serial.tools.list_ports.comports()
-                        for sp in systemSerialPorts:
-                            sn = sp.serial_number if sp.serial_number else ""
-                            m = re1.search(sn)
-                            if m:
-                                # Found an SD device, make sure it's not a Selector
-                                if not re2.search(sn):
-                                    sdif_port_id = sp.device
-                                    unit = m.group(1)
-                                    us = "" if not unit or len(unit) < 1 else " {}".format(unit)
-                                    log.info("SD-Interface{} found on: {}".format(us, sp.device), dt="")
-                                    break
-                        self._port_to_use = sdif_port_id
-                        if self._port_to_use is None:
-                            self._err_msg_hndlr("An SD-Interface was not found. Key/sounder will not function.")
                     if not self._port_to_use is None:
-                        self._port = pkserial.PKSerial(self._port_to_use, timeout=0.5)
-                        self._port.write_timeout = 1
-                        self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
-                        # Read the inputs to initialize them
-                        self.__read_cts()
-                        self.__read_dsr()
-                        # Check for loopback - The minimal PyKOB interface loops-back data to identify itself. It uses CTS for the key.
-                        self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
-                        self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
-                        self._hw_interface = HWInterface.SERIAL
-                        self._port.write(b"PyKOB\n")
-                        self._threadsStop_KS.wait(0.5)
-                        indata = self._port.readline()
-                        if indata == b"PyKOB\n":
-                            self._serial_key_read = self.__read_cts  # Use CTS to read the key
-                            self._serial_pdl_dah = self.__read_nul   # Paddle Dah/Dash cannot be supported
-                            self._paddle_is_supported = False
-                            log.debug("KOB Serial Interface is 'minimal' type (key on CTS).")
-                        else:
-                            self._paddle_is_supported = True
-                            log.debug("KOB Serial Interface is 'full' type (key/pdl-dit on DSR, pdl-dah on CTS).")
-                        self._port_errors_consec = 0
-                        self._port_errors_total = 0
+                        self._port = pkserial.PKSerial(
+                            self._port_to_use,
+                            timeout=0.5,
+                            err_callback=self._err_msg_hndlr,
+                            status_callback=self._status_msg_hndlr,
+                            enable_retries=True)
+                        self._port.write_timeout = 1.0
                     pass
                 except Exception as ex:
-                    self._hw_interface = HWInterface.NONE
-                    self._port = None
-                    self._serial_key_read = self.__read_nul
-                    self._serial_pdl_dah = self.__read_nul
-                    self._err_msg_hndlr("Serial port '{}' is not available. Key/sounder will not function.".format(self._port_to_use))
+                    self._err_msg_hndlr("Serial port '{}' error. Will retry in background.".format(self._port_to_use))
                     log.debug(ex)
                     log.debug(traceback.format_exc(), 3)
+                finally:
+                    self._port.write_timeout = 1.0
+                    self._port.dtr = True  # Provide power for the Les/Chip Loop Interface
+                    # Read the inputs to initialize them
+                    self.__read_cts()
+                    self.__read_dsr()
+                    self._serial_key_read = self.__read_dsr  # Assume that we will use DSR to read the key
+                    self._serial_pdl_dah = self.__read_cts   # Assume that we will use CTS to read the paddle-dah (dash)
+                    self._hw_interface = HWInterface.SERIAL
                 pass
             else:
                 # For one reason or another, we are not using GPIO or Serial.
@@ -604,24 +561,11 @@ class KOB:
                 self._err_msg_hndlr("Error reading key on GPIO interface. Disabling interface.")
                 log.debug(traceback.format_exc(), 3)
         elif self._hw_interface == HWInterface.SERIAL:
-            if self._port_errors_consec > 0 and self._port_to_use:
-                self._threadsStop_KS.wait(0.5)  # Wait 1/2 second before trying again
-            for retry in range(3):
-                try:
-                    kc = self._serial_key_read()
-                    self._port_errors_consec = 0
-                    break
-                except:
-                    self._port_errors_total += 1
-                    self._port_errors_consec += 1
-                    if self._port_errors_total == 1:
-                        self._err_msg_hndlr("Error reading key. Check interface.")
-                        log.debug(traceback.format_exc(), 3)
-                    else:
-                        self._status_msg_hndlr("Error reading key")
-                        log.debug("Error reading key ({} total)".format(self._port_errors_total), 3)
-                    self._threadsStop_KS.wait(0.25)  # Wait 1/4 second before trying again
-                pass
+            try:
+                kc = self._serial_key_read()
+            except:
+                self._status_msg_hndlr("Error reading key. Check interface.")
+                log.debug(traceback.format_exc(), 3)
             pass
         # Invert key state if configured to do so (ex: input is from a modem)
         if self._invert_key_input:
@@ -790,18 +734,6 @@ class KOB:
         return
 
     @property
-    def serial_errors_consecutive(self):  # type: () -> int
-        return self._port_errors_consec
-
-    @property
-    def serial_errors_total(self):  # type: () -> int
-        return self._port_errors_total
-    def clear_serial_error_count(self):  # type: () -> None
-        self._port_errors_consec = 0
-        self._port_errors_total = 0
-        return
-
-    @property
     def sound_local(self): # type: () -> bool
         return self._sound_local
     @sound_local.setter
@@ -923,9 +855,8 @@ class KOB:
         self.shutdown()
         if self._audio:
             self._audio.exit()
-        if self._port and not self._port.closed:
-            self._port.close()
-            self._port = None
+        if self._port:
+            self._port.exit()
         if self._gpio_key_read:
             self._gpio_key_read = None
         if self._gpio_sndr_drive:

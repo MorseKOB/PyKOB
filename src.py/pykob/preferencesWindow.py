@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional
 from pykob import config, log, util
 from pykob.internet import HOST_DEFAULT, PORT_DEFAULT
 from pykob.config2 import Config
-from pykob.kob import PORT_FIND_SDIF_KEY
+from pykob.serial import PORT_FIND_SDIF_KEY
 
 GUI = True                              # Hope for the best...
 try:
