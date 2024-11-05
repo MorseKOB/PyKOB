@@ -29,13 +29,13 @@ SchedFeed.py
 
 Sends messages according to a time schedule.
 
-Serial port, code speed, and audio preferences should be specified by running the
-'configure.sh' script or executing 'python3 Configure.py'.
+Serial port, code speed, and audio preferences should be specified by running
+'python3 Configure.py'.
 
 Change history:
 
 SchedFeed 1.4  2024-03-13
-- add additional parameters when creating Intenet object to handle modules no
+- add additional parameters when creating Internet object to handle modules no
   longer reading directly from the config.
 
 SchedFeed 1.3  2016-02-04
