@@ -208,6 +208,7 @@ class Selector:
                 status_callback=self._status_msg_hdlr, 
                 enable_retries=self._retries_enabled
             )
+            self._port.start()
             v = self._port.cts  # Do a read to see if there are any errors
             if self._port.port_name_used is not None:
                 log.debug("The port '{}' for the Selector is available.".format(self._port.port_name_used))

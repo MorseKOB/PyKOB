@@ -468,7 +468,9 @@ class Mrt:
             soundLocal=self._cfg.local,
             sounderPowerSaveSecs=self._cfg.sounder_power_save,
             virtual_closer_in_use=True,
-            keyCallback=self._from_key
+            keyCallback=self._from_key,
+            err_msg_hndlr=self._err_msg_handler,
+            status_msg_hndlr=self._status_msg_handler
             )
         self._internet = internet.Internet(
             officeID=self._our_office_id,
@@ -535,6 +537,16 @@ class Mrt:
             self._reader.decode(code)
         if self._connected and self._cfg.remote:
             self._internet.write(code)
+        return
+
+    def _err_msg_handler(self, msg):  # type: (str|None) -> None
+        if msg is not None:
+            log.log("\nError: {}\n".format(msg), dt="")
+        return
+
+    def _status_msg_handler(self, msg):  # type: (str|None) -> None
+        if msg is not None:
+            log.log("\n{}\n".format(msg), dt="")
         return
 
     def _from_file(self, code, char:Optional[str]=None):
