@@ -289,7 +289,7 @@ class KOB:
                     self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
                     log.debug(traceback.format_exc(), 3)
             elif self._use_serial and not self._port_to_use is None:
-                serial_support_available = pkserial.serial_available
+                serial_support_available = pkserial.SERIAL_AVAILABLE
                 if not serial_support_available:
                     self._err_msg_hndlr("Serial interface is not available. Key/sounder cannot by used.")
                     log.debug(traceback.format_exc(), 3)
@@ -320,6 +320,7 @@ class KOB:
                             err_callback=self._err_msg_hndlr,
                             status_callback=self._status_msg_hndlr,
                             enable_retries=True)
+                        self._port.start()
                         self._port.write_timeout = 1.0
                     pass
                 except Exception as ex:
