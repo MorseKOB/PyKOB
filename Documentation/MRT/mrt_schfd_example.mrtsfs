@@ -1,0 +1,25 @@
+{
+    "specs": [
+        {
+            "at":906,
+            "msg":"~ «$OFFICE» ON +     ~ AR «$OFFICE» +"
+        },
+        {
+            "at_ii":1207,
+            "msg":"~ «$OFFICE» CHECKING IN= AR «$OFFICE» +"
+        },
+        {
+            "when_i":1950,
+            "msg":"~ «$OFFICE» DONE +     ~ 30 «$OFFICE» +"
+        },
+        {
+            "idle":10,
+            "msgs":[
+                "~ I «$OFFICE» 37 SEEING WHO IS THERE. = 73 «$OFFICE» +",
+                "~ I «$OFFICE» INVITING YOU TO JOIN IN. = K «$OFFICE» +",
+                "~ I «$OFFICE» WELCOME TO OUR WIRE. = «P3.2» WE HOPE YOU ARE ENJOYING YOURSELF. K «$OFFICE» +",
+                "~ I «$OFFICE» 77 PLEASE COME VISIT «$SITE_NAME» AND SEE US IN ACTION. = K «$OFFICE» +"
+            ]
+        }
+    ]
+}
