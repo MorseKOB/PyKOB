@@ -55,6 +55,8 @@ Capture-Replay/*.txt
 *.json
 # Include VSCode settings
 !.vscode/*.json
+# Ignore MRT SchedFeed Spec files. If .mrtsfs files are needed in the source, include them with a '!' line.
+*.mrtsfs
 # Ignore MRT Selector files. If .mrtsel files are needed in the source, include them with a '!' line.
 *.mrtsel
 # Ignore PKCFG files from saving configurations. If PKCFG files are needed in the source, include them with a '!' line.

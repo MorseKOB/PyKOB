@@ -44,6 +44,17 @@
             "justMyCode": false
         },
         {
+            "name": "MRT (sf)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MRT.py",
+            "args": [
+                "--schedfeed", "mrt_schfd.mrtsfs"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "MRT w/Sel",
             "type": "debugpy",
             "request": "launch",
