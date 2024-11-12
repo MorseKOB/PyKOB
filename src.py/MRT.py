@@ -69,7 +69,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.4.3'
+__version__ = '1.4.4'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -1259,15 +1259,42 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 while not self._fst_stop.is_set() and not self._shutdown.is_set():
                     with open(self._send_file_path, "r") as fp:
+                        last_ch_was_nl = False  # If we get two NL in a row, insert a Paragraph.
+                        inserted_para = False   # Track whether we inserted one.
                         while not self._fst_stop.is_set() and not self._shutdown.is_set():
                             ch = fp.read(1)
                             if not ch:
                                 break
                             if ch < ' ':
-                                # don't send control characters
-                                continue
+                                if ch == '\r':
+                                    # Just swallow RETURNs
+                                    continue
+                                if ch == '\n':
+                                    if last_ch_was_nl:
+                                        if not inserted_para:
+                                            ch = '='
+                                            inserted_para = True
+                                        else:
+                                            # Only do a single paragraph in a row.
+                                            continue
+                                    else:
+                                        last_ch_was_nl = True
+                                        continue
+                                    pass
+                                else:
+                                    # don't send control characters
+                                    last_ch_was_nl = False
+                                    continue
+                                pass
+                            else:
+                                last_ch_was_nl = False
+                                inserted_para = False
                             code = self._sender.encode(ch)
                             self._from_file(code, ch)
+                            if inserted_para:
+                                self._fst_stop.wait(2.0)  # Pause 2 seconds after a paragraph
+                            pass
+                        pass
                     self._fst_stop.set()
             except Exception as ex:
                 print(
@@ -1386,6 +1413,12 @@ class MrtSelector:
         self._spec_desc: Optional[str] = None
 
         self._load_selector(self._selector_file_path)
+        if self._selector:
+            # _load_selector returns False if things are okay, but a selector
+            # switch wasn't found and is being looked for n the background.
+            # Until one is found, run with Selection #1
+            self._accept_select.set()
+            self._on_selection_changed(self._selector_type.change, self._selector.selector_value)
         return
 
     def _load_mrt_for_spec(self, spec:dict[str,Optional[list[str]]]) -> Optional[Mrt]:
@@ -1467,7 +1500,11 @@ class MrtSelector:
                         log.log("Checking selector spec for selection {}\n".format(selection_no), dt="")
                         test_mrt = self._load_mrt_for_spec(spec)
                         log.debug("MrtSelector._load_selector - Test Mrt created for spec [{}] with args {}".format(spec[SELECTION_DESCRIPTION_KEY], spec[SELECTION_ARGS_KEY]), 4)
-                    self._selector.start()
+                    if not self._selector.start():
+                        # Selector.start returns False if a switch wasn't found but
+                        # is retrying to find one. If this is the case, return False
+                        # to let __init__ know.
+                        return False
                     return True
         except SelectorMrtLoadError as smle:
             # Just raise it, as it is already set with a message.
@@ -1525,22 +1562,26 @@ class MrtSelector:
         """
         try:
             self._accept_select.set()
-            while self._selection_changed.wait():
-                self._selection_changed.clear()
-                self._accept_select.clear()
-                if self._mrt:
-                    self._mrt.exit()
-                    self._mrt = None
-                if self._new_mrt:
-                    log.log("\nSwitching to MRT selection {}: {}\n\n".format(self._selector.one_of_four, self._spec_desc), dt="")
-                    self._mrt = self._new_mrt
-                    self._new_mrt = None
-                    self._mrt.start()
-                    self._accept_select.set()
-                    self._mrt.main_loop()
-                    log.debug("MrtSelector.run - Mrt returned from main_loop.")
-                else:
-                    break
+            while not self._run_complete.is_set():
+                if self._selection_changed.wait(0.3):
+                    self._selection_changed.clear()
+                    self._accept_select.clear()
+                    if self._mrt:
+                        self._mrt.exit()
+                        self._mrt = None
+                    if self._new_mrt:
+                        log.log("\nSwitching to MRT selection {}: {}\n\n".format(self._selector.one_of_four, self._spec_desc), dt="")
+                        self._mrt = self._new_mrt
+                        self._new_mrt = None
+                        self._mrt.start()
+                        self._accept_select.set()
+                        self._mrt.main_loop()
+                        log.debug("MrtSelector.run - Mrt returned from main_loop.")
+                    else:
+                        break
+                    pass
+                pass
+            pass
         finally:
             log.debug("MrtSelector.run - ending", 3)
             self._run_complete.set()

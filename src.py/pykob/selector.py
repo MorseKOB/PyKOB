@@ -94,7 +94,7 @@ class Selector:
         self._steady_time = steady_time
         self._on_change = on_change
         self._retries_enabled = retries_enabled
-        self._one_of_four = 0
+        self._one_of_four = 1
         self._binary_value = 0
         self._raw_value = 0
         self._t_last_change = time.time()
@@ -162,8 +162,8 @@ class Selector:
                                 values_need_updating = False
                                 oof_changed = False
                                 binary_changed = False
-                    self._shutdown.wait(self._pole_cycle_time)
-                pass
+                    pass
+                self._shutdown.wait(self._pole_cycle_time)
             pass
         finally:
             log.debug("{} thread done.".format(threading.current_thread().name))
@@ -180,6 +180,31 @@ class Selector:
     @property
     def raw_value(self):
         return self._raw_value
+
+    @property
+    def selector_change_type(self):  # type: () -> SelectorChange
+        """
+        The type of change this selector produces.
+        """
+        return self._
+    @property
+    def selector_mode(self):  # type: () -> SelectorMode
+        """
+        The mode the selector is being used in:
+            1 of 4 or Binary
+        """
+        return self._mode
+
+    @property
+    def selector_value(self):  # type: () -> int
+        """
+        The value of the selector that is appropriate for the mode:
+            1,2,3,4 - For 1 of 4
+            0-15 - For Binary
+        """
+        if self._mode == SelectorMode.OneOfFour:
+            return self._one_of_four
+        return self._binary_value
 
     def exit(self):
         """
@@ -200,12 +225,21 @@ class Selector:
         self._shutdown.set()
         return
 
-    def start(self):
+    def start(self):  # type: () -> bool
+        """
+        Start up the selector. Return true if all is good.
+        If we aren't able to find a selector switch, but retried are enabled
+        (so we might find a selector switch later) return false.
+        If we don't find a selector switch and retries aren't enabled, raise
+        an exception.
+
+        Return: True is all is good. False if retrying in background. Exception if error.
+        """
         try:
             self._port = pkserial.PKSerial(
-                self._portToUse, 
-                err_callback=self._status_msg_hdlr, 
-                status_callback=self._status_msg_hdlr, 
+                self._portToUse,
+                err_callback=self._status_msg_hdlr,
+                status_callback=self._status_msg_hdlr,
                 enable_retries=self._retries_enabled
             )
             self._port.start()
@@ -218,13 +252,15 @@ class Selector:
             log.debug("Selector exception: {}".format(ex))
             if self._retries_enabled:
                 log.log("Serial port '{}' error. Will retry connection in the background.\n".format(self._portToUse), dt="")
+                # Return False and retry finding a selector.
+                return False
             else:
                 log.log("Serial port '{}' error. Selector cannot be used.\n".format(self._portToUse), dt="")
                 raise SDSelectorNotFound(ex)
         finally:
             if self._port is not None:
                 self._thread_port_checker.start()
-        return
+        return True
 
 """
 Test code

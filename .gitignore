@@ -57,8 +57,10 @@ Capture-Replay/*.txt
 !.vscode/*.json
 # Ignore MRT SchedFeed Spec files. If .mrtsfs files are needed in the source, include them with a '!' line.
 *.mrtsfs
+!*example.mrtsfs
 # Ignore MRT Selector files. If .mrtsel files are needed in the source, include them with a '!' line.
 *.mrtsel
+!*example.mrtsel
 # Ignore PKCFG files from saving configurations. If PKCFG files are needed in the source, include them with a '!' line.
 *.pkcfg
 # Ignore PKREC files from recordings. If PKREC files are needed in the source, include them with a '!' line.
