@@ -814,8 +814,8 @@ class KOB:
         self._use_gpio = use_gpio
         self._use_sounder = use_sounder
         self.__stop_hw_processing()
-        if self._port and not self._port.closed:
-            self._port.close()
+        if self._port:
+            self._port.exit()
             self._port = None
         self.__init_hw_interface()
         self._update_modes()
