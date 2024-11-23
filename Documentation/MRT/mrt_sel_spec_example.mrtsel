@@ -2,12 +2,6 @@
     "type":"1OF4",
     "selections": [
         {
-            "desc":"Local only",
-            "args":[
-                "0"
-            ]
-        },
-        {
             "desc":"News (Wire 108)",
             "args":[
                 "108"
@@ -16,13 +10,19 @@
         {
             "desc":"Chat (Wire 11)",
             "args":[
-                "11", "--config", "wire-11-public.pkcfg"
+                "--config", "wire11_public.pkcfg", "--schedfeed", "mrt_schfd.mrtsfs", "11"
             ]
         },
         {
-            "desc":"Play a recording and process a file, sending to Wire 91.",
+            "desc":"Play from text file",
             "args":[
-                "91", "--play", "mrt-session.pkrec", "--file", "mkob_learn/The quick brown fox.txt", "--repeat", "8"
+                "--file", "src.py/mkob_learn/The_quick_brown_fox.txt", "--repeat", "5", "0"
+            ]
+        },
+        {
+            "desc":"Local only",
+            "args":[
+                "0"
             ]
         }
     ]
