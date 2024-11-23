@@ -38,6 +38,11 @@ line parameter:
 
 Example:
     python MRT.py 11
+
+Also supports a Selector Switch and built-in Scheduled Feed functionality.
+    Use `--help` on the command line.
+    For complete instructions see the Documentation/MRT directory.
+
 """
 
 from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
@@ -69,7 +74,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.4.4'
+__version__ = '1.4.5'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
