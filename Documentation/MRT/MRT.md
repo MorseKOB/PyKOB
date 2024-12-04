@@ -1,16 +1,16 @@
-# MRT (Marty) - Morse Receive & Transmit
-MRT, 'Marty', is a command-line Morse receive and transmit application.
+# MRT (Mr T) - Morse Receive & Transmit
+MRT, 'Mr T', is a command-line Morse receive and transmit application.
 It connects to a wire and receives, decodes, and displays incoming code on
 the console, and allows a local key to open the circuit and send to the wire.
 In addition, it supports sending from the keyboard, as well as a number of
 other capabilites (see below).
 
 ## Usage
-Marty basic usage is:
+Mr T basic usage is:
 
 `>python3 MRT.py wire`
 
-Marty uses the current configuration (set using the `Configure.py` utility)
+Mr T uses the current configuration (set using the `Configure.py` utility)
 or a specified configuration (using the `--config config-file` option).
 It accepts optional arguments to (among other things...):
 * Display help: `-h`|`--help`
@@ -25,20 +25,20 @@ It accepts optional arguments to (among other things...):
 For a full list of options and descriptions, use the `--help` command line option.
 
 ## Operation
-Marty automatically connects to the wire when it is started and it remains connected
+Mr T automatically connects to the wire when it is started and it remains connected
 while it is running. There is no option to connect/disconnect. The exception to this is if
 wire number 0 is specified.
 In that case, MRT does not connect, and can be used for local practice.
 It monitors the wire and the local key. If the local key is opened, keyed code will be
  sent to the wire.
-While the local key is closed, Marty will sound, as well as decode and display, code
+While the local key is closed, Mr T will sound, as well as decode and display, code
 received from the wire.
 
 The station name of the sending station is displayed when the sending station
 changes.
 
 ## Exiting
-Marty runs continuously once started. To stop, enter a Ctrl-C (^C) on the
+Mr T runs continuously once started. To stop, enter a Ctrl-C (^C) on the
 keyboard or kill the process.
 
 ## Running at Start-Up on Linux
