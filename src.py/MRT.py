@@ -38,6 +38,11 @@ line parameter:
 
 Example:
     python MRT.py 11
+
+Also supports a Selector Switch and built-in Scheduled Feed functionality.
+    Use `--help` on the command line.
+    For complete instructions see the Documentation/MRT directory.
+
 """
 
 from pykob import VERSION, config, config2, log, kob, internet, morse, recorder
@@ -50,13 +55,16 @@ from pykob.selector import Selector, SelectorMode, SelectorChange, SEL_FIND_SDSE
 import pkappargs
 
 import argparse
-from enum import Enum
+from enum import Enum, IntEnum, unique
 import json
 from json import JSONDecodeError
+import os
 from pathlib import Path
 import platform
 import queue
 from queue import Empty, Queue
+import random
+import re  # RegEx
 import select
 import sys
 from sys import platform
@@ -66,7 +74,7 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.4.2'
+__version__ = '1.4.5'
 MRT_VERSION_TEXT = "MRT " + __version__
 
 MRT_SEL_EXT = ".mrtsel"
@@ -242,6 +250,416 @@ class _GetchWindows:
         self.shutdown_event.set()
         return
 
+class SchedFeedError(Exception):
+    pass
+class MultipleSFConditions(SchedFeedError):
+    pass
+
+class SFConditionUnknown(SchedFeedError):
+    pass
+class SFConditionTimeInvalid(SchedFeedError):
+    pass
+
+class SFConditionPeriodInvalid(SchedFeedError):
+    pass
+
+class SFConditionMultipleMsgMsgsEntries(SchedFeedError):
+    pass
+
+class SFConditionMsgsNotList(SchedFeedError):
+    pass
+
+class SFControlInvalid(SchedFeedError):
+    pass
+
+
+class _SFSpecOp:
+    """
+    Internal class to contain a Scheduled Feed Spec and operation history.
+
+    Contains:
+        condition   - The condition that triggers the feed
+        time        - The time/period specified for the condition
+        msg         - A single message (if a single one was specified)
+        msgs        - A list of messages (if multiple were specified, used randomly)
+        --------
+        last_dt     - The date-time of the last transmission
+    """
+
+    def __init__(self, spec):  # type: (dict[str,Any]) -> None
+        self._condition = None      # type: _SchedFeedProcessor._Condition|None
+        self._time = None           # type: int|None
+        self._period = None         # type: int|None
+        self._msg = None            # type: str|None
+        self._msgs = None           # type: list[str]|None
+        self._last_activity = -1    # type: int
+        self._last_dt = -1          # type: int
+        #
+        for key, value in spec.items():
+            if (key == _SchedFeedProcessor._Condition.at.name
+                or key == _SchedFeedProcessor._Condition.at_ii.name
+                or key == _SchedFeedProcessor._Condition.when_i.name
+                or key == _SchedFeedProcessor._Condition.idle.name):
+                if self._condition is not None:
+                    raise MultipleSFConditions("SchedFeed condition {} already set when condition {} was encountered in spec.".format(self._condition, value))
+                self._condition = _SchedFeedProcessor._Condition[key]
+                if self._condition == _SchedFeedProcessor._Condition.idle:
+                    try:
+                        self._period = int(value)
+                        if self._period < 1 or self._period > 2359:
+                            raise SFConditionPeriodInvalid("SchedFeed spec period value {} is not valid. Period must be 0 < p < 2400.".format(self._period))
+                    except ValueError as ex:
+                        raise SFConditionPeriodInvalid("SchedFeed spec period specified is invalid {}. Must be an integer. Error: {}".format(value, ex))
+                else:
+                    try:
+                        self._time = int(value)
+                        if self._time < 0 or self._time > 2359:
+                            raise SFConditionPeriodInvalid("SchedFeed spec time value {} is not valid. Time must be 0 <= p < 2400.".format(self._time))
+                    except ValueError as ex:
+                        raise SFConditionPeriodInvalid("SchedFeed spec time specified is invalid {}. Must be an integer. Error: {}".format(value, ex))
+            elif key == "msg":
+                if self._msg is not None or self._msgs is not None:
+                    raise SFConditionMultipleMsgMsgsEntries("Only a single 'msg' or 'msgs' entry is allowed in a SchedFeed spec.")
+                self._msg = value
+            elif key == "msgs":
+                if self._msg is not None or self._msgs is not None:
+                    raise SFConditionMultipleMsgMsgsEntries("Only a single 'msgs' or 'msg' entry is allowed in a SchedFeed spec.")
+                if not isinstance(value, list):
+                    raise SFConditionMsgsNotList("The SchedFeed spec 'msgs' value must be a list of two or more message strings.")
+                self._msgs = list()
+                for v in value:
+                    self._msgs.append(str(v))
+                pass
+            else:
+                raise SFConditionUnknown("Unknown SchedFeed condition '{}'")
+            pass
+        # Adjust the last time sent and activity
+        self._last_activity = time.time()//60
+        if self._time is not None:
+            t0 = time.localtime()
+            now_mins = t0.tm_hour*60 + t0.tm_min  # current time (min)
+            tMsg = 60*(self._time//100) + (self._time%100)  # time to send message
+            if tMsg < now_mins:
+                # Trigger time is in the past for today. Indicate that we've sent.
+                self._last_dt = now_mins
+        return
+
+    def __str__(self):
+        s = ""
+        if self._condition == _SchedFeedProcessor._Condition.idle:
+            s = "Idle for {} minutes, send: ".format(self._period)
+        elif self._condition == _SchedFeedProcessor._Condition.at:
+            s = "At {}, send: ".format(self._time)
+        elif self._condition == _SchedFeedProcessor._Condition.at_ii:
+            s = "At {}, if idle, send: ".format(self._time)
+        else:
+            s = "When idle at/after {}, send ".format(self._time)
+        if self._msg is not None:
+            s += self._msg
+        elif self._msgs is not None:
+            s += self._msgs
+        return (s)
+
+    def __repr__(self):
+        return self.__str__()
+
+    @property
+    def condition(self):  # type: () -> _SchedFeedProcessor._Condition
+        return self._condition
+
+    @property
+    def last_activity(self):  # type: () -> int
+        return self._last_activity
+    @last_activity.setter
+    def last_activity(self, t):  # type: (int) -> None
+        self._last_activity = t
+        return
+
+    @property
+    def last_dt(self):  # type: () -> int
+        return self._last_dt
+    @last_dt.setter
+    def last_dt(self, dt):  # type: (int) -> None
+        self._last_dt = dt
+        return
+
+    @property
+    def msg(self):  # type: () -> str|None
+        return self._msg
+
+    @property
+    def msgs(self):  # type: () -> list[str]|None
+        return self._msgs
+
+    @property
+    def period(self):  # type: () -> int|None
+        return self._period
+
+    @property
+    def time(self):  # type: () -> int|None
+        return self._time
+
+class _SchedFeedProcessor:
+    """
+    Loads and parses a SchedFeed Spec to create a definition of what needs
+    to be sent and what times.
+
+    Methods are provided that need to be called as activity occurs such that
+    the class knows when the wire is idle, and how long it has been idle.
+
+    A method is also provided that needs to be called regularly so the
+    current time can be checked to see if something needs to be sent.
+
+    The format of a spec is as follows (example):
+    {
+        "specs": [
+            {
+                "at":815,
+                "msg":"~ ES ON +     ~ OK ES +"
+            },
+            {
+                "at_ii":1310,
+                "msg":"~ ES CHECKING IN +     ~ OK ES +"
+            },
+            {
+                "when_i":1310,
+                "msg":"~ ES CHECKING IN +     ~ OK ES +"
+            },
+            {
+                "idle":15,
+                "msgs":[
+                    "~ «$STN_NAME» SEEING WHO IS THERE. = OK «$STN_NAME» +",
+                    "~ «$STN_NAME» INVITING YOU TO JOIN IN. = OK «$STN_NAME» +",
+                    "~ «$STN_NAME» WELCOME TO OUR WIRE. = «P3.2» WE HOPE YOU ARE ENJOYING YOURSELF. OK «$STN_NAME» +",
+                    "~ «$STN_NAME» PLEASE COME VISIT «$SITE_NAME» AND SEE US IN ACTION. = OK «$STN_NAME» +"
+                ]
+            }
+        ]
+    }
+
+    The value of specs is an array/list with a condition and a time or period and a msg with a text_string or a msgs with an array/list of text_strings.
+    condition is one of:
+    at : Sends a message at a specified time. The message will be sent no matter what (it will break in if the wire is currently active).
+    at_ii : Send a message at a specified time if the wire is idle. If the wire is active, the message will not be sent.
+    when_i : Send a message as soon as the wire is idle at, or as soon after, the specified time.
+    idle : Send a message if the wire is idle for the specified period.
+
+    time or period : 24-Hour Hour+Minute value.
+
+    msg : A single text_string containing the message to be sent.
+    msgs : Array/list of text_string values. One of the messages will be used at random when a message is to be sent.
+
+    The text_string can include plain text, or the following special characters/sequences:
+    '~' : Opens the key (same as keyboard sending)
+    '+' : Closes the key (same as keyboard sending)
+    ' «ctrl» : Control value, which is one of: ('«' is Unicode U+00AB and '»' is Unicode U+00BB)
+    $env_var : Replaced with the value of the environment variable env_var
+    Pseconds : Pause the given number of seconds (can be fractional)
+
+    """
+
+    MRT_SCHDFEED_SPEC_EXT = ".mrtsfs"
+
+    SPECS_KEY = "specs"
+    #
+    AT_KEY = "at"
+    AT_IF_IDLE_KEY = "at_ii"
+    WHEN_IDLE_KEY = "when_i"
+    IDLE_KEY = "idle"
+    #
+    MSG_KEY = "msg"
+    MSGS_KEY = "msgs"
+    #
+    CTRL_VAL_START_CHAR = '\u00AB'  # Unicode character: «
+    CTRL_VAL_END_CHAR = '\u00BB'    # Unicode character: »
+    CTRL_VAL_ENV_VAR_START = '$'    # Environment variables are specified by '$'
+    CTRL_VAL_PAUSE_VAR_START = 'P'  # Pause 4.2 seconds example: "P4.2"
+
+    @unique
+    class _Condition(IntEnum):
+        at = 1
+        at_ii = 2
+        when_i = 3
+        idle = 4
+
+
+    def add_ext_if_needed(s: str) -> str:
+        """
+        Add the MRT scheduled feed spec file extension if needed.
+
+        Adds '.mrtsfs' to the string argument if it doesn't already end with it.
+        """
+        if s and not s.endswith(_SchedFeedProcessor.MRT_SCHDFEED_SPEC_EXT):
+            return (s + _SchedFeedProcessor.MRT_SCHDFEED_SPEC_EXT)
+        return s
+
+    def __init__(self, schedfeed_spec_path, morse_sender, code_char_send_callback, shutdown_event):  # type (Path|None, Sender, Callable, Event) -> None
+        self._schedfeed_spec_path = schedfeed_spec_path
+        self._sender = morse_sender
+        self._code_char_send = code_char_send_callback
+        self._shutdown = shutdown_event
+        self._spec_ops = None  # type: list[_SFSpecOp]|None
+
+        self._load_specs()
+        return
+
+    def _load_specs(self):  # type: () -> None
+        if self._schedfeed_spec_path:
+            specs = None
+            jd = None
+            with open(self._schedfeed_spec_path, 'r', encoding="utf-8") as fp:
+                jd = json.load(fp)
+            if jd:
+                specs = jd[_SchedFeedProcessor.SPECS_KEY]
+            if specs:
+                self._spec_ops = list()
+                for spec in specs:
+                    self._spec_ops.append(_SFSpecOp(spec))
+                pass
+            pass
+        return
+
+    def _process_ctrl(self, msg, index):  # type: (str, int) -> int
+        """
+        Process a control sequence within a message. The `index` param is pointing
+        to the lead-in ctrl character.
+
+        Return the index of the beginning of the remainder of the message.
+        """
+        i = index + 1  # The first character of the control sequence
+        ctrl = ''
+        if i < len(msg):
+            ctrl = msg[i]
+            i += 1
+        if not (ctrl == _SchedFeedProcessor.CTRL_VAL_ENV_VAR_START or ctrl == _SchedFeedProcessor.CTRL_VAL_PAUSE_VAR_START):
+            raise SFControlInvalid("Unknown Control '{}' in message: '{}'".format(ctrl, msg))
+        # Read the control value
+        s = msg[i:]
+        ex = re.compile("^([^»]*)(»)")
+        m = ex.match(s)
+        if m:
+            cv = m.group(1)
+            ce = m.group(2)
+            if not cv or len(cv) == 0:
+                raise SFControlInvalid("No Control Value found for '{}' in message: '{}'".format(ctrl, msg))
+            if not ce or len(ce) == 0:
+                raise SFControlInvalid("Control close not found for '{}' in message: '{}'".format(ctrl, msg))
+            if ctrl == _SchedFeedProcessor.CTRL_VAL_ENV_VAR_START:
+                # cv is the name of an environment variable. Get the value and send it.
+                evv = os.environ.get(cv)
+                if evv is not None:
+                    self._send_message(evv)
+                pass
+            else:
+                # ctrl_val should be a float value to use as a delay
+                d = 0.0
+                try:
+                    d = float(cv)
+                except ValueError as ex:
+                    raise SFControlInvalid("Invalid Pause value '{}' in message: '{}'  Error: {}".format(cv, msg, ex))
+                self._shutdown.wait(d)
+            return (i + len(cv) + len(ce))
+        raise SFControlInvalid("Invalid Control Value for '{}' in message: '{}'".format(ctrl, msg))
+
+    def _send_msg_from_spec(self, spec):  # type: (_SFSpecOp) -> None
+        """
+        Send the message if there is a single one, or randomly send one of the
+        list of messages from the spec.
+        """
+        msg = None
+        if spec.msg is not None:
+            msg = spec.msg
+        elif spec.msgs is not None:
+            ec = len(spec.msgs)
+            rnd_indx = random.randint(0, ec-1)
+            msg = spec.msgs[rnd_indx]
+        if msg is not None and len(msg) > 0:
+            self._send_message(msg)
+        return
+
+    def _send_message(self, msg):  # type: (str) -> None
+        """
+        Send a message from the SchedFeed Spec as though it was from the keyboard.
+        """
+        try:
+            i = 0  # Use an index to allow processing parts
+            while i < len(msg):
+                ch = msg[i]
+                # Check for a Control Sequence
+                if ch == _SchedFeedProcessor.CTRL_VAL_START_CHAR:
+                    i = self._process_ctrl(msg, i)
+                else:
+                    i += 1
+                    code = self._sender.encode(ch)
+                    self._code_char_send(code, ch)
+                pass
+            pass
+        except Exception as ex:
+            print("<<< SchedFeed sender encountered an error on message: '{}'  Error: {}".format(msg, ex))
+        return
+
+    def activity(self):  # type: () -> None
+        """
+        Should be called by MRT any time characters are sent or received.
+        """
+        now_mins = time.time()//60  # Now in integer minutes
+        for spec in self._spec_ops:
+            if spec.condition == _SchedFeedProcessor._Condition.idle:
+                spec.last_activity = now_mins
+            pass
+        return
+
+    def process(self, key_closed, wire_active):  # type: (bool, bool) -> None
+        """
+        Process specs based on the current time and wire state.
+
+        This MUST BE CALLED REGULARLY by the main code flow to allow SchedFeed
+        conditions to be checked to see if any messages need to be sent.
+
+        Param key_closed indicates if the local (virtual) key is closed.
+        Param wire_active indicates if a remote station is currently active on the wire.
+        """
+        # Get current time in minutes
+        t0 = time.localtime()
+        now_mins = t0.tm_hour*60 + t0.tm_min
+        #
+        # Run through the specs and see if the condition is met.
+        for spec in self._spec_ops:
+            if spec.time is not None:   # If the spec has a time see if now is the time to do something
+                tMsg = 60*(spec.time//100) + (spec.time%100)  # time to send message
+                if now_mins < tMsg and spec.last_dt >= 0:
+                    # It is before the trigger time for today, yet the last sent time is set...
+                    # Reset the last sent time for today.
+                    self._last_dt = -1
+                    continue
+                if now_mins >= tMsg:   # Now could be the time
+                    if spec.last_dt < 0:    # The operation has not yet been performed
+                        if spec.condition == _SchedFeedProcessor._Condition.at:
+                            # 'AT' Sends now, regardless of other activity.
+                            spec.last_dt = now_mins  # Mark as done
+                            self._send_msg_from_spec(spec)
+                        elif spec.condition == _SchedFeedProcessor._Condition.at_ii:
+                            # 'AT If Idle' Sends now, if the wire is idle, otherwise it is skipped.
+                            spec.last_dt = now_mins  # Mark as done (even if we don't send)
+                            if not wire_active:
+                                self._send_msg_from_spec(spec)
+                        elif spec.condition == _SchedFeedProcessor._Condition.when_i:
+                            # 'When Idle' will send as soon as the wire is idle
+                            if not wire_active and key_closed:
+                                self._send_msg_from_spec(spec)
+                                spec.last_dt = now_mins
+                        pass
+                    pass
+                pass
+            elif spec.period is not None:  # If the spec has a period, see if it has been long enough.
+                dt = (time.time()//60) - spec.last_activity
+                if dt >= spec.period:
+                    self._send_msg_from_spec(spec)
+                pass
+            pass
+        return
+
+
 class Mrt:
     """
     Morse Receive & Transmit 'Mr T'.
@@ -259,7 +677,8 @@ class Mrt:
         repeat_delay: int = -1,
         record_filepath: Optional[str] = None,
         file_to_play: Optional[str] = None,
-        file_to_send: Optional[str] = None
+        file_to_send: Optional[str] = None,
+        schedfeed_spec: Optional[str] = None
     ) -> None:
         self._app_name_version = app_name_version
         self._wire: int = wire
@@ -302,7 +721,13 @@ class Mrt:
                 self._send_file_path = None
                 raise FileNotFoundError(p)
             pass
+        pass
 
+        self._schedfeed_proc = None
+        self._schedfeed_spec_path = None
+        if schedfeed_spec:
+            self._schedfeed_spec_path = _SchedFeedProcessor.add_ext_if_needed(schedfeed_spec.strip())
+        pass
 
         self._internet: Optional[Internet] = None
         self._kob: Optional[KOB] = None
@@ -384,6 +809,8 @@ class Mrt:
             # If we have a non-negative repeat value, repeat (with a pause if specified)
             #
             while not self._shutdown.is_set() and not self._control_c_pressed.is_set():
+                if self._schedfeed_proc:
+                    self._schedfeed_proc.process(not self._local_loop_active, self._internet_station_active)
                 self._process_automation()
                 self._shutdown.wait(0.05)  # Loop while background threads take care of 'stuff'
                 if self._control_c_pressed.is_set():
@@ -455,7 +882,6 @@ class Mrt:
                 play_station_list_callback=None,
                 play_wire_callback=None,
             )
-
         self._kob = kob.KOB(
             interfaceType=self._cfg.interface_type,
             useSerial=self._cfg.use_serial,
@@ -468,7 +894,9 @@ class Mrt:
             soundLocal=self._cfg.local,
             sounderPowerSaveSecs=self._cfg.sounder_power_save,
             virtual_closer_in_use=True,
-            keyCallback=self._from_key
+            keyCallback=self._from_key,
+            err_msg_hndlr=self._err_msg_handler,
+            status_msg_hndlr=self._status_msg_handler
             )
         self._internet = internet.Internet(
             officeID=self._our_office_id,
@@ -491,6 +919,16 @@ class Mrt:
             callback=self._reader_callback,
             decode_at_detected=self._cfg.decode_at_detected
             )
+        if self._schedfeed_spec_path:
+            p = Path(self._schedfeed_spec_path)
+            p.resolve()
+            if not p.is_file():
+                print("SchedFeed spec file not found. '{}'".format(self._schedfeed_spec_path), flush=True)
+                self._schedfeed_spec_path = None
+                raise FileNotFoundError(p)
+            pass
+            self._schedfeed_proc = _SchedFeedProcessor(p, self._sender, self._from_schedfeed_processor, self._shutdown)
+            print("Scheduled Feed specification to use: {}".format(p))
         if sys.stdin.isatty():
             # Threads to read characters from the keyboard to allow sending without (instead of) a physical key.
             self._thread_kbreader = Thread(name="Keyboard-read-thread", daemon=False, target=self._thread_kbreader_body)
@@ -535,6 +973,18 @@ class Mrt:
             self._reader.decode(code)
         if self._connected and self._cfg.remote:
             self._internet.write(code)
+        if self._schedfeed_proc:
+            self._schedfeed_proc.activity()  # Let the SchedFeed processor know something occurred
+        return
+
+    def _err_msg_handler(self, msg):  # type: (str|None) -> None
+        if msg is not None:
+            log.log("\nError: {}\n".format(msg), dt="")
+        return
+
+    def _status_msg_handler(self, msg):  # type: (str|None) -> None
+        if msg is not None:
+            log.log("\n{}\n".format(msg), dt="")
         return
 
     def _from_file(self, code, char:Optional[str]=None):
@@ -573,7 +1023,7 @@ class Mrt:
             self._emit_local_code(code, kob.CodeSource.key)
         return
 
-    def _from_keyboard(self, code, char:Optional[str]=None):
+    def _from_keyboard(self, code, char):  # type: (list[int], str|None) -> None
         """
         Handle inputs received from the keyboard sender.
         Only send if the circuit is open.
@@ -607,6 +1057,8 @@ class Mrt:
             else:
                 self._internet_station_active = True
             self._kob.internet_circuit_closed = not self._internet_station_active
+        if self._schedfeed_proc:
+            self._schedfeed_proc.activity()  # Let the SchedFeed processor know something occurred
         return
 
     def _from_player(self, code, char:Optional[str]=None):
@@ -626,6 +1078,23 @@ class Mrt:
             print("", flush=True)
         log.debug("Recording playback finished.")
         self._playback_complete.set()
+        return
+
+    def _from_schedfeed_processor(self, code, char):  # type: (list[int], str|None) -> None
+        """
+        Called by the SchedFeed Processor.
+        """
+        if len(code) > 0:
+            if code[-1] == 1: # special code for closer/circuit closed
+                self._set_virtual_closer_closed(True)
+                return
+            elif code[-1] == 2: # special code for closer/circuit open
+                self._set_virtual_closer_closed(False)
+                print('[+ to close key (Ctrl-Z=Help)]', flush=True)
+                sys.stdout.flush()
+                return
+        if self._local_loop_active:  # disregard self._internet_station_active, as SF Proc might send when active
+            self._emit_local_code(code, kob.CodeSource.local, char)
         return
 
     def _handle_sender_update(self, sender):
@@ -660,6 +1129,8 @@ class Mrt:
             print("Play recording: {}".format(self._play_file_path))
         if self._send_file_path:
             print("Process text from file: {}".format(self._send_file_path))
+        if self._schedfeed_spec_path:
+            print("Scheduled feed content will be controlled by specification: {}".format(self._schedfeed_spec_path))
         print("[Use CTRL+Z for keyboard help.]", flush=True)
         return
 
@@ -749,7 +1220,7 @@ class Mrt:
         """
         Set local_loop_active state
 
-        True: Key or Keyboard active (Ciruit Closer OPEN)
+        True: Key or Keyboard active (Circuit Closer OPEN)
         False: Circuit Closer (physical and virtual) CLOSED
         """
         self._local_loop_active = active
@@ -793,15 +1264,42 @@ class Mrt:
                 self._set_virtual_closer_closed(False)
                 while not self._fst_stop.is_set() and not self._shutdown.is_set():
                     with open(self._send_file_path, "r") as fp:
+                        last_ch_was_nl = False  # If we get two NL in a row, insert a Paragraph.
+                        inserted_para = False   # Track whether we inserted one.
                         while not self._fst_stop.is_set() and not self._shutdown.is_set():
                             ch = fp.read(1)
                             if not ch:
                                 break
                             if ch < ' ':
-                                # don't send control characters
-                                continue
+                                if ch == '\r':
+                                    # Just swallow RETURNs
+                                    continue
+                                if ch == '\n':
+                                    if last_ch_was_nl:
+                                        if not inserted_para:
+                                            ch = '='
+                                            inserted_para = True
+                                        else:
+                                            # Only do a single paragraph in a row.
+                                            continue
+                                    else:
+                                        last_ch_was_nl = True
+                                        continue
+                                    pass
+                                else:
+                                    # don't send control characters
+                                    last_ch_was_nl = False
+                                    continue
+                                pass
+                            else:
+                                last_ch_was_nl = False
+                                inserted_para = False
                             code = self._sender.encode(ch)
                             self._from_file(code, ch)
+                            if inserted_para:
+                                self._fst_stop.wait(2.0)  # Pause 2 seconds after a paragraph
+                            pass
+                        pass
                     self._fst_stop.set()
             except Exception as ex:
                 print(
@@ -920,6 +1418,12 @@ class MrtSelector:
         self._spec_desc: Optional[str] = None
 
         self._load_selector(self._selector_file_path)
+        if self._selector:
+            # _load_selector returns False if things are okay, but a selector
+            # switch wasn't found and is being looked for n the background.
+            # Until one is found, run with Selection #1
+            self._accept_select.set()
+            self._on_selection_changed(self._selector_type.change, self._selector.selector_value)
         return
 
     def _load_mrt_for_spec(self, spec:dict[str,Optional[list[str]]]) -> Optional[Mrt]:
@@ -1001,7 +1505,11 @@ class MrtSelector:
                         log.log("Checking selector spec for selection {}\n".format(selection_no), dt="")
                         test_mrt = self._load_mrt_for_spec(spec)
                         log.debug("MrtSelector._load_selector - Test Mrt created for spec [{}] with args {}".format(spec[SELECTION_DESCRIPTION_KEY], spec[SELECTION_ARGS_KEY]), 4)
-                    self._selector.start()
+                    if not self._selector.start():
+                        # Selector.start returns False if a switch wasn't found but
+                        # is retrying to find one. If this is the case, return False
+                        # to let __init__ know.
+                        return False
                     return True
         except SelectorMrtLoadError as smle:
             # Just raise it, as it is already set with a message.
@@ -1059,22 +1567,26 @@ class MrtSelector:
         """
         try:
             self._accept_select.set()
-            while self._selection_changed.wait():
-                self._selection_changed.clear()
-                self._accept_select.clear()
-                if self._mrt:
-                    self._mrt.exit()
-                    self._mrt = None
-                if self._new_mrt:
-                    log.log("\nSwitching to MRT selection {}: {}\n\n".format(self._selector.one_of_four, self._spec_desc), dt="")
-                    self._mrt = self._new_mrt
-                    self._new_mrt = None
-                    self._mrt.start()
-                    self._accept_select.set()
-                    self._mrt.main_loop()
-                    log.debug("MrtSelector.run - Mrt returned from main_loop.")
-                else:
-                    break
+            while not self._run_complete.is_set():
+                if self._selection_changed.wait(0.3):
+                    self._selection_changed.clear()
+                    self._accept_select.clear()
+                    if self._mrt:
+                        self._mrt.exit()
+                        self._mrt = None
+                    if self._new_mrt:
+                        log.log("\nSwitching to MRT selection {}: {}\n\n".format(self._selector.one_of_four, self._spec_desc), dt="")
+                        self._mrt = self._new_mrt
+                        self._new_mrt = None
+                        self._mrt.start()
+                        self._accept_select.set()
+                        self._mrt.main_loop()
+                        log.debug("MrtSelector.run - Mrt returned from main_loop.")
+                    else:
+                        break
+                    pass
+                pass
+            pass
         finally:
             log.debug("MrtSelector.run - ending", 3)
             self._run_complete.set()
@@ -1127,14 +1639,22 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             "this will cause the playback or file processing to be repeated. " +
             "The value is the delay, in seconds, to pause before repeating."
     )
+    arg_parser.add_argument(
+        "--schedfeed",
+        metavar="feedspec-path",
+        dest="schedfeed_spec_path",
+        help="Schedule feeds that send from within MRT. The option value is a path " +
+            "to a feeds specification file. See the MRT Users Guild for a description " +
+            "of the format of the specification."
+    )
     if allow_selector:
         arg_parser.add_argument(
             "--Selector",
             nargs=2,
-            metavar=("port","specfile"),
+            metavar=("port","specfile-path"),
             dest="Selector_args",
             help="Use a PyKOB Selector to run MRT with different options based on " +
-                "the MRT Selector Specification file 'specfile' and the current selector " +
+                "the MRT Selector Specification file 'specfile-path' and the current selector " +
                 "setting of a selector connected to port 'port'. Exit with an error if " +
                 "the port cannot be found (the selector is not available). SEE: '--selector' " +
                 "to specify a selector, but run normally if the port cannot be found. " +
@@ -1144,7 +1664,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
         arg_parser.add_argument(
             "--selector",
             nargs=2,
-            metavar=("port","specfile"),
+            metavar=("port","specfile-path"),
             dest="selector_args",
             help="Same as '--Selector' except that MRT will run normally if the selector port " +
                 "cannot be found/used."
@@ -1162,6 +1682,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     record_filepath = pkappargs.record_filepath_from_args(args)
     play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
     sendtext_filepath = None if not (hasattr(args, "textfile_filepath") and args.textfile_filepath) else args.textfile_filepath
+    schedfeed_spec_path = None if not (hasattr(args, "schedfeed_spec_path") and args.schedfeed_spec_path) else args.schedfeed_spec_path
     repeat_delay = args.repeat_delay
     selector_specpath = None
     selector_port = None
@@ -1180,8 +1701,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     sender_dt = args.sender_dt
     #
     # Check to see that recordings/files aren't specified if there is a selector
-    if selector_specpath and (play_filepath or sendtext_filepath):
-        raise Exception("Cannot specify a recording or a file to process when using a Selector. ")
+    if selector_specpath and (play_filepath or sendtext_filepath or schedfeed_spec_path):
+        raise Exception("Cannot specify a recording or a file to process, or a schedfeed spec when using a Selector. ")
 
     selector = None
     #
@@ -1208,6 +1729,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             repeat_delay=repeat_delay,
             file_to_play=play_filepath,
             file_to_send=sendtext_filepath,
+            schedfeed_spec=schedfeed_spec_path
         )
     return (mrt, selector)
 
@@ -1217,7 +1739,7 @@ Main code
 if __name__ == "__main__":
     mrt = None
     mrt_selector = None
-    exit_status = 1
+    exit_status = 0
     try:
         # Main code
         print(MRT_VERSION_TEXT)
@@ -1242,10 +1764,13 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         exit_status = 0
     except FileNotFoundError as fnf:
+        exit_status = 1
         print("File not found: {}".format(fnf.args[0]))
     except SelectorLoadError as sle:
+        exit_status = 2
         print("Error loading selector - {}".format(sle))
     except Exception as ex:
+        exit_status = 3
         print("Error encountered: {}".format(ex))
         log.debug(traceback.format_exc(), 3)
     except SystemExit as arg_err:

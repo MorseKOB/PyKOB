@@ -72,7 +72,7 @@ class PKSerial:
     def __init__(self, port=None, timeout=None, err_callback=None, status_callback=None, enable_retries=False):  # type: (Any,Any,Callable,Callable,bool) -> None
         self._err_callback = err_callback if err_callback is not None else self.null_err_callback
         self._status_callback = status_callback if status_callback is not None else self.null_status_callback
-        self._retries_enabled = enable_retries
+        self._retries_enabled = enable_retries      # type: bool
         self._pyserial = None
         self._lg_timeout = timeout
         if SERIAL_AVAILABLE:
@@ -81,9 +81,9 @@ class PKSerial:
             self._err_callback("Serial module not available")
         self._port = None                           # type: pyserial.Serial|None
         self._port_name_used = None                 # type: str|None
-        self._op_error = None                       # type: str|None
+        self._op_err_msg = None                     # type: str|None
         self._op_error_prev = None                  # type: str|None
-        self._op_err_has_been_thrown = self._retries_enabled  # type: bool  # If retries are enabled, don't throw ex from ctor
+        self._op_err_has_been_thrown = False        # type: bool
         self._module_ex_has_been_thrown = False     # type: bool
         self._reconnect_needed = False              # type: bool
         self._lg_cd = False                         # type: bool
@@ -92,7 +92,7 @@ class PKSerial:
         self._lg_dtr = False                        # type: bool
         self._lg_ri = False                         # type: bool
         self._lg_rts = False                        # type: bool
-        self._lg_timeout = None                     # type: float|None
+        self._lg_timeout = timeout                  # type: float|None
         self._lg_write_timeout = None               # type: float|None
 
         # Thread to check port availability and to retry connection if lost
@@ -100,15 +100,8 @@ class PKSerial:
         self._portchk_t = time.time()               # type: float
         self._shutdown = Event()                    # type: Event
 
-        # If port name was specified attempt to open it
         self._port_requested = port                 # type: str|None
         self._port_to_use = None                    # type: str|None
-        if port is not None:
-            self._open_port()
-        # Assign values using properties
-        self._enable_retries()
-        self.timeout = timeout
-        self._op_err_has_been_thrown = False        # Now allow exceptions from operations
         return
 
     def null_err_callback(self, msg):  # type: (str) -> None
@@ -305,14 +298,23 @@ class PKSerial:
     # ### Internal Methods                                                ###
     # #######################################################################
 
-    def _chk_for_err(self):  # type: () -> bool # raises PKSerialError
-        if self._op_error is not None:
+    def _chk_for_err(self, allow_exception=False):  # type: (bool) -> bool # raises PKSerialError
+        '''
+        Check for an error (by checking the error message).
+        If there is an error and retries are not enabled, or the `allow_exception`
+        parameter is True, throw an exception. Otherwise, just return the status.
+        '''
+        if self._op_err_msg is not None:
+            op_error = self._op_err_msg
             self._reconnect_needed = True
-            if not self._op_error == self._op_error_prev:
-                self._op_error_prev == self._op_error
-                if not self._op_err_has_been_thrown and not self._retries_enabled:
-                    self._op_err_has_been_thrown = True
-                    raise PKSerialPortError(self._op_error)
+            if not op_error == self._op_error_prev:
+                self._op_error_prev == op_error
+                if not self._op_err_has_been_thrown:
+                    if allow_exception or not self._retries_enabled:
+                        self._op_err_has_been_thrown = True
+                        self._op_err_msg = None
+                        raise PKSerialPortError(op_error)
+                    pass
                 pass
             return True
         return False
@@ -323,29 +325,26 @@ class PKSerial:
             self._thread_portchk.start()
         return
 
-    def _open_port(self):  # type: () -> None
+    def _open_port(self): # type: () -> None
         if not self.serial_available:
             err_str = "PySerial module not available. Cannot open port: {}".format(self._port_requested)
             self._err_callback(err_str)
             if not self._module_ex_has_been_thrown:
                 self._module_ex_has_been_thrown = True
                 raise ModuleNotFoundError(err_str)
-        if self._port_requested is None or len(self._port_requested) < 1:
-            return
+            if self._port_requested is None or len(self._port_requested) < 1:
+                return
         self._port_to_use = self._port_requested
         if self._port_requested == PORT_FIND_SDIF_KEY or self._port_requested == PORT_FIND_SDSEL_KEY:
             """
             Look for a Silky-DESIGN Interface or Selector-Switch, by searching for a
             serial port with a serial number that ends in '_AESnnn' (nnn is the unit
             number '_AESnnnA' on Windows).
-
             Note: Early SD interfaces didn't have a unit number (nnn), and SilkyDESIGN-Selector
-                switches have a serial number like '_AESSEL'.
-
+            switches have a serial number like '_AESSEL'.
             So, if the key is SDIF it is important to find interfaces and not selector switches.
             While, if the key is SDDEL it is important to find selector switches and not
             interfaces.
-
             If found, set the port ID. Else, indicate an error
             """
             sd_type = "Interface"
@@ -372,28 +371,32 @@ class PKSerial:
                         us = "" if not unit or len(unit) < 1 else " {}".format(unit)
                         log.log("\nSD-{}{} found on: {}\n".format(sd_type, us, sp.device), dt="")
                         break
+                    pass
+                pass
             self._port_to_use = sdif_port_id
             if self._port_to_use is None:
-                msg = "An SD-{} was not found.".format(sd_type)
                 if not self._reconnect_needed:
-                    self._op_error = msg
+                    self._op_err_msg = "An SD-{} was not found.".format(sd_type)
+                    log.debug(self._op_err_msg)
                 return
             pass
-        try:
-            # Attempt to open the port
-            self._port = pyserial.Serial(self._port_to_use)
-            self._port.timeout = self._lg_timeout
-            self._port.write_timeout = self._lg_write_timeout
-            self._port_name_used = self._port_to_use
-            self._op_error = None
-            self._op_error_prev = None
-            self._op_err_has_been_thrown = False
-            if self._reconnect_needed:
-                self._status_callback("Port '{}' connected".format(self._port_to_use))
-                self._reconnect_needed = False
-        except Exception as ex:
-            msg = "Error opening port '{}': {}".format(self._port_to_use, ex)
-            self._op_error = msg
+        pass
+        if self._port_to_use is not None:
+            try:
+                # Attempt to open the port
+                self._port = pyserial.Serial(self._port_to_use)
+                self._port.timeout = self._lg_timeout
+                self._port.write_timeout = self._lg_write_timeout
+                self._port_name_used = self._port_to_use
+                self._op_err_msg = None
+                self._op_error_prev = None
+                self._op_err_has_been_thrown = False
+                if self._reconnect_needed:
+                    self._status_callback("Port '{}' connected".format(self._port_to_use))
+                    self._reconnect_needed = False
+            except Exception as ex:
+                self._op_err_msg = "Error opening port '{}': {}".format(self._port_to_use, ex)
+            pass
         return
 
     def _port_still_available(self, name):  # type: (str) -> bool
@@ -407,7 +410,7 @@ class PKSerial:
         return False
 
     def _set_error(self, ex):  # type: (Exception) -> None
-        self._op_error = "PKSerial Error: {}".format(ex)
+        self._op_err_msg = "PKSerial Error: {}".format(ex)
         if self._port:
             try:
                 self._port.close()
@@ -417,11 +420,11 @@ class PKSerial:
                 self._port = None
                 self._reconnect_needed = True
         if not self._op_err_has_been_thrown and not self._retries_enabled:
-            self._err_callback(self._op_error)
+            self._err_callback(self._op_err_msg)
             self._op_err_has_been_thrown = True
             raise(PKSerialPortError(ex))
         else:
-            self._status_callback(self._op_error)
+            self._status_callback(self._op_err_msg)
         return
 
     def _thread_portchk_body(self):  # type: () -> None
@@ -445,8 +448,7 @@ class PKSerial:
                     if not self._port_still_available(self._port_name_used):
                         self._port.close()
                         self._port = None
-                        msg = "Port {} not available".format(self._port_name_used)
-                        self._op_error = "PKSerial Error: {}".format(msg)
+                        self._op_err_msg = "PKSerial Error: Port {} not available".format(self._port_name_used)
                     pass
                 pass
             self._shutdown.wait(0.5)
@@ -460,14 +462,6 @@ class PKSerial:
     # #######################################################################
 
     @property
-    def serial_available(self):  # type: () -> bool
-        '''
-        Indicate if the serial interface module is available.
-        '''
-        global SERIAL_AVAILABLE
-        return SERIAL_AVAILABLE
-
-    @property
     def port_name_used(self):  # type: () -> str|None
         return self._port_name_used
 
@@ -477,6 +471,14 @@ class PKSerial:
         Name of the connected port (COMn, /dev/xxx) or None
         '''
         return self._port_requested
+
+    @property
+    def serial_available(self):  # type: () -> bool
+        '''
+        Indicate if the serial interface module is available.
+        '''
+        global SERIAL_AVAILABLE
+        return SERIAL_AVAILABLE
 
 
     # #######################################################################
@@ -512,5 +514,15 @@ class PKSerial:
             log.debug("PKSerial.shutdown", 3)
             self._err_callback = self.null_err_callback
             self._status_callback = self.null_status_callback
+        return
+
+    def start(self):  # type: () -> None
+        if self._port_requested is not None:
+            self._open_port()
+        self._enable_retries()
+        self._chk_for_err(True)
+        self._op_err_has_been_thrown = False        # Now allow exceptions from operations
+        if self._op_err_msg is not None:
+            self._err_callback(self._op_err_msg)
         return
 

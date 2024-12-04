@@ -4,7 +4,7 @@ Using a hardware selector device with MRT (using the `--selector` option) requir
 a 'mrtsel' selector specification file to control how MRT operates for each
 selection. This document describes the format used.
 
-There is an example spec file included: mrt_sel_spec.mrtsel.example
+There is an example spec file included: mrt_sel_spec_example.mrtsel
 
 ## JSON Format
 
@@ -42,3 +42,5 @@ The top entries are:
        to running MRT with the configuration of the parent (less the '--selector port spec', of course).
 
        The only restriction is that you cannot specify '--selector' in these arguments.
+
+Note: JSON strings must be enclosed within quotes __"text"__ (not apostrophes __'text'__).
