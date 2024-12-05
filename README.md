@@ -60,7 +60,7 @@ you to connect to a *Wire* on a **KOB Server** to communicate with others
 or listen to feeds. Instructions for using the MKOB application are in the
 **User Guide** in the **doc** folder.
 
-### MRT (Morse Receive & Transmit 'Marty')
+### MRT (Morse Receive & Transmit 'Mr T')
 
 The **MRT** application provides a command-line application that connects to a
 *Wire* on a **KOB Server** and allows text to be typed and sent, plus full

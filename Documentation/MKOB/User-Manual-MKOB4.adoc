@@ -43,7 +43,7 @@ NOTE: Although MKOB's functionality, and many of the user actions, are similar t
 === pykob Package
 ((MKOB)) uses the *((pykob))* package(((package, pykob))) of modules. The ((pykob)) package consists of a number of modules that provide different aspects of handling code, the physical key and sounder, internet connection to a KOBServer instance, system audio to simulate a sounder or provide tone, configuration and logging capabilities, and more. When updating ((MKOB)), it is advisable to get the latest (associated) release of ((pykob)) as well.
 
-=== MRT (Morse Receive & Transmit - Marty)
+=== MRT (Morse Receive & Transmit - Mr T)
 (((MRT, Morse Receive & Transmit)))
 ((MRT)) is a command-line/terminal application that is similar to ((MKOB)) in its ability to receive and send code. However, it is completely text based, allowing it to be run via a remote terminal connection to a system, or even automatically in the background (headless). It uses the same ((pykob)) configurations as ((MKOB)) (and the utility applications). In addition, it has a few options that allow it to support displays and similar applications.
 
