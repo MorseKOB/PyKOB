@@ -65,6 +65,10 @@ Capture-Replay/*.txt
 *.pkcfg
 # Ignore PKREC files from recordings. If PKREC files are needed in the source, include them with a '!' line.
 *.pkrec
+# Ignore Telegram configuration files. If one is needed, name it something else or specifically include it with a '!' line.
+tg_config.tgc
+# Ignore Telegram Masthead '.svg' files. If needed, include them with a '!' line.
+*.svg
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
 # Include anything that is put into the Documentation and mkob_learn folders
