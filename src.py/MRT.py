@@ -26,7 +26,7 @@ SOFTWARE.
 """
 MRT.py
 
-Morse Receive & Transmit (Marty).
+Morse Receive & Transmit (Mr T).
 Connects to a wire and receives code from it, which is sounded and displayed
 on the console. Follows the local key and opens the circuit if the key
 closer is opened, then sends the local code to the wire.
@@ -662,7 +662,7 @@ class _SchedFeedProcessor:
 
 class Mrt:
     """
-    Morse Receive & Transmit 'Marty'.
+    Morse Receive & Transmit 'Mr T'.
 
     Process the keyboard and a key to send code sequences. Receive from a wire
     and sound and decode/display.
@@ -1599,7 +1599,7 @@ def status_msg_handler(msg):
     return
 
 def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
-    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Marty). "
+    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Mr T). "
         + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
         parents= [
             config2.sound_override,
