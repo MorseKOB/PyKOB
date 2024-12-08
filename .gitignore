@@ -72,5 +72,5 @@ tg_config.tgc
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
 # Include anything that is put into the Documentation and mkob_learn folders
-!Documentation/*
-!src.py/mkob_learn/*
+!Documentation/**
+!src.py/mkob_learn/**

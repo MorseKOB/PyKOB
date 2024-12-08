@@ -23,23 +23,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 """
-Telegraph.py
+Telegram.py
 
-This presents a single page, telegram style page that can fill the entire
+This presents a single, telegram style, page that can fill the entire
 screen. The page will display messages entered on the keyboard or with a
 connected key. Messages will be sounded on a connected sounder or using the
 simulated sounder from the computer's audio.
 
 After a configured period of time the page (screen) clears itself back to
-a blank telegraph form.
+a blank telegram form.
 
-Telegraph can connect to a Wire on a KOBServer to send the message to or
+Telegram can connect to a Wire on a KOBServer to send the message to or
 to receive messages from.
 
 For the majority of the settings it reads the current configuration (the
 same as MKOB and MRT) and it supports the common option flags. For options
-specific to Telegraph (time before clearing the page, ) and for the page
-content and header it looks in the application's parent directory.
+specific to Telegram (time before clearing the page, font, font size, page
+color, and more) it looks in the application's current directory.
 
     Use `--help` on the command line.
 
@@ -70,15 +70,8 @@ from pykob.morse import Reader, Sender
 COMPILE_INFO = globals().get("__compiled__")
 __version__ = '1.0.0'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
-TELEGRAPH_VERSION_TEXT = "Telegraph " + VERSION
+TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
-print(TELEGRAPH_VERSION_TEXT)
-print(" Python: " + sys_version + " on " + sys_platform)
-#print(" Pygame: " + pygame.system.)
-print(" pykob: " + PKVERSION)
-
-SCROLL   = 50  # time to wait before clearing the screen (sec)
-NEWFORM  = 10  # time to wait before displaying a new welcome message (sec)
 FLUSH    = 20  # time to wait before flushing decode buffer (dots)
 STARTMSG = (-0x7fff, +2, -1000, +2)  # code sequence sent at start of telegram
 ENDMSG   = (-1000, +1)  # ending code sequence
@@ -245,7 +238,7 @@ class TelegramConfig:
     FONT_KEY = "font"
     FONT_BOLD_KEY = "font_bold"
     FONT_ITALIC_KEY = "font_italic"
-    FONTSIZE_KEY = "font_size"
+    FONT_SIZE_KEY = "font_size"
     PAGE_CLEAR_IDLE_TIME_KEY = "page_clear_idle_time"
     PAGE_CLEAR_SPEED_KEY = "page_clear_speed"
     PAGE_COLOR_KEY = "page_color"
@@ -253,7 +246,8 @@ class TelegramConfig:
     MASTHEAD_FILE_PATH = "masthead_file"
     MASTHEAD_FONT_KEY = "masthead_font"
     MASTHEAD_FONT_SIZE_KEY = "masthead_font_size"
-    MASTHEAD_TEXT = "masthead_text"
+    MASTHEAD_TEXT_KEY = "masthead_text"
+    MASTHEAD_TEXT_COLOR_KEY = "masthead_text_color"
     SIDE_MARGIN_KEY = "side_margin"
     TOP_MARGIN_KEY = "top_margin"
 
@@ -265,14 +259,15 @@ class TelegramConfig:
         self._font_bold = False  # type: bool
         self._font_italic = False  # type: bool
         self._font_size = 20  # type: int
-        self._text_color = "black"
+        self._text_color = "black"  # type: str|tuple[int,int,int]
         self._page_clear_idle_time = 8.0  # type: float  # Seconds of idle before clear
         self._page_clear_speed = 1.8  # type: float  # Time to take to scroll the page (can be negative)
-        self._page_color = (198,189,150)  # Tan
+        self._page_color = (198,189,150)  # type: str|tuple[int,int,int] # Tan
         self._masthead_filep = None  # type: str|None
         self._masthead_font = self._font
         self._masthead_font_size = self._font_size
         self._masthead_text = None  # type: str|None
+        self._masthead_text_color = "black"  # type: str|tuple[int,int,int]
         self._side_margin = 28  # type: int
         self._top_margin = 38  # type: int
         # Read the Config values from JSON file if a path was provided
@@ -321,6 +316,10 @@ class TelegramConfig:
         return self._masthead_text
 
     @property
+    def masthead_text_color(self):  # type: () -> str|tuple[int,int,int]
+        return self._masthead_text_color
+
+    @property
     def page_clear_idle_time(self):  # type: () -> float
         return self._page_clear_idle_time
 
@@ -329,7 +328,7 @@ class TelegramConfig:
         return self._page_clear_speed
 
     @property
-    def page_color(self):  # type: () -> str
+    def page_color(self):  # type: () -> str|tuple[int,int,int]
         return self._page_color
 
     @property
@@ -337,7 +336,7 @@ class TelegramConfig:
         return self._side_margin
 
     @property
-    def text_color(self):  # type: () -> str
+    def text_color(self):  # type: () -> str|tuple[int,int,int]
         return self._text_color
 
     @property
@@ -379,7 +378,7 @@ class TelegramConfig:
                                 self._font_bold = value
                             case self.FONT_ITALIC_KEY:
                                 self._font_italic = value
-                            case self.FONTSIZE_KEY:
+                            case self.FONT_SIZE_KEY:
                                 self._font_size = int(value)
                             case self.PAGE_CLEAR_IDLE_TIME_KEY:
                                 self._page_clear_idle_time = value
@@ -395,8 +394,10 @@ class TelegramConfig:
                                 self._masthead_font = value
                             case self.MASTHEAD_FONT_SIZE_KEY:
                                 self._masthead_font_size = int(value)
-                            case self.MASTHEAD_TEXT:
+                            case self.MASTHEAD_TEXT_KEY:
                                 self._masthead_text = value
+                            case self.MASTHEAD_TEXT_COLOR_KEY:
+                                self._masthead_text_color = literal_eval(value) if value and value[0] == '(' else value
                             case self.SIDE_MARGIN_KEY:
                                 self._side_margin = int(value)
                             case self.TOP_MARGIN_KEY:
@@ -449,6 +450,7 @@ class Telegram:
         self._closed = Event()  # type: Event
         self._control_c_pressed = Event()  # type: Event
         self._shutdown = Event()  # type: Event
+        self._shutdown_started = Event()  # type: Event
         #
         self._connected = False  # type bool
         self._internet_station_active = False  # type: bool #True if a remote station is sending
@@ -622,35 +624,35 @@ class Telegram:
             self._closed.set()
             print("\nClosing...")
             self._shutdown.set()
-            time.sleep(0.3)
-            log.debug("Telegraph.exit - 1", 3)
+            time.sleep(0.8)
+            log.debug("Telegram.exit - 1", 3)
             self.shutdown()
-            log.debug("Telegraph.exit - 2", 3)
+            log.debug("Telegram.exit - 2", 3)
             kob_ = self._kob
             if kob_:
-                log.debug("Telegraph.exit - 3a", 3)
+                log.debug("Telegram.exit - 3a", 3)
                 kob_.exit()
-                log.debug("Telegraph.exit - 3b", 3)
+                log.debug("Telegram.exit - 3b", 3)
             inet = self._internet
             if inet:
-                log.debug("Telegraph.exit - 4a", 3)
+                log.debug("Telegram.exit - 4a", 3)
                 inet.exit()
-                log.debug("Telegraph.exit - 4b", 3)
+                log.debug("Telegram.exit - 4b", 3)
             rdr = self._reader
             if rdr:
-                log.debug("Telegraph.exit - 5a", 3)
+                log.debug("Telegram.exit - 5a", 3)
                 rdr.exit()
-                log.debug("Telegraph.exit - 5b", 3)
+                log.debug("Telegram.exit - 5b", 3)
             sndr = self._sender
             if sndr:
-                log.debug("Telegraph.exit - 6a", 3)
+                log.debug("Telegram.exit - 6a", 3)
                 sndr.exit()
-                log.debug("Telegraph.exit - 6b", 3)
+                log.debug("Telegram.exit - 6b", 3)
             disp = self._form
             if disp:
-                log.debug("Telegraph.exit - 7a", 3)
+                log.debug("Telegram.exit - 7a", 3)
                 disp.exit()
-                log.debug("Telegraph.exit - 7b", 3)
+                log.debug("Telegram.exit - 7b", 3)
         return
 
     def main_loop(self):
@@ -704,34 +706,37 @@ class Telegram:
         return
 
     def shutdown(self):
-        log.debug("Telegraph.shutdown - 1", 3)
+        if self._shutdown_started.is_set():
+            return  # Shutdown is already underway (or done)
+        self._shutdown_started.set()
+        log.debug("Telegram.shutdown - 1", 3)
         self._shutdown.set()
-        log.debug("Telegraph.shutdown - 2", 3)
+        log.debug("Telegram.shutdown - 2", 3)
         kob_ = self._kob
         if kob_:
-            log.debug("Telegraph.shutdown - 3a", 3)
+            log.debug("Telegram.shutdown - 3a", 3)
             kob_.shutdown()
-            log.debug("Telegraph.shutdown - 3b", 3)
+            log.debug("Telegram.shutdown - 3b", 3)
         inet = self._internet
         if inet:
-            log.debug("Telegraph.shutdown - 4a", 3)
+            log.debug("Telegram.shutdown - 4a", 3)
             inet.shutdown()
-            log.debug("Telegraph.shutdown - 4b", 3)
+            log.debug("Telegram.shutdown - 4b", 3)
         rdr = self._reader
         if rdr:
-            log.debug("Telegraph.shutdown - 5a", 3)
+            log.debug("Telegram.shutdown - 5a", 3)
             rdr.shutdown()
-            log.debug("Telegraph.shutdown - 5b", 3)
+            log.debug("Telegram.shutdown - 5b", 3)
         sndr = self._sender
         if sndr:
-            log.debug("Telegraph.shutdown - 6a", 3)
+            log.debug("Telegram.shutdown - 6a", 3)
             sndr.shutdown()
-            log.debug("Telegraph.shutdown - 6b", 3)
+            log.debug("Telegram.shutdown - 6b", 3)
         disp = self._form
         if disp:
-            log.debug("Telegraph.shutdown - 7a", 3)
+            log.debug("Telegram.shutdown - 7a", 3)
             disp.shutdown()
-            log.debug("Telegraph.shutdown - 7b", 3)
+            log.debug("Telegram.shutdown - 7b", 3)
         return
 
     def start(self):
@@ -780,7 +785,7 @@ class Telegram:
         text_c = self._tgcfg.text_color
         side_margin = self._tgcfg.side_margin
         self._form = PGDisplay(0, 0, page_c, text_c, font, fsize, side_margin)
-        self._form.caption = "Telegraph"
+        self._form.caption = "Telegram"
         self._clock = pygame.time.Clock()
         if self._tgcfg.masthead_file is not None:
             mfile = self._tgcfg.masthead_file
@@ -789,7 +794,17 @@ class Telegram:
             except FileNotFoundError as fnf:
                 if self._tgcfg.masthead_text is not None:
                     log.warn("Masthead file not found: '{}' Will use the Masthead text instead.".format(mfile), dt="")
-                    self._masthead = None
+                    try:
+                        font = None  # type: Font|None
+                        fpath = pygame.font.match_font(self._tgcfg.masthead_font)
+                        if fpath is not None:
+                            font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
+                        else:
+                            font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
+                        self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
+                    except Exception as ex:
+                        log.warn("Error rendering the Masthead text '{}': {}".format(self._tgcfg.masthead_text, ex), dt="")
+                    pass
                 else:
                     log.error("Masthead file not found: '{}'".format(mfile), dt="")
                     raise fnf
@@ -805,14 +820,14 @@ class Telegram:
 Main code
 """
 if __name__ == "__main__":
-    # pygame setup
-    pygame.init()
+    telegram = None
     exit_status = 0
 
     try:
         # Process command option arguments
         arg_parser = argparse.ArgumentParser(description="Telegram "
-            + "Display a telegram form with local and received messages.",
+            + "- Display a telegram form with local and received messages. "
+            + "Telegram specific configuration is in the 'tg_config.tgc' file.",
             parents= [
                 config2.sound_override,
                 config2.sounder_override,
@@ -832,6 +847,15 @@ if __name__ == "__main__":
                 "Use 0 to not connect to a wire (local only).")
 
         args = arg_parser.parse_args()
+
+        print(TELEGRAM_VERSION_TEXT)
+        print(" Python: " + sys_version + " on " + sys_platform)
+        #print(" Pygame: " + pygame.system.)
+        print(" pykob: " + PKVERSION)
+        # pygame setup
+        pygame.init()  # This is required, plus it prints the PyGame-CE version
+
+
         cfg = config2.process_config_args(args)
         log.set_logging_level(cfg.logging_level)
         # Use the wire from the command line if one was specified, else use the one configured.
@@ -839,14 +863,18 @@ if __name__ == "__main__":
 
         # Create the Telegram instance
         tg_config = TelegramConfig("tg_config.tgc")  # ZZZ
-        telegram = Telegram(TELEGRAPH_VERSION_TEXT, wire, cfg, tg_config)
+        telegram = Telegram(TELEGRAM_VERSION_TEXT, wire, cfg, tg_config)
         telegram.start()
         telegram.main_loop()  # This doesn't return until Telegram exits
+        exit_status = 0
+    except KeyboardInterrupt:
+        # ^C or ^Q are allowed to exit
+        pass
     except Exception as ex:
         log.error("Error: {}".format(ex), dt="")
     finally:
-        telegram.shutdown()
-        telegram.exit()
-        telegram = None
-        exit_status = 0
+        if telegram is not None:
+            telegram.shutdown()
+            telegram.exit()
+            telegram = None
     sys.exit(exit_status)
