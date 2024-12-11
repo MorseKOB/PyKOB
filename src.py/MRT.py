@@ -74,8 +74,10 @@ from time import sleep
 import traceback
 from typing import Optional, Sequence
 
-__version__ = '1.4.5'
-MRT_VERSION_TEXT = "MRT " + __version__
+COMPILE_INFO = globals().get("__compiled__")
+__version__ = '1.4.6'
+VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
+MRT_VERSION_TEXT = "MRT " + VERSION
 
 MRT_SEL_EXT = ".mrtsel"
 
@@ -1116,11 +1118,12 @@ class Mrt:
         print("Using configuration: {}".format(cfgname))
         if self._wire == 0:
             print("Not connecting to a wire.")
+            print("Our Station/Office: " + self._our_office_id)
         else:
             print("Connecting to wire: " + str(self._wire))
+            print("Connecting as Station/Office: " + self._our_office_id)
         if self._cfg.decode_at_detected:
             print("Using the detected incoming character speed for decoding.")
-        print("Connecting as Station/Office: " + self._our_office_id)
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
         if self._cfg.invert_key_input:
             print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \

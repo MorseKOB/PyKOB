@@ -49,6 +49,13 @@ NOTE: Although MKOB's functionality, and many of the user actions, are similar t
 
 There is a separate document that describes ((MRT)) and its options.
 
+=== Telegram
+((Telegram)) is an application specifically designed for use in displays. ((Telegram)) presents a full screen
+interface with no exposed controls. Its interface appears as a telegram form that fills
+the entire screen. Received messages are displayed on the form. The form is cleared, or scrolled off, at the
+end of each message, or after a configurable period of idle time. The appearance of the form is configurable
+without changing any code.
+
 === Utilities
 The ((pykob)) package also includes a number of utility applications. The README file included in the package contains a short description of each of the utility applications.
 
@@ -626,8 +633,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((MKOB)) ((Version 4.4.1))
-Edit date: 7-30-2024
+This document reflects the features of ((MKOB)) ((Version 4.4.2))
+Edit date: 12-10-2024
 
 MIT License
 

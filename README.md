@@ -1,4 +1,4 @@
-# MorseKOB Version 4 - Python (Library, MKOB, MRT, Utilities)
+# MorseKOB Version 4 - Python (Library, MKOB, MRT, Telegram, Utilities)
 
 Originally written by Les Kerr, this is a Python library and programs that
 implement the MorseKOB functionality familiar to users of the MorseKOB 2.5
@@ -10,10 +10,10 @@ Written in Python (requires **version 3.11 or later**), that functionality
 The PyKOB library (pykob.*) provides modules, classes, and functions that
 can be used within a Python program to perform Morse operations.
 
-Additionally, there are two complete applications and a number of utilites
-included. The applications and utilites can be used to learn/practice
-copying and sending code. The applications and some of the utilites can also
-connect to a KOB Server to recieve wire feeds and communicate with others.
+Additionally, there are three complete applications and a number of utilities
+included. The applications and utilities can be used to learn/practice
+copying and sending code. The applications and some of the utilities can also
+connect to a KOB Server to receive wire feeds and communicate with others.
 
 **Windows Installer for *MKOB Suite***
 
@@ -34,7 +34,7 @@ the railroads, Western Union, and other communications systems, connected
 by telegraph wires. International Code is used for continuous wave (CW)
 communications using radio.
 
-The utilites and both of the applications can be configured to
+The utilities and both of the applications can be configured to
 receive/decode/print and encode/send either form.
 
 ## Physical Key & Sounder, Synthesized Sounder, Tone Support
@@ -46,26 +46,45 @@ and sounder can be connected using an interface connected to the GPIO.
 The module also provides a synthesized sounder using the computer audio,
 as well as the option to use CW style tone.
 
-The utilites and both of the applications allow using any of these
-options.
+The utilities and the applications allow using any of these options.
 
 ## Applications
 
-There are two applications included in PyKOB.
+There are three applications included in PyKOB. All three applications
+use either the shared global configuration or can use named configuration
+files (created using the **Configure** utility or **MKOB**.)
 
 ### MKOB (Morse Key on Board)
 
-The **MKOB** application provides a full graphical interface that allows the
+The **MKOB** application provides a full graphical interface that allows
 you to connect to a *Wire* on a **KOB Server** to communicate with others
-or listen to feeds. Instructions for using the MKOB application are in the
-**User Guide** in the **doc** folder.
+or listen to feeds. It also has features to help you practice and learn
+the code. Instructions for using the MKOB application are in the
+**User Guide** in the **Documentation** folder.
 
 ### MRT (Morse Receive & Transmit 'Mr T')
 
 The **MRT** application provides a command-line application that connects to a
 *Wire* on a **KOB Server** and allows text to be typed and sent, plus full
-support for a key and sounder. Instructions for using the MRT application are
-in the MRT-README in the **doc** folder.
+support for a key and sounder. In addition, it supports a hardware selector
+switch (or switch-board) that allows switching between different configurations
+(either 4 or 16 depending on the hardware) without having to do anything in
+the application. It also supports a scheduled feed option that will send
+configured messages at specific times or when there is no activity.
+Instructions for using the MRT application are in the MRT document and the
+sample selector and scheduled-feed specifications in the **Documentation** folder.
+
+### Telegram
+
+This application is primarily intended for displays (museums, shows, etc.).
+It runs full-screen and displays a telegram form that shows incoming
+messages from a wire and messages keyed locally. At the end of a message
+or a configured idle time, a new form is displayed for the next message.
+The form's masthead can come from a graphic or configured text. The page
+color, text color, text font and size, and other aspects of the operation
+specific to Telegram are specified in a configuration file. The common
+configuration is from the same global or named configurations used by
+**MKOB** and **MRT**.
 
 ## Utilities
 
@@ -94,7 +113,7 @@ The configuration can be set using option flags and values from the command
 line, or it can launch a GUI that can be used.
 
 Use the command line '-h' or '--help' option to see the usage. A copy of the
-usage help is included in the **doc** folder.
+usage help is included in the **Documentation** folder.
 
 ### SysCheck.py
 
@@ -174,9 +193,8 @@ binary that aren't needed for this application.
 
 # Documentation
 
-Unfortunately, the documentation is a bit lacking, but it is being worked on.
-Please take a look in the **doc** folder for information about the applications,
-the utilities, and more.
+Documentation for the applications is in the **Documentation** folder and
+sub-folders.
 
 ## Simple 'Getting Started'
 
@@ -229,10 +247,16 @@ pip install -r requirements.txt
 
 Using a Python virtual environment is a great way to do development or to
 run tests. If you would rather configure the system Python environment,
-follow the following steps.
+you can still use the *requirements.txt*. Just use the main **pip**.
+
+The following libraries are used.
 
 To use the system sound (to simulate a sounder) you will need **PyAudio**.
-To interface with a key & sounder, you will need **pySerial**
+To interface with a key & sounder, you will need **pySerial**.
+The **Telegram** application requires **pygame-ce**. Note that it is
+important to use the *CE* implementation of *PyGame*, as it contains
+features and bug-fixes that **Telegram** relies on.
+
 Follow the instructions here:
 
 ### PyAudio
@@ -242,6 +266,10 @@ Follow the instructions here:
 ### pySerial
 
  https://pyserial.readthedocs.io/en/latest/pyserial.html
+
+### pygame-ce (for Telegram)
+
+ https://pyga.me/docs/
 
 ## Getting Started
 

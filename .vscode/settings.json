@@ -5,7 +5,9 @@
   "editor.minimap.maxColumn": 80,
   "jupyter.interactiveWindow.viewColumn": "secondGroup",
   "cSpell.words": [
+    "Inovato",
     "pygame",
+    "Quadra",
     "Scriptable"
   ],
   "makefile.configureOnOpen": false
