@@ -1,0 +1,51 @@
+usage: Telegram.py [-h] [-a sound] [-A sounder] [-g gpio] [-P serial]
+                   [-p portname] [-S station] [-c wpm] [-t wpm]
+                   [--config config-file] [--logging-level logging-level]
+                   [wire]
+
+Telegram - Display a telegram form with local and received messages. Telegram
+specific configuration is in the 'tg_config.tgc' file.
+
+positional arguments:
+  wire                  Wire to connect to. If specified, this is used rather
+                        than the configured wire. Use 0 to not connect to a
+                        wire (local only).
+
+options:
+  -h, --help            show this help message and exit
+  -a sound, --sound sound
+                        'ON' or 'OFF' to indicate whether computer audio
+                        should be used to sound code.
+  -A sounder, --sounder sounder
+                        'ON' or 'OFF' to indicate whether to use sounder if
+                        'gpio' or `port` is configured.
+  -g gpio, --gpio gpio  'ON' or 'OFF' to indicate whether GPIO (Raspberry Pi)
+                        key/sounder interface should be used. GPIO takes
+                        priority over the serial interface if both are
+                        specified.
+  -P serial, --serial serial
+                        'ON' or 'OFF' to indicate whether a Serial key/sounder
+                        interface should be used. GPIO takes priority over the
+                        Serial interface if both are specified.
+  -p portname, --port portname
+                        The name/ID of the serial port to use, or the special
+                        value 'SDIF' to try to find a SilkyDESIGN-Interface,
+                        or 'NONE'.
+  -S station, --station station
+                        The Station ID to use (or 'NONE').
+  -c wpm, --charspeed wpm
+                        The minimum character speed to use in words per
+                        minute.
+  -t wpm, --textspeed wpm
+                        The morse text speed in words per minute. Used for
+                        Farnsworth timing. Spacing must not be 'NONE' to
+                        enable Farnsworth.
+  --config config-file  Configuration file to use. The special value 'GLOBAL'
+                        will use the global (un-named) configuration. The
+                        special value 'NEW' will use a new (defaults)
+                        configuration.
+  --logging-level logging-level
+                        Logging level. A value of '0' disables DEBUG output,
+                        '-1' disables INFO, '-2' disables WARN, '-3' disables
+                        ERROR. Higher values above '0' enable more DEBUG
+                        output.

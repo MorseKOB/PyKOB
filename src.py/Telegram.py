@@ -53,6 +53,7 @@ import pygame
 from pygame.font import Font
 from pygame import Surface
 import os
+from os import path as path_func
 import sys
 from sys import platform as sys_platform
 from sys import version as sys_version
@@ -72,9 +73,13 @@ __version__ = '1.0.0'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
+TELEGRAM_CFG_FILE_NAME = "tg_config.tgc"
+
 FLUSH    = 20  # time to wait before flushing decode buffer (dots)
 STARTMSG = (-0x7fff, +2, -1000, +2)  # code sequence sent at start of telegram
 ENDMSG   = (-1000, +1)  # ending code sequence
+LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
+UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
 class PGDisplay:
     """
@@ -177,6 +182,8 @@ class PGDisplay:
         return
 
     def output(self, text, bold=False, italic=False, update=True, spacing=1.0):  # type: (str, bool, float) -> None
+        if text is None:
+            return
         lines_of_words = [word.split(' ') for word in text.splitlines()]
         font = self._font
         font.bold = bold
@@ -452,9 +459,11 @@ class Telegram:
         self._shutdown = Event()  # type: Event
         self._shutdown_started = Event()  # type: Event
         #
+        # (same as MRT)
         self._connected = False  # type bool
         self._internet_station_active = False  # type: bool #True if a remote station is sending
         self._last_received_para = False # type: bool #The last character received was a Paragraph ('=')
+        self._last_advanced_under = False # type: bool #The last character printed was '_' and line advance
         self._local_loop_active = False  # type: bool #True if sending on key or keyboard
         self._our_office_id = cfg.station if not cfg.station is None else ""  # type: str
         self._sender_current = ""  # type: str
@@ -472,18 +481,18 @@ class Telegram:
         """
         Emit local code. That involves:
         1. Send code to the wire if connected
-        2. Decode the code and display it if from the key (no need to display code from the keyboard)
+        2. Decode the code and display it if from the key or keyboard
 
-        This is used indirectly from the key or the keyboard threads to emit code once they
+        This is used from the key thread or the Telegram main loop to emit code once they
         determine it should be emitted.
         """
         kob_ = self._kob
         if kob_:
             kob_.internet_circuit_closed = not self._internet_station_active
         self._handle_sender_update(self._our_office_id)
-        if not code_source == kob.CodeSource.key:
+        if not code_source == kob.CodeSource.key:  # Code from the key is automatically sounded
             kob_.soundCode(code, code_source)
-        if self._reader and not code_source == kob.CodeSource.keyboard:
+        if self._reader:
             self._last_decode_t = sys.float_info.max
             self._reader.decode(code)
             self._last_decode_t = time.time()
@@ -503,18 +512,32 @@ class Telegram:
         If `fresh` create a new, fresh form.
         If not, scroll the current form off.
         """
+        log.debug("Telegram._form_new", 2)
         scroll = 0.0 if fresh else self._tgcfg.page_clear_speed
         self._form.new_form(scroll_time=scroll)
         self._output_masthead()
         self._form.form_update()
-        self._last_display_t = time.time()
+        self._last_display_t = sys.float_info.max
         return
 
     # handle input from telegraph key
     def _from_key(self, code):
-        if wire:
-            self._internet.write(code)
-        self._emit_local_code(code, kob.CodeSource.key)
+        """
+        Handle inputs received from the external key.
+        Only send if the circuit is open.
+
+        Called from the 'KOB-KeyRead' thread.
+        """
+        if len(code) > 0:
+            if code[-1] == 1: # special code for closer/circuit closed
+                self._set_virtual_closer_closed(True)
+                return
+            elif code[-1] == 2: # special code for closer/circuit open
+                self._set_virtual_closer_closed(False)
+                return
+        if not self._internet_station_active and self._local_loop_active:
+            self._emit_local_code(code, kob.CodeSource.key)
+        return
 
     # handle input from internet
     def _from_internet(self, code):
@@ -527,6 +550,8 @@ class Telegram:
                 if code == STARTMSG:
                     self._form_new()
                 elif code == ENDMSG:
+                    # Don't do anything at end. Timeout or new message (STARTMSG)
+                    # will display a new form.
                     pass
                 else:
                     if self._reader:
@@ -544,7 +569,7 @@ class Telegram:
         Handle inputs received from the keyboard sender.
         Only send if the circuit is open.
 
-        Called from the 'Keyboard-Send' thread.
+        Called from the Telegram main loop.
         """
         if char:
             code = self._sender.encode(char)
@@ -554,7 +579,7 @@ class Telegram:
                     return
                 elif code[-1] == 2: # special code for closer/circuit open
                     self._set_virtual_closer_closed(False)
-                    print('[+ to close key (Ctrl-Z=Help)]', flush=True)
+                    print('[+ to close key]', flush=True)
                     sys.stdout.flush()
                     return
             if not self._internet_station_active and self._local_loop_active:
@@ -582,7 +607,12 @@ class Telegram:
             self._display_text(' ', update=False, spacing=0.65)
         self._display_text(char)
         if char == '_':
-            self._form.line_advance()
+            if not self._last_advanced_under:
+                self._form.line_advance()
+                self._last_advanced_under = True
+            pass
+        else:
+            self._last_advanced_under = False
         return
 
     def _handle_sender_update(self, sender):
@@ -605,11 +635,71 @@ class Telegram:
             if lf < 0:
                 lf = 0
             top = self._tgcfg.top_margin
+            log.debug("Masthead BLIT", 3)
             self._form.blit(self._masthead, (lf,top), update=False, set_text_top=True)
         else:
+            log.debug("Masthead text output", 3)
             self._form.output(self._tgcfg._masthead_text, bold=True, italic=False, update=False)
         self._form.line_advance(2)
-        self._last_display_t = sys.float_info.max
+        return
+
+    def _print_start_info(self):
+        cfgname = "Global" if not self._cfg.get_filepath() else self._cfg.get_filepath()
+        print("Using configuration: {}".format(cfgname))
+        if self._wire == 0:
+            print("Not connecting to a wire.")
+            print("Our Station/Office: " + self._our_office_id)
+        else:
+            print("Connecting to wire: " + str(self._wire))
+            print("Connecting as Station/Office: " + self._our_office_id)
+        if self._cfg.decode_at_detected:
+            print("Using the detected incoming character speed for decoding.")
+        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
+        if self._cfg.invert_key_input:
+            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
+                "To enable/disable this setting use `Configure --iki`.")
+        return
+
+    def _set_local_loop_active(self, active):
+        """
+        Set local_loop_active state
+
+        True: Key or Keyboard active (Circuit Closer OPEN)
+        False: Circuit Closer (physical and virtual) CLOSED
+        """
+        self._local_loop_active = active
+        self._kob.energize_sounder((not active), kob.CodeSource.local)
+        return
+
+    def _set_virtual_closer_closed(self, closed):
+        """
+        Handle change of Circuit Closer state.
+
+        A state of:
+        True: 'latch'
+        False: 'unlatch'
+        """
+        self._kob.virtual_closer_is_open = not closed
+        code = LATCH_CODE if closed else UNLATCH_CODE
+        if not self._internet_station_active:
+            if self._cfg.local:
+                if not closed:
+                    self._handle_sender_update(self._our_office_id)
+                if self._reader:
+                    self._reader.decode(code)
+        if self._connected and self._cfg.remote:
+            self._internet.write(code)
+        if len(code) > 0:
+            if code[-1] == 1:
+                # Unlatch (Key closed)
+                self._set_local_loop_active(False)
+                if self._reader:
+                    self._reader.flush()
+            elif code[-1] == 2:
+                # Latch (Key open)
+                self._set_local_loop_active(True)
+        return
+
 
 
     # ########################################################################
@@ -656,6 +746,7 @@ class Telegram:
         return
 
     def main_loop(self):
+        self._print_start_info()
         if not self._wire == 0:
             self._internet.connect(self._wire)
             self._connected = True
@@ -679,17 +770,15 @@ class Telegram:
                             self._shutdown.set()
                             self._control_c_pressed.set()
                             break
+                        elif c == '\x18':  # display a new form on ^X
+                            self._form_new()
                         else:  # otherwise handle keyboard input
-                            if c == '\x1B':  # Escape
-                                circuitCloser = not circuitCloser
-                                if circuitCloser:
-                                    c = '+'
-                                else:
+                            if c == '\x1B':  # Escape toggles the virtual closer
+                                open_vcloser = not self._kob.virtual_closer_is_open
+                                if open_vcloser:
                                     c = '~'
-                            elif c == '+':
-                                circuitCloser = True
-                            elif c == '~':
-                                circuitCloser = False
+                                else:
+                                    c = '+'
                             self._from_keyboard(c)
                 if time.time() - self._flush_t > self._last_decode_t:
                     self._flush_reader()
@@ -698,7 +787,8 @@ class Telegram:
                 self._shutdown.wait(0.010)  # wait a bit before getting the next event
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
-                pass
+                self._shutdown.wait(0.02)
+            pass
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         finally:
@@ -862,7 +952,12 @@ if __name__ == "__main__":
         wire = args.wire if args.wire else cfg.wire
 
         # Create the Telegram instance
-        tg_config = TelegramConfig("tg_config.tgc")  # ZZZ
+        #  See if the Telegram Config exists
+        if (path_func.isfile(TELEGRAM_CFG_FILE_NAME)):
+            tg_config = TelegramConfig(TELEGRAM_CFG_FILE_NAME)
+        else:
+            log.warn("Telegram configuration file '{}' not found. Using default values.".format(TELEGRAM_CFG_FILE_NAME), dt="")
+            tg_config = TelegramConfig(None)
         telegram = Telegram(TELEGRAM_VERSION_TEXT, wire, cfg, tg_config)
         telegram.start()
         telegram.main_loop()  # This doesn't return until Telegram exits

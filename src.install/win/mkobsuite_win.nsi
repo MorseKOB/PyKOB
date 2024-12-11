@@ -45,6 +45,7 @@ SOFTWARE.
   !define Package_dir "..\..\bin\pkg\"
 !endif
 !define Package_core_dir "${Package_dir}core\"
+!define Package_examples_dir "${Package_dir}examples\"
 !define Package_docs_dir "${Package_dir}docs\"
 !define Package_utils_dir "${Package_dir}utils\"
 
@@ -89,6 +90,7 @@ Section "MKOB Core (required)"
 
   ; Put files there
   File /r "${Package_core_dir}*.*"
+  File /r "${Package_examples_dir}*.*"
 
   ; Write the installation path into the registry
   WriteRegStr HKLM ${Regkey} "Install_Dir" "$INSTDIR"
@@ -142,8 +144,12 @@ Section "Desktop & Start Menu Shortcuts"
   CreateShortcut "$DESKTOP\MKOB.lnk" "$INSTDIR\MKOB.exe" "" "" 0 SW_SHOWMINIMIZED
   !ifdef Docs_Installed
     CreateShortcut "$SMPROGRAMS\${Folder_name}\MKOB User Manual.lnk" "$INSTDIR\Documentation\User-Manual-MKOB4.pdf"
+    CreateShortcut "$SMPROGRAMS\${Folder_name}\MRT User Manual.lnk" "$INSTDIR\Documentation\User-Manual-MRT.pdf"
+    CreateShortcut "$SMPROGRAMS\${Folder_name}\Telegram User Manual.lnk" "$INSTDIR\Documentation\User-Manual-Telegram.pdf"
   !endif
   CreateShortcut "$SMPROGRAMS\${Folder_name}\MRT.lnk" "$INSTDIR\MRT.exe"
+  CreateShortcut "$SMPROGRAMS\${Folder_name}\Telegram.lnk" "$INSTDIR\Telegram.exe"
+  CreateShortcut "$SMPROGRAMS\${Folder_name}\Example Files.lnk" "explorer.exe /root,$INSTDIR\examples"
   !ifdef Utils_Installed
     CreateShortcut "$SMPROGRAMS\${Folder_name}\SysCheck.lnk" "$INSTDIR\SysCheck.exe"
   !endif

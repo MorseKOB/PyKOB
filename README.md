@@ -1,4 +1,4 @@
-# MorseKOB Version 4 - Python (Library, MKOB, MRT, Utilities)
+# MorseKOB Version 4 - Python (Library, MKOB, MRT, Telegram, Utilities)
 
 Originally written by Les Kerr, this is a Python library and programs that
 implement the MorseKOB functionality familiar to users of the MorseKOB 2.5

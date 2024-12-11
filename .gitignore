@@ -51,6 +51,9 @@ Fp-info-cache
 *.zip
 log.txt
 Capture-Replay/*.txt
+
+# PNG files not within the Documents folder
+*.png
 # Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
 *.json
 # Include VSCode settings

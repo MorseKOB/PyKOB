@@ -24,7 +24,7 @@
 # ############################################################################
 #
 # Makefile to create:
-#  * A binary package of PyKOB (MKOB, MRT, Configure, ...) using Nuitka.
+#  * A binary package of PyKOB (MKOB, MRT, Telegram, Configure, ...) using Nuitka.
 #  * The manuals (pdf from the adoc)
 #
 #  For the binaries, file copying is done to arrange source to produce
@@ -63,7 +63,8 @@ else
     EXEC_EXT				:= .bin
 endif
 
-NUITKA_FACTORY_BIN	?= /c/Users/aesil/code/Nuitka-factory/Nuitka/bin/nuitka
+NUITKA_FACTORY_BIN		?= /c/Users/aesil/code/Nuitka-factory/Nuitka/bin/nuitka
+NUITKA_MODULE	?= -m nuitka
 AWK				?= awk
 CP				?= cp
 CP_RECURSE		?= $(CP) -rup
@@ -81,7 +82,7 @@ PS				?= ps
 PS_FLAGS		?= -W
 PS_FIELDS		?= "9 47 100"
 PY2BIN_FAC		?= $(PYTHON) $(NUITKA_FACTORY_BIN)
-PY2BIN_REL		?= $(PYTHON) -m nuitka
+PY2BIN_REL		?= $(PYTHON) $(NUITKA_MODULE)
 PY2BIN			?= $(PY2BIN_REL)
 SHELL			:= /bin/bash
 SORT			?= sort
@@ -96,6 +97,15 @@ MANUAL_SETTINGS	:= $(DOC_DIR)man_settings.adoc
 PyKOB_THEME		:= $(DOC_DIR)PyKOB-theme.yml
 MKOB_MANUAL		:= $(DOC_DIR)MKOB/User-Manual-MKOB4.pdf
 MRT_MANUAL		:= $(DOC_DIR)MRT/User-Manual-MRT.pdf
+TGRM_MANUAL		:= $(DOC_DIR)Telegram/User-Manual-Telegram.pdf
+
+# ### Example Files Section
+MRT_EXAMPLES_DIR	:= $(DOC_DIR)MRT/
+MRT_EXAMPLES		:= $(MRT_EXAMPLES_DIR)mrt_schfd_example.mrtsfs\
+ $(MRT_EXAMPLES_DIR)mrt_sel_spec_example.mrtsel
+TGRM_EXAMPLES_DIR	:= $(DOC_DIR)Telegram/
+TGRM_EXAMPLES		:= $(TGRM_EXAMPLES_DIR)tg_config.tgc\
+ $(TGRM_EXAMPLES_DIR)WesternOnion-Masthead.svg
 
 # ### Binary Executable Section                                      ###
 
@@ -140,6 +150,7 @@ ORIGINAL_SRC_CONFIGURE		:= $(SRC_PY_DIR)Configure.py  # Have this as its own app
 ORIGINAL_SRC_MKOB			:= $(SRC_PY_DIR)MKOB.py $(SRC_PY_DIR)mkob%.py
 ORIGINAL_SRC_MKOB_SHELL		:= $(SRC_PY_DIR)MKOB.py $(SRC_PY_DIR)mkob*.py
 ORIGINAL_SRC_MRT			:= $(SRC_PY_DIR)MRT.py
+ORIGINAL_SRC_TGRM			:= $(SRC_PY_DIR)Telegram.py
 ORIGINAL_SRC_UTILS_SHELL	:= $(SRC_PY_DIR)[A-Z][a-np-z]*.py
 
 
@@ -198,7 +209,7 @@ endif
 CONFIGURE_BIN_FLAGS		?= $(APP_BIN_FLAGS)\
 	$(CONFIGURE_ICON)\
 	--include-module=tkinter.ttk\
-	--enable-console
+	--windows-console-mode=attach
 
 
 ### MKOB
@@ -216,7 +227,7 @@ MKOB_BIN_FLAGS			?= $(APP_BIN_FLAGS)\
 	$(MKOB_ICON)\
 	$(MKOB_LOGO)\
 	--include-module=tkinter.ttk\
-	--enable-console
+	--windows-console-mode=attach
 
 ### MRT
 MRT_DIST				:= $(BIN_DIR)MRT$(DIST_DIR_EXT)
@@ -227,35 +238,55 @@ else
   MRT_EXEC				:= $(MRT_DIST)MRT.bin
   MRT_ICON				:=
 endif
-MRT_BIN_FLAGS			?= $(APP_BIN_FLAGS) $(MRT_ICON) --enable-console
+MRT_BIN_FLAGS			?= $(APP_BIN_FLAGS)\
+	$(MRT_ICON)\
+	--windows-console-mode=force
+
+### Telegram
+TGRM_DIST				:= $(BIN_DIR)Telegram$(DIST_DIR_EXT)
+TGRM_LOGO				:= --include-data-files=$(SRC_PY_RES_DIR)Telegram-Logo.png=resources/
+ifdef COMSPEC
+  TGRM_EXEC				:= $(TGRM_DIST)Telegram.exe
+  TGRM_ICON				:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)telegram-icon.ico
+else
+  TGRM_EXEC				:= $(TGRM_DIST)Telegram.bin
+  TGRM_ICON				:=
+endif
+TGRM_BIN_FLAGS			?= $(APP_BIN_FLAGS)\
+	$(TGRM_ICON)\
+	$(TGRM_LOGO)\
+	--include-module=ctypes\
+	--windows-console-mode=attach
 
 ### Utilities
-UTILITIES_BIN_FLAGS		?= $(APP_BIN_FLAGS) --enable-console
+UTILITIES_BIN_FLAGS		?= $(APP_BIN_FLAGS) --windows-console-mode=attach
 SYSCHECK_DIST			:= $(BIN_DIR)Syscheck$(DIST_DIR_EXT)
 ifdef COMSPEC
   SYSCHECK_EXEC			:= $(SYSCHECK_DIST)Syscheck.exe
   SYSCHECK_ICON			:= --windows-icon-from-ico=$(SRC_PY_RES_DIR)SysCheck.ico
 else
-  SYSCHECK_EXEC			:= $(MRT_DIST)Syscheck.bin
+  SYSCHECK_EXEC			:= $(SYSCHECK_DIST)Syscheck.bin
   SYSCHECK_ICON			:=
 endif
-SYSCHECK_BIN_FLAGS		?= $(APP_BIN_FLAGS) $(SYSCHECK_ICON) --enable-console
+SYSCHECK_BIN_FLAGS		?= $(APP_BIN_FLAGS) $(SYSCHECK_ICON) --windows-console-mode=attach
 
 
 # ### Windows Installer Section                                  	 ###
 
-INSTALLER_SRC_DIR		?= src.install/
-INSTALLER_WIN_DIR		?= $(INSTALLER_SRC_DIR)win/
-PACKAGE_DIR				?= $(BIN_DIR)pkg/
-PACKAGE_CORE_DIR		?= $(PACKAGE_DIR)core/
-PACKAGE_DOCS_DIR		?= $(PACKAGE_DIR)docs/
-PACKAGE_UTILS_DIR		?= $(PACKAGE_DIR)utils/
-WIN_INST_CP_OPTS		?= /V2
+INSTALLER_SRC_DIR			?= src.install/
+INSTALLER_WIN_DIR			?= $(INSTALLER_SRC_DIR)win/
+PACKAGE_DIR					?= $(BIN_DIR)pkg/
+PACKAGE_CORE_DIR			?= $(PACKAGE_DIR)core/
+PACKAGE_DOCS_DIR			?= $(PACKAGE_DIR)docs/
+PACKAGE_EXAMPLES_DIR		?= $(PACKAGE_DIR)examples/
+PACKAGE_UTILS_DIR			?= $(PACKAGE_DIR)utils/
+WIN_INST_CP_OPTS			?= /V2
 
 REQUIRED_PACKAGE_DIRS	:= \
     $(PACKAGE_DIR) \
     $(PACKAGE_CORE_DIR) \
 	$(PACKAGE_DOCS_DIR) \
+	$(PACKAGE_EXAMPLES_DIR) \
 	$(PACKAGE_UTILS_DIR)
 
 
@@ -265,6 +296,7 @@ vpath Configure.py	$(BUILD_SRC_APPS_DIR)
 vpath MKOB.py		$(BUILD_SRC_APPS_DIR)
 vpath mkob%.py		$(BUILD_SRC_APPS_DIR)
 vpath MRT.py		$(BUILD_SRC_APPS_DIR)
+vpath Telegram.py	$(BUILD_SRC_APPS_DIR)
 vpath %.py			$(BUILD_SRC_UTILS_DIR)
 vpath %.pyd			$(BIN_DIR)
 vpath %$(EXEC_EXT)	$(BIN_DIR)%$(DIST_DIR_EXT)
@@ -384,10 +416,10 @@ clean_pkg_dir:
 	rm -rf $(PACKAGE_DIR)
 
 .PHONY: docs
-docs: $(MKOB_MANUAL)
+docs: $(MKOB_MANUAL) $(MRT_MANUAL) $(TGRM_MANUAL)
 
 .PHONY: bins
-bins: pykob Configure MKOB MRT
+bins: pykob Configure MKOB MRT TGRM
 
 .PHONY: installer_win
 #installer_win: INSTALLER_NAME := $(shell date +'mkobsuite-install-%Y%m%d.exe')
@@ -402,14 +434,23 @@ package_for_installer: PKG_DIRS := $(shell for d in $(REQUIRED_PACKAGE_DIRS); \
 								[[ -d $$d ]] || mkdir -p $$d;	\
 							done;)
 
-package_for_installer: pykob Configure MKOB MRT Syscheck docs
+package_for_installer: pykob Configure MKOB MRT TGRM Syscheck docs
 	@echo !!! Copy all Dist dirs into PKG for the installer.
 	$(CP_RECURSE) $(CONFIGURE_DIST)* $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(MKOB_DIST)* $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(SRC_PY_DIR)mkob_learn $(PACKAGE_CORE_DIR)
 	$(CP_RECURSE) $(MRT_DIST)* $(PACKAGE_CORE_DIR)
+	$(CP_RECURSE) $(TGRM_DIST)* $(PACKAGE_CORE_DIR)
+	@echo !!! Copy Telegram 'extra' files into PKG for the installer.
+	$(CP_RECURSE) $(TGRM_EXAMPLES) $(PACKAGE_CORE_DIR)
+	@echo !!! Copy docs into PKG for the installer.
 	$(CP_RECURSE) $(MKOB_MANUAL) $(PACKAGE_DOCS_DIR)
-#	$(CP_RECURSE) $(MRT_MANUAL) $(PACKAGE_DOCS_DIR)
+	$(CP_RECURSE) $(MRT_MANUAL) $(PACKAGE_DOCS_DIR)
+	$(CP_RECURSE) $(TGRM_MANUAL) $(PACKAGE_DOCS_DIR)
+	@echo !!! Copy examples into PKG for the installer.
+	$(CP_RECURSE) $(MRT_EXAMPLES) $(PACKAGE_EXAMPLES_DIR)
+	$(CP_RECURSE) $(TGRM_EXAMPLES) $(PACKAGE_EXAMPLES_DIR)
+	@echo !!! Copy utilities into PKG for the installer.
 	$(CP_RECURSE) bin/Syscheck.dist/* $(PACKAGE_UTILS_DIR)
 	@echo !!! Copy Windows DLLs into the PKG for the installer.
 	$(CP) $(INSTALLER_WIN_DIR)api-ms-win-core-path-l1-1-0.dll $(PACKAGE_CORE_DIR)
@@ -431,6 +472,9 @@ MKOB: $(MKOB_EXEC) ;
 .PHONY: MRT
 MRT: $(MRT_EXEC) ;
 
+.PHONY: TGRM
+TGRM: $(TGRM_EXEC)
+
 .PHONY: Syscheck
 Syscheck: $(SYSCHECK_EXEC) ;
 
@@ -443,8 +487,11 @@ Syscheck: $(SYSCHECK_EXEC) ;
 $(MKOB_MANUAL): $(DOC_DIR)MKOB/User-Manual-MKOB4.adoc  mkobversion.txt $(MANUAL_SETTINGS) $(PyKOB_THEME)
 	$(PDFGEN) $<
 
-$(MRT_MANUAL): $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
+$(MRT_MANUAL): $(DOC_DIR)MRT/User-Manual-MRT.adoc  mrtversion.txt $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
+	$(PDFGEN) $<
 
+$(TGRM_MANUAL): $(DOC_DIR)Telegram/User-Manual-Telegram.adoc  telegramversion.txt $(MANUAL_SETTINGS) $(PyKOB_THEME) ;
+	$(PDFGEN) $<
 
 $(CONFIGURE_EXEC): CONFIG_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
@@ -483,6 +530,21 @@ $(MRT_EXEC): MRT.py $(BUILD_SRC_APPS_DIR)pkappargs.pyd $(BUILD_SRC_APPS_DIR)pyko
 	$(PY2BIN) $(MRT_BIN_FLAGS) $<
 	$(call pykob-to-dist,$@)
 	$(call pkappargs-to-dist,$@)
+
+
+$(TGRM_EXEC): TGRM_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
+							do									\
+								[[ -d $$d ]] || mkdir -p $$d;	\
+							done;								\
+						$(CP) -rup $(ORIGINAL_SRC_TGRM) $(BUILD_SRC_APPS_DIR))
+
+$(TGRM_EXEC): TGRM_DIST_DIR := $(BIN_DIR)Telegram$(DIST_DIR_EXT)
+$(TGRM_EXEC): Telegram.py $(BUILD_SRC_APPS_DIR)pykob.pyd
+	$(PY2BIN) $(TGRM_BIN_FLAGS) $<
+	$(MKDIR) $(TGRM_DIST_DIR)resources
+	$(CP) $(SRC_PY_RES_DIR)Telegram-Logo.png $(TGRM_DIST_DIR)resources
+	$(call pykob-to-dist,$@)
+
 
 $(SYSCHECK_EXEC): UTILS_SOURCES := $(shell for d in $(REQUIRED_BIN_DIRS); \
 							do									\
