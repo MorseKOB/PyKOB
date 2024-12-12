@@ -423,7 +423,7 @@ bins: pykob Configure MKOB MRT TGRM
 
 .PHONY: installer_win
 #installer_win: INSTALLER_NAME := $(shell date +'mkobsuite-install-%Y%m%d.exe')
-installer_win: MKOB_SUITE_VERSION := $(shell sed 's/\./_/g' mkobversion.txt)
+installer_win: MKOB_SUITE_VERSION := $(shell sed 's/\./_/g' msuiteversion.txt)
 installer_win:
 	$(WIN_INST_COMPILE) $(WIN_INST_CP_OPTS) $(INSTALLER_WIN_DIR)mkobsuite_win.nsi
 	$(MV_FORCE) $(INSTALLER_WIN_DIR)mkobsuite-install.exe $(BIN_DIR)mkobsuite-$(MKOB_SUITE_VERSION)-install.exe
