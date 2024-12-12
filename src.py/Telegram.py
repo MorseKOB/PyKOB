@@ -51,7 +51,8 @@ import json
 from json import JSONDecodeError
 import pygame
 from pygame.font import Font
-from pygame import Surface
+from pygame import Rect, Surface, typing
+from pygame.typing import ColorLike, RectLike
 import os
 from os import path as path_func
 import sys
@@ -86,9 +87,11 @@ class PGDisplay:
     Holds a PyGame display surface and provides useful methods that operate on
     the display/Surface.
     """
-    def __init__(self, width, height, page_color, text_color, font, font_size=0, side_margin=0):  # type: (int, int, any, any, str|Font, int, int) -> None
-        self._scr_size = (width, height)
-        self._screen = pygame.display.set_mode(self._scr_size)  # 'flags' can have pygame.FULLSCREEN
+    def __init__(self, screensize, page_color, text_color, font, font_size=0, side_margin=0):  # type: (tuple[int,int]|None, any, any, str|Font, int, int) -> None
+        pygame.display.init()
+        pygame.font.init()
+        self._scr_size = screensize if screensize is not None else pygame.display.list_modes()[0]
+        self._screen = pygame.display.set_mode(self._scr_size, pygame.FULLSCREEN)  # 'flags' can have pygame.FULLSCREEN
         self._clock = pygame.time.Clock()
         self._page_color = page_color
         self._text_color = text_color
@@ -113,21 +116,25 @@ class PGDisplay:
         return self._screen.height
 
     @property
+    def page_color(self):  # type: () -> ColorLike
+        return self._page_color
+
+    @property
     def width(self):  # type: () -> int
         return self._screen.width
 
 
-    def blit(self, sprite, pos, update=True, set_text_top=True):  # type: (Surface, tuple[int,int], bool, bool) -> None
+    def blit(self, sprite, topleft, update=False, set_text_top=False):  # type: (Surface, tuple[int,int], bool, bool) -> None
         """
         Blit (draw/render) a Surface sprite onto the form.
         """
-        self._screen.blit(sprite, pos)
+        self._screen.blit(sprite, topleft)
         if set_text_top:
             # Set the text y value to be below the bottom of the sprite
             sh = sprite.get_height()
-            self._text_y = pos[1] + sh
+            self._text_y = topleft[1] + sh
         if update:
-            pygame.display.update()
+            pygame.display.flip()
         return
 
     def exit(self):  # type: () -> None
@@ -135,8 +142,12 @@ class PGDisplay:
         pygame.display.quit()
         return
 
+    def fill(self, color, rect):  # type: (ColorLike, RectLike) -> None
+        self._screen.fill(color, rect)
+        return
+
     def form_update(self):  # type: () -> None
-        pygame.display.update()
+        pygame.display.flip()
         return
 
     def new_form(self, update=True, scroll_time=0.0):  # type: (bool, float) -> None
@@ -163,7 +174,7 @@ class PGDisplay:
                 # fill the evacuated space
                 fr = pygame.Rect(0,rec_top,self._screen.width, dy)
                 self._screen.fill(self._page_color, fr)
-                pygame.display.update()
+                pygame.display.flip()
                 scroll_to_go -= dy
                 if scroll_to_go < dy:
                     dy = scroll_to_go
@@ -173,7 +184,7 @@ class PGDisplay:
         self._text_x = self._text_left_margin
         self._text_y = 0
         if update:
-            pygame.display.update()
+            pygame.display.flip()
         return
 
     def line_advance(self, lines=1):  # type: (int) -> None
@@ -181,7 +192,7 @@ class PGDisplay:
         self._text_y += (self._font.get_linesize() * lines)
         return
 
-    def output(self, text, bold=False, italic=False, update=True, spacing=1.0):  # type: (str, bool, float) -> None
+    def print(self, text, bold=False, italic=False, update=True, spacing=1.0):  # type: (str, bool, bool, bool, float) -> None
         if text is None:
             return
         lines_of_words = [word.split(' ') for word in text.splitlines()]
@@ -212,7 +223,7 @@ class PGDisplay:
                 first_word = False
             first_line = False
         if update:
-            pygame.display.update()
+            pygame.display.flip()
         # Update our positions
         self._text_x = x
         self._text_y = y
@@ -232,7 +243,7 @@ class PGDisplay:
 
     def start(self):  # type: () -> None
         self._screen.fill(self._page_color)
-        pygame.display.update()
+        pygame.display.flip()
         return
 
 class ConfigLoadError(Exception):
@@ -452,10 +463,16 @@ class Telegram:
         self._last_display_t = sys.float_info.min  # type: float  # force welcome screen
         self._last_decode_t = sys.float_info.max  # type: float  # no decodes so far
         self._flush_t = FLUSH * (1.2 / cfg.min_char_speed)  # type: float  # convert dots to seconds
-
+        #
+        # Rendered characters used for the Key Closer state on the display form.
+        self._KC_closed_sprite = None  # type: Surface|None
+        self._KC_open_sprite = None  # type: Surface|None
+        self._KC_state_rect = None  # type: Rect|None
+        self._KC_state_pt = (0,0)  # type: tuple[int,int]
         #
         self._closed = Event()  # type: Event
         self._control_c_pressed = Event()  # type: Event
+        self._ignore_internet = Event()  # type: Event  # set to ignore incoming code, clear to process it
         self._shutdown = Event()  # type: Event
         self._shutdown_started = Event()  # type: Event
         #
@@ -473,7 +490,7 @@ class Telegram:
         """
         Callback function for displaying text on the form.
         """
-        self._form.output(char, self._tgcfg.font_bold, self._tgcfg.font_italic, update, spacing)
+        self._form.print(char, self._tgcfg.font_bold, self._tgcfg.font_italic, update, spacing)
         self._last_display_t = time.time()
         return
 
@@ -492,9 +509,10 @@ class Telegram:
         self._handle_sender_update(self._our_office_id)
         if not code_source == kob.CodeSource.key:  # Code from the key is automatically sounded
             kob_.soundCode(code, code_source)
-        if self._reader:
+        rdr = self._reader  # assign locally incase our reader gets swapped out
+        if rdr is not None:
             self._last_decode_t = sys.float_info.max
-            self._reader.decode(code)
+            rdr.decode(code)
             self._last_decode_t = time.time()
         if self._connected and self._cfg.remote:
             self._internet.write(code)
@@ -503,7 +521,9 @@ class Telegram:
     # flush last characters from decode buffer
     def _flush_reader(self):
         self._last_decode_t = sys.float_info.max
-        self._reader.flush()
+        rdr = self._reader  # assign locally incase our reader gets swapped out
+        if rdr is not None:
+            rdr.flush()
         return
 
     def _form_new(self, fresh=False):  # type: (bool) -> None
@@ -514,8 +534,10 @@ class Telegram:
         """
         log.debug("Telegram._form_new", 2)
         scroll = 0.0 if fresh else self._tgcfg.page_clear_speed
+        self._clear_closer_state(update=True)
         self._form.new_form(scroll_time=scroll)
         self._output_masthead()
+        self._output_closer_state()
         self._form.form_update()
         self._last_display_t = sys.float_info.max
         return
@@ -542,9 +564,8 @@ class Telegram:
 
     # handle input from internet
     def _from_internet(self, code):
-        # self._kob.sounder(code)
-        # else:
-        #     display(code)
+        if self._ignore_internet.is_set():
+            return
         if self._connected:
             if not self._sender_current == self._our_office_id:
                 self._kob.soundCode(code, kob.CodeSource.wire)
@@ -555,8 +576,11 @@ class Telegram:
                     # will display a new form.
                     pass
                 else:
-                    if self._reader:
-                        self._reader.decode(code)
+                    rdr = self._reader  # assign locally incase our reader gets swapped out
+                    if rdr is not None:
+                        rdr.decode(code)
+                    pass
+                pass
             if len(code) > 0 and code[-1] == +1:
                 self._internet_station_active = False
             else:
@@ -628,6 +652,39 @@ class Telegram:
             print(f"<<{self._sender_current}>>", flush=True)
         return
 
+    def _new_Reader(self):  # type: () -> None
+        rdr = self._reader  # assign locally incase our reader gets swapped out
+        self._reader = None
+        if rdr is not None:
+            rdr.setCallback(None)
+            rdr.exit()
+        self._reader = morse.Reader(
+            wpm=self._cfg.text_speed,
+            cwpm=self._cfg.min_char_speed,
+            codeType=self._cfg.code_type,
+            callback=self._from_reader,
+            decode_at_detected=self._cfg.decode_at_detected
+            )
+        return
+
+    def _clear_closer_state(self, update=False):  # type: (bool) -> None
+        self._form.fill(self._form.page_color, self._KC_state_rect)
+        return
+
+    def _output_closer_state(self):  # type: () -> None
+        """
+        Render a 'O' or 'C' in the bottom left corner of the screen
+        based on the open/closed state. Erase what might have been
+        there.
+        """
+        self._clear_closer_state(update=False)
+        open = self._kob.virtual_closer_is_open
+        if open:
+            self._form.blit(self._KC_open_sprite, self._KC_state_pt, update=True, set_text_top=False)
+        else:
+            self._form.blit(self._KC_closed_sprite, self._KC_state_pt, update=True, set_text_top=False)
+        return
+
     def _output_masthead(self):
         """
         Render the top section of the form.
@@ -641,7 +698,7 @@ class Telegram:
             self._form.blit(self._masthead, (lf,top), update=False, set_text_top=True)
         else:
             log.debug("Masthead text output", 3)
-            self._form.output(self._tgcfg._masthead_text, bold=True, italic=False, update=False)
+            self._form.print(self._tgcfg._masthead_text, bold=True, italic=False, update=False)
         self._form.line_advance(2)
         return
 
@@ -673,7 +730,7 @@ class Telegram:
         self._kob.energize_sounder((not active), kob.CodeSource.local)
         return
 
-    def _set_virtual_closer_closed(self, closed):
+    def _set_virtual_closer_closed(self, close):
         """
         Handle change of Circuit Closer state.
 
@@ -681,28 +738,43 @@ class Telegram:
         True: 'latch'
         False: 'unlatch'
         """
-        self._kob.virtual_closer_is_open = not closed
-        code = LATCH_CODE if closed else UNLATCH_CODE
+        was_closed = not self._kob.virtual_closer_is_open
+        if close and was_closed:
+            return
+        open = not close
+        self._kob.virtual_closer_is_open = open
+        self._output_closer_state()
+        code = LATCH_CODE if close else UNLATCH_CODE
         # if not self._internet_station_active:
         if True:  # Allow breaking in to an active wire message
             if self._cfg.local:
-                if not closed:
+                if open:
                     self._handle_sender_update(self._our_office_id)
-                if self._reader:
-                    self._reader.decode(code)
+                rdr = self._reader  # assign locally incase our reader gets swapped out
+                if rdr is not None:
+                    rdr.decode(code)
+                pass
+            pass
         if self._connected and self._cfg.remote:
             self._internet.write(code)
-        if len(code) > 0:
-            if code[-1] == 1:
-                # Unlatch (Key closed)
-                self._set_local_loop_active(False)
-                if self._reader:
-                    self._reader.flush()
-            elif code[-1] == 2:
-                # Latch (Key open)
-                self._set_local_loop_active(True)
+        if code[-1] == 1:
+            # Unlatch local (Key closed)
+            self._set_local_loop_active(False)
+        elif code[-1] == 2:
+            # Latch local (Key open)
+            self._set_local_loop_active(True)
+        if was_closed:
+            # The closer was closed and now it's open
+            #  Flush the reader and display a new form
+            self._ignore_internet.set()
+            rdr = self._reader
+            if rdr is not None:
+                rdr.setCallback(None)  # Don't have it call back
+                self._form_new()
+                self._new_Reader()
+        else:
+            self._ignore_internet.clear()
         return
-
 
 
     # ########################################################################
@@ -732,7 +804,7 @@ class Telegram:
                 inet.exit()
                 log.debug("Telegram.exit - 4b", 3)
             rdr = self._reader
-            if rdr:
+            if rdr is not None:
                 log.debug("Telegram.exit - 5a", 3)
                 rdr.exit()
                 log.debug("Telegram.exit - 5b", 3)
@@ -775,13 +847,18 @@ class Telegram:
                             break
                         elif c == '\x18':  # display a new form on ^X
                             self._form_new()
-                        else:  # otherwise handle keyboard input
+                        else:
                             if c == '\x1B':  # Escape toggles the virtual closer
                                 open_vcloser = not self._kob.virtual_closer_is_open
                                 if open_vcloser:
                                     c = '~'
                                 else:
                                     c = '+'
+                            if c < '\x20':  # Ignore other control chars
+                                continue
+                            vcloser_is_open = self._kob.virtual_closer_is_open
+                            if (c == '~' and vcloser_is_open) or (c == '+' and not vcloser_is_open):
+                                continue  # Don't repeat open when open or close when closed
                             self._from_keyboard(c)
                 if time.time() - self._flush_t > self._last_decode_t:
                     self._flush_reader()
@@ -816,7 +893,7 @@ class Telegram:
             inet.shutdown()
             log.debug("Telegram.shutdown - 4b", 3)
         rdr = self._reader
-        if rdr:
+        if rdr is not None:
             log.debug("Telegram.shutdown - 5a", 3)
             rdr.shutdown()
             log.debug("Telegram.shutdown - 5b", 3)
@@ -850,6 +927,7 @@ class Telegram:
             virtual_closer_in_use=True,
             keyCallback=self._from_key,
             )
+        self._kob.virtual_closer_is_open = False  # Start with the closer closed
         if (self._wire is not None):
             self._internet = internet.Internet(
                 officeID=self._cfg.station,
@@ -865,21 +943,33 @@ class Telegram:
             codeType=self._cfg.code_type,
             spacing=self._cfg.spacing
             )
-        self._reader = morse.Reader(
-            wpm=self._cfg.text_speed,
-            cwpm=self._cfg.min_char_speed,
-            codeType=self._cfg.code_type,
-            callback=self._from_reader,
-            decode_at_detected=self._cfg.decode_at_detected
-            )
+        self._new_Reader()
         font = self._tgcfg.font
         fsize = self._tgcfg.font_size
         page_c = self._tgcfg.page_color
         text_c = self._tgcfg.text_color
         side_margin = self._tgcfg.side_margin
-        self._form = PGDisplay(0, 0, page_c, text_c, font, fsize, side_margin)
+        self._form = PGDisplay(None, page_c, text_c, font, fsize, side_margin)
         self._form.caption = "Telegram"
         self._clock = pygame.time.Clock()
+        #
+        # Create sprite surfaces with the Key-Closed state chars and the rectangle that contains them.
+        status_font = None  # type: Font|None
+        fpath = pygame.font.match_font("Arial, Helvetica, Sans-Serif")
+        if fpath is not None:
+            status_font = pygame.font.Font(fpath, 40)
+        else:
+            status_font = pygame.font.SysFont(None, 40)
+        self._KC_closed_sprite = status_font.render("+", True, (255,255,255))  # Render a white '+' for closed
+        self._KC_open_sprite = status_font.render("~", True, (255,255,255))  # Render a white '~' for open
+        kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
+        kc_h = 4 + status_font.get_linesize()
+        kc_l = self._form.width - kc_w
+        kc_t = self._form.height - kc_h
+        self._KC_state_rect = Rect(kc_l, kc_t, kc_w, kc_h)
+        self._KC_state_pt = (kc_l + 2, kc_t + 2)
+        #
+        # Get Masthead ready
         if self._tgcfg.masthead_file is not None:
             mfile = self._tgcfg.masthead_file
             try:
