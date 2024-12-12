@@ -69,7 +69,7 @@ from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
@@ -535,7 +535,8 @@ class Telegram:
             elif code[-1] == 2: # special code for closer/circuit open
                 self._set_virtual_closer_closed(False)
                 return
-        if not self._internet_station_active and self._local_loop_active:
+        # if not self._internet_station_active and self._local_loop_active:
+        if self._local_loop_active:
             self._emit_local_code(code, kob.CodeSource.key)
         return
 
@@ -582,7 +583,8 @@ class Telegram:
                     print('[+ to close key]', flush=True)
                     sys.stdout.flush()
                     return
-            if not self._internet_station_active and self._local_loop_active:
+            # if not self._internet_station_active and self._local_loop_active:
+            if self._local_loop_active:
                 self._emit_local_code(code, kob.CodeSource.keyboard, char)
         return
 
@@ -681,7 +683,8 @@ class Telegram:
         """
         self._kob.virtual_closer_is_open = not closed
         code = LATCH_CODE if closed else UNLATCH_CODE
-        if not self._internet_station_active:
+        # if not self._internet_station_active:
+        if True:  # Allow breaking in to an active wire message
             if self._cfg.local:
                 if not closed:
                     self._handle_sender_update(self._our_office_id)
