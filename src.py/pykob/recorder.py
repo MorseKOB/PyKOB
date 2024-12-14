@@ -38,7 +38,7 @@ The information is recorded in packets in a JSON structure that includes:
 7. Code Sequence (key timing information)
 
 Though the name of the class is `recorder` it is typical that a 'recorder' can also
-play back. For example, a 'tape recorder', a 'video casset recorder (VCR)',
+play back. For example, a 'tape recorder', a 'video cassette recorder (VCR)',
 a 'digital video recorder' (DVR), etc. can all play back what they (and compatible
 devices) have recorded. This class is no exception. It provides methods to play back
 recordings in addition to making recordings.
@@ -558,7 +558,7 @@ class Recorder:
         if pt:
             self._thread_playback = None
             self._playback_stop_flag.set()
-            self._playback_resume_flag.set() # Set resume flag incase playback was paused
+            self._playback_resume_flag.set() # Set resume flag in case playback was paused
         return
 
     def shutdown(self):

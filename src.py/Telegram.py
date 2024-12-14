@@ -60,6 +60,7 @@ from sys import platform as sys_platform
 from sys import version as sys_version
 from threading import Event
 import time
+import traceback
 
 from pykob import VERSION, config2, log, kob, internet, morse
 from pykob.kob import CodeSource
@@ -82,25 +83,82 @@ ENDMSG   = (-1000, +1)  # ending code sequence
 LATCH_CODE = (-0x7fff, +1)  # code sequence to force latching (close)
 UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 
-class PGDisplay:
+class TGDisplay:
     """
     Holds a PyGame display surface and provides useful methods that operate on
-    the display/Surface.
+    the display/Surface and display a telegram form
     """
-    def __init__(self, screensize, page_color, text_color, font, font_size=0, side_margin=0):  # type: (tuple[int,int]|None, any, any, str|Font, int, int) -> None
+
+    ''' Black color constant '''
+    BLACK = (0,0,0)
+
+    def __init__(self,
+                screensize,
+                tgcfg
+        ):  # type: (tuple[int,int]|None, TelegramConfig) -> None
+        """
+        screensize: The size of the screen in pixels, width and height. Or None to automatically select the size based on the hardware.
+        """
         pygame.display.init()
         pygame.font.init()
         self._scr_size = screensize if screensize is not None else pygame.display.list_modes()[0]
         self._screen = pygame.display.set_mode(self._scr_size, pygame.FULLSCREEN)  # 'flags' can have pygame.FULLSCREEN
         self._clock = pygame.time.Clock()
-        self._page_color = page_color
-        self._text_color = text_color
-        self._font = font if isinstance(font, Font) else pygame.font.SysFont(font, font_size)
-        self._text_left_margin = side_margin
-        self._text_right_margin = self._screen.get_width() - self._text_left_margin
-        self._text_x = 0
+        self._tgcfg = tgcfg
+        #
+        # START OF CONFIG PROPERTIES
+        ## Page features
+        self._page_width = min(tgcfg.page_width, self._screen.width)
+        self._page_color = tgcfg.page_color
+        self._scroll_speed = tgcfg.page_clear_speed  # type: float
+        ## Margins
+        self._side_margin = tgcfg.side_margin
+        self._top_margin = tgcfg.top_margin
+        ## Text features
+        self._wrap_columns = tgcfg.wrap_columns
+        self._text_color = tgcfg.text_color
+        fpath = pygame.font.match_font(tgcfg.text_font)
+        if fpath is not None:
+            self._font = pygame.font.Font(fpath, tgcfg.text_font_size)
+        else:
+            self._font = pygame.font.SysFont(None, tgcfg.text_font_size)
+        # END OF CONFIG PROPERTIES
+        self._space_width = self._font.size(' ')[0]
+        self._text_line_height = self._font.get_linesize()
+        self._spaces = 0
+        #
+        # Calculate the page left from the screen width and the page width
+        self._page_left = (self._screen.width - self._page_width) // 2
+        self._page_rect = (self._page_left, 0, self._page_width, self._screen.height)
+        self._text_leftmost = self._page_left + self._side_margin
+        self._text_right_max = self._page_left + (self._page_width - self._side_margin)
+        self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
+        self._text_x = self._text_leftmost
         self._text_y = 0
+        #
+        # Masthead holder. It will be generated in `start`
+        self._masthead = None  # type: Surface|None
+        #
+        # Rendered characters used for the Key Closer state on the display form.
+        self._KC_closed_sprite = None  # type: Surface|None
+        self._KC_open_sprite = None  # type: Surface|None
+        self._KC_state_bg = None  # type: Surface|None
+        self._KC_state_pt = (0,0)  # type: tuple[int,int]
+        # Flags/Events
         self._shutdown = Event()
+        return
+
+    def _output_masthead(self):
+        """
+        Render the top section of the form.
+        """
+        lf = (self._screen.width // 2) - (self._masthead.width // 2)
+        if lf < 0:
+            lf = 0
+        top = self._tgcfg.top_margin
+        log.debug("TGDisplay._output_masthead", 3)
+        self._screen.blit(self._masthead, (lf,top))
+        self._text_y += self._masthead.get_height() + self._text_line_height
         return
 
     @property
@@ -120,19 +178,41 @@ class PGDisplay:
         return self._page_color
 
     @property
+    def page_width(self):  # type: () -> int
+        return self._page_width
+
+    @property
     def width(self):  # type: () -> int
         return self._screen.width
 
 
-    def blit(self, sprite, topleft, update=False, set_text_top=False):  # type: (Surface, tuple[int,int], bool, bool) -> None
+    def advance(self, pixel_rows):  # type: (int) -> None
+        """
+        Advance the Y position by `pixel_rows`. Positive values move Y down the screen
+        and may scroll the page up. Negative values move Y up the screen and may scroll
+        the page down.
+        """
+        self._text_y += (pixel_rows)
+        sh = self._screen.height
+        if (self._text_y >= sh):
+            self._screen.scroll(0, self._text_y - sh)
+            self._text_y = sh - 1
+        elif (self._text_y < 0):
+            self._screen.scroll(0, (0 - self._text_y))
+            self._text_y = 0
+        return
+
+    def blit(self, sprite, topleft, update=False):  # type: (Surface, tuple[int,int], bool, bool) -> None
         """
         Blit (draw/render) a Surface sprite onto the form.
         """
         self._screen.blit(sprite, topleft)
-        if set_text_top:
-            # Set the text y value to be below the bottom of the sprite
-            sh = sprite.get_height()
-            self._text_y = topleft[1] + sh
+        if update:
+            pygame.display.flip()
+        return
+
+    def erase_closer_state(self, update=False):  # type: (bool) -> None
+        self._screen.blit(self._KC_state_bg, self._KC_statebg_pt)
         if update:
             pygame.display.flip()
         return
@@ -150,17 +230,31 @@ class PGDisplay:
         pygame.display.flip()
         return
 
-    def new_form(self, update=True, scroll_time=0.0):  # type: (bool, float) -> None
+    def line_advance(self, lines=1):  # type: (int) -> None
+        self._text_x = self._text_leftmost
+        self.advance(self._text_line_height * lines)
+        return
+
+    def new_form(self, fresh=False, update=True):  # type: (bool, bool, float) -> None
         """
-        Display a new, blank, form...
-        If scroll_time is 0 the form will just be cleared instantly.
-        If scroll_time is non-zero it is the time, in seconds, to take to scroll the
-        contents off.
-        A positive value will scroll the contents up, negative down.
+        Clear the form and display the masthead.
+        If `fresh`, instantly create a new form.
+        If not, scroll the current form off and replace it.
         """
+        log.debug("TGDisplay.new_form", 2)
+        scroll_time = 0.0 if fresh else self._scroll_speed
+        self.erase_closer_state()
         if scroll_time == 0:
-            self._screen.fill(self._page_color)
+            self._screen.fill(TGDisplay.BLACK)  # Background
+            self._screen.fill(self._page_color, self._page_rect)
+            self._text_x = self._text_leftmost
+            self._text_y = 0
+            self._output_masthead()
         else:
+            # ZZZ try putting something below the bottom
+            rect = Rect(0, self._screen.height - 20, 100, 60)
+            self._screen.blit(self._masthead, rect)
+            pygame.display.flip()
             dy = 4
             dir = -1 if scroll_time > 0 else 1
             st = abs(scroll_time)
@@ -172,7 +266,7 @@ class PGDisplay:
             while scroll_to_go > 0:
                 self._screen.scroll(dx=0, dy=ddy)
                 # fill the evacuated space
-                fr = pygame.Rect(0,rec_top,self._screen.width, dy)
+                fr = pygame.Rect(self._page_left,rec_top,self._page_width, dy)
                 self._screen.fill(self._page_color, fr)
                 pygame.display.flip()
                 scroll_to_go -= dy
@@ -181,60 +275,55 @@ class PGDisplay:
                 self._shutdown.wait(pt)
             pass
         pass
-        self._text_x = self._text_left_margin
+        self._text_x = self._text_leftmost
         self._text_y = 0
+        self._output_masthead()
         if update:
             pygame.display.flip()
         return
 
-    def line_advance(self, lines=1):  # type: (int) -> None
-        self._text_x = self._text_left_margin
-        self._text_y += (self._font.get_linesize() * lines)
-        return
-
-    def print(self, text, bold=False, italic=False, update=True, spacing=1.0):  # type: (str, bool, bool, bool, float) -> None
+    def print(self, text, bold=False, italic=False, update=True, spacing=0.0):  # type: (str, bool, bool, bool, float) -> None
         if text is None:
             return
-        lines_of_words = [word.split(' ') for word in text.splitlines()]
-        font = self._font
-        font.bold = bold
-        font.italic = italic
-        space_width = font.size(' ')[0]
-        spacing_width = int(space_width * spacing)
-        x = self._text_x
-        y = self._text_y
-        first_line = True
-        for line in lines_of_words:
-            if not first_line:
-                # New Line
-                x = self._text_left_margin
-                y += font.get_linesize()
-            first_word = True
-            for word in line:
-                if not first_word:
-                    x += spacing_width
-                word_glyphs = font.render(word, True, self._text_color)
-                word_width, word_height = word_glyphs.get_size()
-                if x + word_width > self._text_right_margin:
-                    x = self._text_left_margin
-                    y += word_height
-                self._screen.blit(word_glyphs, (x,y))
-                x += int(word_width + (spacing_width * 0.2))
-                first_word = False
-            first_line = False
-        if update:
+        screen_output = False
+        for c in text:
+            if c == '\r' or c == '\n':
+                self.line_advance()
+                continue
+            if c == ' ':
+                self._spaces += 1
+                continue
+            if c < ' ':
+                continue
+            font = self._font
+            font.bold = bold
+            font.italic = italic
+            space = int(self._space_width * (self._spaces + spacing))
+            char_glyph = font.render(c, True, self._text_color)
+            glyph_width = char_glyph.get_width()
+            text_end_x = self._text_x + space + glyph_width
+            if ((self._spaces > 0) and (text_end_x > self._text_wrap_x)) or (text_end_x > self._text_right_max):
+                space = 0
+                self.line_advance()
+            self._screen.blit(char_glyph, (self._text_x + space, self._text_y))
+            self._text_x += space + glyph_width
+            self._spaces = 0
+            screen_output = True
+        if update and screen_output:
             pygame.display.flip()
-        # Update our positions
-        self._text_x = x
-        self._text_y = y
         return
 
-    def scroll(self, plines):  # type: (int) -> None
+    def show_closer_state(self, open):  # type: (bool) -> None
         """
-        Scroll the display/form up (positive) or down (negative) by
-        pixel-lines.
+        Render a 'O' or 'C' in the bottom left corner of the screen
+        based on the open/closed state. Erase what might have been
+        there.
         """
-        self._text_y += plines
+        self.erase_closer_state(update=False)
+        if open:
+            self._screen.blit(self._KC_open_sprite, self._KC_state_pt)
+        else:
+            self._screen.blit(self._KC_closed_sprite, self._KC_state_pt)
         return
 
     def shutdown(self):  # type: () -> None
@@ -242,7 +331,59 @@ class PGDisplay:
         return
 
     def start(self):  # type: () -> None
-        self._screen.fill(self._page_color)
+        #
+        # Get Masthead ready
+        if self._tgcfg.masthead_file is not None:
+            mfile = self._tgcfg.masthead_file
+            try:
+                self._masthead = pygame.image.load(mfile).convert_alpha()
+            except FileNotFoundError as fnf:
+                log.warn("Masthead file not found: '{}' Will use the Masthead text instead.".format(mfile), dt="")
+                text = self._tgcfg.masthead_text
+                if text is None:
+                    text = ""
+                try:
+                    font = None  # type: Font|None
+                    fpath = pygame.font.match_font(self._tgcfg.masthead_font)
+                    if fpath is not None:
+                        font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
+                    else:
+                        font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
+                    self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
+                except Exception as ex:
+                    log.warn("Error rendering the Masthead text '{}': {}".format(self._tgcfg.masthead_text, ex), dt="")
+                pass
+            pass
+        pass
+        #
+        # Create sprite surfaces with the Key-Closed state chars and the rectangle that contains them.
+        status_font = None  # type: Font|None
+        fpath = pygame.font.match_font("Arial, Helvetica, Sans-Serif")
+        if fpath is not None:
+            status_font = pygame.font.Font(fpath, 40)
+        else:
+            status_font = pygame.font.SysFont(None, 40)
+        self._KC_closed_sprite = status_font.render("+", True, (255,255,255))  # Render a white '+' for closed
+        self._KC_open_sprite = status_font.render("~", True, (255,255,255))  # Render a white '~' for open
+        kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
+        kc_h = 4 + status_font.get_linesize()
+        kc_l = self._screen.width - kc_w
+        kc_t = self._screen.height - kc_h
+        # Create a background sprite. Chances are this will be black or the page color,
+        # but it's possible that the border width is non-zero but narrower than the
+        # status block width. So, we do the work here to create a sprite that might
+        # have some of the left in the page color and the right in black.
+        #
+        # The black 'stripe' on the right is ((screen_width - page_width) / 2)
+        sz = (kc_w, kc_h)
+        self._KC_state_bg = Surface(sz)  # Per PyGame-CE docs, this creates a black surface
+        pcw = kc_w - ((self._screen.width - self._page_width) // 2)
+        if pcw > 0:
+            state_pagec_rect = Rect(0, 0, pcw, kc_h)
+            self._KC_state_bg.fill(self._page_color, state_pagec_rect)
+        self._KC_statebg_pt = (kc_l, kc_t)
+        self._KC_state_pt = (kc_l + 2, kc_t + 2)
+        self._screen.fill(TGDisplay.BLACK)
         pygame.display.flip()
         return
 
@@ -260,6 +401,7 @@ class TelegramConfig:
     PAGE_CLEAR_IDLE_TIME_KEY = "page_clear_idle_time"
     PAGE_CLEAR_SPEED_KEY = "page_clear_speed"
     PAGE_COLOR_KEY = "page_color"
+    PAGE_WIDTH_KEY = "page_width"
     TEXT_COLOR_KEY = "text_color"
     MASTHEAD_FILE_PATH = "masthead_file"
     MASTHEAD_FONT_KEY = "masthead_font"
@@ -268,26 +410,31 @@ class TelegramConfig:
     MASTHEAD_TEXT_COLOR_KEY = "masthead_text_color"
     SIDE_MARGIN_KEY = "side_margin"
     TOP_MARGIN_KEY = "top_margin"
+    FORM_SPACING_KEY = "form_spacing"
+    WRAP_COLUMNS_KEY = "wrap_columns"
 
 
     def __init__(self, tgcfg_file_path):  # type: (str|None) -> None
         self._cfg_filep = tgcfg_file_path
         # Default values...
-        self._font = "courier"  # type: str
-        self._font_bold = False  # type: bool
-        self._font_italic = False  # type: bool
-        self._font_size = 20  # type: int
+        self._text_font = "courier"  # type: str
+        self._text_font_bold = False  # type: bool
+        self._text_font_italic = False  # type: bool
+        self._text_font_size = 20  # type: int
         self._text_color = "black"  # type: str|tuple[int,int,int]
         self._page_clear_idle_time = 8.0  # type: float  # Seconds of idle before clear
         self._page_clear_speed = 1.8  # type: float  # Time to take to scroll the page (can be negative)
         self._page_color = (198,189,150)  # type: str|tuple[int,int,int] # Tan
+        self._page_width = 980  # type: int  # The page color portion width. 980 is reasonable.
         self._masthead_filep = None  # type: str|None
-        self._masthead_font = self._font
-        self._masthead_font_size = self._font_size
+        self._masthead_font = self._text_font
+        self._masthead_font_size = self._text_font_size
         self._masthead_text = None  # type: str|None
         self._masthead_text_color = "black"  # type: str|tuple[int,int,int]
         self._side_margin = 28  # type: int
         self._top_margin = 38  # type: int
+        self._form_spacing = 10  # type: int
+        self._wrap_columns = 15  # type:int  # Number of spaces before right margin to wrap to next line
         # Read the Config values from JSON file if a path was provided
         if self._cfg_filep is not None:
             self.load()
@@ -302,66 +449,148 @@ class TelegramConfig:
         return
 
     @property
-    def font(self):  # type: () -> str
-        return self._font
+    def text_font(self):  # type: () -> str
+        return self._text_font
+    @text_font.setter
+    def text_font(self, font):  # type: (str) -> None
+        self._text_font = font
+        return
 
     @property
-    def font_bold(self):  # type: () -> bool
-        return self._font_bold
+    def text_font_bold(self):  # type: () -> bool
+        return self._text_font_bold
+    @text_font_bold.setter
+    def text_font_bold(self, b):  # type: (bool) -> None
+        self._bold = b
+        return
 
     @property
-    def font_italic(self):  # type: () -> bool
-        return self._font_italic
+    def text_font_italic(self):  # type: () -> bool
+        return self._text_font_italic
+    @text_font_italic.setter
+    def text_font_italic(self, i):  # type: (bool) -> None
+        self._italic = i
+        return
 
     @property
-    def font_size(self):  # type: () -> int
-        return self._font_size
+    def text_font_size(self):  # type: () -> int
+        return self._text_font_size
+    @text_font_size.setter
+    def text_font_size(self, size):  # type: (int) -> None
+        self._text_font_size = size
+        return
+
+    @property
+    def form_spacing(self):  # type: () -> int
+        return self._form_spacing
+    @form_spacing.setter
+    def form_spacing(self, spacing):  # type: (int) -> None
+        self._form_spacing = spacing
+        return
 
     @property
     def masthead_file(self):  # type: () -> str
         return self._masthead_filep
+    @masthead_file.setter
+    def masthead_file(self, filepath):  # type: (str) -> None
+        self._masthead_filep = filepath
+        return
 
     @property
     def masthead_font(self):  # type: () -> str
         return self._masthead_font
+    @masthead_font.setter
+    def masthead_font(self, font):  # type: (str) -> None
+        self._masthead_font = font
+        return
 
     @property
     def masthead_font_size(self):  # type: () -> int
         return self._masthead_font_size
+    @masthead_font_size.setter
+    def masthead_font_size(self, size):  # type: (int) -> None
+        self._masthead_font_size = size
+        return
 
     @property
     def masthead_text(self):  # type: () -> str
         return self._masthead_text
+    @masthead_text.setter
+    def masthead_text(self, text):  # type: (str) -> None
+        self._masthead_text = text
+        return
 
     @property
     def masthead_text_color(self):  # type: () -> str|tuple[int,int,int]
         return self._masthead_text_color
+    @masthead_text_color.setter
+    def masthead_text_color(self, color):  # type: (str|tuple[int,int,int]) -> None
+        self._masthead_text_color = color
+        return
 
     @property
     def page_clear_idle_time(self):  # type: () -> float
         return self._page_clear_idle_time
+    @page_clear_idle_time.setter
+    def page_clear_idle_time(self, seconds):  # type: (float) -> None
+        self._page_clear_idle_time = seconds
+        return
 
     @property
     def page_clear_speed(self):  # type: () -> float
         return self._page_clear_speed
+    @page_clear_speed.setter
+    def page_clear_speed(self, seconds):  # type: (float) -> None
+        self._page_clear_speed = seconds
+        return
 
     @property
     def page_color(self):  # type: () -> str|tuple[int,int,int]
         return self._page_color
+    @page_color.setter
+    def page_color(self, color):  # type: (str|tuple[int,int,int]) -> None
+        self._page_color = color
+        return
+
+    @property
+    def page_width(self):  # type: () -> int
+        return self._page_width
+    @page_width.setter
+    def page_width(self, width):  # type: (int) -> None
+        self._page_width = width
+        return
 
     @property
     def side_margin(self):  # type: () -> int
         return self._side_margin
+    @side_margin.setter
+    def side_margin(self, margin):  # type: (int) -> None
+        self._side_margin = margin
+        return
 
     @property
     def text_color(self):  # type: () -> str|tuple[int,int,int]
         return self._text_color
+    @text_color.setter
+    def text_color(self, color):  #type: (str|tuple[int,int,int]) -> None
+        self._text_color = color
+        return
 
     @property
     def top_margin(self):  # type: () -> int
         return self._top_margin
+    @top_margin.setter
+    def top_margin(self, margin):  # type(int) -> None
+        self._top_margin = margin
+        return
 
-
+    @property
+    def wrap_columns(self):  # type: () -> int
+        return self._wrap_columns
+    @wrap_columns.setter
+    def wrap_columns(self, columns):  # type: (int) -> None
+        self._wrap_columns = columns
+        return
 
     def load(self, filep=None):  # type: (str|None) -> None
         """
@@ -383,7 +612,7 @@ class TelegramConfig:
         errors = 0
         try:
             dirpath, filename = os.path.split(filepath)
-            data = None  # type: dict[str:Any]|None
+            data = None  # type: dict[Any]|None
             with open(filepath, 'r', encoding="utf-8") as fp:
                 data = json.load(fp)
             if data:
@@ -391,19 +620,21 @@ class TelegramConfig:
                     try:
                         match key:
                             case self.FONT_KEY:
-                                self._font = value
+                                self._text_font = value
                             case self.FONT_BOLD_KEY:
-                                self._font_bold = value
+                                self._text_font_bold = value
                             case self.FONT_ITALIC_KEY:
-                                self._font_italic = value
+                                self._text_font_italic = value
                             case self.FONT_SIZE_KEY:
-                                self._font_size = int(value)
+                                self._text_font_size = int(value)
                             case self.PAGE_CLEAR_IDLE_TIME_KEY:
                                 self._page_clear_idle_time = value
                             case self.PAGE_CLEAR_SPEED_KEY:
                                 self._page_clear_speed = value
                             case self.PAGE_COLOR_KEY:
                                 self._page_color = literal_eval(value) if value and value[0] == '(' else value
+                            case self.PAGE_WIDTH_KEY:
+                                self._page_width = value
                             case self.TEXT_COLOR_KEY:
                                 self._text_color = literal_eval(value) if value and value[0] == '(' else value
                             case self.MASTHEAD_FILE_PATH:
@@ -420,6 +651,10 @@ class TelegramConfig:
                                 self._side_margin = int(value)
                             case self.TOP_MARGIN_KEY:
                                 self._top_margin = int(value)
+                            case self.FORM_SPACING_KEY:
+                                self._form_spacing = int(value)
+                            case self.WRAP_COLUMNS_KEY:
+                                self._wrap_columns = int(value)
                             case _:
                                 raise KeyError()
                     except KeyError as ke:
@@ -451,24 +686,17 @@ class Telegram:
         self._wire = wire  # type: int
         self._cfg = cfg  # type: Config
         self._tgcfg = tgcfg
-        self._masthead = None  # type: Surface|None
         self._internet = None  # type: Internet|None
         self._kob = None  # type: KOB|None
         self._reader = None  # type: Reader|None
         self._sender = None  # type: Sender|None
-        self._form = None  # type: PGDisplay|None
+        self._form = None  # type: TGDisplay|None
         self._clock = None
         self._running = False  # type: bool
         self._dt = 0  # type: int
         self._last_display_t = sys.float_info.min  # type: float  # force welcome screen
         self._last_decode_t = sys.float_info.max  # type: float  # no decodes so far
         self._flush_t = FLUSH * (1.2 / cfg.min_char_speed)  # type: float  # convert dots to seconds
-        #
-        # Rendered characters used for the Key Closer state on the display form.
-        self._KC_closed_sprite = None  # type: Surface|None
-        self._KC_open_sprite = None  # type: Surface|None
-        self._KC_state_rect = None  # type: Rect|None
-        self._KC_state_pt = (0,0)  # type: tuple[int,int]
         #
         self._closed = Event()  # type: Event
         self._control_c_pressed = Event()  # type: Event
@@ -486,11 +714,11 @@ class Telegram:
         self._sender_current = ""  # type: str
         return
 
-    def _display_text(self, char, update=True, spacing=1.0):  # type: (str, bool, float) -> None
+    def _display_text(self, char, update=True, spacing=0.0):  # type: (str, bool, float) -> None
         """
-        Callback function for displaying text on the form.
+        Common function for displaying text on the form.
         """
-        self._form.print(char, self._tgcfg.font_bold, self._tgcfg.font_italic, update, spacing)
+        self._form.print(char, self._tgcfg.text_font_bold, self._tgcfg.text_font_italic, update, spacing)
         self._last_display_t = time.time()
         return
 
@@ -509,7 +737,7 @@ class Telegram:
         self._handle_sender_update(self._our_office_id)
         if not code_source == kob.CodeSource.key:  # Code from the key is automatically sounded
             kob_.soundCode(code, code_source)
-        rdr = self._reader  # assign locally incase our reader gets swapped out
+        rdr = self._reader  # assign locally in case our reader gets swapped out
         if rdr is not None:
             self._last_decode_t = sys.float_info.max
             rdr.decode(code)
@@ -521,25 +749,9 @@ class Telegram:
     # flush last characters from decode buffer
     def _flush_reader(self):
         self._last_decode_t = sys.float_info.max
-        rdr = self._reader  # assign locally incase our reader gets swapped out
+        rdr = self._reader  # assign locally in case our reader gets swapped out
         if rdr is not None:
             rdr.flush()
-        return
-
-    def _form_new(self, fresh=False):  # type: (bool) -> None
-        """
-        Clear the form and display the masthead.
-        If `fresh` create a new, fresh form.
-        If not, scroll the current form off.
-        """
-        log.debug("Telegram._form_new", 2)
-        scroll = 0.0 if fresh else self._tgcfg.page_clear_speed
-        self._clear_closer_state(update=True)
-        self._form.new_form(scroll_time=scroll)
-        self._output_masthead()
-        self._output_closer_state()
-        self._form.form_update()
-        self._last_display_t = sys.float_info.max
         return
 
     # handle input from telegraph key
@@ -570,13 +782,14 @@ class Telegram:
             if not self._sender_current == self._our_office_id:
                 self._kob.soundCode(code, kob.CodeSource.wire)
                 if code == STARTMSG:
-                    self._form_new()
+                    self._form.new_form()
+                    self._form.show_closer_state(self._kob.virtual_closer_is_open)
                 elif code == ENDMSG:
                     # Don't do anything at end. Timeout or new message (STARTMSG)
                     # will display a new form.
                     pass
                 else:
-                    rdr = self._reader  # assign locally incase our reader gets swapped out
+                    rdr = self._reader  # assign locally in case our reader gets swapped out
                     if rdr is not None:
                         rdr.decode(code)
                     pass
@@ -653,7 +866,7 @@ class Telegram:
         return
 
     def _new_Reader(self):  # type: () -> None
-        rdr = self._reader  # assign locally incase our reader gets swapped out
+        rdr = self._reader  # assign locally in case our reader gets swapped out
         self._reader = None
         if rdr is not None:
             rdr.setCallback(None)
@@ -665,41 +878,6 @@ class Telegram:
             callback=self._from_reader,
             decode_at_detected=self._cfg.decode_at_detected
             )
-        return
-
-    def _clear_closer_state(self, update=False):  # type: (bool) -> None
-        self._form.fill(self._form.page_color, self._KC_state_rect)
-        return
-
-    def _output_closer_state(self):  # type: () -> None
-        """
-        Render a 'O' or 'C' in the bottom left corner of the screen
-        based on the open/closed state. Erase what might have been
-        there.
-        """
-        self._clear_closer_state(update=False)
-        open = self._kob.virtual_closer_is_open
-        if open:
-            self._form.blit(self._KC_open_sprite, self._KC_state_pt, update=True, set_text_top=False)
-        else:
-            self._form.blit(self._KC_closed_sprite, self._KC_state_pt, update=True, set_text_top=False)
-        return
-
-    def _output_masthead(self):
-        """
-        Render the top section of the form.
-        """
-        if self._masthead is not None:
-            lf = (self._form.width // 2) - (self._masthead.width // 2)
-            if lf < 0:
-                lf = 0
-            top = self._tgcfg.top_margin
-            log.debug("Masthead BLIT", 3)
-            self._form.blit(self._masthead, (lf,top), update=False, set_text_top=True)
-        else:
-            log.debug("Masthead text output", 3)
-            self._form.print(self._tgcfg._masthead_text, bold=True, italic=False, update=False)
-        self._form.line_advance(2)
         return
 
     def _print_start_info(self):
@@ -743,14 +921,14 @@ class Telegram:
             return
         open = not close
         self._kob.virtual_closer_is_open = open
-        self._output_closer_state()
+        self._form.show_closer_state(open)
         code = LATCH_CODE if close else UNLATCH_CODE
         # if not self._internet_station_active:
         if True:  # Allow breaking in to an active wire message
             if self._cfg.local:
                 if open:
                     self._handle_sender_update(self._our_office_id)
-                rdr = self._reader  # assign locally incase our reader gets swapped out
+                rdr = self._reader  # assign locally in case our reader gets swapped out
                 if rdr is not None:
                     rdr.decode(code)
                 pass
@@ -770,7 +948,8 @@ class Telegram:
             rdr = self._reader
             if rdr is not None:
                 rdr.setCallback(None)  # Don't have it call back
-                self._form_new()
+                self._form.new_form()
+                self._form.show_closer_state(self._kob.virtual_closer_is_open)
                 self._new_Reader()
         else:
             self._ignore_internet.clear()
@@ -846,7 +1025,12 @@ class Telegram:
                             self._control_c_pressed.set()
                             break
                         elif c == '\x18':  # display a new form on ^X
-                            self._form_new()
+                            ignoring_inet = self._ignore_internet.is_set
+                            self._ignore_internet.set()
+                            self._form.new_form()
+                            self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                            if not ignoring_inet:
+                                self._ignore_internet.clear()
                         else:
                             if c == '\x1B':  # Escape toggles the virtual closer
                                 open_vcloser = not self._kob.virtual_closer_is_open
@@ -863,7 +1047,9 @@ class Telegram:
                 if time.time() - self._flush_t > self._last_decode_t:
                     self._flush_reader()
                 if time.time() > self._last_display_t + self._tgcfg.page_clear_idle_time:
-                    self._form_new()
+                    self._form.new_form()
+                    self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                    self._last_display_t = sys.float_info.max
                 self._shutdown.wait(0.010)  # wait a bit before getting the next event
                 if self._control_c_pressed.is_set():
                     raise KeyboardInterrupt
@@ -944,56 +1130,12 @@ class Telegram:
             spacing=self._cfg.spacing
             )
         self._new_Reader()
-        font = self._tgcfg.font
-        fsize = self._tgcfg.font_size
-        page_c = self._tgcfg.page_color
-        text_c = self._tgcfg.text_color
-        side_margin = self._tgcfg.side_margin
-        self._form = PGDisplay(None, page_c, text_c, font, fsize, side_margin)
+        self._form = TGDisplay(None, self._tgcfg)
+        self._form.start()
         self._form.caption = "Telegram"
         self._clock = pygame.time.Clock()
-        #
-        # Create sprite surfaces with the Key-Closed state chars and the rectangle that contains them.
-        status_font = None  # type: Font|None
-        fpath = pygame.font.match_font("Arial, Helvetica, Sans-Serif")
-        if fpath is not None:
-            status_font = pygame.font.Font(fpath, 40)
-        else:
-            status_font = pygame.font.SysFont(None, 40)
-        self._KC_closed_sprite = status_font.render("+", True, (255,255,255))  # Render a white '+' for closed
-        self._KC_open_sprite = status_font.render("~", True, (255,255,255))  # Render a white '~' for open
-        kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
-        kc_h = 4 + status_font.get_linesize()
-        kc_l = self._form.width - kc_w
-        kc_t = self._form.height - kc_h
-        self._KC_state_rect = Rect(kc_l, kc_t, kc_w, kc_h)
-        self._KC_state_pt = (kc_l + 2, kc_t + 2)
-        #
-        # Get Masthead ready
-        if self._tgcfg.masthead_file is not None:
-            mfile = self._tgcfg.masthead_file
-            try:
-                self._masthead = pygame.image.load(mfile).convert_alpha()
-            except FileNotFoundError as fnf:
-                if self._tgcfg.masthead_text is not None:
-                    log.warn("Masthead file not found: '{}' Will use the Masthead text instead.".format(mfile), dt="")
-                    try:
-                        font = None  # type: Font|None
-                        fpath = pygame.font.match_font(self._tgcfg.masthead_font)
-                        if fpath is not None:
-                            font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
-                        else:
-                            font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
-                        self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
-                    except Exception as ex:
-                        log.warn("Error rendering the Masthead text '{}': {}".format(self._tgcfg.masthead_text, ex), dt="")
-                    pass
-                else:
-                    log.error("Masthead file not found: '{}'".format(mfile), dt="")
-                    raise fnf
-                pass
-            pass
-        self._form_new(fresh=True)
+        self._form.new_form(fresh=True)
+        self._form.show_closer_state(self._kob.virtual_closer_is_open)
         self._running = True
         self._dt = 0
         return
@@ -1060,6 +1202,7 @@ if __name__ == "__main__":
         pass
     except Exception as ex:
         log.error("Error: {}".format(ex), dt="")
+        log.debug(traceback.format_exc(), 1, dt="")
     finally:
         if telegram is not None:
             telegram.shutdown()

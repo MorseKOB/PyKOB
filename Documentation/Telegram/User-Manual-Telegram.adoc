@@ -222,6 +222,7 @@ it is used for testing.
     "font_size":30,
     "text_color":"black",
     "page_color":"(198,189,150)",
+    "page_width":1000,
     "masthead_file":"WesternOnion-Masthead.svg",
     "masthead_font":"Vineta,Century725,Times New Roman,Times",
     "masthead_font_size":40,
@@ -266,6 +267,12 @@ text.
 ==== page_color
 Specifies the color of the page (form) background. See **((text_color))** for a description of how to
 specify a color value.
+
+[%nonfacing]
+==== page_width
+Specifies the width of the page (form). The value is an integer. This will be capped at the width of
+the screen. For a nicer looking display, it is best to have this be narrower than the screen, so that
+there is a black band on the left and right.
 
 [%nonfacing]
 ==== masthead_file
