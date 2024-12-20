@@ -11,10 +11,12 @@
     "masthead_font_size":40,
     "masthead_text":"Western Onion Telegraph Co",
     "masthead_text_color":"(0,0,10)",
+    "welcome_msg":"The Telegram App decodes and displays Morse from a Wire or the local key or keyboard. Try keying something.",
     "top_margin":30,
     "side_margin":40,
-    "form_spacing":10
+    "form_spacing":10,
+    "list_sender":false,
     "page_clear_idle_time":15.5,
-    "page_clear_speed":1.2,
-    "wrap_columns":12
+    "page_advance_seconds":2.2,
+    "wrap_columns":8
 }

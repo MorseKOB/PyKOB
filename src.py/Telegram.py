@@ -71,7 +71,7 @@ from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.0.1'
+__version__ = '1.1.0'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
@@ -110,10 +110,12 @@ class TGDisplay:
         ## Page features
         self._page_width = min(tgcfg.page_width, self._screen.width)
         self._page_color = tgcfg.page_color
-        self._scroll_speed = tgcfg.page_clear_speed  # type: float
+        self._page_adv_secs = tgcfg.page_advance_seconds  # type: float
         ## Margins
         self._side_margin = tgcfg.side_margin
-        self._top_margin = tgcfg.top_margin
+        self._bottom_margin = tgcfg.bottom_margin  # type: int  # Bottom margin
+        self._top_margin = tgcfg.top_margin  # type: int  # Top margin
+        self._form_spacing = tgcfg.form_spacing
         ## Text features
         self._wrap_columns = tgcfg.wrap_columns
         self._text_color = tgcfg.text_color
@@ -126,6 +128,7 @@ class TGDisplay:
         self._space_width = self._font.size(' ')[0]
         self._text_line_height = self._font.get_linesize()
         self._spaces = 0
+        self._scroll_lines = 4
         #
         # Calculate the page left from the screen width and the page width
         self._page_left = (self._screen.width - self._page_width) // 2
@@ -133,18 +136,30 @@ class TGDisplay:
         self._text_leftmost = self._page_left + self._side_margin
         self._text_right_max = self._page_left + (self._page_width - self._side_margin)
         self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
-        self._text_x = self._text_leftmost
-        self._text_y = 0
+        self._x = self._text_leftmost
+        self._y = 0
         #
         # Masthead holder. It will be generated in `start`
         self._masthead = None  # type: Surface|None
         #
         # Rendered characters used for the Key Closer state on the display form.
+        #  These are calculated once in the `start` method
         self._KC_closed_sprite = None  # type: Surface|None
         self._KC_open_sprite = None  # type: Surface|None
-        self._KC_state_bg = None  # type: Surface|None
-        self._KC_state_pt = (0,0)  # type: tuple[int,int]
+        self._KC_state_bg = None  # type: Surface|None  # The background for the state to be displayed on
+        self._KC_state_pt = (0,0)  # type: tuple[int,int]  # Location to put the indicator
+        self._KC_statebg_pt = (0,0)  # type: tuple[int,int]  # Location to put the indicator background
+        self._last_closer_display_open = False  # type: bool  # Remembers the last state displayed, to use in new_form
+        # Rendered characters used for the Wire Connected state on the display form.
+        #  These are calculated once in the `start` method
+        self._WC_sprite = None  # type: Surface|None
+        self._WD_sprite = None  # type: Surface|None
+        self._W_state_bg = None  # type: Surface|None  # The background for the state to be displayed on
+        self._W_state_pt = (0,0)  # type: tuple[int,int]  # Location to put the indicator
+        self._K_statebg_pt = (0,0)  # type: tuple[int,int]  # Location to put the indicator background
+        self._last_wire_display_connected = False  # type: bool  # Remembers the last state displayed, to use in new_form
         # Flags/Events
+        self._page_dirty = True  # type: bool  # True if text has been written on a new page/form
         self._shutdown = Event()
         return
 
@@ -152,13 +167,15 @@ class TGDisplay:
         """
         Render the top section of the form.
         """
-        lf = (self._screen.width // 2) - (self._masthead.width // 2)
-        if lf < 0:
-            lf = 0
-        top = self._tgcfg.top_margin
         log.debug("TGDisplay._output_masthead", 3)
-        self._screen.blit(self._masthead, (lf,top))
-        self._text_y += self._masthead.get_height() + self._text_line_height
+        if self._masthead is not None:
+            lf = (self._screen.width - self._masthead.width) // 2
+            if lf < 0:
+                lf = 0
+            y = self._y  # Save `y` before advance
+            self.advance_page(self._tgcfg.top_margin + self._masthead.height)
+            top = y + self._tgcfg.top_margin
+            self._screen.blit(self._masthead, (lf,top))
         return
 
     @property
@@ -186,23 +203,33 @@ class TGDisplay:
         return self._screen.width
 
 
-    def advance(self, pixel_rows):  # type: (int) -> None
+    def advance_page(self, pixel_rows, add_margin=True, paint_page=True):  # type: (int, bool, bool) -> None
         """
-        Advance the Y position by `pixel_rows`. Positive values move Y down the screen
-        and may scroll the page up. Negative values move Y up the screen and may scroll
-        the page down.
+        Advance the Y position by `pixel_rows`. May scroll the page up.
+        If `add_margin` make sure there is bottom_margin space between y and the bottom of the screen.
         """
-        self._text_y += (pixel_rows)
         sh = self._screen.height
-        if (self._text_y >= sh):
-            self._screen.scroll(0, self._text_y - sh)
-            self._text_y = sh - 1
-        elif (self._text_y < 0):
-            self._screen.scroll(0, (0 - self._text_y))
-            self._text_y = 0
+        sw = self._screen.width
+        self.erase_closer_state(update=False)
+        self.erase_wire_state(update=False)
+        y = self._y  # Save the current y
+        self._y += pixel_rows
+        # Clear out the new area
+        bm_add = self._bottom_margin if add_margin else 0
+        dy = (y + pixel_rows) - (sh - bm_add)
+        if dy > 0:
+            self._screen.scroll(0, -dy)
+            self._y = sh - bm_add
+            y -= dy
+        self._screen.fill(TGDisplay.BLACK, pygame.Rect(0, y, sw, sh-y))
+        if paint_page:
+            self._screen.fill(self._page_color, pygame.Rect(self._page_left, y, self._page_width, sh-y))
+        self.show_closer_state(self._last_closer_display_open)
+        self.show_wire_state(self._last_wire_display_connected)
+        pygame.display.flip()
         return
 
-    def blit(self, sprite, topleft, update=False):  # type: (Surface, tuple[int,int], bool, bool) -> None
+    def blit(self, sprite, topleft, update=False):  # type: (Surface, tuple[int,int], bool) -> None
         """
         Blit (draw/render) a Surface sprite onto the form.
         """
@@ -213,6 +240,12 @@ class TGDisplay:
 
     def erase_closer_state(self, update=False):  # type: (bool) -> None
         self._screen.blit(self._KC_state_bg, self._KC_statebg_pt)
+        if update:
+            pygame.display.flip()
+        return
+
+    def erase_wire_state(self, update=False):  # type: (bool) -> None
+        self._screen.blit(self._W_state_bg, self._W_statebg_pt)
         if update:
             pygame.display.flip()
         return
@@ -230,56 +263,111 @@ class TGDisplay:
         pygame.display.flip()
         return
 
-    def line_advance(self, lines=1):  # type: (int) -> None
-        self._text_x = self._text_leftmost
-        self.advance(self._text_line_height * lines)
+    def new_line(self, lines=1):  # type: (int) -> None
+        self._x = self._text_leftmost
+        pixel_line_advance = self._text_line_height * lines
+        self.advance_page(pixel_line_advance)
         return
 
-    def new_form(self, fresh=False, update=True):  # type: (bool, bool, float) -> None
+    def new_form(self, fresh=False, disp_masthead=True):  # type: (bool,bool) -> None
         """
-        Clear the form and display the masthead.
-        If `fresh`, instantly create a new form.
-        If not, scroll the current form off and replace it.
+        If `fresh`, instantly create clear the screen and create a new form at the top.
+        If not, scroll the current form up and start a new one below it.
         """
         log.debug("TGDisplay.new_form", 2)
-        scroll_time = 0.0 if fresh else self._scroll_speed
+        self._x = self._text_leftmost
+        adv_secs = 0.0 if fresh else self._page_adv_secs
         self.erase_closer_state()
-        if scroll_time == 0:
+        self.erase_wire_state()
+        if adv_secs == 0:
             self._screen.fill(TGDisplay.BLACK)  # Background
             self._screen.fill(self._page_color, self._page_rect)
-            self._text_x = self._text_leftmost
-            self._text_y = 0
-            self._output_masthead()
-        else:
-            # ZZZ try putting something below the bottom
-            rect = Rect(0, self._screen.height - 20, 100, 60)
-            self._screen.blit(self._masthead, rect)
-            pygame.display.flip()
-            dy = 4
-            dir = -1 if scroll_time > 0 else 1
-            st = abs(scroll_time)
-            si = int(((self._screen.height / dy) / st) + 0.5)
-            pt = st / si
-            rec_top = 0 if dir > 0 else self._screen.height - dy
-            scroll_to_go = self._screen.height
-            ddy = dy * dir
+            self._y = 0
+            if disp_masthead:
+                self._output_masthead()
+                self.new_line(2)
+            else:
+                self.advance_page(self._top_margin)
+            pass
+        elif adv_secs < 0:  # A value of -1 indicates 'no new page'
+            self.new_line(2)
+        elif self._page_dirty and adv_secs > 0:
+            self.new_line()
+            # We scroll in the:
+            #  - page bottom margin
+            #  - gap between pages
+            #  - page top margin
+            #  - masthead
+            #  - gap between masthead and first line of text
+            #
+            ## Bottom margin
+            self._y = self._screen.height
+            scroll_to_go = self._bottom_margin
             while scroll_to_go > 0:
-                self._screen.scroll(dx=0, dy=ddy)
-                # fill the evacuated space
-                fr = pygame.Rect(self._page_left,rec_top,self._page_width, dy)
-                self._screen.fill(self._page_color, fr)
-                pygame.display.flip()
+                dy = min(self._scroll_lines, scroll_to_go)
+                self.advance_page(dy, add_margin=False)
+                scroll_pause = (adv_secs / (self._screen.height / dy))
+                dt = scroll_pause if scroll_to_go >= dy else (scroll_pause / (dy / scroll_to_go))
                 scroll_to_go -= dy
-                if scroll_to_go < dy:
-                    dy = scroll_to_go
-                self._shutdown.wait(pt)
+                pygame.display.flip()
+                self._shutdown.wait(dt)
+            pass
+            ## Page gap
+            scroll_to_go = self._form_spacing
+            while scroll_to_go > 0:
+                dy = min(self._scroll_lines, scroll_to_go)
+                self.advance_page(dy, add_margin=False, paint_page=False)
+                scroll_pause = (adv_secs / (self._screen.height / dy))
+                dt = scroll_pause if scroll_to_go >= dy else (scroll_pause / (dy / scroll_to_go))
+                scroll_to_go -= dy
+                pygame.display.flip()
+                self._shutdown.wait(dt)
+            pass
+            ## Top margin
+            scroll_to_go = self._top_margin
+            while scroll_to_go > 0:
+                dy = min(self._scroll_lines, scroll_to_go)
+                self.advance_page(dy, add_margin=False)
+                scroll_pause = (adv_secs / (self._screen.height / dy))
+                dt = scroll_pause if scroll_to_go >= dy else (scroll_pause / (dy / scroll_to_go))
+                scroll_to_go -= dy
+                pygame.display.flip()
+                self._shutdown.wait(dt)
+            pass
+            ## Masthead
+            scroll_to_go = self._masthead.height
+            mhstart_y = 0  # Where to start in the masthead
+            mhleft_x = (self._screen.width - self._masthead.width) // 2
+            while scroll_to_go > 0:
+                dy = min(self._scroll_lines, (self._masthead.height - mhstart_y), scroll_to_go)
+                self.advance_page(dy, add_margin=False)
+                ty = self._y - dy
+                # blit a section of the masthead
+                mh_slice = Rect(0, mhstart_y, self._masthead.width, dy)
+                self._screen.blit(self._masthead, (mhleft_x,ty), mh_slice)
+                scroll_pause = (adv_secs / (self._screen.height / dy))
+                dt = scroll_pause if scroll_to_go >= dy else (scroll_pause / (dy / scroll_to_go))
+                scroll_to_go -= dy
+                mhstart_y += dy
+                pygame.display.flip()
+                self._shutdown.wait(dt)
+            pass
+            ## Two blank lines between masthead and text
+            scroll_to_go = 2 * self._text_line_height
+            while scroll_to_go > 0:
+                dy = min(self._scroll_lines, scroll_to_go)
+                self.advance_page(dy)
+                scroll_pause = (adv_secs / (self._screen.height / dy))
+                dt = scroll_pause if scroll_to_go >= dy else (scroll_pause / (dy / scroll_to_go))
+                scroll_to_go -= dy
+                pygame.display.flip()
+                self._shutdown.wait(dt)
             pass
         pass
-        self._text_x = self._text_leftmost
-        self._text_y = 0
-        self._output_masthead()
-        if update:
-            pygame.display.flip()
+        self.show_closer_state(self._last_closer_display_open)
+        self.show_wire_state(self._last_wire_display_connected)
+        self._page_dirty = False
+        pygame.display.flip()
         return
 
     def print(self, text, bold=False, italic=False, update=True, spacing=0.0):  # type: (str, bool, bool, bool, float) -> None
@@ -288,7 +376,7 @@ class TGDisplay:
         screen_output = False
         for c in text:
             if c == '\r' or c == '\n':
-                self.line_advance()
+                self.new_line()
                 continue
             if c == ' ':
                 self._spaces += 1
@@ -300,30 +388,46 @@ class TGDisplay:
             font.italic = italic
             space = int(self._space_width * (self._spaces + spacing))
             char_glyph = font.render(c, True, self._text_color)
-            glyph_width = char_glyph.get_width()
-            text_end_x = self._text_x + space + glyph_width
+            glyph_width = char_glyph.width
+            text_end_x = self._x + space + glyph_width
             if ((self._spaces > 0) and (text_end_x > self._text_wrap_x)) or (text_end_x > self._text_right_max):
                 space = 0
-                self.line_advance()
-            self._screen.blit(char_glyph, (self._text_x + space, self._text_y))
-            self._text_x += space + glyph_width
+                self.new_line()
+            self._screen.blit(char_glyph, (self._x + space, self._y-char_glyph.height))
+            self._x += space + glyph_width
             self._spaces = 0
             screen_output = True
+            self._page_dirty = True
         if update and screen_output:
             pygame.display.flip()
         return
 
     def show_closer_state(self, open):  # type: (bool) -> None
         """
-        Render a 'O' or 'C' in the bottom left corner of the screen
+        Render a '~' or '+' in the bottom left corner of the screen
         based on the open/closed state. Erase what might have been
         there.
         """
         self.erase_closer_state(update=False)
+        self._last_closer_display_open = open
         if open:
             self._screen.blit(self._KC_open_sprite, self._KC_state_pt)
         else:
             self._screen.blit(self._KC_closed_sprite, self._KC_state_pt)
+        return
+
+    def show_wire_state(self, connected):  # type: (bool) -> None
+        """
+        Render a closed or open circle for connected or disconnected
+        in the bottom right corner of the screen based on the connected
+        state. Erase what might have been there.
+        """
+        self.erase_wire_state(update=False)
+        self._last_wire_display_connected = connected
+        if connected:
+            self._screen.blit(self._WC_sprite, self._W_state_pt)
+        else:
+            self._screen.blit(self._WD_sprite, self._W_state_pt)
         return
 
     def shutdown(self):  # type: () -> None
@@ -363,27 +467,58 @@ class TGDisplay:
             status_font = pygame.font.Font(fpath, 40)
         else:
             status_font = pygame.font.SysFont(None, 40)
-        self._KC_closed_sprite = status_font.render("+", True, (255,255,255))  # Render a white '+' for closed
-        self._KC_open_sprite = status_font.render("~", True, (255,255,255))  # Render a white '~' for open
+        #
+        #  Key Closed status indicator values
+        #
+        self._KC_closed_sprite = status_font.render('+', True, (255,255,255))  # Render a white '+' for closed
+        self._KC_open_sprite = status_font.render('~', True, (255,255,255))  # Render a white '~' for open
         kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
         kc_h = 4 + status_font.get_linesize()
-        kc_l = self._screen.width - kc_w
         kc_t = self._screen.height - kc_h
+        # Create a background sprite. Chances are this will be black or the page color,
+        # but it's possible that the black side width is non-zero but narrower than the
+        # status block width. So, we do the work here to create a sprite that might
+        # have some of the left in black and some of the right in the page color.
+        #
+        sz = (kc_w, kc_h)
+        self._KC_state_bg = Surface(sz)  # Per PyGame-CE docs - this creates a black surface
+        blk_w = (self._screen.width - self._page_width) // 2
+        pgcolorw = kc_w - blk_w  # Width of background that will be the page color
+        if pgcolorw > 0:
+            state_pagec_rect = Rect(blk_w, 0, pgcolorw, kc_h)
+            self._KC_state_bg.fill(self._page_color, state_pagec_rect)
+        self._KC_statebg_pt = (0, kc_t)
+        self._KC_state_pt = (2, kc_t + 2)
+        #
+        #  Wire Connected/Disconnected status indicator values
+        #
+        self._WC_sprite = status_font.render('\u25CF', True, (255,255,255))  # White closed circle '●' for Connected
+        self._WD_sprite = status_font.render('\u25CB', True, (255,255,255))  # White open circle '○' for Disconnected
+        ws_w = 8 + max(self._WC_sprite.width, self._WD_sprite.width)
+        ws_h = 4 + status_font.get_linesize()
+        ws_t = self._screen.height - ws_h
         # Create a background sprite. Chances are this will be black or the page color,
         # but it's possible that the border width is non-zero but narrower than the
         # status block width. So, we do the work here to create a sprite that might
-        # have some of the left in the page color and the right in black.
+        # have some of the left in the page color and some of the right in black.
         #
-        # The black 'stripe' on the right is ((screen_width - page_width) / 2)
-        sz = (kc_w, kc_h)
-        self._KC_state_bg = Surface(sz)  # Per PyGame-CE docs, this creates a black surface
-        pcw = kc_w - ((self._screen.width - self._page_width) // 2)
-        if pcw > 0:
-            state_pagec_rect = Rect(0, 0, pcw, kc_h)
-            self._KC_state_bg.fill(self._page_color, state_pagec_rect)
-        self._KC_statebg_pt = (kc_l, kc_t)
-        self._KC_state_pt = (kc_l + 2, kc_t + 2)
+        sz = (ws_w, ws_h)
+        self._W_state_bg = Surface(sz)  # Per PyGame-CE docs - this creates a black surface
+        pgcolorw = blk_w - ws_w  # Negative value is page color
+        if pgcolorw < 0:
+            state_pagec_rect = Rect(0, 0, -pgcolorw, ws_h)
+            self._W_state_bg.fill(self._page_color, state_pagec_rect)
+        ws_l = self._screen.width-ws_w
+        self._W_statebg_pt = (ws_l, ws_t)
+        self._W_state_pt = (ws_l + 2, ws_t + 2)
+        #
+        # Calculate scroll_lines such that each scroll is 1/10 second
+        if self._page_adv_secs > 0:
+            lines_per_sec = self._screen.height / self._page_adv_secs
+            self._scroll_lines = int((lines_per_sec / 10) + 0.5)
+        #
         self._screen.fill(TGDisplay.BLACK)
+        pygame.mouse.set_visible(False)
         pygame.display.flip()
         return
 
@@ -399,7 +534,7 @@ class TelegramConfig:
     FONT_ITALIC_KEY = "font_italic"
     FONT_SIZE_KEY = "font_size"
     PAGE_CLEAR_IDLE_TIME_KEY = "page_clear_idle_time"
-    PAGE_CLEAR_SPEED_KEY = "page_clear_speed"
+    PAGE_ADVANCE_SECONDS_KEY = "page_advance_seconds"
     PAGE_COLOR_KEY = "page_color"
     PAGE_WIDTH_KEY = "page_width"
     TEXT_COLOR_KEY = "text_color"
@@ -408,9 +543,12 @@ class TelegramConfig:
     MASTHEAD_FONT_SIZE_KEY = "masthead_font_size"
     MASTHEAD_TEXT_KEY = "masthead_text"
     MASTHEAD_TEXT_COLOR_KEY = "masthead_text_color"
+    LIST_SENDER_KEY = "list_sender"
+    BOTTOM_MARGIN_KEY = "bottom_margin"
     SIDE_MARGIN_KEY = "side_margin"
     TOP_MARGIN_KEY = "top_margin"
     FORM_SPACING_KEY = "form_spacing"
+    WELCOME_MESSAGE_KEY = "welcome_msg"
     WRAP_COLUMNS_KEY = "wrap_columns"
 
 
@@ -422,8 +560,8 @@ class TelegramConfig:
         self._text_font_italic = False  # type: bool
         self._text_font_size = 20  # type: int
         self._text_color = "black"  # type: str|tuple[int,int,int]
-        self._page_clear_idle_time = 8.0  # type: float  # Seconds of idle before clear
-        self._page_clear_speed = 1.8  # type: float  # Time to take to scroll the page (can be negative)
+        self._page_clear_idle_time = 18.0  # type: float  # Seconds of idle before clear
+        self._page_advance_seconds = 2.8  # type: float  # Time to take to scroll the page (-1 means no 'new page')
         self._page_color = (198,189,150)  # type: str|tuple[int,int,int] # Tan
         self._page_width = 980  # type: int  # The page color portion width. 980 is reasonable.
         self._masthead_filep = None  # type: str|None
@@ -432,9 +570,12 @@ class TelegramConfig:
         self._masthead_text = None  # type: str|None
         self._masthead_text_color = "black"  # type: str|tuple[int,int,int]
         self._side_margin = 28  # type: int
+        self._bottom_margin = 42  # type: int
         self._top_margin = 38  # type: int
         self._form_spacing = 10  # type: int
-        self._wrap_columns = 15  # type:int  # Number of spaces before right margin to wrap to next line
+        self._wrap_columns = 8  # type:int  # Number of spaces before right margin to wrap to next line
+        self._welcome_msg = None  # type:str|None  # Printed at the top of the form ^X or idle timeout
+        self._list_sender = False  # type:bool  # True to list the sender on change+receive
         # Read the Config values from JSON file if a path was provided
         if self._cfg_filep is not None:
             self.load()
@@ -489,6 +630,14 @@ class TelegramConfig:
         return
 
     @property
+    def list_sender(self):  # type: () -> bool
+        return self._list_sender
+    @list_sender.setter
+    def list_sender(self, b):  # type: (bool) -> None
+        self._list_sender = b
+        return
+
+    @property
     def masthead_file(self):  # type: () -> str
         return self._masthead_filep
     @masthead_file.setter
@@ -537,11 +686,11 @@ class TelegramConfig:
         return
 
     @property
-    def page_clear_speed(self):  # type: () -> float
-        return self._page_clear_speed
-    @page_clear_speed.setter
-    def page_clear_speed(self, seconds):  # type: (float) -> None
-        self._page_clear_speed = seconds
+    def page_advance_seconds(self):  # type: () -> float
+        return self._page_advance_seconds
+    @page_advance_seconds.setter
+    def page_advance_seconds(self, seconds):  # type: (float) -> None
+        self._page_advance_seconds = seconds
         return
 
     @property
@@ -577,11 +726,27 @@ class TelegramConfig:
         return
 
     @property
+    def bottom_margin(self):  # type: () -> int
+        return self._bottom_margin
+    @bottom_margin.setter
+    def bottom_margin(self, margin):  # type(int) -> None
+        self._bottom_margin = margin
+        return
+
+    @property
     def top_margin(self):  # type: () -> int
         return self._top_margin
     @top_margin.setter
     def top_margin(self, margin):  # type(int) -> None
         self._top_margin = margin
+        return
+
+    @property
+    def welcome_msg(self):  # type: () -> str|None
+        return self._welcome_msg
+    @welcome_msg.setter
+    def welcome_msg(self, s):  # type: (str|None) -> None
+        self._welcome_msg = s
         return
 
     @property
@@ -629,14 +794,16 @@ class TelegramConfig:
                                 self._text_font_size = int(value)
                             case self.PAGE_CLEAR_IDLE_TIME_KEY:
                                 self._page_clear_idle_time = value
-                            case self.PAGE_CLEAR_SPEED_KEY:
-                                self._page_clear_speed = value
+                            case self.PAGE_ADVANCE_SECONDS_KEY:
+                                self._page_advance_seconds = value
                             case self.PAGE_COLOR_KEY:
                                 self._page_color = literal_eval(value) if value and value[0] == '(' else value
                             case self.PAGE_WIDTH_KEY:
                                 self._page_width = value
                             case self.TEXT_COLOR_KEY:
                                 self._text_color = literal_eval(value) if value and value[0] == '(' else value
+                            case self.LIST_SENDER_KEY:
+                                self._list_sender = value
                             case self.MASTHEAD_FILE_PATH:
                                 self._masthead_filep = value
                             case self.MASTHEAD_FONT_KEY:
@@ -649,10 +816,22 @@ class TelegramConfig:
                                 self._masthead_text_color = literal_eval(value) if value and value[0] == '(' else value
                             case self.SIDE_MARGIN_KEY:
                                 self._side_margin = int(value)
+                            case self.BOTTOM_MARGIN_KEY:
+                                self._bottom_margin = int(value)
                             case self.TOP_MARGIN_KEY:
                                 self._top_margin = int(value)
                             case self.FORM_SPACING_KEY:
                                 self._form_spacing = int(value)
+                            case self.WELCOME_MESSAGE_KEY:
+                                s = value
+                                if s is not None:
+                                    if len(str(s)) == 0:
+                                        s = None
+                                    else:
+                                        s = str(s)
+                                    pass
+                                pass
+                                self._welcome_msg = s
                             case self.WRAP_COLUMNS_KEY:
                                 self._wrap_columns = int(value)
                             case _:
@@ -712,6 +891,33 @@ class Telegram:
         self._local_loop_active = False  # type: bool #True if sending on key or keyboard
         self._our_office_id = cfg.station if not cfg.station is None else ""  # type: str
         self._sender_current = ""  # type: str
+        return
+
+    def _connect_to_wire(self, connect, wire=None):  # type: (bool, int|None) -> None
+        """
+        Connect (True) or disconnect (False) from a wire. If wire is None, the last
+        wire (probably from the configuration) will be used, otherwise the specified
+        wire will be used and saved as current.
+        """
+        new_wire = (not wire == self._wire) if wire is not None else False
+        if wire is not None:
+            self._wire = wire
+        inet = self._internet
+        if inet is not None:
+            if (not connect) or new_wire:
+                # Disconnect
+                inet.disconnect()
+                self._connected = False
+            if connect:
+                # Connect to wire
+                inet.connect(self._wire)
+                self._connected = True
+            kob_ = self._kob
+            if kob_:
+                kob_.internet_circuit_closed = not self._internet_station_active
+                kob_.wire_connected = self._connected
+            pass
+        self._form.show_wire_state(self._connected)
         return
 
     def _display_text(self, char, update=True, spacing=0.0):  # type: (str, bool, float) -> None
@@ -784,6 +990,7 @@ class Telegram:
                 if code == STARTMSG:
                     self._form.new_form()
                     self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                    self._form.show_wire_state(self._connected)
                 elif code == ENDMSG:
                     # Don't do anything at end. Timeout or new message (STARTMSG)
                     # will display a new form.
@@ -828,7 +1035,7 @@ class Telegram:
     def _from_reader(self, char, spacing):
         if not char == '=':
             if self._last_received_para:
-                self._form.line_advance()
+                self._form.new_line()
             self._last_received_para = False
         else:
             self._last_received_para = True
@@ -847,7 +1054,7 @@ class Telegram:
         self._display_text(char)
         if char == '_':
             if not self._last_advanced_under:
-                self._form.line_advance()
+                self._form.new_line()
                 self._last_advanced_under = True
             pass
         else:
@@ -863,6 +1070,10 @@ class Telegram:
             self._sender_current = sender
             print()
             print(f"<<{self._sender_current}>>", flush=True)
+            if self._tgcfg.list_sender:
+                self._form.new_form()
+                self._form.print(sender)
+                self._form.new_line()
         return
 
     def _new_Reader(self):  # type: () -> None
@@ -950,6 +1161,7 @@ class Telegram:
                 rdr.setCallback(None)  # Don't have it call back
                 self._form.new_form()
                 self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                self._form.show_wire_state(self._connected)
                 self._new_Reader()
         else:
             self._ignore_internet.clear()
@@ -961,7 +1173,6 @@ class Telegram:
     # Public Methods
     #
     # ########################################################################
-
 
     def exit(self):
         if not self._closed.is_set():
@@ -1002,12 +1213,7 @@ class Telegram:
     def main_loop(self):
         self._print_start_info()
         if not self._wire == 0:
-            self._internet.connect(self._wire)
-            self._connected = True
-            kob_ = self._kob
-            if kob_:
-                kob_.internet_circuit_closed = not self._internet_station_active
-                kob_.wire_connected = self._connected
+            self._connect_to_wire(True, self._wire)
         self._shutdown.wait(0.5)
         try:
             while not self._shutdown.is_set():
@@ -1017,6 +1223,7 @@ class Telegram:
                         break
                     elif event.type == pygame.KEYDOWN:
                         c = event.unicode
+                        k = event.key
                         if c == '\x11':  # quit on ^Q
                             self._shutdown.set()
                             break
@@ -1025,10 +1232,12 @@ class Telegram:
                             self._control_c_pressed.set()
                             break
                         elif c == '\x18':  # display a new form on ^X
-                            ignoring_inet = self._ignore_internet.is_set
+                            ignoring_inet = self._ignore_internet.is_set()
                             self._ignore_internet.set()
-                            self._form.new_form()
-                            self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                            self._form.new_form(fresh=True)
+                            if self._tgcfg.welcome_msg is not None:
+                                self._form.print(self._tgcfg.welcome_msg)
+                                self._form.new_line(2)
                             if not ignoring_inet:
                                 self._ignore_internet.clear()
                         else:
@@ -1038,6 +1247,19 @@ class Telegram:
                                     c = '~'
                                 else:
                                     c = '+'
+                            if k == pygame.K_F8:
+                                # Toggle the connected state
+                                self.toggle_connection()
+                                continue
+                            if k == pygame.K_F11:
+                                # Clear the page, but don't print a masthead
+                                ignoring_inet = self._ignore_internet.is_set()
+                                self._ignore_internet.set()
+                                self._form.new_form(fresh=True, disp_masthead=False)
+                                self._form.new_line(1)
+                                if not ignoring_inet:
+                                    self._ignore_internet.clear()
+                                continue
                             if c < '\x20':  # Ignore other control chars
                                 continue
                             vcloser_is_open = self._kob.virtual_closer_is_open
@@ -1047,8 +1269,16 @@ class Telegram:
                 if time.time() - self._flush_t > self._last_decode_t:
                     self._flush_reader()
                 if time.time() > self._last_display_t + self._tgcfg.page_clear_idle_time:
-                    self._form.new_form()
+                    ignoring_inet = self._ignore_internet.is_set()
+                    self._ignore_internet.set()
+                    self._form.new_form(fresh=True)
+                    if self._tgcfg.welcome_msg is not None:
+                        self._form.print(self._tgcfg.welcome_msg)
+                        self._form.new_line(2)
                     self._form.show_closer_state(self._kob.virtual_closer_is_open)
+                    self._form.show_wire_state(self._connected)
+                    if not ignoring_inet:
+                        self._ignore_internet.clear()
                     self._last_display_t = sys.float_info.max
                 self._shutdown.wait(0.010)  # wait a bit before getting the next event
                 if self._control_c_pressed.is_set():
@@ -1136,10 +1366,17 @@ class Telegram:
         self._clock = pygame.time.Clock()
         self._form.new_form(fresh=True)
         self._form.show_closer_state(self._kob.virtual_closer_is_open)
+        self._form.show_wire_state(self._connected)
         self._running = True
         self._dt = 0
         return
 
+    def toggle_connection(self):  # type: () -> None
+        """
+        Disconnect from wire if connected, connect if disconnected.
+        """
+        self._connect_to_wire(not self._connected)
+        return
 
 """
 Main code
@@ -1150,10 +1387,17 @@ if __name__ == "__main__":
 
     try:
         # Process command option arguments
+        tgcfg_override = argparse.ArgumentParser(add_help=False)
+        tgcfg_override.add_argument("--tgcfg", metavar="tg-cfg-file", dest="tgcfg_filepath", default=TELEGRAM_CFG_FILE_NAME,
+            help="Telegram specific configuration file to use. By default Telegram looks for "
+            + "the file 'tg_config.tgc' in the current directory. This option specifies the "
+            + "path to a '.tgc' (json) file to use.")
+
         arg_parser = argparse.ArgumentParser(description="Telegram "
             + "- Display a telegram form with local and received messages. "
             + "Telegram specific configuration is in the 'tg_config.tgc' file.",
             parents= [
+                tgcfg_override,
                 config2.sound_override,
                 config2.sounder_override,
                 config2.use_gpio_override,
@@ -1185,11 +1429,12 @@ if __name__ == "__main__":
         log.set_logging_level(cfg.logging_level)
         # Use the wire from the command line if one was specified, else use the one configured.
         wire = args.wire if args.wire else cfg.wire
+        tgcfg_path = args.tgcfg_filepath if args.tgcfg_filepath else TELEGRAM_CFG_FILE_NAME
 
         # Create the Telegram instance
         #  See if the Telegram Config exists
-        if (path_func.isfile(TELEGRAM_CFG_FILE_NAME)):
-            tg_config = TelegramConfig(TELEGRAM_CFG_FILE_NAME)
+        if (path_func.isfile(tgcfg_path)):
+            tg_config = TelegramConfig(tgcfg_path)
         else:
             log.warn("Telegram configuration file '{}' not found. Using default values.".format(TELEGRAM_CFG_FILE_NAME), dt="")
             tg_config = TelegramConfig(None)
