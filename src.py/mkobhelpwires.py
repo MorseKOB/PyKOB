@@ -161,7 +161,7 @@ class MKOBHelpWires(tk.Toplevel):
         else:
             self._status_msg[TEXT] = host
         if not data_str is None:
-            data = []  # An empty list incase we can't decode the content
+            data = []  # An empty list in case we can't decode the content
             our_wire = self._mkwin.wire_number
             our_id = self._mkwin.office_id
             our_iid = self._gen_iid(our_wire, our_id)

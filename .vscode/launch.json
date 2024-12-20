@@ -66,6 +66,15 @@
             "justMyCode": false
         },
         {
+            "name": "Telegram",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/Telegram.py",
+            "args": ["--logging-level", "1", "--tgcfg", "tg_config.tgc", "901"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Configure",
             "type": "debugpy",
             "request": "launch",

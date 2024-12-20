@@ -12,12 +12,12 @@ toc::[]
 [introduction]
 = Introduction
 ((Telegram)) is specifically designed for Telegraph displays (museums and the like).
-It runs full-screen and presents a (simulated) telegram form. Messages received from
+It runs full-screen and presents a (mock) telegram form. Messages received from
 the wire are sounded and decoded and displayed in the body of the form. At the end of
-the message, or after a configurable amount of idle time, a new form is shown, ready
-to display the next message. In addition to receiving messages from the wire, messages
-can also be entered on a local key or with the keyboard. These are sounded, displayed,
-and sent out on the wire.
+the message a new form is scrolled into place. Or after a configurable amount of idle
+time, a new, blank, form is shown, ready to display the next message. In addition to
+receiving messages from the wire, messages can also be entered on a local key or with
+the keyboard. These are sounded, displayed, and sent out on the wire.
 
 .((Telegram)) app screen
 [.text-center]
@@ -60,9 +60,10 @@ description of each of the utility applications.
 [quickstart%nonfacing]
 = Quick Start
 
-Get started with ((Telegram)) by using **((MKOB))** or **((Configure))** to set up your configuration. Copy the
-example `((tg_config.tgc))` ((Telegram configuration file)) from the Telegram Documentation folder to the directory
-that you are running Telegram from. Copy the `((WesternOnion-Masthead.svg))` file from the Telegram Documentation
+Get started with ((Telegram)) by using **((MKOB))** or **((Configure))** to set up your Morse, hardware, etc. configuration the
+same as for MKOB, MRT, and the utilities. Copy the example `((tg_config.tgc))` ((Telegram configuration file)) from
+the Telegram Documentation folder to the directory that you are running Telegram from.
+Copy the `((WesternOnion-Masthead.svg))` file from the Telegram Documentation
 folder to the directory that you are running Telegram from. These two files configure the look and operation of
 the telegram form and provide the form masthead content.
 
@@ -77,13 +78,14 @@ a following section.
 
 = User's Guide
 
-((Telegram)) automatically connects to the wire when it is started and it remains connected
-while it is running. There is no option to connect/disconnect during operation.
+((Telegram)) automatically connects to the wire when it is started.
+The F8 key can be used to disconnect/connect during operation. However, there is no option to change wires. To
+change wires, Telegram needs to be restarted with the new wire number.
 
-The exception to this is if wire number 0 is specified. In that case, ((Telegram)) does not connect to a wire,
+The exception to automatically connecting is if wire number 0 is specified. In that case, ((Telegram)) does not connect to a wire,
 and can be used for local (only) displays.
 
-It monitors the wire and the local key. If the local key is opened, keyed code will be sent to the wire.
+Telegram monitors the wire and the local key. If the local key is opened, keyed code will be sent to the wire.
 While the local key is closed, ((Telegram)) will sound, as well as decode and display, code
 received from the wire.
 
@@ -93,16 +95,32 @@ received from the wire.
 ((Telegram)) automatically connects to the wire, either from the configuration or specified on the command line.
 There are four keyboard commands:
 
-1. (('~' - Open the key)).
-2. (('+' - Close the key)).
-3. ((ESC - Toggle the key closed state))
-4. ((Ctrl-X - Clear the form (scroll the current form off)))
-5. ((Ctrl-Q - Quit/Exit))
-6. ((Ctrl-C - Quit/Exit))
+1. (('~'  - Open the key)).
+2. (('+'  - Close the key)).
+3. ((ESC  - Toggle the key open/closed state))
+4. ((F8   - Toggle the wire connection (connect/disconnect)))
+5. ((F11   - Clear the form without showing a new Masthead))
+6. ((Ctrl-X   - Clear the form (instantly show a new form)))
+7. ((Ctrl-Q   - Quit/Exit))
+8. ((Ctrl-C   - Quit/Exit))
 
 If the key is open (either physically or by using '~'), other text typed will be sounded, displayed, and encoded and sent to the wire if connected.
 
 (Simple, right!)
+
+[%nonfacing]
+== ((Indicators))
+((Telegram)) displays two ((indicators)) in the bottom corners of the screen.
+
+**Bottom Left**:
+
+* '+' - The key is closed
+* '~' - The key is open
+
+**Bottom Right**
+
+* '●' (filled circle) for ((Connected to Wire))
+* '○' (open circle) for ((Disconnected from Wire))
 
 [%nonfacing]
 == Exiting
@@ -113,14 +131,27 @@ keyboard.
 == Command-Line Options
 ((Telegram)) is controlled by command-line options in addition to the ((MKOB/PyKOB Configuration))
 being used (a command-line option allows specifying which configuration to use, rather than
-using the ((global configuration))). It is suggested that the `((--help))` command-line
+using the ((global configuration))). 
+
+The two options/parameters specific to Telegram are:
+
+* `--tgcfg path_to_telegram_cfg_file` - Allows specifying the path to a Telegram Configuration file with
+a different name or in a different location than 'tg_config.tgc' in the current directory.
+* `wire`(((wire, parameter))) (as the last parameter) The wire number to connect to or '0' to not connect
+to a wire. If this parameter isn't included, the wire from the configuration is used.
+
+The rest of the options are the standard options used to override values from the (main) Configuration.
+
+It is suggested that the `((--help))` command-line
 option be used to get the up-to-date description of the options available. The following
 list is provided for convenience.
 
 ```
-usage: Telegram.py [-h] [-a sound] [-A sounder] [-g gpio] [-P serial]
-                   [-p portname] [-S station] [-c wpm] [-t wpm]
-                   [--config config-file] [--logging-level logging-level]
+pygame-ce 2.5.2 (SDL 2.30.8, Python 3.11.4)
+usage: Telegram.py [-h] [--tgcfg tg-cfg-file] [-a sound] [-A sounder]
+                   [-g gpio] [-P serial] [-p portname] [-S station] [-c wpm]
+                   [-t wpm] [--config config-file]
+                   [--logging-level logging-level]
                    [wire]
 
 Telegram - Display a telegram form with local and received messages. Telegram
@@ -133,6 +164,10 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  --tgcfg tg-cfg-file   Telegram specific configuration file to use. By
+                        default Telegram looks for the file 'tg_config.tgc' in
+                        the current directory. This option specifies the path
+                        to a '.tgc' (json) file to use.
   -a sound, --sound sound
                         'ON' or 'OFF' to indicate whether computer audio
                         should be used to sound code.
@@ -175,7 +210,7 @@ options:
 == Telegram Configuration File (tg_config.tgc)
 While the configuration that you create and set up using **((MKOB))** or **((Configure))**, that is used by **((Telegram))**, controls the Morse encoding
 and decoding, what hardware you have and how it's connected, your Office/Station name, and other aspects of the operations,
-a separate configuration file, specific to **((Telegram))** controls the look and operation of the form.
+a separate configuration file, specific to **((Telegram))** controls the look and operation of the telegram form.
 
 The Telegram Configuration controls:
 
@@ -186,14 +221,19 @@ The Telegram Configuration controls:
 * Text bold (true/false)
 * Text italic (true/false)
 * Side (left/right) margin
+* Bottom margin
 * Top margin
+* Text wrap column (typewriter bell column)
+* Page (form) spacing (blank space between forms)
 * Masthead (top banner/graphic) file
-* Masthead text (used if the masthead file isn't found)
-* Masthead font (used for the text)
+* Masthead text (used if the masthead file isn't specified/found)
+* Masthead font (used for the masthead text)
 * Masthead font size
 * Masthead text color
+* Welcome message (shown on completely new form)
+* Display sender office/station ID (true/false)
 * Page (form) clear idle time
-* Page (form) scroll/clear speed
+* Page (form) page scroll speed
 
 The example ((`tg_config.tgc`)) file is in the ((Telegram Documentation folder))
 
@@ -208,11 +248,11 @@ you everything you need, and you should be able to simply modify some of the
 values.
 
 [%nonfacing]
-=== File is JSON Format Map/Dictionary
+=== Entries
 
-Below is an example file. The following sections will describe each of the value options. Although the
-example is provided here, it is recommended that you use the file provided as a starting point, as
-it is used for testing.
+The file is JSON Format Map/Dictionary. Below is an example file. The following sections
+describe each of the value options. Although the example is provided here, it is recommended
+that you use the file provided as a starting point, as it is used for testing.
 
 ``` json
 {
@@ -222,97 +262,175 @@ it is used for testing.
     "font_size":30,
     "text_color":"black",
     "page_color":"(198,189,150)",
+    "page_width":1000,
     "masthead_file":"WesternOnion-Masthead.svg",
     "masthead_font":"Vineta,Century725,Times New Roman,Times",
     "masthead_font_size":40,
     "masthead_text":"Western Onion Telegraph Co",
     "masthead_text_color":"(0,0,10)",
+    "welcome_msg":"The Telegram App decodes and displays Morse from a Wire or the local key or keyboard. Try keying something.",
     "top_margin":30,
     "side_margin":40,
+    "form_spacing":10,
+    "list_sender":false,
     "page_clear_idle_time":15.5,
-    "page_clear_speed":1.2
+    "page_advance_seconds":2.2,
+    "wrap_columns":8
 }
 ```
 
+If an entry doesn't exist in the Telegram config file, the default value will be used.
+
+**((Telegram Config Entry Descriptions))**:
+
 [%nonfacing]
-==== font
+==== ((font))
 Specifies the ((font)) to be used for the messages received or entered locally. This is a font name as
 found on the system. Many text editors and graphics applications provide a mechanism to see the
 various fonts available on the system. This entry can also be a comma separated list of font names.
 An example of that is used in the `masthead_font` entry in the file. When a list is used, the list
 is scanned from left to right and the first font found on the system will be used.
 
-[%nonfacing]
-==== font_bold
-Specifies whether the text used for messages should be ((bold)). The value must be `true` or `false`.
+Default: courier
 
 [%nonfacing]
-==== font_italic
+==== ((font_bold))
+Specifies whether the text used for messages should be ((bold)). The value must be `true` or `false`.
+
+Default: false
+
+[%nonfacing]
+==== ((font_italic))
 Specifies whether the text used for messages should be ((italic)). The value must be `true` or `false`.
 
 It is valid to specify both ((bold and italic)) as `true`.
 
-[%nonfacing]
-==== font_size
-Specifies the size of the text used for messages. The size is the font _((point size))_.
+Default: false
 
 [%nonfacing]
-==== text_color
+==== ((font_size))
+Specifies the size of the text used for messages. The size is the font _((pixel))_ height (((pixel height))).
+
+Default: 20
+
+[%nonfacing]
+==== ((text_color))
 Specifies the color of the text used for messages. This can either be a standard system color name, or
 a ((RGB (Red,Green,Blue))) value. For example, the values "black" and "(0,0,0)" result in the same black
-text.
+text. For anything but the ((basic colors)): BLACK, WHITE, RED, GREEN, BLUE it is suggested that a
+((RGB (Red,Green,Blue))) value be used.
+
+Default: black
 
 [%nonfacing]
-==== page_color
+==== ((page_color))
 Specifies the color of the page (form) background. See **((text_color))** for a description of how to
 specify a color value.
 
+Default: (198,189,150)
+
 [%nonfacing]
-==== masthead_file
-Specifies a graphic file to be used for the ((Masthead))(((Masthead, banner))) of the form. Testing is
+==== ((page_width))
+Specifies the width of the page (form). The value is an integer. This will be capped at the width of
+the screen. For a nicer looking display, it is best to have this be narrower than the screen, so that
+there is a black band on the left and right.
+
+Default: 980
+
+[%nonfacing]
+==== ((masthead_file))
+Specifies a graphic file to be used for the ((Masthead))(((Masthead, banner))) of the form. Testing
 is done with SVG and PNG format files. If SVG is used, any text must be converted to paths in order to
 be displayed. If PNG is used, you will probably want to use a transparent background. Other graphics
 formats may work, but are not tested.
 
+Default: <none>
+
 [%nonfacing]
-==== masthead_font
+==== ((masthead_text))
+Specifies the ((Masthead text)) (content) to use if a ((Masthead file)) isn't specified, or the file can't be found or loaded.
+
+Default: <none>
+
+[%nonfacing]
+==== ((masthead_font))
 If a ((Masthead)) file isn't specified, or the file can't be found or loaded, it is possible to specify
 ((Masthead text)) to be used instead. This property specifies the font to be used. See ((font))(((font, text)))
 above for valid values.
 
+Default: <uses the text font>
+
 [%nonfacing]
-==== masthead_font_size
+==== ((masthead_font_size))
 Specifies the font size to use for the ((Masthead text)). Not used if a ((Masthead file)) is used. See ((font_size))
 above for valid values.
 
-[%nonfacing]
-==== masthead_text
-Specifies the ((Masthead text)) (content) to use if a ((Masthead file)) isn't specified, or the file can't be found or loaded.
+Default: <uses the text font size>
 
 [%nonfacing]
-==== masthead_text_color
+==== ((masthead_text_color))
 Specifies the color of the ((Masthead text)). See **((text_color))** for a description of how to
 specify a color value.
 
+Default: black
+
 [%nonfacing]
-==== top_margin
+==== ((welcome_msg))
+A message that is shown below the masthead when Telegram is started, the idle time is reached, or
+Control-X is entered.
+
+Default: <none>
+
+[%nonfacing]
+==== ((top_margin))
 Specifies the space, in pixels, between the top of the page (form) and the ((Masthead)).
 
+Default: 38
+
 [%nonfacing]
-==== side_margin
+==== ((bottom_margin))
+Specifies the space, in pixels, to maintain between the text and the bottom of the page (form).
+
+Default: 42
+
+[%nonfacing]
+==== ((side_margin))
 The space, in pixels, between the left and right sides of the page (form) and the text.
 
-[%nonfacing]
-==== page_clear_idle_time
-Specified the idle time, in seconds, before the page (form) is cleared (a new form, including Masthead,
-is displayed). A fractional value is allowed.
+Default: 28
 
 [%nonfacing]
-==== page_clear_speed
-Specifies the amount of time, in seconds, for the current page (form) to be scrolled off
-and a new page to be displayed. A fractional value is allowed. A value of 0 will simply replace the
-current page with a fresh one. A negative value will cause the current content to scroll down off
-of the screen rather than up.
+==== ((wrap_columns))
+Specifies the number of columns from the right margin that text will be wrapped on a space (if possible). If
+there aren't any spaces, the text will wrap/break at the right margin. The column width is based on the
+width of a space character of the text font specified.
+
+Default: 8
+
+[%nonfacing]
+==== ((page_clear_idle_time))
+Specifies the idle time, in seconds, before the page (form) is cleared (a new form, including Masthead,
+is displayed). A fractional value is allowed. Idle time is time when no code is received from the
+wire or entered on the local key or keyboard.
+
+Default: 18.0
+
+[%nonfacing]
+==== ((page_clear_speed))
+Specifies the amount of time, in seconds, for complete page (form) to be scrolled off
+and a new page to be displayed. A fractional value is allowed. A value of 0 will instantly replace the
+current page with a fresh one (full form without scrolling). The special value of -1 indicates that
+the form is continuous, and is never replaced by a new form. If -1 is specified, the form can be
+cleared using the ((F11)) key, or cleared and a masthead displayed using the ((Ctrl-X)) key.
+
+Default: 2.8
+
+[%nonfacing]
+==== ((list_sender))
+Specifies that the current sender's office/station ID be displayed when Telegram is started or the
+sender changes. The value must be `true` or `false`.
+
+Default: false
 
 ifeval::["{backend}" == "pdf"]
 [index]
@@ -321,8 +439,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((Telegram)) ((Version 1.0.0))
-Edit date: 12-10-2024
+This document reflects the features of ((Telegram)) ((Version 1.1.0))
+Edit date: 12-20-2024
 
 MIT License
 

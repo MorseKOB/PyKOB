@@ -5,6 +5,7 @@
   "editor.minimap.maxColumn": 80,
   "jupyter.interactiveWindow.viewColumn": "secondGroup",
   "cSpell.words": [
+    "Blit",
     "Inovato",
     "pygame",
     "pykob",

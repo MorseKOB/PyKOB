@@ -377,6 +377,10 @@ class Reader:
             f.join()
         return
 
+    def setCallback(self, callback):
+        self._char_callback = callback
+        return
+
     def setWPM(self, wpm, cwpm=0):
         self._wpm       = max(wpm, cwpm)  # configured code speed
         self._dotLen    = int(1200.0 / self._wpm)  # nominal dot length (ms)
