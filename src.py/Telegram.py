@@ -71,7 +71,7 @@ from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
@@ -402,7 +402,7 @@ class TGDisplay:
             pygame.display.flip()
         return
 
-    def show_closer_state(self, open):  # type: (bool) -> None
+    def show_closer_state(self, open, update=False):  # type: (bool,bool) -> None
         """
         Render a '~' or '+' in the bottom left corner of the screen
         based on the open/closed state. Erase what might have been
@@ -414,9 +414,11 @@ class TGDisplay:
             self._screen.blit(self._KC_open_sprite, self._KC_state_pt)
         else:
             self._screen.blit(self._KC_closed_sprite, self._KC_state_pt)
+        if update:
+            pygame.display.flip()
         return
 
-    def show_wire_state(self, connected):  # type: (bool) -> None
+    def show_wire_state(self, connected, update=False):  # type: (bool,bool) -> None
         """
         Render a closed or open circle for connected or disconnected
         in the bottom right corner of the screen based on the connected
@@ -428,6 +430,8 @@ class TGDisplay:
             self._screen.blit(self._WC_sprite, self._W_state_pt)
         else:
             self._screen.blit(self._WD_sprite, self._W_state_pt)
+        if update:
+            pygame.display.flip()
         return
 
     def shutdown(self):  # type: () -> None
@@ -535,6 +539,7 @@ class TelegramConfig:
     FONT_SIZE_KEY = "font_size"
     PAGE_CLEAR_IDLE_TIME_KEY = "page_clear_idle_time"
     PAGE_ADVANCE_SECONDS_KEY = "page_advance_seconds"
+    PAGE_NEW_ON_KEY_OPEN_KEY = "page_new_on_key_open"
     PAGE_COLOR_KEY = "page_color"
     PAGE_WIDTH_KEY = "page_width"
     TEXT_COLOR_KEY = "text_color"
@@ -562,6 +567,7 @@ class TelegramConfig:
         self._text_color = "black"  # type: str|tuple[int,int,int]
         self._page_clear_idle_time = 18.0  # type: float  # Seconds of idle before clear
         self._page_advance_seconds = 2.8  # type: float  # Time to take to scroll the page (-1 means no 'new page')
+        self._page_new_on_key_open = False  # type: bool  # Scroll in a new form when the key is opened
         self._page_color = (198,189,150)  # type: str|tuple[int,int,int] # Tan
         self._page_width = 980  # type: int  # The page color portion width. 980 is reasonable.
         self._masthead_filep = None  # type: str|None
@@ -702,6 +708,14 @@ class TelegramConfig:
         return
 
     @property
+    def page_new_on_key_open(self):  # type: () -> bool
+        return self._page_new_on_key_open
+    @page_new_on_key_open.setter
+    def page_new_on_key_open(self, b):  # type: (bool) -> None
+        self._page_new_on_key_open = b
+        return
+
+    @property
     def page_width(self):  # type: () -> int
         return self._page_width
     @page_width.setter
@@ -798,6 +812,8 @@ class TelegramConfig:
                                 self._page_advance_seconds = value
                             case self.PAGE_COLOR_KEY:
                                 self._page_color = literal_eval(value) if value and value[0] == '(' else value
+                            case self.PAGE_NEW_ON_KEY_OPEN_KEY:
+                                self._page_new_on_key_open = value
                             case self.PAGE_WIDTH_KEY:
                                 self._page_width = value
                             case self.TEXT_COLOR_KEY:
@@ -990,7 +1006,7 @@ class Telegram:
                 if code == STARTMSG:
                     self._form.new_form()
                     self._form.show_closer_state(self._kob.virtual_closer_is_open)
-                    self._form.show_wire_state(self._connected)
+                    self._form.show_wire_state(self._connected, update=True)
                 elif code == ENDMSG:
                     # Don't do anything at end. Timeout or new message (STARTMSG)
                     # will display a new form.
@@ -1124,15 +1140,16 @@ class Telegram:
         Handle change of Circuit Closer state.
 
         A state of:
-        True: 'latch'
-        False: 'unlatch'
+        close=True: 'latch'
+        close=False: 'unlatch'
         """
         was_closed = not self._kob.virtual_closer_is_open
+        log.debug("Telegram._set_virtual_closer_closed: {}:{}".format(was_closed, close), 2, dt="")
         if close and was_closed:
             return
         open = not close
         self._kob.virtual_closer_is_open = open
-        self._form.show_closer_state(open)
+        self._form.show_closer_state(open, update=True)
         code = LATCH_CODE if close else UNLATCH_CODE
         # if not self._internet_station_active:
         if True:  # Allow breaking in to an active wire message
@@ -1154,17 +1171,18 @@ class Telegram:
             self._set_local_loop_active(True)
         if was_closed:
             # The closer was closed and now it's open
-            #  Flush the reader and display a new form
+            #  Flush the reader
+            ignoring_inet = self._ignore_internet.is_set()
             self._ignore_internet.set()
             rdr = self._reader
             if rdr is not None:
                 rdr.setCallback(None)  # Don't have it call back
+            if self._tgcfg.page_new_on_key_open:
                 self._form.new_form()
-                self._form.show_closer_state(self._kob.virtual_closer_is_open)
-                self._form.show_wire_state(self._connected)
+            if rdr is not None:
                 self._new_Reader()
-        else:
-            self._ignore_internet.clear()
+            if not ignoring_inet:
+                self._ignore_internet.clear()
         return
 
 
@@ -1231,6 +1249,13 @@ class Telegram:
                             self._shutdown.set()
                             self._control_c_pressed.set()
                             break
+                        elif c == '\x01':  # advance the form on ^A
+                            ignoring_inet = self._ignore_internet.is_set()
+                            self._ignore_internet.set()
+                            self._form.new_form()
+                            self._last_display_t = sys.float_info.max
+                            if not ignoring_inet:
+                                self._ignore_internet.clear()
                         elif c == '\x18':  # display a new form on ^X
                             ignoring_inet = self._ignore_internet.is_set()
                             self._ignore_internet.set()
@@ -1238,6 +1263,7 @@ class Telegram:
                             if self._tgcfg.welcome_msg is not None:
                                 self._form.print(self._tgcfg.welcome_msg)
                                 self._form.new_line(2)
+                            self._last_display_t = sys.float_info.max
                             if not ignoring_inet:
                                 self._ignore_internet.clear()
                         else:
@@ -1257,6 +1283,7 @@ class Telegram:
                                 self._ignore_internet.set()
                                 self._form.new_form(fresh=True, disp_masthead=False)
                                 self._form.new_line(1)
+                                self._last_display_t = sys.float_info.max
                                 if not ignoring_inet:
                                     self._ignore_internet.clear()
                                 continue
@@ -1276,7 +1303,7 @@ class Telegram:
                         self._form.print(self._tgcfg.welcome_msg)
                         self._form.new_line(2)
                     self._form.show_closer_state(self._kob.virtual_closer_is_open)
-                    self._form.show_wire_state(self._connected)
+                    self._form.show_wire_state(self._connected, update=True)
                     if not ignoring_inet:
                         self._ignore_internet.clear()
                     self._last_display_t = sys.float_info.max
@@ -1366,7 +1393,7 @@ class Telegram:
         self._clock = pygame.time.Clock()
         self._form.new_form(fresh=True)
         self._form.show_closer_state(self._kob.virtual_closer_is_open)
-        self._form.show_wire_state(self._connected)
+        self._form.show_wire_state(self._connected, update=True)
         self._running = True
         self._dt = 0
         return

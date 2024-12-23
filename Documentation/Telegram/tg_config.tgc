@@ -18,5 +18,6 @@
     "list_sender":false,
     "page_clear_idle_time":15.5,
     "page_advance_seconds":2.2,
+    "page_new_on_key_open":false,
     "wrap_columns":8
 }
