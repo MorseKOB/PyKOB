@@ -100,9 +100,10 @@ There are four keyboard commands:
 3. ((ESC  - Toggle the key open/closed state))
 4. ((F8   - Toggle the wire connection (connect/disconnect)))
 5. ((F11   - Clear the form without showing a new Masthead))
-6. ((Ctrl-X   - Clear the form (instantly show a new form)))
-7. ((Ctrl-Q   - Quit/Exit))
-8. ((Ctrl-C   - Quit/Exit))
+6. ((Ctrl-A   - Advance in a new form (scroll current form up)))
+7. ((Ctrl-X   - Clear the form (instantly show a new form)))
+8. ((Ctrl-Q   - Quit/Exit))
+9. ((Ctrl-C   - Quit/Exit))
 
 If the key is open (either physically or by using '~'), other text typed will be sounded, displayed, and encoded and sent to the wire if connected.
 
@@ -232,6 +233,7 @@ The Telegram Configuration controls:
 * Masthead text color
 * Welcome message (shown on completely new form)
 * Display sender office/station ID (true/false)
+* Page (form) advance on key opened
 * Page (form) clear idle time
 * Page (form) page scroll speed
 
@@ -275,6 +277,7 @@ that you use the file provided as a starting point, as it is used for testing.
     "list_sender":false,
     "page_clear_idle_time":15.5,
     "page_advance_seconds":2.2,
+    "page_new_on_key_open":false,
     "wrap_columns":8
 }
 ```
@@ -416,7 +419,7 @@ wire or entered on the local key or keyboard.
 Default: 18.0
 
 [%nonfacing]
-==== ((page_clear_speed))
+==== ((page_advance_seconds))
 Specifies the amount of time, in seconds, for complete page (form) to be scrolled off
 and a new page to be displayed. A fractional value is allowed. A value of 0 will instantly replace the
 current page with a fresh one (full form without scrolling). The special value of -1 indicates that
@@ -424,6 +427,14 @@ the form is continuous, and is never replaced by a new form. If -1 is specified,
 cleared using the ((F11)) key, or cleared and a masthead displayed using the ((Ctrl-X)) key.
 
 Default: 2.8
+
+[%nonfacing]
+==== ((page_new_on_key_open))
+If true, a new form is scrolled in when the key is opened (from being closed). If false, opening
+the key will keep the current form and start displaying the locally keyed code. In this mode
+a new form can be scrolled in using the ((Ctrl-A)) key if desired.
+
+Default: false
 
 [%nonfacing]
 ==== ((list_sender))
@@ -439,8 +450,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((Telegram)) ((Version 1.1.0))
-Edit date: 12-20-2024
+This document reflects the features of ((Telegram)) ((Version 1.2.0))
+Edit date: 12-22-2024
 
 MIT License
 
