@@ -56,9 +56,12 @@ from pygame.typing import ColorLike, RectLike
 import os
 from os import path as path_func
 import sys
+from sys import path
 from sys import platform as sys_platform
 from sys import version as sys_version
 from threading import Event
+import tkinter as tk
+from tkinter import messagebox
 import time
 import traceback
 
@@ -102,13 +105,13 @@ class TGDisplay:
         pygame.display.init()
         pygame.font.init()
         self._scr_size = screensize if screensize is not None else pygame.display.list_modes()[0]
-        self._screen = pygame.display.set_mode(self._scr_size, pygame.FULLSCREEN)  # 'flags' can have pygame.FULLSCREEN
+        self._screen = None
         self._clock = pygame.time.Clock()
         self._tgcfg = tgcfg
         #
         # START OF CONFIG PROPERTIES
         ## Page features
-        self._page_width = min(tgcfg.page_width, self._screen.width)
+        self._page_width = min(tgcfg.page_width, self._scr_size[0])
         self._page_color = tgcfg.page_color
         self._page_adv_secs = tgcfg.page_advance_seconds  # type: float
         ## Margins
@@ -129,14 +132,7 @@ class TGDisplay:
         self._text_line_height = self._font.get_linesize()
         self._spaces = 0
         self._scroll_lines = 4
-        #
-        # Calculate the page left from the screen width and the page width
-        self._page_left = (self._screen.width - self._page_width) // 2
-        self._page_rect = (self._page_left, 0, self._page_width, self._screen.height)
-        self._text_leftmost = self._page_left + self._side_margin
-        self._text_right_max = self._page_left + (self._page_width - self._side_margin)
-        self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
-        self._x = self._text_leftmost
+        self._x = 0
         self._y = 0
         #
         # Masthead holder. It will be generated in `start`
@@ -261,6 +257,41 @@ class TGDisplay:
 
     def form_update(self):  # type: () -> None
         pygame.display.flip()
+        return
+
+
+    def message_box(self, message, font_size=30):  # type: (str,int) -> None
+        """
+        Display a message in a box in the center of the screen.
+        """
+        # Create a default font
+        font = pygame.font.Font(None, font_size)
+
+        # Render the text
+        text_surface = font.render(message, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=(self._screen.get_width() // 2, self._screen.get_height() // 2))
+
+        # Draw a background rectangle
+        bg_rect = text_rect.inflate(20, 20)
+        pygame.draw.rect(self._screen, (0, 0, 0), bg_rect)
+
+        # Blit the text onto the screen
+        self._screen.blit(text_surface, text_rect)
+
+        # Update the display
+        pygame.display.flip()
+
+        # Wait for a key press
+        wait_for_key = True
+        while wait_for_key:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    wait_for_key = False
+                if event.type == pygame.KEYDOWN:
+                    wait_for_key = False
+                pass
+            pass
         return
 
     def new_line(self, lines=1):  # type: (int) -> None
@@ -440,27 +471,47 @@ class TGDisplay:
 
     def start(self):  # type: () -> None
         #
+        # Check the page size value and see if it's less than 101. If so,
+        # it is a percentage of the physical screen size.
+        requested = self._tgcfg.page_width
+        self._page_width = min(requested, self._scr_size[0]) if requested > 100 else ((self._scr_size[0] * 100) // requested)
+        #
+        # Calculate the margins and gaps
+        #
+        #  Calculate the page left from the screen width and the page width
+        self._page_left = (self._scr_size[0] - self._page_width) // 2
+        self._page_rect = (self._page_left, 0, self._page_width, self._scr_size[1])
+        self._text_leftmost = self._page_left + self._side_margin
+        self._text_right_max = self._page_left + (self._page_width - self._side_margin)
+        self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
+        self._x = self._text_leftmost
+        #
         # Get Masthead ready
+        load_masthead_text = True
         if self._tgcfg.masthead_file is not None:
             mfile = self._tgcfg.masthead_file
             try:
                 self._masthead = pygame.image.load(mfile).convert_alpha()
+                load_masthead_text = False
             except FileNotFoundError as fnf:
                 log.warn("Masthead file not found: '{}' Will use the Masthead text instead.".format(mfile), dt="")
-                text = self._tgcfg.masthead_text
-                if text is None:
-                    text = ""
-                try:
-                    font = None  # type: Font|None
-                    fpath = pygame.font.match_font(self._tgcfg.masthead_font)
-                    if fpath is not None:
-                        font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
-                    else:
-                        font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
-                    self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
-                except Exception as ex:
-                    log.warn("Error rendering the Masthead text '{}': {}".format(self._tgcfg.masthead_text, ex), dt="")
-                pass
+            except Exception as ex:
+                log.warn("Problem loading Masthead file: {}  Error: {}  Will use the Masthead text instead.".format(mfile, ex), dt="")
+            pass
+        if load_masthead_text:           
+            text = self._tgcfg.masthead_text
+            if text is None:
+                text = ""
+            try:
+                font = None  # type: Font|None
+                fpath = pygame.font.match_font(self._tgcfg.masthead_font)
+                if fpath is not None:
+                    font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
+                else:
+                    font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
+                self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
+            except Exception as ex:
+                log.warn("Error rendering the Masthead text '{}':  Error: {}".format(self._tgcfg.masthead_text, ex), dt="")
             pass
         pass
         #
@@ -478,7 +529,7 @@ class TGDisplay:
         self._KC_open_sprite = status_font.render('~', True, (255,255,255))  # Render a white '~' for open
         kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
         kc_h = 4 + status_font.get_linesize()
-        kc_t = self._screen.height - kc_h
+        kc_t = self._scr_size[1] - kc_h
         # Create a background sprite. Chances are this will be black or the page color,
         # but it's possible that the black side width is non-zero but narrower than the
         # status block width. So, we do the work here to create a sprite that might
@@ -486,7 +537,7 @@ class TGDisplay:
         #
         sz = (kc_w, kc_h)
         self._KC_state_bg = Surface(sz)  # Per PyGame-CE docs - this creates a black surface
-        blk_w = (self._screen.width - self._page_width) // 2
+        blk_w = (self._scr_size[0] - self._page_width) // 2
         pgcolorw = kc_w - blk_w  # Width of background that will be the page color
         if pgcolorw > 0:
             state_pagec_rect = Rect(blk_w, 0, pgcolorw, kc_h)
@@ -500,7 +551,7 @@ class TGDisplay:
         self._WD_sprite = status_font.render('\u25CB', True, (255,255,255))  # White open circle '○' for Disconnected
         ws_w = 8 + max(self._WC_sprite.width, self._WD_sprite.width)
         ws_h = 4 + status_font.get_linesize()
-        ws_t = self._screen.height - ws_h
+        ws_t = self._scr_size[1] - ws_h
         # Create a background sprite. Chances are this will be black or the page color,
         # but it's possible that the border width is non-zero but narrower than the
         # status block width. So, we do the work here to create a sprite that might
@@ -512,17 +563,20 @@ class TGDisplay:
         if pgcolorw < 0:
             state_pagec_rect = Rect(0, 0, -pgcolorw, ws_h)
             self._W_state_bg.fill(self._page_color, state_pagec_rect)
-        ws_l = self._screen.width-ws_w
+        ws_l = self._scr_size[0] - ws_w
         self._W_statebg_pt = (ws_l, ws_t)
         self._W_state_pt = (ws_l + 2, ws_t + 2)
         #
         # Calculate scroll_lines such that each scroll is 1/10 second
         if self._page_adv_secs > 0:
-            lines_per_sec = self._screen.height / self._page_adv_secs
+            lines_per_sec = self._scr_size[1] / self._page_adv_secs
             self._scroll_lines = int((lines_per_sec / 10) + 0.5)
         #
+        scr_opt = pygame.FULLSCREEN if self._tgcfg.fullscreen else pygame.RESIZABLE
+        self._screen = pygame.display.set_mode(self._scr_size, scr_opt)
         self._screen.fill(TGDisplay.BLACK)
-        pygame.mouse.set_visible(False)
+        if self._tgcfg.fullscreen:
+            pygame.mouse.set_visible(False)
         pygame.display.flip()
         return
 
@@ -537,6 +591,7 @@ class TelegramConfig:
     FONT_BOLD_KEY = "font_bold"
     FONT_ITALIC_KEY = "font_italic"
     FONT_SIZE_KEY = "font_size"
+    FULLSCREEN_KEY = "fullscreen"
     PAGE_CLEAR_IDLE_TIME_KEY = "page_clear_idle_time"
     PAGE_ADVANCE_SECONDS_KEY = "page_advance_seconds"
     PAGE_NEW_ON_KEY_OPEN_KEY = "page_new_on_key_open"
@@ -560,20 +615,21 @@ class TelegramConfig:
     def __init__(self, tgcfg_file_path):  # type: (str|None) -> None
         self._cfg_filep = tgcfg_file_path
         # Default values...
+        self._fullscreen = False  # type: bool
         self._text_font = "courier"  # type: str
         self._text_font_bold = False  # type: bool
         self._text_font_italic = False  # type: bool
-        self._text_font_size = 20  # type: int
+        self._text_font_size = 32  # type: int
         self._text_color = "black"  # type: str|tuple[int,int,int]
         self._page_clear_idle_time = 18.0  # type: float  # Seconds of idle before clear
         self._page_advance_seconds = 2.8  # type: float  # Time to take to scroll the page (-1 means no 'new page')
         self._page_new_on_key_open = False  # type: bool  # Scroll in a new form when the key is opened
         self._page_color = (198,189,150)  # type: str|tuple[int,int,int] # Tan
-        self._page_width = 980  # type: int  # The page color portion width. 980 is reasonable.
+        self._page_width = 80  # type: int  # The page color portion width. Use 80% of the screen.
         self._masthead_filep = None  # type: str|None
         self._masthead_font = self._text_font
         self._masthead_font_size = self._text_font_size
-        self._masthead_text = None  # type: str|None
+        self._masthead_text = "Telegram - Part of the MKOB Suite"  # type: str|None
         self._masthead_text_color = "black"  # type: str|tuple[int,int,int]
         self._side_margin = 28  # type: int
         self._bottom_margin = 42  # type: int
@@ -633,6 +689,14 @@ class TelegramConfig:
     @form_spacing.setter
     def form_spacing(self, spacing):  # type: (int) -> None
         self._form_spacing = spacing
+        return
+
+    @property
+    def fullscreen(self):  # type: () -> bool
+        return self._fullscreen
+    @fullscreen.setter
+    def fullscreen(self, b):  # type: (bool) -> None
+        self._fullscreen = b
         return
 
     @property
@@ -806,6 +870,8 @@ class TelegramConfig:
                                 self._text_font_italic = value
                             case self.FONT_SIZE_KEY:
                                 self._text_font_size = int(value)
+                            case self.FULLSCREEN_KEY:
+                                self._fullscreen = value
                             case self.PAGE_CLEAR_IDLE_TIME_KEY:
                                 self._page_clear_idle_time = value
                             case self.PAGE_ADVANCE_SECONDS_KEY:
@@ -1413,6 +1479,18 @@ if __name__ == "__main__":
     exit_status = 0
 
     try:
+        # Init Tk so we can use messagebox if needed.
+        root = tk.Tk(className="Telegram")
+        root.withdraw()
+        script_dir = path[0]
+        script_dir = script_dir + "/" if ((not script_dir is None) and (not script_dir == "")) else ""
+        log.debug(" Running from: {}".format(script_dir), 2, dt="")
+        icon_file = script_dir + "resources/Telegram-Logo.png"
+        icon_file_exists = False
+        if (path_func.isfile(icon_file)):
+            icon = tk.PhotoImage(file=icon_file)
+            root.iconphoto(True, icon)
+            icon_file_exists = True
         # Process command option arguments
         tgcfg_override = argparse.ArgumentParser(add_help=False)
         tgcfg_override.add_argument("--tgcfg", metavar="tg-cfg-file", dest="tgcfg_filepath", default=TELEGRAM_CFG_FILE_NAME,
@@ -1464,6 +1542,8 @@ if __name__ == "__main__":
             tg_config = TelegramConfig(tgcfg_path)
         else:
             log.warn("Telegram configuration file '{}' not found. Using default values.".format(TELEGRAM_CFG_FILE_NAME), dt="")
+            msg = "Unable to find Telegram configuration file: \n'{}'.\nUsing default values.\n\nAre you running from a different location or forget to use the\n`--tgconfig` option?".format(TELEGRAM_CFG_FILE_NAME)
+            messagebox.showwarning(TELEGRAM_VERSION_TEXT, msg)
             tg_config = TelegramConfig(None)
         telegram = Telegram(TELEGRAM_VERSION_TEXT, wire, cfg, tg_config)
         telegram.start()
