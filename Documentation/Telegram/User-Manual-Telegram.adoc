@@ -216,6 +216,7 @@ a separate configuration file, specific to **((Telegram))** controls the look an
 The Telegram Configuration controls:
 
 * Form (page) color
+* Full screen or windowed
 * Text font
 * Text font size
 * Text color
@@ -262,6 +263,7 @@ that you use the file provided as a starting point, as it is used for testing.
     "font_bold":true,
     "font_italic":false,
     "font_size":30,
+    "fullscreen":true,
     "text_color":"black",
     "page_color":"(198,189,150)",
     "page_width":1000,
@@ -317,6 +319,13 @@ Specifies the size of the text used for messages. The size is the font _((pixel)
 Default: 20
 
 [%nonfacing]
+==== ((fullscreen))
+Specifies whether Telegram uses the full screen without any boarders, title-bar, etc.
+The value must be `true` or `false`.
+
+Default: false
+
+[%nonfacing]
 ==== ((text_color))
 Specifies the color of the text used for messages. This can either be a standard system color name, or
 a ((RGB (Red,Green,Blue))) value. For example, the values "black" and "(0,0,0)" result in the same black
@@ -336,9 +345,10 @@ Default: (198,189,150)
 ==== ((page_width))
 Specifies the width of the page (form). The value is an integer. This will be capped at the width of
 the screen. For a nicer looking display, it is best to have this be narrower than the screen, so that
-there is a black band on the left and right.
+there is a black band on the left and right. If the value is 100 or less, the value is taken as a
+percentage of the screen width.
 
-Default: 980
+Default: 80
 
 [%nonfacing]
 ==== ((masthead_file))

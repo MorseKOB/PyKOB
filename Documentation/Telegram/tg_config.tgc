@@ -3,6 +3,7 @@
     "font_bold":true,
     "font_italic":false,
     "font_size":30,
+    "fullscreen":true,
     "text_color":"black",
     "page_color":"(198,189,150)",
     "page_width":1000,
