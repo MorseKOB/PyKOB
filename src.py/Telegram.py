@@ -1464,7 +1464,7 @@ class Telegram:
         self._new_Reader()
         self._form = TGDisplay(None, self._tgcfg, self._icon_path)
         self._form.start()
-        self._form.caption = "Telegram"
+        self._form.caption = self._app_name_version
         self._clock = pygame.time.Clock()
         self._form.new_form(fresh=True)
         self._form.show_closer_state(self._kob.virtual_closer_is_open)
