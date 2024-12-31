@@ -74,7 +74,7 @@ from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 

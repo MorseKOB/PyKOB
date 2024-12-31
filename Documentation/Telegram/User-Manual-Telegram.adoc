@@ -1,7 +1,7 @@
 = Telegram: User's Manual
 include::../man_settings.adoc[]
 include::../../telegramversion.txt[]
-:organization: MorseKOB in Python (PyKOB)
+:organization: Telegram - MKOB Suite
 // Multi-Part Book: [Quick Start][User Guide]
 :doctype: book
 :description: Telegraph display telegram application..
@@ -93,7 +93,7 @@ received from the wire.
 [%nonfacing]
 == Keyboard Commands
 ((Telegram)) automatically connects to the wire, either from the configuration or specified on the command line.
-There are four keyboard commands:
+There are nine keyboard commands:
 
 1. (('~'  - Open the key)).
 2. (('+'  - Close the key)).
@@ -105,7 +105,8 @@ There are four keyboard commands:
 8. ((Ctrl-Q   - Quit/Exit))
 9. ((Ctrl-C   - Quit/Exit))
 
-If the key is open (either physically or by using '~'), other text typed will be sounded, displayed, and encoded and sent to the wire if connected.
+If the key is open (either physically or by using '~'), typed text (other than '+') will be sounded, displayed,
+and encoded and sent to the wire if connected.
 
 (Simple, right!)
 
@@ -215,7 +216,8 @@ a separate configuration file, specific to **((Telegram))** controls the look an
 
 The Telegram Configuration controls:
 
-* Form (page) color
+* Page (form) color
+* Page (form) width
 * Full screen or windowed
 * Text font
 * Text font size
@@ -253,9 +255,9 @@ values.
 [%nonfacing]
 === Entries
 
-The file is JSON Format Map/Dictionary. Below is an example file. The following sections
-describe each of the value options. Although the example is provided here, it is recommended
-that you use the file provided as a starting point, as it is used for testing.
+The file is a JSON Format Map/Dictionary. Below is an example file. The following sections
+describe each of the value options. Although an example is provided here, it is recommended
+that you use the example file provided as a starting point, as it is used for testing.
 
 ``` json
 {
@@ -348,7 +350,7 @@ the screen. For a nicer looking display, it is best to have this be narrower tha
 there is a black band on the left and right. If the value is 100 or less, the value is taken as a
 percentage of the screen width.
 
-Default: 80
+Default: 80 (80% of the screen width)
 
 [%nonfacing]
 ==== ((masthead_file))
@@ -460,8 +462,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((Telegram)) ((Version 1.2.0))
-Edit date: 12-22-2024
+This document reflects the features of ((Telegram)) ((Version 1.2.1))
+Edit date: 12-30-2024
 
 MIT License
 
