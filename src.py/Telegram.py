@@ -97,21 +97,26 @@ class TGDisplay:
 
     def __init__(self,
                 screensize,
-                tgcfg
-        ):  # type: (tuple[int,int]|None, TelegramConfig) -> None
+                tgcfg,
+                icon_path
+        ):  # type: (tuple[int,int]|None, TelegramConfig, str|None) -> None
         """
         screensize: The size of the screen in pixels, width and height. Or None to automatically select the size based on the hardware.
+        tgcfg: The Telegram Config to use for the rest of the settings.
         """
         pygame.display.init()
         pygame.font.init()
-        self._scr_size = screensize if screensize is not None else pygame.display.list_modes()[0]
+        desktop_size = pygame.display.get_desktop_sizes()[0]
+        window_scale = 1.0 if tgcfg.fullscreen else 0.8
+        self._window_size = screensize if screensize is not None else (int(desktop_size[0] * window_scale), int(desktop_size[1] * window_scale))
         self._screen = None
         self._clock = pygame.time.Clock()
         self._tgcfg = tgcfg
+        self._icon_path = icon_path
         #
         # START OF CONFIG PROPERTIES
         ## Page features
-        self._page_width = min(tgcfg.page_width, self._scr_size[0])
+        self._page_width = min(tgcfg.page_width, self._window_size[0])
         self._page_color = tgcfg.page_color
         self._page_adv_secs = tgcfg.page_advance_seconds  # type: float
         ## Margins
@@ -474,13 +479,13 @@ class TGDisplay:
         # Check the page size value and see if it's less than 101. If so,
         # it is a percentage of the physical screen size.
         requested = self._tgcfg.page_width
-        self._page_width = min(requested, self._scr_size[0]) if requested > 100 else ((self._scr_size[0] * 100) // requested)
+        self._page_width = min(requested, self._window_size[0]) if requested > 100 else ((self._window_size[0] * requested) // 100)
         #
         # Calculate the margins and gaps
         #
         #  Calculate the page left from the screen width and the page width
-        self._page_left = (self._scr_size[0] - self._page_width) // 2
-        self._page_rect = (self._page_left, 0, self._page_width, self._scr_size[1])
+        self._page_left = (self._window_size[0] - self._page_width) // 2
+        self._page_rect = (self._page_left, 0, self._page_width, self._window_size[1])
         self._text_leftmost = self._page_left + self._side_margin
         self._text_right_max = self._page_left + (self._page_width - self._side_margin)
         self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
@@ -529,7 +534,7 @@ class TGDisplay:
         self._KC_open_sprite = status_font.render('~', True, (255,255,255))  # Render a white '~' for open
         kc_w = 8 + max(self._KC_closed_sprite.width, self._KC_open_sprite.width)
         kc_h = 4 + status_font.get_linesize()
-        kc_t = self._scr_size[1] - kc_h
+        kc_t = self._window_size[1] - kc_h
         # Create a background sprite. Chances are this will be black or the page color,
         # but it's possible that the black side width is non-zero but narrower than the
         # status block width. So, we do the work here to create a sprite that might
@@ -537,7 +542,7 @@ class TGDisplay:
         #
         sz = (kc_w, kc_h)
         self._KC_state_bg = Surface(sz)  # Per PyGame-CE docs - this creates a black surface
-        blk_w = (self._scr_size[0] - self._page_width) // 2
+        blk_w = (self._window_size[0] - self._page_width) // 2
         pgcolorw = kc_w - blk_w  # Width of background that will be the page color
         if pgcolorw > 0:
             state_pagec_rect = Rect(blk_w, 0, pgcolorw, kc_h)
@@ -551,7 +556,7 @@ class TGDisplay:
         self._WD_sprite = status_font.render('\u25CB', True, (255,255,255))  # White open circle '○' for Disconnected
         ws_w = 8 + max(self._WC_sprite.width, self._WD_sprite.width)
         ws_h = 4 + status_font.get_linesize()
-        ws_t = self._scr_size[1] - ws_h
+        ws_t = self._window_size[1] - ws_h
         # Create a background sprite. Chances are this will be black or the page color,
         # but it's possible that the border width is non-zero but narrower than the
         # status block width. So, we do the work here to create a sprite that might
@@ -563,17 +568,20 @@ class TGDisplay:
         if pgcolorw < 0:
             state_pagec_rect = Rect(0, 0, -pgcolorw, ws_h)
             self._W_state_bg.fill(self._page_color, state_pagec_rect)
-        ws_l = self._scr_size[0] - ws_w
+        ws_l = self._window_size[0] - ws_w
         self._W_statebg_pt = (ws_l, ws_t)
         self._W_state_pt = (ws_l + 2, ws_t + 2)
         #
         # Calculate scroll_lines such that each scroll is 1/10 second
         if self._page_adv_secs > 0:
-            lines_per_sec = self._scr_size[1] / self._page_adv_secs
+            lines_per_sec = self._window_size[1] / self._page_adv_secs
             self._scroll_lines = int((lines_per_sec / 10) + 0.5)
         #
         scr_opt = pygame.FULLSCREEN if self._tgcfg.fullscreen else pygame.RESIZABLE
-        self._screen = pygame.display.set_mode(self._scr_size, scr_opt)
+        if self._icon_path is not None:
+            icon_image = pygame.image.load(self._icon_path)
+            pygame.display.set_icon(icon_image)
+        self._screen = pygame.display.set_mode(self._window_size, scr_opt)
         self._screen.fill(TGDisplay.BLACK)
         if self._tgcfg.fullscreen:
             pygame.mouse.set_visible(False)
@@ -942,11 +950,12 @@ class Telegram:
     """
     Telegram operations.
     """
-    def __init__(self, app_name_version, wire, cfg, tgcfg):  # type: (str, int, Config, TelegramConfig) -> None
+    def __init__(self, app_name_version, wire, cfg, tgcfg, icon_path):  # type: (str, int, Config, TelegramConfig, str|None) -> None
         self._app_name_version = app_name_version  # type: str
         self._wire = wire  # type: int
         self._cfg = cfg  # type: Config
         self._tgcfg = tgcfg
+        self._icon_path = icon_path
         self._internet = None  # type: Internet|None
         self._kob = None  # type: KOB|None
         self._reader = None  # type: Reader|None
@@ -1453,7 +1462,7 @@ class Telegram:
             spacing=self._cfg.spacing
             )
         self._new_Reader()
-        self._form = TGDisplay(None, self._tgcfg)
+        self._form = TGDisplay(None, self._tgcfg, self._icon_path)
         self._form.start()
         self._form.caption = "Telegram"
         self._clock = pygame.time.Clock()
@@ -1491,6 +1500,8 @@ if __name__ == "__main__":
             icon = tk.PhotoImage(file=icon_file)
             root.iconphoto(True, icon)
             icon_file_exists = True
+        else:
+            icon_file = None
         # Process command option arguments
         tgcfg_override = argparse.ArgumentParser(add_help=False)
         tgcfg_override.add_argument("--tgcfg", metavar="tg-cfg-file", dest="tgcfg_filepath", default=TELEGRAM_CFG_FILE_NAME,
@@ -1545,7 +1556,7 @@ if __name__ == "__main__":
             msg = "Unable to find Telegram configuration file: \n'{}'.\nUsing default values.\n\nAre you running from a different location or forget to use the\n`--tgconfig` option?".format(TELEGRAM_CFG_FILE_NAME)
             messagebox.showwarning(TELEGRAM_VERSION_TEXT, msg)
             tg_config = TelegramConfig(None)
-        telegram = Telegram(TELEGRAM_VERSION_TEXT, wire, cfg, tg_config)
+        telegram = Telegram(TELEGRAM_VERSION_TEXT, wire, cfg, tg_config, icon_file)
         telegram.start()
         telegram.main_loop()  # This doesn't return until Telegram exits
         exit_status = 0

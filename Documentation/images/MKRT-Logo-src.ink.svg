@@ -58,14 +58,14 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="false"
      inkscape:zoom="0.35355339"
-     inkscape:cx="869.74134"
+     inkscape:cx="646.2956"
      inkscape:cy="680.23672"
      inkscape:window-width="1536"
      inkscape:window-height="890"
      inkscape:window-x="-6"
      inkscape:window-y="-6"
      inkscape:window-maximized="1"
-     inkscape:current-layer="g1165" />
+     inkscape:current-layer="g1049" />
   <g
      inkscape:groupmode="layer"
      inkscape:label="Image"
@@ -163,23 +163,26 @@
      inkscape:groupmode="layer"
      id="g1049"
      inkscape:label="Text-Tgm-BG"
-     style="display:inline">
+     style="display:inline"
+     sodipodi:insensitive="true">
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:800px;font-family:Ebrima;-inkscape-font-specification:'Ebrima Bold';letter-spacing:-0.2px;word-spacing:-0.2px;white-space:pre;inline-size:1604.4;display:inline;fill:#d5d5ff;fill-opacity:1;stroke:#000000;stroke-opacity:1"
        x="251.73001"
        y="540.22955"
        id="text1047"
-       transform="matrix(0.95557236,0,0,1.7114611,-296.62814,172.70841)"><tspan
+       transform="matrix(0.95557236,0,0,1.7114611,-296.62814,172.70841)"
+       sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1367">T</tspan></text>
+         id="tspan1365">T</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:533.333px;font-family:Ebrima;-inkscape-font-specification:'Ebrima, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#d5d5ff;fill-opacity:1;stroke:#000000;stroke-width:1.275;stroke-dasharray:none;stroke-opacity:1"
        x="359.21027"
        y="905.09674"
-       id="text1155"><tspan
+       id="text1155"
+       sodipodi:insensitive="true"><tspan
          sodipodi:role="line"
          id="tspan1153"
          x="359.21027"
@@ -215,7 +218,7 @@
        sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1369">C</tspan></text>
+         id="tspan1367">C</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -233,7 +236,7 @@
        sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1371">C</tspan></text>
+         id="tspan1369">C</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -305,7 +308,8 @@
   <g
      inkscape:groupmode="layer"
      id="layer2"
-     inkscape:label="Key_Fill">
+     inkscape:label="Key_Fill"
+     sodipodi:insensitive="true">
     <path
        style="fill:#aca793;fill-opacity:1;stroke:#000000;stroke-width:3.31853;stroke-opacity:1"
        d="m 1023.3005,989.3408 c -50.99284,-5.88967 -88.14053,-15.11111 -118.21116,-29.34487 -47.48004,-22.47424 -55.87681,-43.12906 -27.38029,-67.35203 17.92811,-15.23964 54.20582,-29.2911 99.31968,-38.46959 31.34237,-6.37669 45.63727,-7.30044 112.95807,-7.30044 86.7466,0 125.0453,5.39057 174.6177,24.57787 28.4843,11.02535 54.8932,32.19117 54.8932,43.99574 0,28.48821 -45.5766,53.86739 -121.6066,67.71633 -43.8803,7.99281 -131.9053,11.10717 -174.5906,6.17699 z"
@@ -357,7 +361,7 @@
        transform="matrix(0.94665458,0,0,1.7266098,-262.38017,175.90238)"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1373">M</tspan></text>
+         id="tspan1371">M</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -374,13 +378,14 @@
        transform="matrix(1.2565582,0,0,1.7111264,-360.80039,178.45234)"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1375">R</tspan></text>
+         id="tspan1373">R</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
      id="g1165"
      inkscape:label="Text-Tgm-FG"
      style="display:inline"
+     transform="translate(5.6568543)"
      sodipodi:insensitive="true">
     <text
        xml:space="preserve"
@@ -388,11 +393,13 @@
        x="251.73001"
        y="540.22955"
        id="text1159"
-       transform="matrix(0.95557236,0,0,1.7114611,-296.62814,172.70841)"
+       transform="matrix(0.95557236,0,0,1.7114611,-299.45657,172.70841)"
+       inkscape:transform-center-x="59.396972"
+       inkscape:transform-center-y="14.142136"
        sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1377">T</tspan></text>
+         id="tspan1375">T</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -422,7 +429,7 @@
        sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1379">C</tspan></text>
+         id="tspan1377">C</tspan></text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -440,7 +447,7 @@
        sodipodi:insensitive="true"><tspan
          x="251.73001"
          y="540.22955"
-         id="tspan1381">C</tspan></text>
+         id="tspan1379">C</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:266.667px;font-family:Ebrima;-inkscape-font-specification:'Ebrima, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;display:inline;fill:#d5d5ff;fill-opacity:1;stroke:#4d4d4d;stroke-width:2.75528"
