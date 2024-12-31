@@ -503,7 +503,7 @@ class TGDisplay:
             except Exception as ex:
                 log.warn("Problem loading Masthead file: {}  Error: {}  Will use the Masthead text instead.".format(mfile, ex), dt="")
             pass
-        if load_masthead_text:           
+        if load_masthead_text:
             text = self._tgcfg.masthead_text
             if text is None:
                 text = ""
@@ -514,7 +514,7 @@ class TGDisplay:
                     font = pygame.font.Font(fpath, self._tgcfg.masthead_font_size)
                 else:
                     font = pygame.font.SysFont(self._tgcfg.masthead_font, self._tgcfg.masthead_font_size)
-                self._masthead = font.render(self._tgcfg.masthead_text, True, self._tgcfg.masthead_text_color)
+                self._masthead = font.render(text, True, self._tgcfg.masthead_text_color)
             except Exception as ex:
                 log.warn("Error rendering the Masthead text '{}':  Error: {}".format(self._tgcfg.masthead_text, ex), dt="")
             pass
