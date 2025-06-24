@@ -1,7 +1,7 @@
 = Telegram: User's Manual
 include::../man_settings.adoc[]
 include::../../telegramversion.txt[]
-:organization: MorseKOB in Python (PyKOB)
+:organization: Telegram - MKOB Suite
 // Multi-Part Book: [Quick Start][User Guide]
 :doctype: book
 :description: Telegraph display telegram application..
@@ -93,7 +93,7 @@ received from the wire.
 [%nonfacing]
 == Keyboard Commands
 ((Telegram)) automatically connects to the wire, either from the configuration or specified on the command line.
-There are four keyboard commands:
+There are nine keyboard commands:
 
 1. (('~'  - Open the key)).
 2. (('+'  - Close the key)).
@@ -105,7 +105,8 @@ There are four keyboard commands:
 8. ((Ctrl-Q   - Quit/Exit))
 9. ((Ctrl-C   - Quit/Exit))
 
-If the key is open (either physically or by using '~'), other text typed will be sounded, displayed, and encoded and sent to the wire if connected.
+If the key is open (either physically or by using '~'), typed text (other than '+') will be sounded, displayed,
+and encoded and sent to the wire if connected.
 
 (Simple, right!)
 
@@ -215,7 +216,9 @@ a separate configuration file, specific to **((Telegram))** controls the look an
 
 The Telegram Configuration controls:
 
-* Form (page) color
+* Page (form) color
+* Page (form) width
+* Full screen or windowed
 * Text font
 * Text font size
 * Text color
@@ -252,9 +255,9 @@ values.
 [%nonfacing]
 === Entries
 
-The file is JSON Format Map/Dictionary. Below is an example file. The following sections
-describe each of the value options. Although the example is provided here, it is recommended
-that you use the file provided as a starting point, as it is used for testing.
+The file is a JSON Format Map/Dictionary. Below is an example file. The following sections
+describe each of the value options. Although an example is provided here, it is recommended
+that you use the example file provided as a starting point, as it is used for testing.
 
 ``` json
 {
@@ -262,18 +265,19 @@ that you use the file provided as a starting point, as it is used for testing.
     "font_bold":true,
     "font_italic":false,
     "font_size":30,
+    "fullscreen":true,
     "text_color":"black",
     "page_color":"(198,189,150)",
-    "page_width":1000,
+    "page_width":88,
     "masthead_file":"WesternOnion-Masthead.svg",
     "masthead_font":"Vineta,Century725,Times New Roman,Times",
     "masthead_font_size":40,
-    "masthead_text":"Western Onion Telegraph Co",
+    "masthead_text":"- Telegram -",
     "masthead_text_color":"(0,0,10)",
     "welcome_msg":"The Telegram App decodes and displays Morse from a Wire or the local key or keyboard. Try keying something.",
     "top_margin":30,
     "side_margin":40,
-    "form_spacing":10,
+    "form_spacing":28,
     "list_sender":false,
     "page_clear_idle_time":15.5,
     "page_advance_seconds":2.2,
@@ -317,6 +321,13 @@ Specifies the size of the text used for messages. The size is the font _((pixel)
 Default: 20
 
 [%nonfacing]
+==== ((fullscreen))
+Specifies whether Telegram uses the full screen without any boarders, title-bar, etc.
+The value must be `true` or `false`.
+
+Default: false
+
+[%nonfacing]
 ==== ((text_color))
 Specifies the color of the text used for messages. This can either be a standard system color name, or
 a ((RGB (Red,Green,Blue))) value. For example, the values "black" and "(0,0,0)" result in the same black
@@ -336,9 +347,10 @@ Default: (198,189,150)
 ==== ((page_width))
 Specifies the width of the page (form). The value is an integer. This will be capped at the width of
 the screen. For a nicer looking display, it is best to have this be narrower than the screen, so that
-there is a black band on the left and right.
+there is a black band on the left and right. If the value is 100 or less, the value is taken as a
+percentage of the screen width.
 
-Default: 980
+Default: 80 (80% of the screen width)
 
 [%nonfacing]
 ==== ((masthead_file))
@@ -450,8 +462,8 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((Telegram)) ((Version 1.2.0))
-Edit date: 12-22-2024
+This document reflects the features of ((Telegram)) ((Version 1.2.1))
+Edit date: 12-30-2024
 
 MIT License
 

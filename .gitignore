@@ -52,7 +52,7 @@ Fp-info-cache
 log.txt
 Capture-Replay/*.txt
 
-# PNG files not within the Documents folder
+# PNG files not within the Documents or resources folder
 *.png
 # Ignore JSON files from recordings. If JSON files are needed in the source, include them with a '!' line.
 *.json
@@ -74,6 +74,7 @@ tg_config.tgc
 *.svg
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
-# Include anything that is put into the Documentation and mkob_learn folders
+# Include anything that is put into the Documentation, mkob_learn, and resources folders
 !Documentation/**
 !src.py/mkob_learn/**
+!src.py/resources/**
