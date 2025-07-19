@@ -43,6 +43,7 @@ The files are INI format with the values in a section named "PYKOB".
 """
 import argparse
 import configparser
+import getpass
 import os
 import platform
 import pykob
@@ -838,7 +839,15 @@ def read_config():
 
     # Get the system data
     try:
-        user_name = os.getlogin()
+        try:
+            user_name = getpass.getuser()  # os.getlogin()
+        except Exception as e1:
+            log.err("getpass.getuser() unable to get user name. Trying `os.getlogin()`: {}".format(e1))
+            try:
+                user_name = os.getlogin()
+            except FileNotFoundError as e2:
+                log.err("os.getlogin() unable to get user name. Using 'root': {}".format(e2))
+                user_name = "root"
         user_home = os.path.expanduser('~')
         os_name = os.name
         system_name = platform.system()
