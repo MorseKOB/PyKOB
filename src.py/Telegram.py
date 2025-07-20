@@ -74,7 +74,7 @@ from pykob.kob import KOB
 from pykob.morse import Reader, Sender
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.2.1'
+__version__ = '1.2.2'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 TELEGRAM_VERSION_TEXT = "Telegram " + VERSION
 
@@ -491,6 +491,16 @@ class TGDisplay:
         self._text_wrap_x = max((self._text_leftmost + (4 * self._space_width)), (self._text_right_max - (self._wrap_columns * self._space_width)))
         self._x = self._text_leftmost
         #
+        # Get the Screen ready
+        scr_opt = pygame.FULLSCREEN if self._tgcfg.fullscreen else pygame.RESIZABLE
+        if self._icon_path is not None:
+            icon_image = pygame.image.load(self._icon_path)
+            pygame.display.set_icon(icon_image)
+        self._screen = pygame.display.set_mode(self._window_size, scr_opt)
+        self._screen.fill(TGDisplay.BLACK)
+        if self._tgcfg.fullscreen:
+            pygame.mouse.set_visible(False)
+        #
         # Get Masthead ready
         load_masthead_text = True
         if self._tgcfg.masthead_file is not None:
@@ -577,14 +587,6 @@ class TGDisplay:
             lines_per_sec = self._window_size[1] / self._page_adv_secs
             self._scroll_lines = int((lines_per_sec / 10) + 0.5)
         #
-        scr_opt = pygame.FULLSCREEN if self._tgcfg.fullscreen else pygame.RESIZABLE
-        if self._icon_path is not None:
-            icon_image = pygame.image.load(self._icon_path)
-            pygame.display.set_icon(icon_image)
-        self._screen = pygame.display.set_mode(self._window_size, scr_opt)
-        self._screen.fill(TGDisplay.BLACK)
-        if self._tgcfg.fullscreen:
-            pygame.mouse.set_visible(False)
         pygame.display.flip()
         return
 
