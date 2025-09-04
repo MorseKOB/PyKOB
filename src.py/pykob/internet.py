@@ -272,8 +272,10 @@ class Internet:
                 with self._socketWRGuard:
                     log.debug("internet.disconnect -  socketWRGuard-ed", 7)
                     if self._socket:
-                        self._socket.sendto(shortPacket, self._get_address())
                         try:
+                            addr = self._get_address()
+                            if addr is not None:
+                                self._socket.sendto(shortPacket, addr)
                             self._socket.shutdown(socket.SHUT_RDWR)
                         except OSError as oe:
                             if oe.errno == 57:
