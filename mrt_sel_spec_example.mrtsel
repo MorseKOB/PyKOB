@@ -1,0 +1,29 @@
+{
+    "type":"1OF4",
+    "selections": [
+        {
+            "desc":"News (Wire 108)",
+            "args":[
+                "108"
+            ]
+        },
+        {
+            "desc":"Chat (Wire 11)",
+            "args":[
+                "11"
+            ]
+        },
+        {
+            "desc":"Play from text file",
+            "args":[
+                "--file", "src.py/mkob_learn/The_quick_brown_fox.txt", "--repeat", "5", "0"
+            ]
+        },
+        {
+            "desc":"Local only",
+            "args":[
+                "0"
+            ]
+        }
+    ]
+}

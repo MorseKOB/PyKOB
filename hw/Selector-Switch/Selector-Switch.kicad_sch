@@ -282,6 +282,14 @@
     (uuid fb3f6556-1cac-44e4-bca1-a02e6674f812)
   )
 
+  (text_box "For the selector switch and 3D printed enclosure, a wire length of 2.25 inch works well."
+    (at 190.5 156.21 0) (size 72.39 13.97)
+    (stroke (width 0) (type default))
+    (fill (type none))
+    (effects (font (size 2.032 2.032)) (justify left top))
+    (uuid 70e1757b-6cb0-4ae4-ba12-3832a43045b2)
+  )
+
   (label "WHITE-" (at 162.56 80.01 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 0a963afe-f5cc-49eb-8d01-e92e5e5f00db)

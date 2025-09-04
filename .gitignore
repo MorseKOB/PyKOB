@@ -26,7 +26,7 @@ nuitka-crash-report.xml
 **/CPackConfig.cmake
 **/cmake_install.cmake
 **/install_manifest.txt
-**/compie_commands.json
+**/compile_commands.json
 
 # PCB
 */#auto_saved_files#

@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
     try:
         log.set_logging_level(log.DEBUG_MIN_LEVEL)
-        port = sys.argv[1] if len(sys.argv) == 2 else 'COM4'
+        port = sys.argv[1] if len(sys.argv) == 2 else 'SDSEL'
         __test_selector = Selector(port, SelectorMode.OneOfFour, on_change=__test_on_change)
         __test_selector.start()
         while True:
