@@ -103,6 +103,7 @@ def main(argv):
                     config2.interface_type_override,
                     config2.invert_key_input_override,
                     config2.no_key_closer_override,
+                    config2.open_check_extend_override,
                     config2.local_override,
                     config2.remote_override,
                     config2.sound_override,

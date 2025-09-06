@@ -376,6 +376,8 @@ A value of zero (0) disables this functionality.(((Sounder power save, disable))
 This enables/disables the sounding of code keyed locally, from either the physical key or from the Keyboard Sender.
 ** *Invert key input*:
 This inverts the state of the key. Some interfaces, most notably the modem interface, present the key state at the opposite level of what is considered ‘normal’, and this option allows their use.
+** *Extend key open check*:
+This extends the length of time that the key closer must be open before opening the circuit. When this option is enabled the circuit isn't considered open until the key closer has remained open continuously for almost a second (rather than immediately upon opening it). This option is primarily intended for use with a longer physical wire loop, where noise on the line might otherwise trigger a circuit open state.
 
 ==== Internet Connection
 Configuration for connecting to a KOBServer and wire.
@@ -633,7 +635,7 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((MKOB)) ((Version 4.4.2))
+This document reflects the features of ((MKOB)) ((Version 4.4.3))
 Edit date: 12-10-2024
 
 MIT License
