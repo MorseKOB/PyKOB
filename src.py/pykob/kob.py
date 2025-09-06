@@ -57,9 +57,10 @@ from threading import Event, RLock, Thread
 import traceback
 from typing import Any, Callable
 
-DEBOUNCE  = 0.018  # time to ignore transitions due to contact bounce (sec)
+DEBOUNCE  = 0.010  # time to ignore transitions due to contact bounce (sec)
 CODESPACE = 0.120  # amount of space to signal end of code sequence (sec)
 CKTCLOSE  = 0.800  # length of mark to signal circuit closure (sec)
+CKTOPENEXTEND = 0.800  # extended time to check for consistent OPEN state (sec)
 
 log.debug("Platform: {}".format(sys.platform))
 if sys.platform == "win32" or sys.platform == "cygwin":
@@ -164,9 +165,9 @@ class KOB:
     def __init__(
             self, interfaceType=InterfaceType.loop, useSerial=False, portToUse=None,
             useGpio=False, useAudio=False, audioType=AudioType.SOUNDER, useSounder=False, invertKeyInput=False,
-            noKeyCloser=False, soundLocal=True, sounderPowerSaveSecs=0,
+            noKeyCloser=False, koCheckExtend=False, soundLocal=True, sounderPowerSaveSecs=0,
             virtual_closer_in_use=False, err_msg_hndlr=None, status_msg_hndlr=None, keyCallback=None):
-        # type: (InterfaceType, bool, str|None, bool, bool, AudioType, bool, bool, bool, bool, int, bool, Callable, Callable) -> None
+        # type: (InterfaceType, bool, str|None, bool, bool, AudioType, bool, bool, bool, bool, bool, int, bool, Callable, Callable, Callable) -> None
         """
         When PyKOB code is not running, the physical sounder (if connected) is not powered by
         a connected interface, so set the initial state flags accordingly.
@@ -176,6 +177,7 @@ class KOB:
         self._interface_type = interfaceType        # type: InterfaceType
         self._invert_key_input = invertKeyInput     # type: bool
         self._no_key_closer = noKeyCloser           # type: bool
+        self._ko_check_extend = koCheckExtend       # type: bool
         self._err_msg_hndlr = err_msg_hndlr if err_msg_hndlr else log.warn  # type: Callable  # Function that can take a string
         self._status_msg_hndlr = status_msg_hndlr if status_msg_hndlr else self.__str_sync  # type: Callable  # Function that can take a string
         self._use_serial = useSerial                # type: bool
@@ -345,6 +347,7 @@ class KOB:
                 # consistency.
                 self._interface_type = InterfaceType.key_sounder
                 self._no_key_closer = True
+                self._ko_check_extend = False
                 self._paddle_is_supported = False
                 self._port = None
             # Update closers states based on state of key
@@ -681,7 +684,7 @@ class KOB:
 
         log.debug("kob._update_modes: now {}:{}".format(
             self._sounder_mode.name, self._synth_mode.name), 2)
-        energize_sounder = (not sounder_mode == SounderMode.DIS) and ((sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK))
+        energize_sounder = (not sounder_mode == SounderMode.DIS) and ((sounder_mode == SounderMode.EFK) or (not sounder_mode == SounderMode.SLC and not sounder_mode == SounderMode.FK) or (sounder_mode == SounderMode.SLC and not kcon))
         self._energize_hw_sounder(energize_sounder)
         if not (from_key_closer and self._virtual_closer_in_use):
             energize_synth = (not synth_mode == SynthMode.DIS) and ((not synth_mode == SynthMode.SLC and not synth_mode == SynthMode.FK))
@@ -731,6 +734,14 @@ class KOB:
         if not on == was:
             self._no_key_closer = on
             self._update_modes()
+        return
+
+    @property
+    def ko_check_extend(self): # type: () -> bool
+        return self._ko_check_extend
+    @ko_check_extend.setter
+    def ko_check_extend(self, on:bool): # type: (bool) -> None
+        self._ko_check_extend = on
         return
 
     @property
@@ -797,8 +808,8 @@ class KOB:
             self._update_modes()
         return
 
-    def change_hardware(self, interface_type, use_serial, port_to_use, use_gpio, use_sounder, invert_key_input, no_key_closer):
-        # type: (InterfaceType, bool, str|None, bool, bool, bool, bool) -> None
+    def change_hardware(self, interface_type, use_serial, port_to_use, use_gpio, use_sounder, invert_key_input, no_key_closer, ko_check_extend):
+        # type: (InterfaceType, bool, str|None, bool, bool, bool, bool, bool) -> None
         """
         Change the hardware from what it was at initialization
         Note: Hardware may not be different, but re-init with these values.
@@ -809,6 +820,7 @@ class KOB:
         self._interface_type = interface_type
         self._invert_key_input = invert_key_input
         self._no_key_closer = no_key_closer
+        self._ko_check_extend = ko_check_extend
         self._use_serial = use_serial
         self._port_to_use = port_to_use
         self._use_gpio = use_gpio
@@ -871,14 +883,41 @@ class KOB:
         if self._shutdown.is_set():
             return code
         sleep_time = 0.001
+        waiting_for_open = False
+        t_first_opened = 0
         while not self._threadsStop_KS.is_set() and self._hw_is_available():
             kc = self._key_state_last_closed
             try:
-                kc = self._key_is_closed()
+                kc1 = self._key_is_closed()
+                if kc != kc1:
+                    self._threadsStop_KS.wait(DEBOUNCE)
+                    kc2 = self._key_is_closed()
+                    if kc1 != kc2:
+                        continue     # Key is bouncing, check again
+                    kc = kc2
             except(OSError):
                 log.debug(traceback.format_exc(), 3)
                 return code # Stop trying to process the key
             t = time.time()
+            if self._circuit_is_closed:
+                if not kc:
+                    # Key is now open from a closed state. See if we need to delay before changing state
+                    if self._ko_check_extend:
+                        # Yes. See if this is the first time we have seen an open
+                        if not waiting_for_open:
+                            # Currently Closed, the key is now open, and we aren't already waiting for an Open
+                            waiting_for_open = True
+                            t_first_opened = t
+                            continue
+                        else:
+                            # The key has already been recognized as being open, see if enough time has passed
+                            if (t - t_first_opened) < CKTOPENEXTEND:
+                                continue
+                            pass
+                        pass
+                    pass
+                pass
+            waiting_for_open = False
             if kc != self._key_state_last_closed:
                 self._key_state_last_closed = kc
                 dt = int((t - self._t_key_last_change) * 1000)
@@ -891,7 +930,6 @@ class KOB:
                 #
                 if self._sounder_mode == SounderMode.FK or self._synth_mode == SynthMode.FK:
                     self.energize_sounder(kc, CodeSource.key)
-                self._threadsStop_KS.wait(DEBOUNCE)
                 if kc:
                     code += (-dt,)
                 elif self._circuit_is_closed and not self._no_key_closer:

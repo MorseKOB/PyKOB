@@ -94,6 +94,7 @@ _INVERT_KEY_INPUT_KEY = "KEY_INPUT_INVERT"
 _LOCAL_KEY = "LOCAL"
 _MIN_CHAR_SPEED_KEY = "CHAR_SPEED_MIN"
 _NO_KEY_CLOSER_KEY = "NO_KEY_CLOSER"
+_OPEN_CHECK_EXTEND_KEY = "OPEN_EXTEND"
 _REMOTE_KEY = "REMOTE"
 _SERVER_URL_KEY = "SERVER_URL"
 _SOUND_KEY = "SOUND"
@@ -141,6 +142,7 @@ interface_type = InterfaceType.loop
 invert_key_input = False
 local = True
 no_key_closer = False
+open_check_extend = False
 remote = True
 server_url = None
 sound = True
@@ -457,6 +459,28 @@ def set_no_key_closer(b):
         raise
     return
 
+def set_open_check_extend(b):
+    """Enable/disable a longer open period before indicating 'Key Open'.
+
+    This lengthens the check for the key being open (consecutive open state tests) before
+    transitioning the state from Closed to Open. This is to help with noisy lines being 
+    interpreted as a key opening.
+
+    Parameters
+    ----------
+    b : str
+        The enable/disable state to set as a string. Values of `YES`|`ON`|`TRUE`
+        will indicate the open time should be extended. Values of `NO`|`OFF`|`FALSE` indicate a normal test duration.
+    """
+    global open_check_extend
+    try:
+        open_check_extend = strtobool(str(b))
+        user_config.set(_CONFIG_SECTION, _OPEN_CHECK_EXTEND_KEY, util.on_off_from_bool(open_check_extend))
+    except ValueError as ex:
+        log.err("Extend Open check value '{}' is not a valid boolean value. Not setting value.".format(ex.args[0]))
+        raise
+    return
+
 def set_remote(r):
     """Enable/disable remote send
 
@@ -767,6 +791,7 @@ def print_config():
     print("Invert key input:", util.on_off_from_bool(invert_key_input))
     print("Local copy:", util.on_off_from_bool(local))
     print("No key closer:", util.true_false_from_bool(no_key_closer))
+    print("Open Check extend:", util.on_off_from_bool(open_check_extend))
     print("Remote send:", util.on_off_from_bool(remote))
     print("KOB Server URL:", url)
     print("Sound:", util.on_off_from_bool(sound))
@@ -827,6 +852,7 @@ def read_config():
     global local
     global min_char_speed
     global no_key_closer
+    global open_check_extend
     global remote
     global server_url
     global sound
@@ -910,6 +936,7 @@ def read_config():
         _LOGGING_LEVEL_KEY:"0",
         _MIN_CHAR_SPEED_KEY:"18",
         _NO_KEY_CLOSER_KEY:"OFF",
+        _OPEN_CHECK_EXTEND_KEY:"OFF",
         _REMOTE_KEY:"ON",
         _SERVER_URL_KEY:"NONE",
         _SOUND_KEY:"ON",
@@ -1006,6 +1033,9 @@ def read_config():
         __option = "No key closer"
         __key = _NO_KEY_CLOSER_KEY
         no_key_closer = user_config.getboolean(_CONFIG_SECTION, __key)
+        __option = "Extend Open check"
+        __key = _OPEN_CHECK_EXTEND_KEY
+        open_check_extend = user_config.getboolean(_CONFIG_SECTION, __key)
         __option = "Remote send"
         __key = _REMOTE_KEY
         remote = user_config.getboolean(_CONFIG_SECTION, __key)
@@ -1125,6 +1155,16 @@ no_key_closer_override.add_argument(
     help="'TRUE' or 'FALSE' to indicate if the physical key does not have a closer.",
     metavar="no-closer",
     dest="no_key_closer",
+)
+
+open_check_extend_override = argparse.ArgumentParser(add_help=False)
+open_check_extend_override.add_argument(
+    "-O",
+    "--open-check-extend",
+    default=open_check_extend,
+    help="'TRUE' or 'FALSE' to indicate if the Key Open check time should be extended.",
+    metavar="extend",
+    dest="open_check_extend",
 )
 
 remote_override = argparse.ArgumentParser(add_help=False)
