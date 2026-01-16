@@ -3,20 +3,31 @@
 This file is not intended as any type of tutorial on development, and is therefore
 fairly terse.
 
+## Python
+
+PyKOB is currently targeted to Python 3.11. When running the applications, a newer
+version can probably be used, but for now we are sticking with 3.11 for development
+in order to support the older machines that a number of the users have.
+
+Install a Python 3.11 on the dev machine in order to create the virtual environment
+used for development (see the next section).
+
 ## Virtual Environment
 
 Use the **requirments.txt** to create a virtual Python environment
+
+### Windows
 
 ``` shell
 python3 -m venv .venv
 .venv/Scripts/activate.bat
 ```
 
- OR
+### Mac
 
 ``` shell
 python3 -m venv .venv
-source .venv/Scripts/activate
+source .venv/bin/activate
 ```
 
 Load the required modules into the virtual environment:

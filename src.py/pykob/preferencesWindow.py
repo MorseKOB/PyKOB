@@ -225,6 +225,11 @@ class PreferencesWindow:
         ttk.Checkbutton(advancedlocalInterface, text="Invert key input",
                         variable=self._invertKeyInput).grid(row=9, column=0, padx=[22, 0], sticky=tk.W)
 
+        # Add a single checkbox for Extend Key Open Check
+        self._openCheckExtend = tk.IntVar(value=self._cfg.open_check_extend)
+        ttk.Checkbutton(advancedlocalInterface, text="Extend key open check",
+                        variable=self._openCheckExtend).grid(row=10, column=0, padx=[22, 0], sticky=tk.W)
+
         basiclocalInterface.pack(fill=tk.BOTH)
         advancedlocalInterface.pack(fill=tk.BOTH)
 
@@ -606,6 +611,7 @@ class PreferencesWindow:
             muted_cfg.local = bool(self._soundLocalCode.get())
             muted_cfg.invert_key_input = bool(self._invertKeyInput.get())
             muted_cfg.no_key_closer = bool(self._noKeyCloser.get())
+            muted_cfg.open_check_extend = bool(self._openCheckExtend.get())
             muted_cfg.sound = bool(self._useSystemSound.get())
             muted_cfg.audio_type = self._audioType
             muted_cfg.sounder = bool(self._useLocalSounder.get())

@@ -70,7 +70,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "src.py/Telegram.py",
-            "args": ["--logging-level", "1", "--tgcfg", "tg_config.tgc", "901"],
+            "args": ["--logging-level", "1", "--tgcfg", "tg_config.tgc", "108"],
             "console": "integratedTerminal",
             "justMyCode": false
         },

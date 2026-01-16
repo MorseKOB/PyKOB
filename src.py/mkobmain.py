@@ -147,6 +147,7 @@ class MKOBMain:
                 useSounder=cfg.sounder,
                 invertKeyInput=cfg.invert_key_input,
                 noKeyCloser=cfg.no_key_closer,
+                koCheckExtend=cfg.open_check_extend,
                 soundLocal=cfg.local,
                 sounderPowerSaveSecs=cfg.sounder_power_save,
                 virtual_closer_in_use=True,
@@ -956,8 +957,8 @@ class MKOBMain:
                 kob_.sounder_power_save_secs = cfg.sounder_power_save
                 if cfg.sound_changed or cfg.audio_type_changed:
                     kob_.change_audio(cfg.sound, cfg.audio_type)
-                if cfg.interface_type_changed or cfg.use_serial_changed or cfg.serial_port_changed or cfg.use_gpio_changed:
-                    kob_.change_hardware(cfg.interface_type, cfg.use_serial, cfg.serial_port, cfg.use_gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer)
+                if cfg.interface_type_changed or cfg.use_serial_changed or cfg.serial_port_changed or cfg.use_gpio_changed or cfg.invert_key_input_changed or cfg.no_key_closer_changed or cfg.open_check_extend_changed:
+                    kob_.change_hardware(cfg.interface_type, cfg.use_serial, cfg.serial_port, cfg.use_gpio, cfg.sounder, cfg.invert_key_input, cfg.no_key_closer, cfg.open_check_extend)
                 elif cfg.sounder_changed:
                     kob_.use_sounder = cfg.sounder
         finally:

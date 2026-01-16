@@ -46,7 +46,7 @@ import mkobwindow as mkw
 from mkobwindow import MKOBWindow
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = "4.4.2"
+__version__ = "4.4.3"
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 MKOB_VERSION_TEXT = "MKOB " + VERSION
 

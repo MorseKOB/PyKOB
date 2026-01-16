@@ -58,9 +58,14 @@ Examples:
 
 Change history:
 
+Feed 2.3  2025-12-04
+- Remove 'Feed' specific single character option flags to avoid conflicts with 'config' options.
+   (config uses many of the single character flags, and those that it doesn't should be reserved for its use.)
+- Handle NONE `description` from RSS feed.
+
 Feed 2.2  2024-03-13
 - Create Internet instance with all parameters needed to adapt to new config usage
-  (modules don't read directly from config)
+   (modules don't read directly from config)
 
 Feed 2.1  2024-02-21
 - Send text character along with the code for compatibility with CWCOM clients
@@ -99,7 +104,7 @@ from pykob import config, newsreader, morse, internet, kob, log, recorder
 from pykob.util import strtobool
 
 
-VERSION     = '2.2'
+VERSION     = '2.3'
 DATEFORMAT  = '%a, %d %b %Y %H:%M:%S'
 TIMEOUT     = 30.0  # time to keep sending after last indication of live listener (sec)
 
@@ -226,7 +231,8 @@ def processRSS():
             text = ''
             if title:
                 text += title + '. '
-            text += description
+            if description:
+                text += description
             if pubDate:  # treat as an article, not freeform text
                 text += '  ='
             while activeSender() or not activeListener():
@@ -259,6 +265,7 @@ try:
             config.serial_port_override,
             config.code_type_override,
             config.interface_type_override,
+            config.logging_level_override,
             config.sound_override,
             config.sounder_override,
             config.spacing_override,
@@ -274,13 +281,13 @@ try:
             help="The URI for the feed (e.g. http://rss.cnn.com/rss/cnn_topstories.rss or file://civilwar.xml)")
     arg_parser.add_argument("speed", type=int, help="The code speed for the feed (in WPM)")
 
-    arg_parser.add_argument("--article-pause", "-P", metavar="<sec>", type=float, default=2.0,
+    arg_parser.add_argument("--article-pause", metavar="<sec>", type=float, default=2.0,
                             help="Pause between articles", dest= "artPause")
-    arg_parser.add_argument("--group-pause", "-G", metavar="<sec>", type=float, default=5.0,
+    arg_parser.add_argument("--group-pause", metavar="<sec>", type=float, default=5.0,
                             help="Pause between article groups", dest="grpPause")
-    arg_parser.add_argument("--days", "-d", metavar="<days>", type=int, default=0,
+    arg_parser.add_argument("--days", metavar="<days>", type=int, default=0,
                             help="Number of days from today of articles to read before repeating (default: all)", dest="days")
-    arg_parser.add_argument("--wait", "-w", metavar="<sec>", type=float, default=0.0,
+    arg_parser.add_argument("--wait", metavar="<sec>", type=float, default=0.0,
                             help="Number of seconds to wait for the wire to be idle before sending (default: none)", dest="wait")
 
     args = arg_parser.parse_args()
@@ -370,7 +377,14 @@ except KeyboardInterrupt:
 except Exception as ex:
     print()
     print("Feed encountered error: {}".format(ex))
+    log.debug(traceback.format_exc(), 3)
     sys.exit(1)
 finally:
+    if myKOB:
+        myKOB.exit()
+    if myInternet:
+        myInternet.exit()
+    if mySender:
+        mySender.exit()
     print("Goodbye")
     print("")
