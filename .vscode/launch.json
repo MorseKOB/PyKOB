@@ -92,6 +92,17 @@
             "args": ["--gui"],
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "Feed",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/Feed.py",
+            "args": [
+                "--logging-level", "3", "901", "Feed test, ES", "http://rss.cnn.com/rss/cnn_topstories.rss", "20"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
