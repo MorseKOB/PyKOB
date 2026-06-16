@@ -609,6 +609,8 @@ class KOB:
         """
         Track the physical key closer. This controls the Loop/KOB sounder state.
         """
+        keyaction = "OPENED" if open else "CLOSED"
+        log.debug("KEY {}".format(keyaction), 1)
         log.debug("kob._set_key_closer_open: {}->{}".format(self._key_closer_is_open, open), 3)
         if not open == self._key_closer_is_open:
             was_open = self._key_closer_is_open

@@ -31,7 +31,8 @@
             "args": [
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
             "name": "MRT",
@@ -39,9 +40,11 @@
             "request": "launch",
             "program": "src.py/MRT.py",
             "args": [
+                "--senderdt"
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
             "name": "MRT (sf)",
@@ -60,10 +63,11 @@
             "request": "launch",
             "program": "src.py/MRT.py",
             "args": [
-                "--selector", "SDSEL", "mrt_sel_spec.mrtsel"
+                "--senderdt", "--Selector", "SDSEL", "mrt_sel_spec.mrtsel"
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
             "name": "Telegram",

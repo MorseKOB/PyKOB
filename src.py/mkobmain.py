@@ -76,7 +76,8 @@ class MKOBMain:
         self._last_char_was_para: bool = False
         self._wire_data_received: bool = False
 
-        self._internet_station_active = False  # True if connected and a remote station is sending
+        self._inet_breakin_open_cnt = 0         # Track consecutive Open count to break in to open wire
+        self._internet_station_active = False   # True if connected and a remote station is sending
 
         self._sender_ID = ""
 
@@ -213,6 +214,8 @@ class MKOBMain:
             done_callback = emit_code_packet[4]
 
             callback_delay = 30
+            if not (code[-1] == 2 or code[-1] == 1):    # special code for closer/circuit open/closed
+                self._inet_breakin_open_cnt = 0         # reset the break in count on other key actions
             if not self._internet_station_active:
                 callback_delay = 1
                 if closer_open:
@@ -645,6 +648,14 @@ class MKOBMain:
         False: 'UNLATCH' the circuit (now open)
 
         """
+        if self._internet_station_active:
+            if not closed:
+                self._inet_breakin_open_cnt += 1
+                if self._inet_breakin_open_cnt > 1:
+                    # Break in to open wire
+                    self.reset_wire_state()
+            if self._internet_station_active:
+                return
         code = LATCH_CODE if closed else UNLATCH_CODE
         # Set the Circuit Closer checkbox appropriately
         self._kw.vkey_closed = 1 if closed else 0
