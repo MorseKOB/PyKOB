@@ -75,7 +75,7 @@ import traceback
 from typing import Optional, Sequence
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.4.6'
+__version__ = '1.4.7'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 MRT_VERSION_TEXT = "MRT " + VERSION
 
