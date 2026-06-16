@@ -662,6 +662,16 @@ class _SchedFeedProcessor:
         return
 
 
+class _MrtOptions:
+    """
+    Non-Config options passed in to MRT
+    """
+    def __init__(
+            self,
+            sender_dt: bool = False,
+    ) -> None:
+        self.sender_dt = sender_dt
+
 class Mrt:
     """
     Morse Receive & Transmit 'Mr T'.
@@ -1317,8 +1327,7 @@ class Mrt:
                     self._fst_stop.set()
             except Exception as ex:
                 print(
-                    "<<< File sender encountered an error and will stop sending. Exception: {}"
-                ).format(ex)
+                    "<<< File sender encountered an error and will stop sending. Exception: {}".format("?" if ex is None else ex))
                 log.debug(traceback.format_exc(), 3)
                 self._fst_stop.set()
             finally:
@@ -1412,9 +1421,10 @@ class MrtSelector:
         return s
 
 
-    def __init__(self, selector_port, selector_file_path, cfg:Optional[Config]=None, status_msg_hdlr=None, enable_retries=False) -> None:
+    def __init__(self, selector_port, selector_file_path, goptions:Optional[_MrtOptions]=None, cfg:Optional[Config]=None, status_msg_hdlr=None, enable_retries=False) -> None:
         self._selector_file_path = MrtSelector.add_ext_if_needed(selector_file_path)
         self._selector_port: str = selector_port
+        self._goptions: Optional[_MrtOptions] = goptions
         self._cfg: Optional[Config] = cfg
         self._status_msg_hdlr = status_msg_hdlr
         self._enable_retries = enable_retries
@@ -1453,7 +1463,7 @@ class MrtSelector:
         log.debug("MrtSelector._load_mrt_for_spec: '{}'  MRT {}".format(spec_desc, spec_args))
         mrt = None
         try:
-            mrt, sel_spec = mrt_from_args(spec_args, cfg=self._cfg, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
+            mrt, sel_spec, goptions = mrt_from_args(self._goptions, spec_args, cfg=self._cfg, allow_selector=False)  # Don't allow a Selector to be specified in a selection spec.
         except FileNotFoundError as fnf:
             raise SelectorMrtFileNotFound("File not found: '{}', trying to load specification: '{}'".format(fnf, spec_desc))
         except Exception as ex:
@@ -1612,7 +1622,7 @@ def status_msg_handler(msg):
     log.log("\n{}\n".format(msg), dt="")
     return
 
-def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
+def mrt_from_args(gopts: Optional[_MrtOptions] = None, options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None, allow_selector:bool=True) -> tuple[Mrt, Optional[MrtSelector]]:
     arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit (Mr T). "
         + "Receive from wire and send from key.\nThe Global configuration is used except as overridden by options.",
         parents= [
@@ -1631,6 +1641,8 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
         ],
         exit_on_error=False
     )
+    if gopts is None:
+        gopts = _MrtOptions()
     arg_parser.add_argument(
         "--file",
         metavar="text-file-path",
@@ -1692,6 +1704,10 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
     cfg = config2.process_config_args(args, cfg)
     log.set_logging_level(cfg.logging_level)
 
+    sender_dt = gopts.sender_dt or args.sender_dt
+    gopts.sender_dt = sender_dt
+    if sender_dt:
+        log.debug("New sender listed with Date-Time", 1)
     wire = args.wire if args.wire else cfg.wire
     record_filepath = pkappargs.record_filepath_from_args(args)
     play_filepath = None if not (hasattr(args, "play_filepath") and args.play_filepath) else args.play_filepath
@@ -1712,18 +1728,21 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             selector_specpath = args.Selector_args[1]
             selector_optional = False  # Require a selector, error out if not
         pass
-    sender_dt = args.sender_dt
     #
-    # Check to see that recordings/files aren't specified if there is a selector
-    if selector_specpath and (play_filepath or sendtext_filepath or schedfeed_spec_path):
-        raise Exception("Cannot specify a recording or a file to process, or a schedfeed spec when using a Selector. ")
-
+    if (play_filepath or sendtext_filepath or schedfeed_spec_path):
+        # Set wire to 0 if playing or sending text
+        if (play_filepath or sendtext_filepath):
+            wire = 0
+        # Check to see that recordings/files aren't specified if there is a selector
+        if selector_specpath:
+            raise Exception("Cannot specify a recording or a file to process, or a schedfeed spec when using a Selector. ")
+    #
     selector = None
     #
     # If we have a selector spec path, create a selector to return
     if selector_specpath:
         try:
-            selector = MrtSelector(selector_port, selector_specpath, cfg, status_msg_hdlr=status_msg_handler, enable_retries=selector_optional)
+            selector = MrtSelector(selector_port, selector_specpath, gopts, cfg, status_msg_hdlr=status_msg_handler, enable_retries=selector_optional)
         except SelectorLoadError as ex:
             # If a selector is not optional, exit with an error, else return a 'plain' MRT
             if not selector_optional:
@@ -1734,7 +1753,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             pass
         pass
 
-    mrt = None if not selector is None else Mrt(
+    mrt = None if selector is not None else Mrt(
         MRT_VERSION_TEXT,
             wire,
             cfg,
@@ -1745,7 +1764,7 @@ def mrt_from_args(options: Optional[Sequence[str]] = None, cfg: Optional[Config]
             file_to_send=sendtext_filepath,
             schedfeed_spec=schedfeed_spec_path
         )
-    return (mrt, selector)
+    return (mrt, selector, gopts)
 
 """
 Main code
@@ -1762,7 +1781,7 @@ if __name__ == "__main__":
         print("PySerial: " + config.pyserial_version, flush=True)
 
 
-        mrt, mrt_selector = mrt_from_args(allow_selector=True)
+        mrt, mrt_selector, goptions = mrt_from_args(allow_selector=True)
 
         if mrt_selector:
             log.log("Running with a selector.\n", dt="")
