@@ -740,7 +740,8 @@ class Mrt:
         self._thread_kbsender: Optional[Thread] = None
 
         self._connected = False
-        self._internet_station_active = False  # True if a remote station is sending
+        self._inet_breakin_open_cnt = 0         # Track consecutive Open count to break in to open wire
+        self._internet_station_active = False  # True if a remote station has the wire open
         self._last_received_para = False # The last character received was a Paragraph ('=')
         self._local_loop_active = False  # True if sending on key or keyboard
         self._our_office_id = cfg.station if not cfg.station is None else ""
@@ -964,6 +965,8 @@ class Mrt:
         determine it should be emitted.
         """
         kob_ = self._kob
+        if not (code[-1] == 2 or code[-1] == 1):    # special code for closer/circuit open/closed
+            self._inet_breakin_open_cnt = 0         # reset the break in count on other key actions
         if kob_:
             kob_.internet_circuit_closed = not self._internet_station_active
         self._handle_sender_update(self._our_office_id)
@@ -1238,6 +1241,14 @@ class Mrt:
         True: 'latch'
         False: 'unlatch'
         """
+        if self._internet_station_active:
+            if not closed:
+                self._inet_breakin_open_cnt += 1
+                if self._inet_breakin_open_cnt > 1:
+                    # Break in to open wire
+                    self._internet_station_active = False
+            if self._internet_station_active:
+                return
         self._kob.virtual_closer_is_open = not closed
         code = LATCH_CODE if closed else UNLATCH_CODE
         if not self._internet_station_active:

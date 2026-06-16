@@ -635,7 +635,7 @@ endif::[]
 
 [colophon]
 = Colophon
-This document reflects the features of ((MKOB)) ((Version 4.4.3))
+This document reflects the features of ((MKOB)) ((Version 4.4.4))
 Edit date: 12-10-2024
 
 MIT License

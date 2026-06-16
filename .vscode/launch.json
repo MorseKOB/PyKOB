@@ -31,7 +31,8 @@
             "args": [
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
             "name": "MRT",
@@ -41,7 +42,8 @@
             "args": [
             ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
             "name": "MRT (sf)",

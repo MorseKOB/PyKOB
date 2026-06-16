@@ -1,4 +1,4 @@
-MRT 1.4.6
+MRT 1.4.7
 usage: MRT.py [-h] [-a sound] [-A sounder] [-g gpio] [-P serial] [-p portname]
               [-S station] [-c wpm] [-t wpm] [--config config-file]
               [--logging-level logging-level] [--record filepath|['A'|'AUTO']]
