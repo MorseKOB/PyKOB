@@ -975,7 +975,7 @@ class Mrt:
         determine it should be emitted.
         """
         kob_ = self._kob
-        if not (code[-1] == 2 or code[-1] == 1):    # special code for closer/circuit open/closed
+        if len(code) > 0 and (not (code[-1] == 2 or code[-1] == 1)): # special code for open/closed
             self._inet_breakin_open_cnt = 0         # reset the break in count on other key actions
         if kob_:
             kob_.internet_circuit_closed = not self._internet_station_active

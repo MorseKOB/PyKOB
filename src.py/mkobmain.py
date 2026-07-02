@@ -214,7 +214,7 @@ class MKOBMain:
             done_callback = emit_code_packet[4]
 
             callback_delay = 30
-            if not (code[-1] == 2 or code[-1] == 1):    # special code for closer/circuit open/closed
+            if len(code) > 0 and (not (code[-1] == 2 or code[-1] == 1)): # special code for open/closed
                 self._inet_breakin_open_cnt = 0         # reset the break in count on other key actions
             if not self._internet_station_active:
                 callback_delay = 1
