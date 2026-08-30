@@ -282,6 +282,9 @@ class KOB:
             gpio_button = None
             if self._use_gpio:
                 try:
+                    #import gpiod
+                    #from gpiod.line import Direction, Value, Bias, Edge
+                    # PULL-UP: bias=Bias.PULL_UP
                     from gpiozero import LED, Button
 
                     gpio_module_available = True

@@ -23,17 +23,23 @@ SOFTWARE.
 """
 """
     Selector -
-    Class that monitors a full UART interface for one of four handshake
-    signals being active. Or a value from 0 to 15 (0x00 - 0xFF) using the
-    four handshake signals as binary: RI(bit-3) CD(bit-2) DSR(bit-1) CTS(bit-0)
+    Class that monitors:
+     1) Full UART interface monitoring four handshake signals
+        RI(bit-3) CD(bit-2) DSR(bit-1) CTS(bit-0)
+     2) Four GPIO pins (typically on a Raspberry Pi)
+        GPIO05(bit-3) GPIO06(bit-2) GPIO13(bit-1) GPIO19(bit-0)
+        (these are 4 in a row on the RPi header: 29,31,33,35)
+    It can check for one of the four signals being active (1,2,3,4). Or it can
+    use them to read a value from 0 to 15 (0x00 - 0x0F). 
 
     The value can be read as needed and a callback can be supplied that is
     called when the value changes.
 
-    The 'port_to_use' can be a serial port specification
-        (COMx on Windows, /dev/tty... on *nix/Mac)
-    or the special value 'SDSEL' (Silky-DESIGN Selector) to find a
-    serial port with a serial number ending in '_AESSEL' ('_AESSELA' on Windows)
+    The 'portToUse' can be a serial port specification
+        (COMx on Windows, /dev/tty... on *nix/Mac),
+    the special value 'SDSEL' (Silky-DESIGN Selector) to find a
+    serial port with a serial number ending in '_AESSEL' ('_AESSELA' on Windows),
+    or 'GPIO' to use the four GPIO pins.
 """
 from enum import Enum, IntEnum, unique
 import sys
@@ -88,6 +94,8 @@ class Selector:
             pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None, status_msg_hdlr=None, retries_enabled=False) -> None:
         self._status_msg_hdlr = status_msg_hdlr if status_msg_hdlr is not None else self._null_status_hdlr
         self._portToUse = portToUse
+        self._useGPIO = False
+        self._gpio_dev = None
         self._port = None
         self._mode = mode
         self._pole_cycle_time = pole_cycle_time if pole_cycle_time >= POLE_CYCLE_TIME_MIN else POLE_CYCLE_TIME_MIN
@@ -228,7 +236,7 @@ class Selector:
     def start(self):  # type: () -> bool
         """
         Start up the selector. Return true if all is good.
-        If we aren't able to find a selector switch, but retried are enabled
+        If we aren't able to find a selector switch, but retries are enabled
         (so we might find a selector switch later) return false.
         If we don't find a selector switch and retries aren't enabled, raise
         an exception.
@@ -236,29 +244,44 @@ class Selector:
         Return: True is all is good. False if retrying in background. Exception if error.
         """
         try:
-            self._port = pkserial.PKSerial(
-                self._portToUse,
-                err_callback=self._status_msg_hdlr,
-                status_callback=self._status_msg_hdlr,
-                enable_retries=self._retries_enabled
-            )
-            self._port.start()
-            v = self._port.cts  # Do a read to see if there are any errors
-            if self._port.port_name_used is not None:
-                log.debug("The port '{}' for the Selector is available.".format(self._port.port_name_used))
+            # If the portToUse is "gpio" see if we have a GPIO to use else we try to find a serial module
+            if self._portToUse.lower() == "gpio":
+                self._useGPIO = True
+                from pykob import gpio
+                self._gpio_dev = gpio.get_gpio_dev()
+                if self._gpio_dev is not None:
+                    log.debug("GPIO found on '{}' for the Selector".format(self._gpio_dev))
+                else:
+                    log.log("GPIO 'pin' hardware not found. Selector cannot be used.\n", dt="")
+                    raise SDSelectorNotFound("No usable GPIO Hardware")
             else:
-                log.log("Serial port '{}' problem. Will retry connection in the background.\n".format(self._portToUse), dt="")
+                self._port = pkserial.PKSerial(
+                    self._portToUse,
+                    err_callback=self._status_msg_hdlr,
+                    status_callback=self._status_msg_hdlr,
+                    enable_retries=self._retries_enabled
+                )
+                self._port.start()
+                v = self._port.cts  # Do a read to see if there are any errors
+                if self._port.port_name_used is not None:
+                    log.debug("The port '{}' for the Selector is available.".format(self._port.port_name_used))
+                else:
+                    log.log("Selector serial port '{}' problem.\n".format(self._portToUse), dt="")
         except Exception as ex:
             log.debug("Selector exception: {}".format(ex))
-            if self._retries_enabled:
-                log.log("Serial port '{}' error. Will retry connection in the background.\n".format(self._portToUse), dt="")
-                # Return False and retry finding a selector.
-                return False
+            if self._useGPIO:
+                log.log("GPIO error. Selector cannot be used.\n", dt="")
             else:
-                log.log("Serial port '{}' error. Selector cannot be used.\n".format(self._portToUse), dt="")
-                raise SDSelectorNotFound(ex)
+                log.log("Selector serial port '{}' error. ".format(self._portToUse), dt="")
+                if self._retries_enabled:
+                    log.log("Will retry connection in the background.\n", dt="")
+                    # Return False and retry finding a selector.
+                    return False
+                else:
+                    log.log("Selector cannot be used.\n", dt="")
+            raise SDSelectorNotFound(ex)
         finally:
-            if self._port is not None:
+            if self._gpio_dev is not None or self._port is not None:
                 self._thread_port_checker.start()
         return True
 

@@ -58,12 +58,47 @@
             "justMyCode": false
         },
         {
-            "name": "MRT w/Sel",
+            "name": "MRT w/Sel (SDSEL)",
             "type": "debugpy",
             "request": "launch",
             "program": "src.py/MRT.py",
             "args": [
-                "--senderdt", "--Selector", "SDSEL", "mrt_sel_spec.mrtsel"
+                "--senderdt",
+                "--Selector",
+                "SDSEL",
+                "mrt_sel_spec.mrtsel"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
+        },
+        {
+            "name": "MRT w/Sel (GPIO)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MRT.py",
+            "args": [
+                "--logging-level",
+                "2",
+                "--senderdt",
+                "--Selector",
+                "GPIO",
+                "mrt_sel_spec.mrtsel"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "${workspaceFolder}/.venv/bin/python3"
+        },
+        {
+            "name": "MRT w/Sel (optional)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/MRT.py",
+            "args": [
+                "--senderdt",
+                "--selector",
+                "/dev/ttyusb0",
+                "mrt_sel_spec.mrtsel"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
