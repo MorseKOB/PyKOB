@@ -90,7 +90,7 @@ class SelectorLoadError(Exception):
         return self._port
 
 class GpioSwitch:
-    def __init__(self, gpio_dev) -> None:
+    def __init__(self, gpio_dev, p0=19, p1=13, p2=6, p3=5) -> None:
         self._gpio_dev = gpio_dev
         self._pins = {"b0": p0, "b1": p1, "b2": p2, "b3": p3}
         self._b0 = 0
