@@ -8,9 +8,9 @@
             ]
         },
         {
-            "desc":"Chat (Wire 11)",
+            "desc":"Test (Wire 901)",
             "args":[
-                "11"
+                "901"
             ]
         },
         {
