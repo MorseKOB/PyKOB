@@ -39,7 +39,7 @@ SOFTWARE.
         (COMx on Windows, /dev/tty... on *nix/Mac),
     the special value 'SDSEL' (Silky-DESIGN Selector) to find a
     serial port with a serial number ending in '_AESSEL' ('_AESSELA' on Windows),
-    or 'GPIO' to use the four GPIO pins.
+    or 'GPIO' to use the four GPIO pins (19(35), 13(33), 06(31), 05(29)).
 """
 from enum import Enum, IntEnum, unique
 import sys
@@ -123,7 +123,7 @@ class GpioSwitch:
             log.debug("Error loading 'gpiod' module (is it installed?)")
             raise   # <- re-raise that exception
         except PermissionError as pex:
-            log.error("Permission error accessing GPIO hardware: {}".format(pex), dt="")
+            log.error("Permission error accessing GPIO hardware for Selector: {}".format(pex), dt="")
             raise
         except Exception as ex:
             raise
@@ -196,7 +196,6 @@ class GpioSwitch:
         self._close_pins()
         self._has_error = True
         return
-
 
 
 class Selector:
@@ -384,7 +383,7 @@ class Selector:
             if self._portToUse.lower() == "gpio":
                 self._useGPIO = True
                 from pykob import gpio
-                self._gpio_dev = gpio.get_gpio_dev()
+                self._gpio_dev = gpio.get_gpio_pins_dev()
                 if self._gpio_dev is not None:
                     self._gpiosw = GpioSwitch(self._gpio_dev)
                     self._gpiosw.read_pins()     # Do a read to see if there are any errors

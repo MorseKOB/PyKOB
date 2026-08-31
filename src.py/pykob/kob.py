@@ -68,6 +68,9 @@ if sys.platform == "win32" or sys.platform == "cygwin":
     from ctypes import windll
     windll.winmm.timeBeginPeriod(1)  # set clock resolution to 1 ms (Windows only)
 
+class GPIONotFound(Exception):
+    pass
+
 @unique
 class CodeSource(IntEnum):
     local = 1
@@ -108,6 +111,111 @@ class SynthMode(IntEnum):
     SLC         = 0x10  # CLICK/TONE / CLACK/SILENCE to sound local code starting with silence.
     REC         = 0x20  # ON/OFF to sound recordings, but nothing else.
     SRC         = 0x40  # CLICK/TONE / CLACK/SILENCE to sound remote code starting with silence.
+
+class GpioKob:
+    def __init__(self, gpio_dev, sndr=26, key=21, dash=20) -> None:
+        self._gpio_dev = gpio_dev
+        self._pins = {"sndr": sndr, "key": key, "dash": dash}
+        self._sndr = False
+        self._sndr_pin = sndr
+        self._op_err_msg = None
+        self._rdpins_loop = 0
+
+        try:
+            import gpiod
+            from gpiod.line import Direction, Bias
+
+            self._gpiod = gpiod
+
+            # Configure settings for switch input
+            input_settings = gpiod.LineSettings(
+                direction=Direction.INPUT,
+                bias=Bias.DISABLED
+            )
+            # Configure settings for switch output
+            output_settings = gpiod.LineSettings(
+                direction=Direction.OUTPUT,
+                bias=Bias.DISABLED
+            )
+            # Request all 3 lines in a single call
+            self._line_request = gpiod.request_lines(
+                self._gpio_dev,
+                config={
+                    self._pins["sndr"]: output_settings,
+                    self._pins["key"]: input_settings,
+                    self._pins["dash"]: input_settings
+                }
+            )
+        except ImportError:
+            log.debug("Error loading 'gpiod' module (is it installed?)")
+            raise   # <- re-raise that exception
+        except PermissionError as pex:
+            log.error("Permission error accessing GPIO hardware for Key+Sounder: {}".format(pex), dt="")
+            raise
+        except Exception as ex:
+            raise
+
+    @property
+    def key(self):  # type: () -> bool
+        s = False
+        if (not self.has_error()):
+            try:
+                s = self._line_request.get_value(self._pins["key"]).value == 1
+            except Exception as ex:
+                self._set_error(ex)
+        return s
+
+    @property
+    def dash(self):  # type: () -> bool
+        s = False
+        if (not self.has_error()):
+            try:
+                s = self._line_request.get_value(self._pins["dash"]).value == 1
+            except Exception as ex:
+                self._set_error(ex)
+                raise
+        return s
+
+    @property
+    def sndr(self):  # type: () -> bool
+        return self._sndr
+    @sndr.setter
+    def sndr(self, energized):  # type: (bool) -> None
+        self._sndr = energized
+        if (not self.has_error()):
+            try:
+                state = self._gpiod.Value.ACTIVE if energized else self._gpiod.Value.INACTIVE
+                self._line_request.set_value(self._sndr, state)
+            except Exception as ex:
+                self._set_error(ex)
+        return
+
+
+    def close(self) -> None:
+        log.debug("GpioSwitch.close - 1", 3)
+        self._close_pins()
+        log.debug("GpioSwitch.close - 2", 3)
+        return
+
+    def has_error(self) -> None:
+        return self._op_err_msg is not None
+
+    def _close_pins(self):  # type: () -> None
+        if self._line_request:
+            try:
+                self._line_request.close()
+            except Exception:
+                pass
+            self._line_request = None
+        return
+
+    def _set_error(self, ex):  # type: (Exception) -> None
+        self._op_err_msg = "GpioKob (gpiod) Error: {}".format(ex)
+        log.debug("GpioKob._set_error: {}".format(self._op_err_msg), 3)
+        self._close_pins()
+        self._has_error = True
+        return
+
 
 # ####################################################################
 
@@ -192,9 +300,8 @@ class KOB:
         #
         self._shutdown = Event()                    # type: Event
         self._hw_interface = HWInterface.NONE       # type: HWInterface
-        self._gpio_key_read = self.__read_nul       # type: Callable
-        self._gpio_pdl_dah = self.__read_nul        # type: Callable
-        self._gpio_sndr_drive = None                # type: Callable|None
+        self._gpio_dev = None                       # type: str
+        self._gpio_kob = None                       # type: GpioKob
         self._port = None                           # type: 'serial.Serial'|None
         self._serial_key_read = self.__read_nul     # type: Callable  # Read a NUL key. Changed in HW Init if interface is configured.
         self._serial_pdl_dah = self.__read_nul      # type: Callable  # Read a NUL paddle dah (dash).
@@ -278,20 +385,27 @@ class KOB:
         with self._sounder_guard:
             gpio_module_available = False
             serial_support_available = False
-            gpio_led = None
-            gpio_button = None
+            self._gpio_kob = None
             if self._use_gpio:
                 try:
-                    #import gpiod
-                    #from gpiod.line import Direction, Value, Bias, Edge
-                    # PULL-UP: bias=Bias.PULL_UP
-                    from gpiozero import LED, Button
-
+                    from pykob import gpio
+                    self._gpio_dev = gpio.get_gpio_pins_dev()
+                    if self._gpio_dev is not None:
+                        self._gpio_kob = GpioKob(self._gpio_dev)
+                        keystate = "CLOSED" if self._gpio_kob.key else "OPEN" # Do a read to see if there are any errors
+                        log.debug("GPIO found on '{}' for the Sounder+Key. Key is {}".format(self._gpio_dev, keystate))
+                    else:
+                        log.debug("GPIO 'pin' hardware not found. GPIO Sounder+Key cannot be used.", 3)
+                        raise GPIONotFound("No usable GPIO Hardware")
                     gpio_module_available = True
-                    gpio_led = LED
-                    gpio_button = Button
+                except ImportError:
+                    self._err_msg_hndlr("Error loading 'gpiod' module (is it installed?)")
+                    log.debug(traceback.format_exc(), 3)
+                except PermissionError as pex:
+                    self._err_msg_hndlr("Permission error accessing GPIO hardware: {}".format(pex))
+                    log.debug(traceback.format_exc(), 3)
                 except:
-                    self._err_msg_hndlr("Module 'gpiozero' is not available. GPIO interface cannot be used for a key/sounder.")
+                    self._err_msg_hndlr("Error occurred initializing GPIO. GPIO interface cannot be used for a key/sounder.")
                     log.debug(traceback.format_exc(), 3)
             elif self._use_serial and not self._port_to_use is None:
                 serial_support_available = pkserial.SERIAL_AVAILABLE
@@ -305,9 +419,6 @@ class KOB:
             #
             if gpio_module_available:
                 try:
-                    self._gpio_key_read = gpio_button(21, pull_up=True)  # GPIO21 is key input.
-                    self._gpio_pdl_dah = gpio_button(20, pull_up=True)   # GPIO20 is paddle-dah (dash).
-                    self._gpio_sndr_drive = gpio_led(26)  # GPIO26 used to drive sounder.
                     self._hw_interface = HWInterface.GPIO
                     self._paddle_is_supported = True
                     log.debug("The GPIO interface is available/active and will be used.", 1)
@@ -498,9 +609,9 @@ class KOB:
                 if self._hw_interface == HWInterface.GPIO:
                     try:
                         if hw_energize:
-                            self._gpio_sndr_drive.on()  # Pin goes high and energizes sounder
+                            self._gpio_kob.sndr = True  # Pin goes high and energizes sounder
                         else:
-                            self._gpio_sndr_drive.off()  # Pin goes low and deenergizes sounder
+                            self._gpio_kob.sndr = False # Pin goes low and de-energizes sounder
                     except OSError:
                         self._hw_interface = HWInterface.NONE
                         self._err_msg_hndlr("GPIO output error setting sounder state. Disabling interface.")
@@ -560,7 +671,7 @@ class KOB:
         kc = True
         if self._hw_interface == HWInterface.GPIO:
             try:
-                kc = self._gpio_key_read.is_pressed
+                kc = self._gpio_kob.key
                 pass
             except:
                 self._hw_interface = HWInterface.NONE
@@ -831,6 +942,9 @@ class KOB:
         self._use_gpio = use_gpio
         self._use_sounder = use_sounder
         self.__stop_hw_processing()
+        if self._gpio_kob:
+            self._gpio_kob.close()
+            self._gpio_kob = None
         if self._port:
             self._port.exit()
             self._port = None
@@ -874,12 +988,9 @@ class KOB:
             self._audio.exit()
         if self._port:
             self._port.exit()
-        if self._gpio_key_read:
-            self._gpio_key_read = None
-        if self._gpio_pdl_dah:
-            self._gpio_pdl_dah = None
-        if self._gpio_sndr_drive:
-            self._gpio_sndr_drive = None
+        if self._gpio_kob:
+            self._gpio_kob.close()
+            self._gpio_kob = None
         return
 
     def key(self): # type: () -> tuple[int,...]

@@ -1,7 +1,7 @@
-# IDE/OS files
+# IDE/OS/Python files
 .DS_Store
-.venv/
-venv/
+.venv*/
+venv*/
 
 # Build and Output
 bin/

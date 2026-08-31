@@ -30,7 +30,7 @@ from pykob import log
 
 import os
 
-def get_gpio_dev():
+def get_gpio_pins_dev():
     """
     Dynamically scan /dev/ for all available gpiochip devices and
     returns the path of the chip driving the main pin header.
