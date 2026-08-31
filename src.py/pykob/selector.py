@@ -98,7 +98,8 @@ class GpioSwitch:
         self._b2 = 0
         self._b3 = 0
         self._op_err_msg = None
-
+        self._rdpins_loop = 0
+        
         try:
             import gpiod
             from gpiod.line import Direction, Bias
@@ -166,12 +167,15 @@ class GpioSwitch:
         return self._op_err_msg is not None
 
     def read_pins(self) -> None:
+        self._rdpins_loop = self._rdpins_loop + 1
         try:
             # Pins are active low, so 0 is ON and 1 is OFF
             self._b0 = 1 - self._line_request.get_value(self._pins["b0"]).value
             self._b1 = 1 - self._line_request.get_value(self._pins["b1"]).value
             self._b2 = 1 - self._line_request.get_value(self._pins["b2"]).value
             self._b3 = 1 - self._line_request.get_value(self._pins["b3"]).value
+            if (self._rdpins_loop % 1000 == 0):
+                log.debug("GpioSwitch.read_pins: {}{}{}{}".format(self._b3, self._b2, self._b1, self._b0), 3)
         except Exception as ex:
             self._set_error(ex)
             raise
@@ -188,6 +192,7 @@ class GpioSwitch:
 
     def _set_error(self, ex):  # type: (Exception) -> None
         self._op_err_msg = "GpioSwitch (gpiod) Error: {}".format(ex)
+        log.debug("GpioSwitch._set_error: {}".format(self._op_err_msg), 3)
         self._close_pins()
         self._has_error = True
         return
