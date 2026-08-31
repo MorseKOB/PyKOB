@@ -130,28 +130,28 @@ class GpioSwitch:
     @property
     def b0(self):  # type: () -> int
         s = 0
-        if (not self.has_err()):
+        if (not self.has_error()):
             s = self._b0
         return s
 
     @property
     def b1(self):  # type: () -> int
         s = 0
-        if (not self.has_err()):
+        if (not self.has_error()):
             s = self._b0
         return s
 
     @property
     def b2(self):  # type: () -> int
         s = 0
-        if (not self.has_err()):
+        if (not self.has_error()):
             s = self._b0
         return s
 
     @property
     def b3(self):  # type: () -> int
         s = 0
-        if (not self.has_err()):
+        if (not self.has_error()):
             s = self._b0
         return s
 
@@ -173,7 +173,7 @@ class GpioSwitch:
             self._b2 = 1 - self._line_request.get_value(self.pins["b2"])
             self._b3 = 1 - self._line_request.get_value(self.pins["b3"])
         except Exception as ex:
-            self._set_error(self, ex)
+            self._set_error(ex)
             raise
         return
 
