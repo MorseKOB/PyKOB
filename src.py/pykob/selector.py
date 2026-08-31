@@ -221,6 +221,24 @@ class Selector:
         self._shutdown = Event()
         self._thread_port_checker = Thread(name='Selector-PortReader', daemon=False, target=self._thread_port_checker_body)
 
+    def _compute_value(self, rval) -> None:
+        self._raw_value = rval
+        if not self._binary_value == rval:
+            self._binary_value = rval
+        # 1 of 4 only if a single bit is set
+        oof = self._one_of_four
+        if rval == 1:
+            oof = 1
+        elif rval == 2:
+            oof = 2
+        elif rval == 4:
+            oof = 3
+        elif rval == 8:
+            oof = 4
+        if not oof == self._one_of_four:
+            self._one_of_four = oof
+        return
+
     def _null_status_hdlr(self, msg):  # type: (str|None) -> None
         log.debug("Selector status: {}".format(msg), 5)
         return
@@ -261,24 +279,15 @@ class Selector:
                     now = time.time()
                     if (now - self._t_last_change) >= self._steady_time:
                         if values_need_updating:
-                            if not self._binary_value == rval:
-                                self._binary_value = rval
+                            pbv = self._binary_value
+                            poof = self._one_of_four
+                            self._compute_value(rval)
+                            if not self._binary_value == pbv:
                                 binary_changed = True
-                            # 1 of 4 only if a single bit is set
-                            oof = 0
-                            if rval == 1:
-                                oof = 1
-                            elif rval == 2:
-                                oof = 2
-                            elif rval == 4:
-                                oof = 3
-                            elif rval == 8:
-                                oof = 4
-                            if not oof == self._one_of_four:
-                                self._one_of_four = oof
+                            if not self._one_of_four == poof:
                                 oof_changed = True
                             # Call On-Change?
-                            if self._on_change:
+                            if self._on_change and (binary_changed or oof_changed):
                                 if (oof_changed and self._mode == SelectorMode.OneOfFour):
                                     self._on_change(SelectorChange.OneOfFour, self._one_of_four)
                                 else:
@@ -411,6 +420,24 @@ class Selector:
             raise SDSelectorNotFound(ex)
         finally:
             if self._gpiosw or self._port:
+                b0 = 0
+                b1 = 0
+                b2 = 0
+                b3 = 0
+                if self._port:
+                    if not self._port.closed:
+                        b0 = 1 if self._port.cts else 0
+                        b1 = 2 if self._port.dsr else 0
+                        b2 = 4 if self._port.cd else 0
+                        b3 = 8 if self._port.ri else 0
+                elif self._gpiosw:
+                    self._gpiosw.read_pins()
+                    b0 = self._gpiosw.b0
+                    b1 = (self._gpiosw.b1 << 1)
+                    b2 = (self._gpiosw.b2 << 2)
+                    b3 = (self._gpiosw.b3 << 3)
+                rval = (b3+b2+b1+b0)
+                self._compute_value(rval)
                 self._thread_port_checker.start()
         return True
 
@@ -434,7 +461,7 @@ if __name__ == "__main__":
         __test_selector = Selector(port, SelectorMode.OneOfFour, on_change=__test_on_change)
         __test_selector.start()
         while True:
-            time.sleep(10.0)
+            time.sleep(5.0)
             print("Selector Raw Value: {}  1of4: {}".format(
                 __test_selector.raw_value, __test_selector.one_of_four))
     except Exception as ex:
