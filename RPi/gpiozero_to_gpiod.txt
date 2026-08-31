@@ -50,8 +50,9 @@ sounder.off() # Set low
 
 * gpiod Pattern:
 
-import gpiodfrom gpiod.line import Direction, Value
-# Request the line inside a session blockwith gpiod.request_lines(
+import gpiod from gpiod.line import Direction, Value
+# Request the line inside a session block 
+with gpiod.request_lines(
     "/dev/gpiochip0",
     config={17: gpiod.LineSettings(direction=Direction.OUTPUT)}
 ) as request:

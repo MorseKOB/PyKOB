@@ -89,6 +89,111 @@ class SelectorLoadError(Exception):
     def port(self) -> Optional[str]:
         return self._port
 
+class GpioSwitch:
+    def __init__(self, gpio_dev) -> None:
+        self._gpio_dev = gpio_dev
+        self._pins = {"b0": p0, "b1": p1, "b2": p2, "b3": p3}
+        self._b0 = 0
+        self._b1 = 0
+        self._b2 = 0
+        self._b3 = 0
+        self._op_err_msg = None
+
+        try:
+            import gpiod
+            from gpiod.line import Direction, Bias
+
+            # Configure settings for a pull-up switch input
+            input_settings = gpiod.LineSettings(
+                direction=Direction.INPUT,
+                bias=Bias.PULL_UP
+            )
+            # Request all 4 lines in a single call
+            self._line_request = gpiod.request_lines(
+                self._gpio_dev,
+                config={
+                    self._pins["b0"]: input_settings,
+                    self._pins["b1"]: input_settings,
+                    self._pins["b2"]: input_settings,
+                    self._pins["b3"]: input_settings
+                }
+            )
+        except ImportError:
+            log.debug("Error loading 'gpiod' module (is it installed?)")
+            raise   # <- re-raise that exception
+        except PermissionError as pex:
+            log.error("Permission error accessing GPIO hardware: {}".format(pex), dt="")
+            raise
+        except Exception as ex:
+            raise
+
+    @property
+    def b0(self):  # type: () -> int
+        s = 0
+        if (not self.has_err()):
+            s = self._b0
+        return s
+
+    @property
+    def b1(self):  # type: () -> int
+        s = 0
+        if (not self.has_err()):
+            s = self._b0
+        return s
+
+    @property
+    def b2(self):  # type: () -> int
+        s = 0
+        if (not self.has_err()):
+            s = self._b0
+        return s
+
+    @property
+    def b3(self):  # type: () -> int
+        s = 0
+        if (not self.has_err()):
+            s = self._b0
+        return s
+
+
+    def close(self) -> None:
+        log.debug("GpioSwitch.close - 1", 3)
+        self._close_pins()
+        log.debug("GpioSwitch.close - 2", 3)
+        return
+
+    def has_error(self) -> None:
+        return self._op_err_msg is not None
+
+    def read_pins(self) -> None:
+        try:
+            # Pins are active low, so 0 is ON and 1 is OFF
+            self._b0 = 1 - self._line_request.get_value(self.pins["b0"])
+            self._b1 = 1 - self._line_request.get_value(self.pins["b1"])
+            self._b2 = 1 - self._line_request.get_value(self.pins["b2"])
+            self._b3 = 1 - self._line_request.get_value(self.pins["b3"])
+        except Exception as ex:
+            self._set_error(self, ex)
+            raise
+        return
+
+    def _close_pins(self):  # type: () -> None
+        if self._line_request:
+            try:
+                self._line_request.close()
+            except Exception:
+                pass
+            self._line_request = None
+        return
+
+    def _set_error(self, ex):  # type: (Exception) -> None
+        self._op_err_msg = "GpioSwitch (gpiod) Error: {}".format(ex)
+        self._close_pins()
+        self._has_error = True
+        return
+
+
+
 class Selector:
     def __init__(self, portToUse:str, mode:SelectorMode=SelectorMode.OneOfFour,
             pole_cycle_time:float=0.1, steady_time:float=0.8, on_change=None, status_msg_hdlr=None, retries_enabled=False) -> None:
@@ -96,6 +201,7 @@ class Selector:
         self._portToUse = portToUse
         self._useGPIO = False
         self._gpio_dev = None
+        self._gpiosw = None
         self._port = None
         self._mode = mode
         self._pole_cycle_time = pole_cycle_time if pole_cycle_time >= POLE_CYCLE_TIME_MIN else POLE_CYCLE_TIME_MIN
@@ -116,60 +222,70 @@ class Selector:
 
     def _thread_port_checker_body(self):
         """
-        Called by the Port Checker thread `run` to read the handshake values from the port.
+        Called by the Port Checker thread `run` to read the switch values from the port.
         """
         try:
             values_need_updating = False
             oof_changed = False
             binary_changed = False
             while not self._shutdown.is_set():
-                if self._port and not self._port.closed:
-                    b0 = 1 if self._port.cts else 0
-                    b1 = 2 if self._port.dsr else 0
-                    b2 = 4 if self._port.cd else 0
-                    b3 = 8 if self._port.ri else 0
-                    rval = (b3+b2+b1+b0)
-                    if not rval == self._raw_value:
-                        self._raw_value = rval
-                        values_need_updating = True
-                        self._t_last_change = time.time()
-                    else:
-                        # The value read is the same as last time
-                        # see if enough time has passed to record it.
-                        now = time.time()
-                        if (now - self._t_last_change) >= self._steady_time:
-                            if values_need_updating:
-                                if not self._binary_value == rval:
-                                    self._binary_value = rval
-                                    binary_changed = True
-                                # 1 of 4 only if a single bit is set
-                                oof = 0
-                                if rval == 1:
-                                    oof = 1
-                                elif rval == 2:
-                                    oof = 2
-                                elif rval == 4:
-                                    oof = 3
-                                elif rval == 8:
-                                    oof = 4
-                                if not oof == self._one_of_four:
-                                    self._one_of_four = oof
-                                    oof_changed = True
-                                # Call On-Change?
-                                if self._on_change:
-                                    if (oof_changed and self._mode == SelectorMode.OneOfFour):
-                                        self._on_change(SelectorChange.OneOfFour, self._one_of_four)
+                b0 = 0
+                b1 = 0
+                b2 = 0
+                b3 = 0
+                if self._port:
+                    if not self._port.closed:
+                        b0 = 1 if self._port.cts else 0
+                        b1 = 2 if self._port.dsr else 0
+                        b2 = 4 if self._port.cd else 0
+                        b3 = 8 if self._port.ri else 0
+                elif self._gpiosw:
+                    b0 = self._gpiosw.b0
+                    b1 = (self._gpiosw.b1 << 1)
+                    b2 = (self._gpiosw.b2 << 2)
+                    b3 = (self._gpiosw.b3 << 3)
+                rval = (b3+b2+b1+b0)
+                if not rval == self._raw_value:
+                    self._raw_value = rval
+                    values_need_updating = True
+                    self._t_last_change = time.time()
+                else:
+                    # The value read is the same as last time
+                    # see if enough time has passed to record it.
+                    now = time.time()
+                    if (now - self._t_last_change) >= self._steady_time:
+                        if values_need_updating:
+                            if not self._binary_value == rval:
+                                self._binary_value = rval
+                                binary_changed = True
+                            # 1 of 4 only if a single bit is set
+                            oof = 0
+                            if rval == 1:
+                                oof = 1
+                            elif rval == 2:
+                                oof = 2
+                            elif rval == 4:
+                                oof = 3
+                            elif rval == 8:
+                                oof = 4
+                            if not oof == self._one_of_four:
+                                self._one_of_four = oof
+                                oof_changed = True
+                            # Call On-Change?
+                            if self._on_change:
+                                if (oof_changed and self._mode == SelectorMode.OneOfFour):
+                                    self._on_change(SelectorChange.OneOfFour, self._one_of_four)
+                                else:
+                                    change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
+                                        (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
+                                    if (binary_changed and self._mode == SelectorMode.Binary):
+                                        self._on_change(change, self._binary_value)
                                     else:
-                                        change = (SelectorChange.BinaryAnd1of4 if binary_changed and oof_changed else
-                                            (SelectorChange.Binary if binary_changed else SelectorChange.OneOfFour))
-                                        if (binary_changed and self._mode == SelectorMode.Binary):
-                                            self._on_change(change, self._binary_value)
-                                        else:
-                                            self._on_change(change, (self._binary_value, self._one_of_four))
-                                # Clear the flags
-                                values_need_updating = False
-                                oof_changed = False
-                                binary_changed = False
+                                        self._on_change(change, (self._binary_value, self._one_of_four))
+                            # Clear the flags
+                            values_need_updating = False
+                            oof_changed = False
+                            binary_changed = False
                     pass
                 self._shutdown.wait(self._pole_cycle_time)
             pass
@@ -224,6 +340,10 @@ class Selector:
         if self._port and not self._port.closed:
             self._port.exit()
             self._port = None
+        if self._gpiosw:
+            self._gpiosw.close()
+            self._gpiosw = None
+        return
 
     def shutdown(self):
         """
@@ -240,6 +360,7 @@ class Selector:
         (so we might find a selector switch later) return false.
         If we don't find a selector switch and retries aren't enabled, raise
         an exception.
+            Note: Retries aren't applicable to a GPIO Switch
 
         Return: True is all is good. False if retrying in background. Exception if error.
         """
@@ -251,6 +372,8 @@ class Selector:
                 self._gpio_dev = gpio.get_gpio_dev()
                 if self._gpio_dev is not None:
                     log.debug("GPIO found on '{}' for the Selector".format(self._gpio_dev))
+                    self._gpiosw = GpioSwitch(self._gpio_dev)
+                    self._gpiosw.read_pins()     # Do a read to see if there are any errors
                 else:
                     log.log("GPIO 'pin' hardware not found. Selector cannot be used.\n", dt="")
                     raise SDSelectorNotFound("No usable GPIO Hardware")
@@ -281,7 +404,7 @@ class Selector:
                     log.log("Selector cannot be used.\n", dt="")
             raise SDSelectorNotFound(ex)
         finally:
-            if self._gpio_dev is not None or self._port is not None:
+            if self._gpiosw is not None or self._port is not None:
                 self._thread_port_checker.start()
         return True
 
