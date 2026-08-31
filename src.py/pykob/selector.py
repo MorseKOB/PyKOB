@@ -139,21 +139,21 @@ class GpioSwitch:
     def b1(self):  # type: () -> int
         s = 0
         if (not self.has_error()):
-            s = self._b0
+            s = self._b1
         return s
 
     @property
     def b2(self):  # type: () -> int
         s = 0
         if (not self.has_error()):
-            s = self._b0
+            s = self._b2
         return s
 
     @property
     def b3(self):  # type: () -> int
         s = 0
         if (not self.has_error()):
-            s = self._b0
+            s = self._b3
         return s
 
 
