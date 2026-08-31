@@ -876,6 +876,8 @@ class KOB:
             self._port.exit()
         if self._gpio_key_read:
             self._gpio_key_read = None
+        if self._gpio_pdl_dah:
+            self._gpio_pdl_dah = None
         if self._gpio_sndr_drive:
             self._gpio_sndr_drive = None
         return
