@@ -173,7 +173,7 @@ class GpioSwitch:
             self._b1 = 1 - self._line_request.get_value(self._pins["b1"]).value
             self._b2 = 1 - self._line_request.get_value(self._pins["b2"]).value
             self._b3 = 1 - self._line_request.get_value(self._pins["b3"]).value
-            if (self._rdpins_loop % 1000 == 0):
+            if (self._rdpins_loop % 100 == 0):
                 log.debug("GpioSwitch.read_pins: {}{}{}{}".format(self._b3, self._b2, self._b1, self._b0), 3)
             self._rdpins_loop = self._rdpins_loop + 1
         except Exception as ex:
@@ -219,7 +219,7 @@ class Selector:
         self._t_last_change = time.time()
         #
         self._shutdown = Event()
-        self._thread_port_checker = Thread(name='Selector-PortReader', daemon=True, target=self._thread_port_checker_body)
+        self._thread_port_checker = Thread(name='Selector-PortReader', daemon=False, target=self._thread_port_checker_body)
 
     def _null_status_hdlr(self, msg):  # type: (str|None) -> None
         log.debug("Selector status: {}".format(msg), 5)
@@ -377,9 +377,9 @@ class Selector:
                 from pykob import gpio
                 self._gpio_dev = gpio.get_gpio_dev()
                 if self._gpio_dev is not None:
-                    log.debug("GPIO found on '{}' for the Selector".format(self._gpio_dev))
                     self._gpiosw = GpioSwitch(self._gpio_dev)
                     self._gpiosw.read_pins()     # Do a read to see if there are any errors
+                    log.debug("GPIO found on '{}' for the Selector".format(self._gpio_dev))
                 else:
                     log.log("GPIO 'pin' hardware not found. Selector cannot be used.\n", dt="")
                     raise SDSelectorNotFound("No usable GPIO Hardware")
@@ -410,7 +410,7 @@ class Selector:
                     log.log("Selector cannot be used.\n", dt="")
             raise SDSelectorNotFound(ex)
         finally:
-            if self._gpiosw is not None or self._port is not None:
+            if self._gpiosw or self._port:
                 self._thread_port_checker.start()
         return True
 
