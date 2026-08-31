@@ -168,10 +168,10 @@ class GpioSwitch:
     def read_pins(self) -> None:
         try:
             # Pins are active low, so 0 is ON and 1 is OFF
-            self._b0 = 1 - self._line_request.get_value(self._pins["b0"])
-            self._b1 = 1 - self._line_request.get_value(self._pins["b1"])
-            self._b2 = 1 - self._line_request.get_value(self._pins["b2"])
-            self._b3 = 1 - self._line_request.get_value(self._pins["b3"])
+            self._b0 = 1 - self._line_request.get_value(self._pins["b0"]).value
+            self._b1 = 1 - self._line_request.get_value(self._pins["b1"]).value
+            self._b2 = 1 - self._line_request.get_value(self._pins["b2"]).value
+            self._b3 = 1 - self._line_request.get_value(self._pins["b3"]).value
         except Exception as ex:
             self._set_error(ex)
             raise
