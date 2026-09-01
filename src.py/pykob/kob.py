@@ -123,7 +123,7 @@ class GpioKob:
 
         try:
             import gpiod
-            from gpiod.line import Direction, Bias
+            from gpiod.line import Direction, Bias, Value
 
             self._gpiod = gpiod
 
@@ -136,7 +136,7 @@ class GpioKob:
             output_settings = gpiod.LineSettings(
                 direction=Direction.OUTPUT,
                 bias=Bias.DISABLED,
-                output_value=gpiod.Value.INACTIVE
+                output_value=Value.INACTIVE
             )
             # Request all 3 lines in a single call
             self._line_request = gpiod.request_lines(
@@ -185,7 +185,7 @@ class GpioKob:
         self._sndr = energized
         if (not self.has_error()):
             try:
-                state = self._gpiod.Value.ACTIVE if energized else self._gpiod.Value.INACTIVE
+                state = self._gpiod.line.Value.ACTIVE if energized else self._gpiod.line.Value.INACTIVE
                 self._line_request.set_value(self._sndr, state)
             except Exception as ex:
                 self._set_error(ex)
