@@ -186,7 +186,7 @@ class GpioKob:
         if (not self.has_error()):
             try:
                 state = self._gpiod.line.Value.ACTIVE if energized else self._gpiod.line.Value.INACTIVE
-                self._line_request.set_value(self._sndr, state)
+                self._line_request.set_value(self._sndr_pin, state)
             except Exception as ex:
                 self._set_error(ex)
         return
