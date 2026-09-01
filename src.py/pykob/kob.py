@@ -130,12 +130,13 @@ class GpioKob:
             # Configure settings for switch input
             input_settings = gpiod.LineSettings(
                 direction=Direction.INPUT,
-                bias=Bias.DISABLED
+                bias=Bias.PULL_UP
             )
             # Configure settings for switch output
             output_settings = gpiod.LineSettings(
                 direction=Direction.OUTPUT,
-                bias=Bias.DISABLED
+                bias=Bias.DISABLED,
+                output_value=gpiod.Value.INACTIVE
             )
             # Request all 3 lines in a single call
             self._line_request = gpiod.request_lines(
@@ -160,7 +161,7 @@ class GpioKob:
         s = False
         if (not self.has_error()):
             try:
-                s = self._line_request.get_value(self._pins["key"]).value == 1
+                s = self._line_request.get_value(self._pins["key"]).value == 0
             except Exception as ex:
                 self._set_error(ex)
         return s
@@ -170,7 +171,7 @@ class GpioKob:
         s = False
         if (not self.has_error()):
             try:
-                s = self._line_request.get_value(self._pins["dash"]).value == 1
+                s = self._line_request.get_value(self._pins["dash"]).value == 0
             except Exception as ex:
                 self._set_error(ex)
                 raise
