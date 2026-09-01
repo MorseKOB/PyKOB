@@ -1,0 +1,18 @@
+#!/bin/bash
+# PyKOB Headless Deployment Startup Entrypoint
+cd /home/pi/PyKOB
+
+# Activate the local virtual environment context
+source venv/bin/activate
+
+# Launch MRT inside tmux 'virtual terminal'
+exec tmux new-session -d -s mrt_term 'python src.py/MRT.py --Selector GPIO RPi/selector-spec.mrtsel'
+
+#
+## To connect to the virtual terminal:
+## tmux attach -t mrt_term
+##
+## To disconnect from the virtual terminal while leaving MRT running (from within the terminal):
+## CTRL-B D
+#
+

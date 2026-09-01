@@ -28,7 +28,7 @@ Run this on the Pi to permanently grant the pi user direct hardware access to th
 sudo usermod -aG dialout,audio,gpio,i2c pi
 ```
 
-## Stop the PyKOB MRT Service
+## Stop the PyKOB Service
 
 If you ever need to halt the background daemon to run configurations, pull manual git updates, or free up the hardware interfaces, use systemd over ssh:
 
@@ -132,7 +132,7 @@ sudo systemctl restart pykob.service
 screen -r mrt-term
 ```
 
-### Using (lightweight) 'tmux'
+### Using (lightweight) 'tmux' (APPROACH USED)
 
 The 'tmux' approach is also a virtual screen that MRT can output to. It solves the problem of cross-user access.
 
@@ -190,3 +190,36 @@ To SSH in and immediately go into the tmux session...
 ```bash
 ssh pi@192.168.68.86 -t "tmux attach -t mrt_term"
 ```
+
+## Change PyKOB Service to Execute Script
+
+Rather than having the `python MRT.py` command baked into the service descriptor, the final implementation executes a script contained within the PyKOB/RPi directory. By having the commands to run within a script file it is much easier to make changes when needed. There is no requirement to edit the service descriptor, which requires 'sudo' access. There is also no need to redeploy the service. It simply needs to be stopped and started to pick up the changes.
+
+The script is: PyKOB/RPi/pykobsrv.cmds.sh
+
+The pykob service descriptor is: /etc/systemd/system/pykob.service
+
+```text
+[Unit]
+Description=PyKOB Telegraph Application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=pi
+WorkingDirectory=/home/pi/PyKOB
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/PyKOB/RPi/pykobsvc.cmds
+ExecStop=/home/pi/PyKOB/RPi/pykobsrv.stp
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+As authored, the start-up script and shutdown script expect that the final command is run within a **TMUX Virtual Terminal**. If a **TMUX Virtual Terminal** is not used, appropriate changes need to be made to the shutdown.
+
+Although the script can be modified, the service does expect the final command to be run within a **TMUX Virtual Terminal** named **mrt_term**, as that is how it
+
