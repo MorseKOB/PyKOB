@@ -2,11 +2,8 @@
 # PyKOB Headless Deployment Startup Entrypoint
 cd /home/pi/PyKOB
 
-# Activate the local virtual environment context
-source venv/bin/activate
-
-# Launch MRT inside tmux 'virtual terminal'
-exec tmux new-session -d -s mrt_term 'python src.py/MRT.py --Selector GPIO RPi/selector-spec.mrtsel'
+# Force tmux to initialize its virtual room directly inside the PyKOB root
+tmux new-session -d -s mrt_term -c /home/pi/PyKOB 'venv/bin/python src.py/MRT.py --Selector GPIO RPi/selector-spec.mrtsel'
 
 #
 ## To connect to the virtual terminal:

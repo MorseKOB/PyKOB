@@ -206,12 +206,12 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=forking
+Type=simple
 User=pi
 WorkingDirectory=/home/pi/PyKOB
-Environment=PYTHONUNBUFFERED=1
 ExecStart=/home/pi/PyKOB/RPi/pykobsvc.cmds
-ExecStop=/home/pi/PyKOB/RPi/pykobsrv.stp
+ExecStop=/home/pi/PyKOB/RPi/pykobsvc.stp
+RemainAfterExit=yes
 Restart=on-failure
 RestartSec=5
 
@@ -223,3 +223,10 @@ As authored, the start-up script and shutdown script expect that the final comma
 
 Although the script can be modified, the service does expect the final command to be run within a **TMUX Virtual Terminal** named **mrt_term**, as that is how it
 
+### Checking Execution Error Logs
+
+The Service captures the error output from the execution. It can be viewed using the command:
+
+```bash
+sudo journalctl -u pykob.service -n 30 --no-pager
+```
