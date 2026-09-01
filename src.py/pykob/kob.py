@@ -193,9 +193,9 @@ class GpioKob:
 
 
     def close(self) -> None:
-        log.debug("GpioSwitch.close - 1", 3)
+        log.debug("GpioKob.close - 1", 3)
         self._close_pins()
-        log.debug("GpioSwitch.close - 2", 3)
+        log.debug("GpioKob.close - 2", 3)
         return
 
     def has_error(self) -> None:
@@ -211,8 +211,9 @@ class GpioKob:
         return
 
     def _set_error(self, ex):  # type: (Exception) -> None
-        self._op_err_msg = "GpioKob (gpiod) Error: {}".format(ex)
-        log.debug("GpioKob._set_error: {}".format(self._op_err_msg), 3)
+        self._op_err_msg = "GpioKob Error: {}".format(ex)
+        log.debug("GpioKob._set_error: {}".format(self._op_err_msg), 2)
+        log.debug(traceback.format_exc(), 3)
         self._close_pins()
         self._has_error = True
         return
