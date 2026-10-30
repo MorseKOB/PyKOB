@@ -70,6 +70,20 @@
             "python": "${workspaceFolder}/.venv/bin/python3"
         },
         {
+            "name": "Responder",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src.py/Responder.py",
+            "args": [
+                "-S","RSP, Test",
+                "--sine","RP",
+                "_tst_rspndr_spec",
+                "901"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Telegram",
             "type": "debugpy",
             "request": "launch",

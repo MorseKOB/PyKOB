@@ -74,6 +74,8 @@ tg_config.tgc
 *.svg
 # Ignore 'test' programs. If test programs are needed, include them with a '!' line
 _test*.py
+# Ignore 'testing' files. If testing type files are needed, include them with a '!' line
+_tst*.*
 # Include anything that is put into the Documentation, mkob_learn, and resources folders
 !Documentation/**
 !src.py/mkob_learn/**
