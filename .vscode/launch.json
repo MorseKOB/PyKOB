@@ -76,7 +76,8 @@
             "program": "src.py/Responder.py",
             "args": [
                 "-S","RSP, Test",
-                "--sine","RP",
+                "--idnames","_tst_idnames.txt",
+                "--sine","RS",
                 "_tst_rspndr_spec",
                 "901"
             ],
