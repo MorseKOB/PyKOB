@@ -81,12 +81,32 @@ UNLATCH_CODE = (-0x7fff, +2)  # code sequence to unlatch (open)
 #
 # ###################################################################
 
-def get_first_word(text: str) -> str:
+def get_first_word(text: str|None) -> str:
     # \w+ matches the first sequence of word characters (letters/digits)
-    match = re.search(r'\w+', text)
-    return match.group(0) if match else ""
+    if text:
+        match = re.search(r'\w+', text)
+        return match.group(0) if match else ""
+    return ""
 
-def strings_are_different(string_list: list[str]) -> bool:
+def load_lookup_table(file_path: str|None) -> dict[str, str]:
+    lookup = {}
+    if file_path:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                # Split by whitespace: maxsplit=1 protects values that contain spaces
+                tokens = line.split(maxsplit=1)
+                # Skip empty lines or pure whitespace lines safely
+                if not tokens:
+                    continue
+                # Ensure the line actually has both an ID and a Value
+                if len(tokens) == 2:
+                    item_id, item_value = tokens
+                    lookup[item_id] = item_value.strip()
+                else:
+                    print(f"Warning: Malformed list data in {file_path} on line {line_num}: {repr(line)}")
+    return lookup
+
+def values_are_different(string_list: list[str]) -> bool:
     # An empty list or single item has no mismatches
     if not string_list:
         return False
@@ -122,7 +142,7 @@ class SSParser:
     def __init__(self):
         # Common English auxiliary and linking verbs that initiate questions
         self.question_starters_verbs = {
-            "is", "am", "are", "was", "were", "do", "does", "did",
+            "is", "am", "are", "r", "was", "were", "do", "does", "did",
             "can", "could", "will", "would", "should", "has", "have", "had"
         }
         
@@ -132,12 +152,12 @@ class SSParser:
         }
 
         self.linking_verbs = {
-            "is", "am", "are", "was", "were", "be", "been", "being",
+            "is", "am", "are", "r", "was", "were", "be", "b", "been", "being",
             "become", "becomes", "became", "seem", "seems", "seemed", "feels"
         }
         
         self.prepositions = {
-            "at", "in", "on", "to", "for", "with", "by", "from", "into", 
+            "at", "in", "on", "to", "for", "4", "with", "by", "from", "into", 
             "through", "during", "under", "over", "between", "after", "before"
         }
 
@@ -232,7 +252,7 @@ class SSParser:
                 result[SSParser.VERB_C] = verb_word
                 remaining = core_words[verb_index + 1:]
             else:
-                result[SSParser.SUBJECT_C] = "???"
+                result[SSParser.SUBJECT_C] = ""
                 verb_word = core_words if core_words else None
                 result[SSParser.VERB_C] = verb_word
                 remaining = core_words[1:]
@@ -247,7 +267,15 @@ class SSParser:
                     
         return result
 
+    def print(self, parsed_data: dict) -> None:
+            print(f"Sentence: \"{parsed_data[SSParser.SENTENCE_C]}\"")
+            print(f"  SentenceType: {parsed_data[SSParser.TYPE_C]}")
+            for key, value in parsed_data.items():
+                if key not in [SSParser.SENTENCE_C, SSParser.TYPE_C] and value is not None:
+                    print(f"    {key}: {value}")
+            print("-" * 40)
 
+"""
 # --- Demonstration of Usage ---
 if __name__ == "__main__":
     parser = SSParser()
@@ -263,13 +291,29 @@ if __name__ == "__main__":
     ]
     for sentence in test_sentences:
         parsed_data = parser.parse(sentence)
-        print(f"Sentence: \"{parsed_data[SSParser.SENTENCE_C]}\"")
-        print(f"  SentenceType: {parsed_data[SSParser.TYPE_C]}")
-        for key, value in parsed_data.items():
-            if key not in [SSParser.SENTENCE_C, SSParser.TYPE_C] and value is not None:
-                print(f"    {key}: {value}")
-        print("-" * 40)
+        parser.print(parsed_data)
+"""
 
+class CustomHelpFormatter(argparse.HelpFormatter):
+    """
+    Custom Help Formatter - Used with `argparse` to strip the 'optional' argument
+    brackets ('[' ']') from our positional spec-path argument. The optional
+    state is due to allowing '--parsetest' or 'resp_spec_path' on the command line.
+
+    This is used with 'argparse' as follows:
+    argparse.ArgumentParser(formatter_class=CustomHelpFormatter, ...)
+
+    """
+    def _format_args(self, action, default_metavar):
+        # Let the standard engine build the initial bracket string
+        result = super()._format_args(action, default_metavar)
+        
+        # If this is our custom positional path, strip the brackets added by nargs='?'
+        if action.dest == "resp_spec_path":
+            if result.startswith("[") and result.endswith("]"):
+                return result[1:-1]
+                
+        return result
 
 
 # ###################################################################
@@ -482,7 +526,7 @@ class _RESPSpecOp:
 class RespProcessor:
     """
     Loads and parses a Resp Spec to create a definition of what needs
-    to be sent and what times.
+    to be sent and at what times or after what periods.
 
     Methods are provided that need to be called as activity occurs such that
     the class knows when the wire is idle, and how long it has been idle.
@@ -493,6 +537,24 @@ class RespProcessor:
     The format of a spec is as follows (example):
     {
         "specs": [
+            {
+                "resp_s_tts":5,
+                "msgs":[
+                    "~ HELLO «FSID», I FIND «SUBJECT» INTERESTING. +",
+                    "~ HI «FSID:LOOKUP» +"
+                ]
+            },
+            {
+                "resp_q":4,
+                "msg":"~ HI «FSID» I WONDERED IF «SUBJECT» «VERB» «COMPLEMENT».  +"
+            },
+            {
+                "resp_b":8,
+                "msgs":[
+                    "~ HI «FOID1:LOOKUP», U THERE? +",
+                    "~ «FOID1:LOOKUP», WERE YOU GOING TO CHIME IN? +"
+                ]
+            },
             {
                 "at":815,
                 "msg":"~ ES ON +     ~ OK ES +"
@@ -532,8 +594,10 @@ class RespProcessor:
     resp_s: Respond to a statement. If the last message was a statement this will respond with a message.
     resp_s_tts: Respond to a statement if the message was directed to this station. See: `resp_tts`
     
-    time or period : 24-Hour Hour+Minute value. 
+    time: 24-Hour Hour+Minute value.
+    period: Duration in seconds 
         For the 'resp' conditions, this is how long to wait while the line is idle before responding.
+        For 'idle', this is how long the line must be idle before sending a message
 
     msg : A single text_string containing the message to be sent.
     msgs : Array/list of text_string values. One of the messages will be used at random when a message is to be sent.
@@ -544,10 +608,11 @@ class RespProcessor:
     «ctrl» : Control value, which is one of: 
         ('«' is Unicode U+00AB and '»' is Unicode U+00BB)
       $env_var : Replaced with the value of the environment variable env_var
-      Pseconds : Pause the given number of seconds (can be fractional)
+      Pseconds : Pause the given number of seconds (the value after the 'P', can be fractional)
+      -- TOKENS --
       OOID : Replaced with Our (full) Office ID (from the configuration/command line)
       OSID : Replaced with Our (short) ID/Sine (from the command line)
-      -- additional for 'resp' messages (not valid in other messages) --
+      -- additional TOKENS for 'resp' messages (not valid in other messages) --
       FOID : Office ID of the sender ('from' as indicated by the wire)
       FOID1 : The first component of the sender Office ID ('from' as indicated by the wire)
       FSID : Short ID/Sine of the sender ('from' as received in the message)
@@ -558,6 +623,10 @@ class RespProcessor:
       SUBJECT = The Subject in the sentence
       TYPE : The sentence Type (BLANK/QUESTION/STATEMENT)
       VERB : The Verb in the sentence
+    
+    The TOKENS: 'OOID', 'OSID', 'FOID', 'FOID1', 'FSID' support appending ':LOOKUP'.
+    Appending ':LOOKUP' will attempt to look the ID/Sine up in 'ID Name' table and use the
+    Name rather than the ID/Sine if found.    
 
     """
 
@@ -625,13 +694,15 @@ class RespProcessor:
             return (s + RespProcessor.RESPONSE_SPEC_EXT)
         return s
 
-    def __init__(self, oid, sid, resp_spec_path, morse_sender, code_char_send_callback, shutdown_event):  # type (str, Path|None, Sender, Callable, Event) -> None
+    def __init__(self, oid, sid, resp_spec_path, id_names, morse_sender, code_char_send_callback, shutdown_event):  # type (str, Path|None, dict[str, str], Sender, Callable, Event) -> None
         self._oid = oid
+        self._oid1 = get_first_word(oid)
         self._sid = sid
         self._resp_spec_path = resp_spec_path
+        self._id_names = id_names
         self._morse_sender = morse_sender
         self._code_char_send = code_char_send_callback
-        self._shutdown = shutdown_event
+        self._shutdown: Event = shutdown_event
         self._spec_ops = list()  # type: list[_RESPSpecOp]
         #
         self._mode = RespProcessor._Mode.IGNORE
@@ -666,127 +737,103 @@ class RespProcessor:
             pass
         return
 
-    def _process_ctrl(self, msg, index):  # type: (str, int) -> int
-        """
-        Process a control sequence within a message. The `index` param is pointing
-        to the lead-in ctrl character.
-
-        Return the index of the beginning of the remainder of the message.
-        """
-        i = index + 1  # The first character of the control sequence
-        ctrl = msg[i]
-        s = msg[i:]
-        # Read the control string
-        m = self._re_ctrlval.match(s)
-        if m:
-            cv = m.group(1)  # The Token
-            ce = m.group(2)  # End character
-            if not cv or len(cv) == 0:
-                raise RESPControlInvalid("No Control Token/Value found for '{}' in message: '{}'".format(ctrl, msg))
-            if not ce or len(ce) == 0:
-                raise RESPControlInvalid("Control close not found for '{}' in message: '{}'".format(ctrl, msg))
-            
-            if not (ctrl == RespProcessor.CTRL_VAL_ENV_VAR_START or ctrl == RespProcessor.CTRL_VAL_PAUSE_VAR_START):
-                # It's not an environment variable or a pause duration
-                # see if the control content is one of our tokens
-                if cv in [
-                    self.CTRL_TOKEN_OOID,
-                    self.CTRL_TOKEN_OSID,
-                    self.CTRL_TOKEN_FOID,
-                    self.CTRL_TOKEN_FOID1,
-                    self.CTRL_TOKEN_FSID,
-                    self.CTRL_TOKEN_SENTENCE,
-                    self.CTRL_TOKEN_ADVERBIAL,
-                    self.CTRL_TOKEN_COMPLEMENT,
-                    self.CTRL_TOKEN_OBJECT,
-                    self.CTRL_TOKEN_SUBJECT,
-                    self.CTRL_TOKEN_TYPE,
-                    self.CTRL_TOKEN_VERB
-                ]:
-                    # It is one of our tokens
-                    #  Process it:
-                    val: str|None = None
-                    match cv:
-                        case self.CTRL_TOKEN_OOID:
-                            val = self._oid
-                        case self.CTRL_TOKEN_OSID:
-                            val = self._sid
-                        case self.CTRL_TOKEN_FOID:
-                            val = self._sndr_oid
-                        case self.CTRL_TOKEN_FOID1:
-                            if self._sndr_oid:
-                                val = get_first_word(self._sndr_oid)
-                        case self.CTRL_TOKEN_FSID:
-                            val = self._msg_from[0]
-                        case self.CTRL_TOKEN_SENTENCE:
-                            val = self._msg_parsed[SSParser.SENTENCE_C]
-                        case self.CTRL_TOKEN_ADVERBIAL:
-                            val = self._msg_parsed[SSParser.ADVERBIAL_C]
-                        case self.CTRL_TOKEN_COMPLEMENT:
-                            val = self._msg_parsed[SSParser.COMPLEMENT_C]
-                        case self.CTRL_TOKEN_OBJECT:
-                            val = self._msg_parsed[SSParser.OBJECT_C]
-                        case self.CTRL_TOKEN_SUBJECT:
-                            val = self._msg_parsed[SSParser.SUBJECT_C]
-                        case self.CTRL_TOKEN_TYPE:
-                            val = self._msg_parsed[SSParser.TYPE_C]
-                        case self.CTRL_TOKEN_VERB:
-                            val = self._msg_parsed[SSParser.VERB_C]
-                    if val is not None:
-                        self._send_message(val)
-                    return (i + len(cv) + len(ce))
-                else:
-                    raise RESPControlInvalid("Unknown Control '{}' in message: '{}'".format(ctrl, msg))
-            if ctrl == RespProcessor.CTRL_VAL_ENV_VAR_START:
-                # cv is the name of an environment variable. Get the value and send it.
-                evv = os.environ.get(cv)
-                if evv is not None:
-                    self._send_message(evv)
-                pass
-            else:
-                # ctrl_val should be a float value to use as a delay
-                d = 0.0
-                try:
-                    d = float(cv)
-                except ValueError as ex:
-                    raise RESPControlInvalid("Invalid Pause value '{}' in message: '{}'  Error: {}".format(cv, msg, ex))
-                self._shutdown.wait(d)
-            return (i + len(cv) + len(ce))
-        raise RESPControlInvalid("Invalid Control Value for '{}' in message: '{}'".format(ctrl, msg))
-
     def _send_msg_from_spec(self, spec):  # type: (_RESPSpecOp) -> None
         """
         Send the message if there is a single one, or randomly send one of the
         list of messages from the spec.
         """
-        msg = None
+        template = None
         if spec.msg is not None:
-            msg = spec.msg
+            template = spec.msg
         elif spec.msgs is not None:
-            ec = len(spec.msgs)
-            rnd_indx = random.randint(0, ec-1)
-            msg = spec.msgs[rnd_indx]
-        if msg is not None and len(msg) > 0:
-            self._send_message(msg)
+            template = random.choice(spec.msgs)
+        if template is not None and len(template) > 0:
+            # Generate the context for processing
+            context = {
+                # -- Global Session Tokens --
+                self.CTRL_TOKEN_OOID: self._oid,
+                self.CTRL_TOKEN_OSID: self._sid,
+                # -- Sender/To Identification (From the Wire/Message) --
+                self.CTRL_TOKEN_FOID: self._sndr_oid,
+                self.CTRL_TOKEN_FOID1: get_first_word(self._sndr_oid),
+                self.CTRL_TOKEN_FSID: self._msg_from[0] if len(self._msg_from) > 0 else get_first_word(self._sndr_oid),
+                # -- Parsed Sentence Components --
+                self.CTRL_TOKEN_SENTENCE: self._msg_parsed[SSParser.SENTENCE_C],
+                self.CTRL_TOKEN_TYPE: self._msg_parsed[SSParser.TYPE_C],
+                self.CTRL_TOKEN_SUBJECT: self._msg_parsed[SSParser.SUBJECT_C],
+                self.CTRL_TOKEN_VERB: self._msg_parsed[SSParser.VERB_C],
+                self.CTRL_TOKEN_OBJECT: self._msg_parsed[SSParser.OBJECT_C],
+                self.CTRL_TOKEN_ADVERBIAL: self._msg_parsed[SSParser.ADVERBIAL_C],
+                self.CTRL_TOKEN_COMPLEMENT: self._msg_parsed[SSParser.COMPLEMENT_C]
+            }
+            msg = self._create_message(template, context, self._id_names)
+            self._send_message(msg, template)
         return
 
-    def _send_message(self, msg):  # type: (str) -> None
+    def _update_specs_last_access(self):  # type: () -> None
+        # Get current time now
+        now = datetime.now()
+        now_secs = int((now.hour * 3600) + (now.minute * 60) + now.second)
+        for spec in self._spec_ops:
+            if spec.condition == RespProcessor._CondOp.idle or spec.is_resp_type:
+                spec.last_activity = now_secs
+            pass
+        return
+    
+    CANCEL_MARKER = "\x18"  # 'CAN' Used if a token doesn't have a value, for clean removal
+    PAUSE_MARKER = "\x11"  # 'DC1' Used to indicate a pause. It will be followed by a float.
+    TOKEN_PATTERN = re.compile(r'«(?P<name>[\w\$]+)(?:(?P<lookup>:LOOKUP))?»')
+    def _create_message(self, message_template, context, name_table):
+        # Inner helper function handles ONE token match at a time
+        def replacer(match):
+            token_name = match.group("name")
+            has_lookup = bool(match.group("lookup"))
+            # 1. Environment Variables
+            if token_name.startswith("$"):
+                return os.environ.get(token_name[1:]) or self.CANCEL_MARKER
+            # 2. Pauses (preserve them exactly as-is for the hardware driver)
+            if token_name.startswith("P"):
+                return self.PAUSE_MARKER + token_name[1:] + " "
+            # 3. Contextual Components (Subject, Object, FSID, etc.)
+            value = context.get(token_name, "")
+            # 4. Handle Lookups
+            if has_lookup and value:
+                return name_table.get(value, value)
+            return value if value else self.CANCEL_MARKER
+
+        # Pass 1: Replace all tokens. Missing ones become the GHOST_MARKER
+        raw_msg = self.TOKEN_PATTERN.sub(replacer, message_template)
+        # 2. Clean up the cancel markers and a possible trailing space
+        # \x18  = Matches the literal CAN control character
+        # \s?   = Matches zero or one trailing whitespace characters
+        cleaned_msg = re.sub(rf"{self.CANCEL_MARKER}\s?", "", raw_msg)
+        return cleaned_msg
+
+    def _send_message(self, msg, template):  # type: (str,str) -> None
         """
         Send a message from the Resp Spec as though it was from an operator.
         """
         try:
-            i = 0  # Use an index to allow processing parts
+            # for ch in msg:  // Can't use because of need to pull in pause value
+            i = 0
             while i < len(msg):
                 ch = msg[i]
-                # Check for a Control Sequence
-                if ch == RespProcessor.CTRL_VAL_START_CHAR:
-                    i = self._process_ctrl(msg, i)
+                if ch == self.PAUSE_MARKER:
+                    # Pull in the value
+                    i += 1
+                    pv = msg[i:].split(' ', 1)[0]
+                    i += len(pv) + 1  # Skip the value and the added space
+                    d = 0.0
+                    try:
+                        d = float(pv)
+                    except ValueError as ex:
+                        raise RESPControlInvalid("Invalid Pause value '{}' in template: '{}'  Error: {}".format(pv, template, ex))
+                    self._shutdown.wait(d)
+                    continue
                 else:
                     i += 1
-                    code = self._morse_sender.encode(ch)
-                    self._code_char_send(code, ch)
-                pass
-            pass
+                code = self._morse_sender.encode(ch)
+                self._code_char_send(code, ch)
         except Exception as ex:
             print("<<< Resp sender encountered an error on message: '{}'  Error: {}".format(msg, ex))
             raise
@@ -825,13 +872,7 @@ class RespProcessor:
                     case RespProcessor._Mode.COLLECTED:
                         # Shouldn't get here - as this is after sender has closed key
                         pass
-        # Get current time now
-        now = datetime.now()
-        now_secs = int((now.hour * 3600) + (now.minute * 60) + now.second)
-        for spec in self._spec_ops:
-            if spec.condition == RespProcessor._CondOp.idle or spec.is_resp_type:
-                spec.last_activity = now_secs
-            pass
+        self._update_specs_last_access()
         return
 
     def exit(self):  # type () -> None
@@ -861,10 +902,10 @@ class RespProcessor:
                         RespProcessor._CondOp.resp_tts
                     ]:
                         # Requires that the message be directed 'To This Station'
-                        # See if it was...
+                        # See if at least one of the 'TO' words is our SID or OID1
                         to_us = False
                         for t in self._msg_to:
-                            if t == self._sid:
+                            if t == self._sid or t == self._oid1:
                                 to_us = True
                                 break
                         if not to_us:
@@ -888,6 +929,7 @@ class RespProcessor:
                         now = datetime.now()
                         now_secs = int((now.hour * 3600) + (now.minute * 60) + now.second)
                         dt = now_secs - spec.last_activity
+                        # print(f"DT:{dt} NOW:{now_secs} LAST:{spec.last_activity} PERIOD:{spec.period} COND:{spec.condition}")
                         if dt >= spec.period:
                             self._send_msg_from_spec(spec)
                             self._mode = RespProcessor._Mode.SENT
@@ -948,6 +990,7 @@ class RespProcessor:
         Sender closed their key. See if we collected anything and 
         generate a response if appropriate.
         """
+        self._update_specs_last_access()
         self._sender_on = False
         sndr_msg = "".join(self._msg)
         sndr_msg = " ".join(sndr_msg.split()[-8:])
@@ -957,7 +1000,7 @@ class RespProcessor:
         if not sndr_msg:
             s = "".join(self._msg_to)
             sl = s.split()
-            if strings_are_different(sl):
+            if values_are_different(sl):
                 sndr_msg = " ".join(sl)
                 self._msg_to = []
         self._msg_parsed = self._sntnc_parser.parse(sndr_msg)
@@ -1022,12 +1065,14 @@ class MrtCtrl:
         oid: str,
         sid: str,
         sender_dt: bool,
-        resp_spec_path: str|None = None
+        resp_spec_path: str|None = None,
+        id_names_path: str|None = None
     ) -> None:
         self._app_name_version = app_name_version
         self._wire: int = wire
         self._cfg: Config = cfg
         self._oid: str = oid
+        self._oid1: str = get_first_word(oid)
         self._sid: str = sid
         self._sender_dt: bool = sender_dt
         self._shutdown: Event = Event()
@@ -1041,6 +1086,8 @@ class MrtCtrl:
         self._resp_spec_path = RespProcessor.add_ext_if_needed(resp_spec_path.strip())
         self._resp_proc = None
 
+        self._id_names_path = id_names_path
+        self._id_names = load_lookup_table(self._id_names_path)
         self._internet: Optional[Internet] = None
         self._reader: Optional[Reader] = None
         self._sender: Optional[Sender] = None
@@ -1160,6 +1207,13 @@ class MrtCtrl:
             callback=self._reader_callback,
             decode_at_detected=self._cfg.decode_at_detected
             )
+        if self._id_names_path:
+            p = Path(self._id_names_path)
+            p.resolve()
+            if not p.is_file():
+                print("Resp ID:Names file not found. '{}'".format(self._id_names_path), flush=True)
+                self._id_names_path = None
+                raise FileNotFoundError(p)
         if self._resp_spec_path:
             p = Path(self._resp_spec_path)
             p.resolve()
@@ -1168,7 +1222,7 @@ class MrtCtrl:
                 self._resp_spec_path = None
                 raise FileNotFoundError(p)
             pass
-            self._resp_proc = RespProcessor(self._oid, self._sid, p, self._sender, self._from_resp_processor, self._shutdown)
+            self._resp_proc = RespProcessor(self._oid, self._sid, p, self._id_names, self._sender, self._from_resp_processor, self._shutdown)
             print("Responder specification to use: {}".format(p))
         return
 
@@ -1261,6 +1315,8 @@ class MrtCtrl:
                 "To enable/disable this setting use `Configure --iki`.")
         if self._resp_spec_path:
             print("Responder operation will be controlled by specification: {}".format(self._resp_spec_path))
+        if self._id_names:
+            print("Responder ID:Names from: {}".format(self._id_names_path))
         if self._resp_proc:
             print("Responder Actions/Conditions:")
             self._resp_proc.print_conditions("  ")
@@ -1347,7 +1403,7 @@ def status_msg_handler(msg):
     return
 
 def mrtc_from_args(gopts: Optional[_MrtcOptions] = None, options: Optional[Sequence[str]] = None, cfg: Optional[Config] = None) -> tuple[MrtCtrl, _MrtcOptions]:
-    arg_parser = argparse.ArgumentParser(description="Morse Receive & Transmit Controller for Responder. "
+    arg_parser = argparse.ArgumentParser(description="Morse Responder. "
         + "Receive from wire and possibly respond. Also, provide scheduled content.\nThe Global configuration is used except as overridden by options.",
         parents= [
             config2.sound_override,
@@ -1362,18 +1418,41 @@ def mrtc_from_args(gopts: Optional[_MrtcOptions] = None, options: Optional[Seque
             config2.logging_level_override,
             pkappargs.sender_datetime_override
         ],
+        formatter_class=CustomHelpFormatter,
         exit_on_error=False
     )
     if gopts is None:
         gopts = _MrtcOptions()
-    arg_parser.add_argument("--sine", metavar="sine", dest="sine",
+    arg_parser.add_argument("--idnames", metavar="PATH-to-ID_NAMES", dest="id_names_path",
+        help="File containing a list of 'ID NAME' pairs, one per line. Used to respond with full names.")
+    arg_parser.add_argument("--sine", metavar="SINE", dest="sine",
         help="The Short ID (sine) to use (otherwise, first part of Station ID is used).")
-    arg_parser.add_argument("resp_spec_path", type=str,
-        help="Responder specification file path.")
-    arg_parser.add_argument("wire", nargs='?', type=int,
+    arg_parser.add_argument("--parsetest", metavar="SENTENCE", dest="parsetest",
+        help="Parse the next argument as a sentence and list the parts identified, then exit. Helps with generating responses.")
+    arg_parser.add_argument("resp_spec_path", nargs='?', metavar="(resp_spec_path | --parsetest SENTENCE)", type=str,
+        help="Responder specification file path. (required if not running a test parse)")
+    arg_parser.add_argument("wire", nargs='?', metavar="wire#", type=int,
         help="Wire to connect to. If specified, this is used rather than the configured wire.")
 
     args = arg_parser.parse_args(options)
+
+    # --- Mutually Exclusive Argument Enforcement ---
+    # Check if both or neither are provided
+    if bool(args.resp_spec_path) == bool(args.parsetest):
+        if args.resp_spec_path:
+            arg_parser.error("If test parsing with '--parsetest SENTENCE' a resp_spec_path isn't used.")
+        else:
+            arg_parser.error("missing required input: provide a resp_spec_path or use '--parsetest SENTENCE'.")
+
+    #
+    # Before doing any real work, see if they just want to parse an example sentence
+    #
+    if args.parsetest:
+        parser = SSParser()
+        parsed_data = parser.parse(args.parsetest)
+        print("")
+        parser.print(parsed_data)
+        sys.exit(0)
 
     cfg = config2.process_config_args(args, cfg)
     log.set_logging_level(cfg.logging_level)
@@ -1386,6 +1465,7 @@ def mrtc_from_args(gopts: Optional[_MrtcOptions] = None, options: Optional[Seque
         log.debug("New sender listed with Date-Time", 1)
     wire = args.wire if args.wire else cfg.wire
     resp_spec_path = args.resp_spec_path
+    id_names_path = args.id_names_path
     #
 
     mrtc = MrtCtrl(
@@ -1395,7 +1475,8 @@ def mrtc_from_args(gopts: Optional[_MrtcOptions] = None, options: Optional[Seque
             station,
             sid,
             sender_dt,
-            resp_spec_path=resp_spec_path
+            resp_spec_path,
+            id_names_path
         )
     return (mrtc, gopts)
 
@@ -1438,9 +1519,12 @@ if __name__ == "__main__":
         exit_status = 3
         print("Error encountered: {}".format(ex))
         log.debug(traceback.format_exc(), 0)
-    except SystemExit as arg_err:
-        print(arg_err)
-        log.debug(traceback.format_exc(), 3)
+    except SystemExit as se:
+        if se.code == 0 or se.code is None:
+            exit_status = 0
+        else:
+            exit_status = se.code
+            log.debug(traceback.format_exc(), 3)
     finally:
         if mrtc:
             mrtc.exit()
