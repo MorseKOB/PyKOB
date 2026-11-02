@@ -68,7 +68,7 @@ import traceback
 from typing import Optional, Sequence
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 RESP_VERSION_TEXT = "Responder " + VERSION
 
@@ -118,7 +118,7 @@ def load_common_words():  # type: () -> set[str]
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 2. Build the absolute path to the dictionary file
-    file_path = os.path.join(current_dir, "mkob_learn", "Word-list.txt")
+    file_path = os.path.join(current_dir, "pykob", "data", "dictionary.txt")
     
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -277,7 +277,7 @@ class MessageBuffer:
         clean_msg = calibrated_text
         if not sender_id:
             if dict:
-                clean_msg = " ".join([word for word in calibrated_text.split() if word.rstrip("?:!,.").upper() in dict])
+                clean_msg = " ".join([word for word in calibrated_text.split() if len(word) < 2 or word.rstrip("?:!,.").upper() in dict])
             return clean_msg
 
         tokens = calibrated_text.split()
@@ -1129,41 +1129,48 @@ class RespProcessor:
 
     def _process_buffer(self):
         """
-        Executes the two-pass bootstrap strategy upon sender channel closure:
-        Pass 1: Space-blind extraction and removal of routing preambles.
-        Pass 2: Dynamic single-sender threshold calibration and syntax parsing.
+        Processes the single-sender message stream. Guarantees a 3-tuple return
+        to support 'BLANK' message conditions and prevent thread unpacking crashes.
         """
+        # SSParser handles an empty string by mapping it to a BLANK type specification
+        parsed_blank = self._ss_parser.parse("")
         msg_buffer = self._msg_buf
         try:
-            # --- PASS 1: Timing Calibration & Word Assembly ---
-            # 1. Run the 1D statistical valley detection on the full single-sender metrics
+            # 1. Run the dynamic timing calibration pass across the token buffer
             calibrated_threshold = msg_buffer.compute_adaptive_threshold()
-            
-            # 2. Rebuild the text, cleanly dropping the Farnsworth intra-word padding
             calibrated_text = msg_buffer.get_calibrated_text(calibrated_threshold)
-            if not calibrated_text:
-                return (None,None,self._ss_parser.parse(""))  # Quietly drop empty channel closures
 
-            # --- PASS 2: Routing Isolation & Grammar Parsing ---
-            # 3. Pull routing information safely from the fully assembled text string
-            routing_meta, sender_id = msg_buffer.parse_routing_from_text(calibrated_text, oid=self._oid1, sid=self._sid)
+            # Handle blank/empty string immediately if the token extraction is clean air
+            if not calibrated_text or not calibrated_text.strip():
+                return None, None, parsed_blank
 
-            # 4. Strip the address preamble cleanly now that words are properly formed
-            cleaned_body = msg_buffer.strip_preamble_from_text(calibrated_text, oid=self._oid1, sid=self._sid)
+            # 2. Extract dynamic routing targets and the transmitting station callsign
+            routing_meta, sender_id = msg_buffer.parse_routing_from_text(
+                calibrated_text, 
+                oid=self._oid, 
+                sid=self._sid
+            )
 
-            if not cleaned_body:
-                return None
+            # 3. Strip the address preamble block to isolate the core message body
+            # (Passing your common_words spelling dictionary sieve if configured)
+            cleaned_body = msg_buffer.strip_preamble_from_text(
+                calibrated_text, 
+                oid=self._oid, 
+                sid=self._sid,
+                dict=self._common_words  # Use your actual word-set property name here
+            )
 
-            # 5. Map the pristine grammatical components via the sentence parser (SSParser)
+            # Handle BLANK message condition safely if stripping leaves an empty sentence
+            if not cleaned_body or not cleaned_body.strip():
+                return sender_id, routing_meta, parsed_blank
+
+            # 4. Map valid text via the rule-based sentence parser
             parsed_sentence = self._ss_parser.parse(cleaned_body)
-
-
-            # Return the processed values
-            return (sender_id, routing_meta, parsed_sentence)
+            return sender_id, routing_meta, parsed_sentence
 
         except Exception as e:
-            log.error(f"Error in message buffer processing: {str(e)}")
-            return (None,None,self._ss_parser.parse(""))
+            log.error(f"Problem processing incoming message buffer: {str(e)}")
+            return None, None, parsed_blank
 
     def sender_closed(self):  # () -> None
         """
