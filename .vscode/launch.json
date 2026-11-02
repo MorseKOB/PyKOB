@@ -75,6 +75,7 @@
             "request": "launch",
             "program": "src.py/Responder.py",
             "args": [
+                "-c","23",
                 "-S","RSP, Test",
                 "--idnames","_tst_idnames.txt",
                 "--sine","RS",

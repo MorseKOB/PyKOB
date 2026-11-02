@@ -49,6 +49,7 @@ apparatus
 apple
 approval
 arch
+are
 argument
 arm
 army
@@ -597,6 +598,7 @@ rat
 rate
 ray
 reaction
+real
 red
 reading
 ready
