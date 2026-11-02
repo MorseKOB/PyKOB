@@ -53,6 +53,7 @@ import pkappargs
 
 import argparse
 from datetime import datetime
+from collections import deque
 from enum import IntEnum, unique
 import json
 import os
@@ -67,7 +68,7 @@ import traceback
 from typing import Optional, Sequence
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 RESP_VERSION_TEXT = "Responder " + VERSION
 
@@ -106,6 +107,35 @@ def load_lookup_table(file_path: str|None) -> dict[str, str]:
                     print(f"Warning: Malformed list data in {file_path} on line {line_num}: {repr(line)}")
     return lookup
 
+def load_common_words():  # type: () -> set[str]
+    """
+    Loads the training word list into a fast lookup set.
+    Handles comment stripping, whitespace trimming, and forces UPPERCASE.
+    """
+    common_words_set = set()
+    
+    # 1. Dynamically find the directory where Responder.py resides
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 2. Build the absolute path to the dictionary file
+    file_path = os.path.join(current_dir, "mkob_learn", "Word-list.txt")
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                clean_line = line.strip()
+                
+                # Skip empty lines or comment lines
+                if not clean_line or clean_line.startswith("#"):
+                    continue
+                
+                # Store the word in uppercase to match Morse stream conventions
+                common_words_set.add(clean_line.upper())
+                
+    except FileNotFoundError:
+        log.error(f"Common words file not found at: {file_path}")
+    return common_words_set
+
 def values_are_different(string_list: list[str]) -> bool:
     # An empty list or single item has no mismatches
     if not string_list:
@@ -116,6 +146,151 @@ def values_are_different(string_list: list[str]) -> bool:
 def word_count_is(text: str, target_count: int) -> bool:
     # split() handles trimming and multiple spaces automatically
     return len(text.split()) == target_count
+
+
+# ###################################################################
+# 
+# Message Buffer that keeps the 'Head' and the 'Tail' of an
+# incoming character stream and provides a 'clean' head and body, the
+# detected 'TO' and 'FROM' IDs, as well as the raw buffers.
+#
+# ###################################################################
+class MessageBuffer:
+    """
+    Keep 'Head' and 'Tail' of a character stream tracking (char, spacing) tuples.
+    """
+    def __init__(self, head_len=50, tail_limit=120):  # (int,int,float) -> None
+        self._head_len = head_len
+        self._tail_limit = tail_limit
+        # Standard list to hold the first x elements as (char, spacing) tuples
+        self._head = []
+        # Circular queue to retain the last y elements as (char, spacing) tuples
+        self._tail = deque(maxlen=tail_limit)
+
+    def append(self, ch, spacing):  # type: (str, float) -> None
+        """Appends the decoded character and its associated timing metric."""
+        # 1. Process and append to the head buffer up to its limit as a tuple
+        if len(self._head) < self._head_len:
+            if self._head or not ch == ' ':
+                self._head.append((ch, spacing))
+                
+        # 2. Append to the tail deque
+        self._tail.append((ch, spacing))
+
+    def compute_adaptive_threshold(self) -> float:
+        """
+        Calculates the optimal word boundary threshold for the entire single-sender
+        session. Allows the boundary to scale low enough to capture precise, high-speed
+        automated transmissions.
+        """
+        all_tokens = list(self._head) + list(self._tail)
+        
+        # Lower the noise floor filter to 0.5 to catch tight, fast character spacing profiles
+        session_gaps = sorted([gap for _, gap in all_tokens if 0.5 <= gap <= 8.5])
+        
+        # Standard American Morse default fallback if dataset is empty or too sparse
+        if len(session_gaps) < 2:
+            return 3.5  
+
+        max_diff = -1.0
+        threshold = 3.5
+        
+        # Locate the widest structural valley in the transmission timing array
+        for i in range(len(session_gaps) - 1):
+            gap_current = session_gaps[i]
+            gap_next = session_gaps[i+1]
+            
+            diff = gap_next - gap_current
+            if diff > max_diff:
+                max_diff = diff
+                threshold = gap_current + (diff / 2.0)
+
+        # Relax guard rails: drop minimum floor down to 1.2 to protect precise senders
+        return max(1.2, min(threshold, 5.0))
+
+    def get_calibrated_text(self, threshold: float) -> str:
+        """
+        Deduplicates the buffer and reassembles a perfectly spaced string.
+        Evaluates the timing values of both characters and explicit space primitives
+        against the calibrated threshold to cleanly separate letters from word breaks.
+        """
+        head_list = list(self._head)
+        tail_list = list(self._tail)
+        all_tokens = head_list + tail_list[len(head_list):] if len(head_list) >= self._head_len else head_list
+
+        rebuilt_text = []
+        
+        for char, gap in all_tokens:
+            if char == ' ':
+                # Only preserve an explicit space token if its duration signals a true word boundary
+                if gap >= threshold:
+                    rebuilt_text.append(' ')
+            else:
+                rebuilt_text.append(char)
+                # If a regular character's trailing metric scales past the threshold,
+                # inject a structural word break
+                if gap >= threshold:
+                    rebuilt_text.append(' ')
+        # Join elements and consolidate consecutive white spaces into a single space
+        return " ".join("".join(rebuilt_text).split()).strip()
+    
+    def parse_routing_from_text(self, calibrated_text, oid, sid):  # type: (str,str,str) -> tuple[str | None, str | None]
+        """
+        Extracts target routing and sender office/sine from calibrated header.
+        """
+        tokens = calibrated_text.split()
+
+        # Assure that 'short_id' won't match the beginning of 'long_id'
+        if len(oid) >= len(sid):
+            long_id = re.escape(oid)   # e.g., "RSO"
+            short_id = re.escape(sid)    # e.g., "RS"
+        else:
+            long_id = re.escape(sid)
+            short_id = re.escape(oid)
+        ids_pattern = f"(?:{long_id}|{short_id})"
+        
+        # Pattern that tries to find two occurrences of either of our IDs
+        pattern = re.compile(rf"^.*?{ids_pattern}.*?(?P<to>{ids_pattern})\s+(?P<sender>[A-Z0-9]+)\s?")
+        
+        match = pattern.match(calibrated_text)
+        if match:
+            sender_id = match.group("sender")
+            
+            # Guard Clause: Handle 2x 'TO' cases (sender)
+            if sender_id == sid or sender_id == oid:
+                match_word_count = len(calibrated_text[:match.end()].split())
+                if match_word_count < len(tokens):
+                    sender_id = tokens[match_word_count].rstrip("?:!,.")
+            msg_to = match.group("to")
+            return msg_to, sender_id
+        return None, None
+
+    def strip_preamble_from_text(self, calibrated_text, oid, sid, dict=None):  # (str,str,str,set[str]|None) -> str
+        """
+        Strips the address preamble block off the calibrated text string view,
+        relying on the resolved regex sender ID to split the message body.
+
+        If `dict` (a set of words) is supplied, then words in the text must be found
+        to be included.
+        """
+        msg_to, sender_id = self.parse_routing_from_text(calibrated_text, oid, sid)
+        clean_msg = calibrated_text
+        if not sender_id:
+            if dict:
+                clean_msg = " ".join([word for word in calibrated_text.split() if word.rstrip("?:!,.").upper() in dict])
+            return clean_msg
+
+        tokens = calibrated_text.split()
+        for i, token in enumerate(tokens):
+            if token.rstrip("?:!,.") == sender_id:
+                clean_msg = " ".join(tokens[i + 1:])
+                break
+        
+        # Evaluate clean_msg for being in the dictionary
+        if dict:
+            clean_msg = " ".join([word for word in clean_msg.split() if len(word) < 3 or word.rstrip("?:!,.").upper() in dict])
+        return clean_msg
+
 
 # ###################################################################
 # 
@@ -676,12 +851,10 @@ class RespProcessor:
 
     @unique
     class _Mode(IntEnum):
-        COLLECTING_TO = 1
-        COLLECTING_FROM = 2
-        COLLECTING_MSG = 3
-        COLLECTED = 4
-        IGNORE = 5
-        SENT = 6
+        COLLECTING = 1
+        COLLECTED = 2
+        IGNORE = 3
+        SENT = 4
     
     @staticmethod
     def add_ext_if_needed(s: str) -> str:
@@ -705,21 +878,22 @@ class RespProcessor:
         self._shutdown: Event = shutdown_event
         self._spec_ops = list()  # type: list[_RESPSpecOp]
         #
+        self._common_words = load_common_words()
         self._mode = RespProcessor._Mode.IGNORE
-        self._msg_to = []
-        self._msg_from = []
-        self._msg = []
+        self._msg_buf = MessageBuffer()
+        self._msg_from = None
+        self._msg_is_to_us = False
+        self._msg_to = None
         self._sndr_oid = None  # type: str|None
         self._re_ctrlval = re.compile("^([^»]*)(»)")
         self._re_mwchar = re.compile("^[A-Z0-9 ]+$")
-        self._sender_on = False  # type: bool
-        self._sender_collected = []
 
         self._load_specs()
-        self._sntnc_parser = SSParser()
-        self._msg_parsed = self._sntnc_parser.parse("")
+        self._ss_parser = SSParser()
+        self._msg_parsed = self._ss_parser.parse("")
         #
         return
+
 
     def _load_specs(self):  # type: () -> None
         if self._resp_spec_path:
@@ -751,12 +925,12 @@ class RespProcessor:
             # Generate the context for processing
             context = {
                 # -- Global Session Tokens --
-                self.CTRL_TOKEN_OOID: self._oid,
+                self.CTRL_TOKEN_OOID: self._oid1,
                 self.CTRL_TOKEN_OSID: self._sid,
                 # -- Sender/To Identification (From the Wire/Message) --
                 self.CTRL_TOKEN_FOID: self._sndr_oid,
                 self.CTRL_TOKEN_FOID1: get_first_word(self._sndr_oid),
-                self.CTRL_TOKEN_FSID: self._msg_from[0] if len(self._msg_from) > 0 else get_first_word(self._sndr_oid),
+                self.CTRL_TOKEN_FSID: self._msg_from,
                 # -- Parsed Sentence Components --
                 self.CTRL_TOKEN_SENTENCE: self._msg_parsed[SSParser.SENTENCE_C],
                 self.CTRL_TOKEN_TYPE: self._msg_parsed[SSParser.TYPE_C],
@@ -839,39 +1013,12 @@ class RespProcessor:
             raise
         return
 
-    def activity(self, content, halfsp):  # type: (str,bool) -> None
+    def activity(self, content, spacing):  # type: (str,float) -> None
         """
         Should be called by MrtCtrl any time characters are received.
         """
-        stop_collecting = (content == '.' or content == '?')
-        if not halfsp or (halfsp and self._mode == RespProcessor._Mode.COLLECTING_MSG):
-            if (bool(self._re_mwchar.match(content)) or (self._mode == RespProcessor._Mode.COLLECTING_MSG and stop_collecting)):
-                match self._mode:
-                    case RespProcessor._Mode.COLLECTING_TO:
-                        self._msg_to.append(content)
-                        # see if we have collected 3 words
-                        if content == ' ' and not halfsp:
-                            collected = "".join(self._msg_to)
-                            if word_count_is(collected, 3):
-                                self._mode = RespProcessor._Mode.COLLECTING_FROM
-                    case RespProcessor._Mode.COLLECTING_FROM:
-                        self._msg_from.append(content)
-                        # see if we have collected 1 word
-                        if content == ' ' and not halfsp:
-                            collected = "".join(self._msg_from)
-                            if word_count_is(collected, 1):
-                                self._mode = RespProcessor._Mode.COLLECTING_MSG
-                    case RespProcessor._Mode.COLLECTING_MSG:
-                        # collect the message but stop collecting at the first '.' or '?'
-                        if (stop_collecting):
-                            self._mode = RespProcessor._Mode.IGNORE
-                        else:
-                            self._msg.append(content)
-                    case RespProcessor._Mode.IGNORE:
-                        pass
-                    case RespProcessor._Mode.COLLECTED:
-                        # Shouldn't get here - as this is after sender has closed key
-                        pass
+        if (self._mode is RespProcessor._Mode.COLLECTING and bool(self._re_mwchar.match(content))):
+            self._msg_buf.append(content, spacing)
         self._update_specs_last_access()
         return
 
@@ -903,12 +1050,7 @@ class RespProcessor:
                     ]:
                         # Requires that the message be directed 'To This Station'
                         # See if at least one of the 'TO' words is our SID or OID1
-                        to_us = False
-                        for t in self._msg_to:
-                            if t == self._sid or t == self._oid1:
-                                to_us = True
-                                break
-                        if not to_us:
+                        if not self._msg_is_to_us:
                             continue  # The message wasn't to us, so the condition isn't met
                     # The message was to us or we don't care who it is to
                     #  See if the type matches
@@ -985,50 +1127,86 @@ class RespProcessor:
                 print("{}{}".format(lead_in, spec))
         return
 
+    def _process_buffer(self):
+        """
+        Executes the two-pass bootstrap strategy upon sender channel closure:
+        Pass 1: Space-blind extraction and removal of routing preambles.
+        Pass 2: Dynamic single-sender threshold calibration and syntax parsing.
+        """
+        msg_buffer = self._msg_buf
+        try:
+            # --- PASS 1: Timing Calibration & Word Assembly ---
+            # 1. Run the 1D statistical valley detection on the full single-sender metrics
+            calibrated_threshold = msg_buffer.compute_adaptive_threshold()
+            
+            # 2. Rebuild the text, cleanly dropping the Farnsworth intra-word padding
+            calibrated_text = msg_buffer.get_calibrated_text(calibrated_threshold)
+            if not calibrated_text:
+                return (None,None,self._ss_parser.parse(""))  # Quietly drop empty channel closures
+
+            # --- PASS 2: Routing Isolation & Grammar Parsing ---
+            # 3. Pull routing information safely from the fully assembled text string
+            routing_meta, sender_id = msg_buffer.parse_routing_from_text(calibrated_text, oid=self._oid1, sid=self._sid)
+
+            # 4. Strip the address preamble cleanly now that words are properly formed
+            cleaned_body = msg_buffer.strip_preamble_from_text(calibrated_text, oid=self._oid1, sid=self._sid)
+
+            if not cleaned_body:
+                return None
+
+            # 5. Map the pristine grammatical components via the sentence parser (SSParser)
+            parsed_sentence = self._ss_parser.parse(cleaned_body)
+
+
+            # Return the processed values
+            return (sender_id, routing_meta, parsed_sentence)
+
+        except Exception as e:
+            log.error(f"Error in message buffer processing: {str(e)}")
+            return (None,None,self._ss_parser.parse(""))
+
     def sender_closed(self):  # () -> None
         """
         Sender closed their key. See if we collected anything and 
         generate a response if appropriate.
         """
         self._update_specs_last_access()
-        self._sender_on = False
-        sndr_msg = "".join(self._msg)
-        sndr_msg = " ".join(sndr_msg.split()[-8:])
-        # See if the message is blank, but we have a 'to'
-        #  if so, and the 'to' has different words, assume
-        #  the 'to' is actually the message.
-        if not sndr_msg:
-            s = "".join(self._msg_to)
-            sl = s.split()
-            if values_are_different(sl):
-                sndr_msg = " ".join(sl)
-                self._msg_to = []
-        self._msg_parsed = self._sntnc_parser.parse(sndr_msg)
-        msg_to = "".join(self._msg_to)
-        msg_from = "".join(self._msg_from)
-        print(f"TO: {msg_to}")
-        print(f"FROM: {msg_from}")
+        # Process the message buffer
+        detected_sender, msg_to, parsed_sentence = self._process_buffer()
+        # See if the buffer is directed to us and, if so, get the sender
+        if detected_sender:
+            # Match found! Log the sender identity to our session attributes
+            self._msg_from = detected_sender
+            self._msg_to = msg_to
+            self._msg_is_to_us = True
+        else:
+            # General overhearing or follow-on message
+            # Set the from ID/Sine based on the wire ID of the from station
+            self._msg_from = get_first_word(self._sndr_oid)
+            self._msg_to = None
+        # Optimize filter metrics and grab the body for the SSParser
+        self._msg_parsed = parsed_sentence
+        print(f"TO: {msg_to} (to us: {self._msg_is_to_us})")
+        print(f"FROM: {self._msg_from}")
         print(f"Message: \"{self._msg_parsed[SSParser.SENTENCE_C]}\"")
         print(f"  Type: {self._msg_parsed[SSParser.TYPE_C]}")
         for key, value in self._msg_parsed.items():
             if key not in [SSParser.SENTENCE_C, SSParser.TYPE_C] and value is not None:
                 print(f"    {key}: {value}")
         print("-" * 40, flush=True)
-        # Combine the msg_to and msg_from into lists of strings
-        self._msg_from = msg_from.split()
-        self._msg_to = msg_to.split()
         # Indicate that the message has been collected
         self._mode = RespProcessor._Mode.COLLECTED
         return
     
     def sender_opened(self, sndr_oid):  # (str) -> None
         self._sndr_oid = sndr_oid
-        self._sender_on = True
-        self._msg = []
-        self._msg_from = []
-        self._msg_to = []
-        self._msg_parsed = self._sntnc_parser.parse("")
-        self._mode = RespProcessor._Mode.COLLECTING_TO
+        self._msg_buf = MessageBuffer()
+        self._msg = None
+        self._msg_from = None
+        self._msg_to = None
+        self._msg_is_to_us = False
+        self._msg_parsed = self._ss_parser.parse("")
+        self._mode = RespProcessor._Mode.COLLECTING
         return
     
     def shutdown(self): # type: () -> None
@@ -1095,7 +1273,6 @@ class MrtCtrl:
         self._connected = False
         self._inet_breakin_open_cnt = 0        # Track consecutive Open count to break in to open wire
         self._internet_station_active = False  # True if a remote station has the wire open
-        self._last_received_para = False # The last character received was a Paragraph ('=')
         self._our_office_id = cfg.station if not cfg.station is None else ""
         self._sender_current = ""
 
@@ -1307,6 +1484,8 @@ class MrtCtrl:
             print("Connecting to wire: " + str(self._wire))
             print("Connecting as Station/Office: " + self._our_office_id)
         print("Our ID: {}".format(self._oid))
+        print("Our Office: {}".format(self._oid1))
+        print("Our Sine: {}".format(self._sid))
         if self._cfg.decode_at_detected:
             print("Using the detected incoming character speed for decoding.")
         # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
@@ -1333,12 +1512,6 @@ class MrtCtrl:
         # print(f"_sender_current: {repr(self._sender_current)}")
         # print(f"_our_office_id: {repr(self._our_office_id)}")
 
-        if not char == '=':
-            if self._last_received_para:
-                print(flush=True)
-            self._last_received_para = False
-        else:
-            self._last_received_para = True
         if self._resp_proc:
             halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
             fullSpace = False
@@ -1347,11 +1520,10 @@ class MrtCtrl:
             if halfSpaces >= 2:
                 fullSpace = True
                 halfSpaces = (halfSpaces - 1) // 2
-            for i in range(halfSpaces):
-                self._resp_proc.activity(' ', True)
-            if fullSpace:
-                self._resp_proc.activity(' ', False)
-            self._resp_proc.activity(char, False)
+            if fullSpace or halfSpaces > 0:
+                self._resp_proc.activity(" ", spacing)
+                spacing = 0
+            self._resp_proc.activity(char, spacing)
         return
 
     def _set_local_loop_active(self, active):
