@@ -68,7 +68,7 @@ import traceback
 from typing import Optional, Sequence
 
 COMPILE_INFO = globals().get("__compiled__")
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 VERSION = __version__ if COMPILE_INFO is None else __version__ + 'c'
 RESP_VERSION_TEXT = "Responder " + VERSION
 
@@ -150,9 +150,9 @@ def word_count_is(text: str, target_count: int) -> bool:
 
 # ###################################################################
 # 
-# Message Buffer that keeps the 'Head' and the 'Tail' of an
-# incoming character stream and provides a 'clean' head and body, the
-# detected 'TO' and 'FROM' IDs, as well as the raw buffers.
+# Message Buffer that keeps the 'Head' and the 'Tail' Text+Spacing
+# of an incoming character stream and provides a 'clean' head and
+# body, the detected 'TO' and 'FROM' IDs, as well as the raw buffers.
 #
 # ###################################################################
 class MessageBuffer:
@@ -167,15 +167,19 @@ class MessageBuffer:
         # Circular queue to retain the last y elements as (char, spacing) tuples
         self._tail = deque(maxlen=tail_limit)
 
-    def append(self, ch, spacing):  # type: (str, float) -> None
+    def append(self, ch, spacing, mode):  # type: (str,float,RespProcessor._Mode) -> None
         """Appends the decoded character and its associated timing metric."""
         # 1. Process and append to the head buffer up to its limit as a tuple
-        if len(self._head) < self._head_len:
-            if self._head or not ch == ' ':
-                self._head.append((ch, spacing))
+        if mode == RespProcessor._Mode.PROC_HEAD:
+            if len(self._head) < self._head_len:
+                if self._head or not ch == ' ':
+                    self._head.append((ch, spacing))
+                    print(f"{ch}", end="", flush=True)
                 
         # 2. Append to the tail deque
-        self._tail.append((ch, spacing))
+        if mode == RespProcessor._Mode.PROC_TAIL:
+            self._tail.append((ch, spacing))
+            print(f"{ch}", end="", flush=True)
 
     def compute_adaptive_threshold(self) -> float:
         """
@@ -277,19 +281,58 @@ class MessageBuffer:
         clean_msg = calibrated_text
         if not sender_id:
             if dict:
-                clean_msg = " ".join([word for word in calibrated_text.split() if len(word) < 2 or word.rstrip("?:!,.").upper() in dict])
+                clean_msg = " ".join([word for word in calibrated_text.split() if len(word) < 2 or word.rstrip("?:!,._").upper() in dict])
+            else:
+                clean_msg = " ".join([word for word in calibrated_text.split() if len(word.rstrip("?:!,._")) > 0])
             return clean_msg
 
         tokens = calibrated_text.split()
         for i, token in enumerate(tokens):
-            if token.rstrip("?:!,.") == sender_id:
+            if token.rstrip("?:!,._") == sender_id:
                 clean_msg = " ".join(tokens[i + 1:])
                 break
         
         # Evaluate clean_msg for being in the dictionary
         if dict:
-            clean_msg = " ".join([word for word in clean_msg.split() if len(word) < 3 or word.rstrip("?:!,.").upper() in dict])
+            clean_msg = " ".join([word for word in clean_msg.split() if len(word) < 3 or word.rstrip("?:!,._").upper() in dict])
+        else:
+            clean_msg = " ".join([word for word in clean_msg.split() if len(word.rstrip("?:!,._")) > 0])
         return clean_msg
+
+
+# ###################################################################
+# 
+# Morse Buffer that keeps the 'Head' and the 'Tail' Spacing of an
+# incoming wire stream and provides and provides the raw buffers.
+#
+# ###################################################################
+class MorseBuffer:
+    """
+    Keep 'Head' and 'Tail' of a Morse spacing stream tracking.
+    """
+    def __init__(self, head_len=500, tail_limit=1000):  # (int,int,float) -> None
+        self._head_len = head_len
+        self._tail_limit = tail_limit
+        # Standard list to hold the first x spacing values
+        self._head = []
+        # Circular queue to retain the last y spacing values
+        self._tail = deque(maxlen=tail_limit)
+
+    def append(self, spacing):  # type: (float) -> None
+        """ Appends the spacing value to both up to the Head Limit, then just the Tail. """
+        # 1. Process and append to the head buffer up to its limit as a tuple
+        if len(self._head) < self._head_len:
+            self._head.append(spacing)
+        # 2. Append to the tail deque
+        self._tail.append(spacing)
+
+    def get_head(self):  # type: () -> list[float]
+        """ Return Head list """
+        return self._head
+
+    def get_tail(self):  # type: () -> deque[float]
+        """ Return Tail list """
+        return self._tail
 
 
 # ###################################################################
@@ -853,8 +896,12 @@ class RespProcessor:
     class _Mode(IntEnum):
         COLLECTING = 1
         COLLECTED = 2
-        IGNORE = 3
-        SENT = 4
+        PROCESSING = 3
+        PROC_HEAD = 4
+        PROC_TAIL = 5
+        RESPONDING = 6
+        IGNORE = 7
+        SENT = 8
     
     @staticmethod
     def add_ext_if_needed(s: str) -> str:
@@ -867,12 +914,12 @@ class RespProcessor:
             return (s + RespProcessor.RESPONSE_SPEC_EXT)
         return s
 
-    def __init__(self, oid, sid, resp_spec_path, id_names, morse_sender, code_char_send_callback, shutdown_event):  # type (str, Path|None, dict[str, str], Sender, Callable, Event) -> None
+    def __init__(self, oid, sid, resp_spec_path, id_names, code_type, morse_sender, code_char_send_callback, shutdown_event):  # type (str, Path|None, dict[str, str], config.CodeType, Sender, Callable, Event) -> None
         self._oid = oid
-        self._oid1 = get_first_word(oid)
         self._sid = sid
         self._resp_spec_path = resp_spec_path
         self._id_names = id_names
+        self._code_type = code_type
         self._morse_sender = morse_sender
         self._code_char_send = code_char_send_callback
         self._shutdown: Event = shutdown_event
@@ -880,6 +927,7 @@ class RespProcessor:
         #
         self._common_words = load_common_words()
         self._mode = RespProcessor._Mode.IGNORE
+        self._morse_buf = MorseBuffer()
         self._msg_buf = MessageBuffer()
         self._msg_from = None
         self._msg_is_to_us = False
@@ -925,7 +973,7 @@ class RespProcessor:
             # Generate the context for processing
             context = {
                 # -- Global Session Tokens --
-                self.CTRL_TOKEN_OOID: self._oid1,
+                self.CTRL_TOKEN_OOID: self._oid,
                 self.CTRL_TOKEN_OSID: self._sid,
                 # -- Sender/To Identification (From the Wire/Message) --
                 self.CTRL_TOKEN_FOID: self._sndr_oid,
@@ -941,6 +989,7 @@ class RespProcessor:
                 self.CTRL_TOKEN_COMPLEMENT: self._msg_parsed[SSParser.COMPLEMENT_C]
             }
             msg = self._create_message(template, context, self._id_names)
+            print(f"{msg}", flush=True)
             self._send_message(msg, template)
         return
 
@@ -1013,17 +1062,27 @@ class RespProcessor:
             raise
         return
 
-    def activity(self, content, spacing):  # type: (str,float) -> None
+    def _reader_callback(self, char, spacing):  # type: (str, float) -> None
         """
-        Should be called by MrtCtrl any time characters are received.
+        Called by our Reader as it decodes code.
         """
-        if (self._mode is RespProcessor._Mode.COLLECTING and bool(self._re_mwchar.match(content))):
-            self._msg_buf.append(content, spacing)
-        self._update_specs_last_access()
+        halfSpaces = min(max(int(2 * spacing + 0.5), 0), 10)
+        fullSpace = False
+        if halfSpaces > 0:
+            halfSpaces -=1
+        if halfSpaces >= 2:
+            fullSpace = True
+            halfSpaces = (halfSpaces - 1) // 2
+        if fullSpace or halfSpaces > 0:
+            self._msg_buf.append(" ", spacing, self._mode)
+            spacing = 0
+        self._msg_buf.append(char, spacing, self._mode)
         return
 
+    def code_received(self, code):
+        self._morse_buf.append(code)
+
     def exit(self):  # type () -> None
-        pass
         return
     
     def process(self, wire_active):  # type: (bool) -> None
@@ -1039,7 +1098,7 @@ class RespProcessor:
         # Run through the specs and see if the condition is met.
         for spec in self._spec_ops:
             if spec.is_resp_type:  # This is a response, see if we have a complete message
-                if self._mode is RespProcessor._Mode.COLLECTED:
+                if self._mode is RespProcessor._Mode.COLLECTED or self._mode is RespProcessor._Mode.RESPONDING:
                     # Yes. See if it meets the criteria
                     #  Work from the most specific to the most generic
                     if spec.condition in [
@@ -1065,6 +1124,9 @@ class RespProcessor:
                         if (self._msg_parsed[SSParser.TYPE_C] is not SSParser.BLANK_T):
                             continue  # We want a blank message and the message isn't blank
                     # If we've made it here it means that we should respond...
+                    if self._mode == RespProcessor._Mode.COLLECTED:
+                        print("Responding with: ", end="", flush=True)
+                        self._mode = RespProcessor._Mode.RESPONDING
                     # But we might need to wait for some idle time
                     if spec.period is not None:
                         # Get current time now
@@ -1073,11 +1135,13 @@ class RespProcessor:
                         dt = now_secs - spec.last_activity
                         # print(f"DT:{dt} NOW:{now_secs} LAST:{spec.last_activity} PERIOD:{spec.period} COND:{spec.condition}")
                         if dt >= spec.period:
-                            self._send_msg_from_spec(spec)
                             self._mode = RespProcessor._Mode.SENT
+                            self._send_msg_from_spec(spec)
+                            print("-" * 40, flush=True)
                         pass
                     pass
                 pass
+            pass
             if spec.time is not None:   # If the spec has a time see if now is the time to do something
                 tMsg = int((60*(spec.time//100) + (spec.time%100)) * 60)  # time to send message
                 # Get current time now
@@ -1117,6 +1181,12 @@ class RespProcessor:
                     spec.last_activity = now_secs
                 pass
             pass
+        if self._mode is RespProcessor._Mode.COLLECTED:
+            # If we get here it means we checked all the 'respond' specs and none matched
+            print("Not responding.")
+            print("-" * 40, flush=True)
+            self._mode = RespProcessor._Mode.IGNORE
+        pass
         return
 
     def print_conditions(self, lead_in):  # (str) -> None
@@ -1156,8 +1226,7 @@ class RespProcessor:
             cleaned_body = msg_buffer.strip_preamble_from_text(
                 calibrated_text, 
                 oid=self._oid, 
-                sid=self._sid,
-                dict=self._common_words  # Use your actual word-set property name here
+                sid=self._sid
             )
 
             # Handle BLANK message condition safely if stripping leaves an empty sentence
@@ -1178,6 +1247,58 @@ class RespProcessor:
         generate a response if appropriate.
         """
         self._update_specs_last_access()
+        #
+        # Process the received code until a consistent speed is detected.
+        print("-" * 40, flush=True)
+        self._mode = RespProcessor._Mode.PROCESSING
+        reader = None
+        try:
+            reader = morse.Reader(
+            wpm=22,
+            cwpm=22,
+            codeType=self._code_type,
+            callback=None,  # We don't want any data from these initial passes
+            decode_at_detected=True
+            )
+            i = 0
+            ldwpm = 0
+            speed_matched = 0
+            head_code = self._morse_buf.get_head()
+            tail_code = self._morse_buf.get_tail()
+            print("Detecting speed: ", end="", flush=True)
+            while i < 10:
+                for code in head_code:
+                    reader.decode(code, use_flusher=False)
+                reader.flush()
+                for code in tail_code:
+                    reader.decode(code, use_flusher=False)
+                reader.flush()
+                dwpm = reader.detected_wpm
+                print(f"{dwpm}", sep="", end=",", flush=True)
+                if ldwpm == dwpm:
+                    speed_matched += 1
+                ldwpm = dwpm
+                if speed_matched > 3:
+                    break
+            print(f"\nDetected: {ldwpm}", flush=True)
+            #
+            # The reader has sunk onto the code speed (or we've tried),
+            # decode the code
+            # 
+            reader.setCallback(self._reader_callback)
+            self._mode = RespProcessor._Mode.PROC_HEAD
+            print("HEAD: ", end="", flush=True)
+            for code in head_code:
+                reader.decode(code, use_flusher=False)
+            reader.flush()
+            self._mode = RespProcessor._Mode.PROC_TAIL
+            print("\nTAIL: ", end="", flush=True)
+            for code in tail_code:
+                reader.decode(code, use_flusher=False)
+            reader.flush()
+        finally:
+            if reader:
+                reader.exit()
         # Process the message buffer
         detected_sender, msg_to, parsed_sentence = self._process_buffer()
         # See if the buffer is directed to us and, if so, get the sender
@@ -1200,19 +1321,22 @@ class RespProcessor:
         for key, value in self._msg_parsed.items():
             if key not in [SSParser.SENTENCE_C, SSParser.TYPE_C] and value is not None:
                 print(f"    {key}: {value}")
-        print("-" * 40, flush=True)
         # Indicate that the message has been collected
         self._mode = RespProcessor._Mode.COLLECTED
         return
     
     def sender_opened(self, sndr_oid):  # (str) -> None
         self._sndr_oid = sndr_oid
+        self._morse_buf = MorseBuffer()
         self._msg_buf = MessageBuffer()
         self._msg = None
         self._msg_from = None
         self._msg_to = None
         self._msg_is_to_us = False
         self._msg_parsed = self._ss_parser.parse("")
+        if self._mode not in [RespProcessor._Mode.IGNORE,RespProcessor._Mode.SENT]:
+            print("Cancelled")
+            print("-" * 40, flush=True)
         self._mode = RespProcessor._Mode.COLLECTING
         return
     
@@ -1274,7 +1398,6 @@ class MrtCtrl:
         self._id_names_path = id_names_path
         self._id_names = load_lookup_table(self._id_names_path)
         self._internet: Optional[Internet] = None
-        self._reader: Optional[Reader] = None
         self._sender: Optional[Sender] = None
 
         self._connected = False
@@ -1301,21 +1424,16 @@ class MrtCtrl:
                 log.debug("MrtCtrl.exit - 3a", 3)
                 inet.exit()
                 log.debug("MrtCtrl.exit - 3b", 3)
-            rdr = self._reader
-            if rdr:
-                log.debug("MrtCtrl.exit - 4a", 3)
-                rdr.exit()
-                log.debug("MrtCtrl.exit - 4b", 3)
             rspndr = self._resp_proc
             if rspndr:
-                log.debug("MrtCtrl.exit - 5a", 3)
+                log.debug("MrtCtrl.exit - 4a", 3)
                 rspndr.exit()
-                log.debug("MrtCtrl.exit - 5b", 3)
+                log.debug("MrtCtrl.exit - 4b", 3)
             sndr = self._sender
             if sndr:
-                log.debug("MrtCtrl.exit - 6a", 3)
+                log.debug("MrtCtrl.exit - 5a", 3)
                 sndr.exit()
-                log.debug("MrtCtrl.exit - 6b", 3)
+                log.debug("MrtCtrl.exit - 5b", 3)
         return
 
     def main_loop(self):
@@ -1352,21 +1470,16 @@ class MrtCtrl:
             log.debug("MrtCtrl.shutdown - 3a", 3)
             inet.shutdown()
             log.debug("MrtCtrl.shutdown - 3b", 3)
-        rdr = self._reader
-        if rdr:
-            log.debug("MrtCtrl.shutdown - 4a", 3)
-            rdr.shutdown()
-            log.debug("MrtCtrl.shutdown - 4b", 3)
         rspndr = self._resp_proc
         if rspndr:
-            log.debug("MrtCtrl.shutdown - 5a", 3)
+            log.debug("MrtCtrl.shutdown - 4a", 3)
             rspndr.shutdown()
-            log.debug("MrtCtrl.shutdown - 5b", 3)
+            log.debug("MrtCtrl.shutdown - 4b", 3)
         sndr = self._sender
         if sndr:
-            log.debug("MrtCtrl.shutdown - 6a", 3)
+            log.debug("MrtCtrl.shutdown - 5a", 3)
             sndr.shutdown()
-            log.debug("MrtCtrl.shutdown - 6b", 3)
+            log.debug("MrtCtrl.shutdown - 5b", 3)
         return
 
     def start(self):
@@ -1384,13 +1497,6 @@ class MrtCtrl:
             codeType=self._cfg.code_type,
             spacing=self._cfg.spacing
             )
-        self._reader = morse.Reader(
-            wpm=self._cfg.text_speed,
-            cwpm=self._cfg.min_char_speed,
-            codeType=self._cfg.code_type,
-            callback=self._reader_callback,
-            decode_at_detected=self._cfg.decode_at_detected
-            )
         if self._id_names_path:
             p = Path(self._id_names_path)
             p.resolve()
@@ -1406,7 +1512,7 @@ class MrtCtrl:
                 self._resp_spec_path = None
                 raise FileNotFoundError(p)
             pass
-            self._resp_proc = RespProcessor(self._oid, self._sid, p, self._id_names, self._sender, self._from_resp_processor, self._shutdown)
+            self._resp_proc = RespProcessor(self._oid1, self._sid, p, self._id_names, self._cfg.code_type, self._sender, self._from_resp_processor, self._shutdown)
             print("Responder specification to use: {}".format(p))
         return
 
@@ -1439,8 +1545,8 @@ class MrtCtrl:
         """handle inputs received from the internet"""
         if self._connected:
             if not self._sender_current == self._our_office_id:
-                if self._reader:
-                    self._reader.decode(code)
+                if self._resp_proc:
+                    self._resp_proc.code_received(code)
             if len(code) > 0:
                 self._internet_station_active = True
                 if code[-1] == 1:
@@ -1493,12 +1599,6 @@ class MrtCtrl:
         print("Our ID: {}".format(self._oid))
         print("Our Office: {}".format(self._oid1))
         print("Our Sine: {}".format(self._sid))
-        if self._cfg.decode_at_detected:
-            print("Using the detected incoming character speed for decoding.")
-        # Let the user know if 'invert key input' is enabled (typically only used for MODEM input)
-        if self._cfg.invert_key_input:
-            print("IMPORTANT! Key input signal invert is enabled (typically only used with a MODEM). " + \
-                "To enable/disable this setting use `Configure --iki`.")
         if self._resp_spec_path:
             print("Responder operation will be controlled by specification: {}".format(self._resp_spec_path))
         if self._id_names:
@@ -1570,8 +1670,6 @@ class MrtCtrl:
             if code[-1] == 1:
                 # Unlatch (Key closed)
                 self._set_local_loop_active(False)
-                if self._reader and (not self._sender_current == self._our_office_id):
-                    self._reader.flush()
             elif code[-1] == 2:
                 # Latch (Key open)
                 self._set_local_loop_active(True)
