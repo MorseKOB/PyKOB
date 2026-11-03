@@ -89,7 +89,14 @@ try:
         sys.exit(1)
     useGpio = strtobool(args.use_gpio) # Use GPIO (Raspberry Pi)
 
-    myKOB = kob.KOB(useSerial=useSerial, portToUse=port, useGpio=useGpio, useAudio=sound)
+    myKOB = kob.KOB(
+        interfaceType=config.interface_type_from_str(args.interface_type),
+        useSerial=useSerial,
+        portToUse=port,
+        useGpio=useGpio,
+        useAudio=sound,
+        useSounder=strtobool(args.sounder)
+    )
     mySender = morse.Sender(text_speed)
 
     # Print some info in case people don't use the help
