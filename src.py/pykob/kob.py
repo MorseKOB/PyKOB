@@ -45,6 +45,7 @@ The `sound_code` method can also be used to appropriately spend time based on th
 code being sounded without causing any sound to be produced.
 
 """
+import atexit
 import re  # RegEx
 import sys
 import time
@@ -245,6 +246,9 @@ class KOB:
         #
         self.__start_keyer_processing()
         self.__start_hw_processing()
+        # Make sure everything (especially the audio stream) is stopped before the interpreter
+        # shuts down, even if the application doesn't call `exit`.
+        atexit.register(self.exit)
         return
 
     def __init_audio(self): # type: () -> None
@@ -399,17 +403,17 @@ class KOB:
             self.power_save(False)
             if self._key_callback:
                 if not self._thread_keyread:
-                    self._thread_keyread = Thread(name="KOB-KeyRead", target=self._thread_keyread_body)
+                    self._thread_keyread = Thread(name="KOB-KeyRead", target=self._thread_keyread_body, daemon=True)
                     self._thread_keyread.start()
             if not self._thread_powersave:
-                self._thread_powersave = Thread(name="KOB-PowerSave", target=self._thread_powersave_body)
+                self._thread_powersave = Thread(name="KOB-PowerSave", target=self._thread_powersave_body, daemon=True)
                 self._thread_powersave.start()
         return
 
     def __start_keyer_processing(self): # type: () -> None
         if not self._shutdown.is_set() and not self._thread_keyer:
             self._threadsStop_keyer.clear()
-            self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body)
+            self._thread_keyer = Thread(name="KOB-Keyer", target=self._thread_keyer_body, daemon=True)
             self._thread_keyer.start()
         return
 
@@ -866,6 +870,7 @@ class KOB:
         """
         Stop the threads and exit.
         """
+        atexit.unregister(self.exit)
         self.shutdown()
         if self._audio:
             self._audio.exit()
