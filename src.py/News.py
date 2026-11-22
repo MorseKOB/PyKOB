@@ -78,3 +78,6 @@ try:
 except KeyboardInterrupt:
     print()
     sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
+finally:
+    myKOB.exit()
+    mySender.exit()

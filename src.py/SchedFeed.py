@@ -83,6 +83,7 @@ for i in range(len(msgs) - 1):  # adjust duplicate times
 #    print(m[0], m[1])  # uncomment to display sorted message list
 
 myKOB = kob.KOB(useSerial=USESERIAL, portToUse=PORT, useGpio=USEGPIO, useAudio=USESOUND, audioType=AUDIOTYPE, useSounder=USESOUNDER, interfaceType=HWTYPE)
+myInternet = None
 if WIRE:
     myInternet = internet.Internet(IDTEXT, appver=app_ver, server_url=config.server_url)
     myInternet.connect(WIRE)
@@ -109,3 +110,8 @@ try:
 except KeyboardInterrupt:
     print()
     sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
+finally:
+    if myInternet:
+        myInternet.exit()
+    myKOB.exit()
+    mySender.exit()

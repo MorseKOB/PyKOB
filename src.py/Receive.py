@@ -67,6 +67,10 @@ def readerCallback(char, spacing):
     elif char == '=':
         print()
 
+myInternet = None
+myReader = None
+myKOB = None
+outFile = None
 try:
     arg_parser = argparse.ArgumentParser(description="Monitors a KOB wire, and displays decoded text.", \
         parents=\
@@ -123,3 +127,12 @@ except KeyboardInterrupt:
     print()
     print()
     sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
+finally:
+    if myInternet:
+        myInternet.exit()
+    if myReader:
+        myReader.exit()
+    if myKOB:
+        myKOB.exit()
+    if outFile:
+        outFile.close()

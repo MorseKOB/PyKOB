@@ -56,6 +56,9 @@ with the hope that it will be a source of joy and inspiration to all the world."
 __full = False
 __DLW = False
 
+myKOB = None
+mySender = None
+repeat = False
 try:
     arg_parser = argparse.ArgumentParser(description=__description, \
         parents=\
@@ -130,3 +133,8 @@ except KeyboardInterrupt:
     if not repeat:
         sys.exit(1) # Indicate this was an abnormal exit
     sys.exit(0)     # Normal exit for ^C when repeating
+finally:
+    if myKOB:
+        myKOB.exit()
+    if mySender:
+        mySender.exit()

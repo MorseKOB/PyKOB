@@ -258,6 +258,9 @@ global app_ver
 app_ver = "Feed {0}".format(VERSION)
 log.log('Starting ' + app_ver)
 
+myKOB = None
+myInternet = None
+mySender = None
 try:
     arg_parser = argparse.ArgumentParser(description="Morse wire feed",
         parents= [

@@ -867,6 +867,11 @@ class KOB:
         Stop the threads and exit.
         """
         self.shutdown()
+        # Wait for the keyer thread to finish before closing the audio it might be using.
+        t = self._thread_keyer
+        if t and t.is_alive() and t is not threading.current_thread():
+            t.join(timeout=2.0)
+        self._thread_keyer = None
         if self._audio:
             self._audio.exit()
         if self._port:
