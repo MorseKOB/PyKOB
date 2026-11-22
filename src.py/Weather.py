@@ -219,6 +219,10 @@ def send(text):
         myInternet.write(code)
 
 exit_status = 1
+myInternet = None
+myReader = None
+mySender = None
+myKOB = None
 try:
     arg_parser = argparse.ArgumentParser(description="Morse weather conditions and forcast service.",
         epilog="Waits for a station to send a message ending in WX XXXX, where XXXX is the 4- or 5-character "

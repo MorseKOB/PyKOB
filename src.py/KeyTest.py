@@ -46,8 +46,9 @@ try:
     while True:
         print(myKOB.key())
 except KeyboardInterrupt:
-    if myKOB:
-        myKOB.exit()
     print()
     print("Thank you for using the Key-Test!\n~73")
     sys.exit(0)     # Indicate this was a normal exit
+finally:
+    if myKOB:
+        myKOB.exit()

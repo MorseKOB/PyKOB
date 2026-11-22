@@ -69,6 +69,10 @@ def send(code):
         myInternet.write(code)
     myKOB.soundCode(code)
 
+myKOB = None
+myInternet = None
+listenerThread = None
+listenerStop = None
 try:
     import sys
     import time
@@ -106,12 +110,13 @@ try:
         myInternet.connect(wire)
         time.sleep(1)
 
+        listenerStop = threading.Event()
+
         def checkForListener():
-            while True:
+            while not listenerStop.is_set():
                 myInternet.read()  # activate the reader to get tLastListener updates
 
-        listenerThread = threading.Thread(target=checkForListener)
-        listenerThread.daemon = True
+        listenerThread = threading.Thread(name="Time-ListenerCheck", target=checkForListener)
         listenerThread.start()
 
     while True:
@@ -157,3 +162,12 @@ try:
 except KeyboardInterrupt:
     print()
     sys.exit(0)     # Since the main program is an infinite loop, ^C is a normal, successful exit.
+finally:
+    if listenerStop:
+        listenerStop.set()
+    if myInternet:
+        myInternet.exit()   # Also makes a pending `read` return
+    if listenerThread:
+        listenerThread.join()
+    if myKOB:
+        myKOB.exit()

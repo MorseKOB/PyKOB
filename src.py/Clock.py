@@ -128,6 +128,9 @@ def announce(s, kob, sender, recorder, source=kob.CodeSource.local):
             recorder.record(code, source)
     if local_text: print('')
 
+myRecorder = None
+myKOB = None
+mySender = None
 try:
     #log.log("Starting Clock")
 
@@ -145,7 +148,7 @@ try:
     arg_parser.add_argument("-b", "--begin", default=900, type=int, help="Beginning of time announcements (24-hour value 0-2400)", metavar="time", dest="Begin")
     arg_parser.add_argument("-e", "--end", default=2200, type=int, help="End of time announcements  (24-hour value 0-2400)", metavar="time", dest="End")
     arg_parser.add_argument("-i", "--interval", default=60, type=int, help="The time announcement interval in minutes", metavar="minutes", dest="Interval")
-    arg_parser.add_argument("-P", "--print", action='store_true', default=False, help="Print the text sent as code to the sounder", dest="Text")
+    arg_parser.add_argument("--print", action='store_true', default=False, help="Print the text sent as code to the sounder", dest="Text")
     arg_parser.add_argument("--record", action='store_true', default=False, help="Record the code to the `Clock.'ts'.json` file", dest="Record")
     args = arg_parser.parse_args()
     
@@ -181,7 +184,6 @@ try:
     annc_interval = args.Interval * 60      # announcement interval (sec)
     local_text = args.Text
 
-    myRecorder = None
     if (args.Record):
         ts = recorder.get_timestamp()
         targetFileName = "Clock." + str(ts) + ".json"
@@ -213,3 +215,10 @@ try:
 except KeyboardInterrupt:
     print()
     sys.exit(0)     # Since normal operation is an infinite loop, ^C is actually a normal exit.
+finally:
+    if myKOB:
+        myKOB.exit()
+    if mySender:
+        mySender.exit()
+    if myRecorder:
+        myRecorder.exit()
